@@ -24,8 +24,12 @@ Minecraft `com.mojang:minecraft:26.2`，Java 25，Fabric Loader `0.19.5`，Fabri
 
 ## 当前验证
 
-`./gradlew build clientKit`：编译 main/client、生成客户端 JAR、运行相关测试并打包。测试覆盖 bounded 样本在 delayed GPU 结果下的回收/清空、缺失与无效 timestamp 的 CSV 空值、26.2 hook 的字节码位置，以及使用 Minecraft 自带 Vulkan GLSL 编译器将三份 shader 编译为 SPIR-V。shader 测试无需创建 Vulkan device，不能代替 graphics pipeline 实测。
+`./gradlew build clientKit`：编译 main/client、生成客户端 JAR、运行相关测试并打包。测试先检查最终 JAR 的 mixin package 只含已声明的 mixin 类，再覆盖 bounded 样本在 delayed GPU 结果下的回收/清空、缺失与无效 timestamp 的 CSV 空值、26.2 hook 的字节码位置，以及使用 Minecraft 自带 Vulkan GLSL 编译器将三份 shader 编译为 SPIR-V。shader 测试无需创建 Vulkan device，不能代替 graphics pipeline 实测。
 
 当前环境没有 `/dev/dri` GPU 设备和图形 display；未启动 Minecraft，也未生成帧率/显存/画质跑分。P0a 实机门槛仍未通过；安装验证步骤见 [INSTALL.md](INSTALL.md)。采样导出仅覆盖诊断 pass，不是原计划完整 benchmark 系统。
 
 下一步先在真实 26.2 Vulkan 客户端完成 smoke、depth/颜色校验与 timestamp 对比，再建立 WorldSceneBridge、最小材质/normal 接入和完整资源预算。通过这些门槛之后才实现 P1 参考阴影与缓存。
+
+## 0.1.1 启动崩溃修复
+
+用户实机确认 0.1.0 在 client entrypoint 阶段发生 `IllegalClassLoadError`：mixins JSON 将整个 `com.voxellight.adapter` 声明为保留包，普通 `RenderProbe` 因此无法加载。0.1.1 将 mixin 单独放在 `com.voxellight.mixin.client`，适配器保持原包；不修改其他 mod。新增最终 JAR 包布局回归测试，在 0.1.0 上重现失败后验证修复。benchmark 导出版本改为从 Fabric mod 元数据读取。此修复针对已报告的启动错误，尚未替代后续实机渲染验证。

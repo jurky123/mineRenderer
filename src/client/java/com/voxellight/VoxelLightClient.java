@@ -40,7 +40,8 @@ public final class VoxelLightClient implements ClientModInitializer {
                             var path = directory.resolve("probe-" + Instant.now().toEpochMilli() + ".csv");
                             PROBE.metrics().export(path);
                             Files.writeString(path.resolveSibling(path.getFileName() + ".txt"),
-                                    "Minecraft=26.2\nVoxelLight=0.1.0\n" + PROBE.status() + "\n");
+                                    "Minecraft=26.2\nVoxelLight=" + FabricLoader.getInstance().getModContainer("voxellight")
+                                            .orElseThrow().getMetadata().getVersion().getFriendlyString() + "\n" + PROBE.status() + "\n");
                             context.getSource().sendFeedback(Component.literal("VoxelLight: exported " + path.getFileName()
                                     + " to benchmark-results/voxellight"));
                             return 1;

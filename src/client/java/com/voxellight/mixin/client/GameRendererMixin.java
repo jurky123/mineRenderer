@@ -1,4 +1,4 @@
-package com.voxellight.adapter;
+package com.voxellight.mixin.client;
 
 import com.voxellight.VoxelLightClient;
 import net.minecraft.client.renderer.GameRenderer;

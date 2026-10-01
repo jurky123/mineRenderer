@@ -44,8 +44,12 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 test {
+    dependsOn tasks.named('jar')
     useJUnitPlatform()
     jvmArgs '--enable-native-access=ALL-UNNAMED'
+    doFirst {
+        systemProperty 'voxellight.modJar', tasks.jar.archiveFile.get().asFile.absolutePath
+    }
 }
 
 // Verify version-specific hooks and compile shaders without starting a game/window.
