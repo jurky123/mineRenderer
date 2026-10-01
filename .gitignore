@@ -1,0 +1,33 @@
+# Local agent instructions and private configuration
+AGENTS.md
+.agents/
+.codex/
+.aws/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Build tools and IDEs
+.gradle/
+**/build/
+**/target/
+**/out/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*~
+~$*.docx
+
+# Minecraft development runtime and measurements
+run/
+runs/
+logs/
+crash-reports/
+saves/
+screenshots/
+benchmark-results/
+*.jfr
+hs_err_pid*
