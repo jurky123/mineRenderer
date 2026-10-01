@@ -33,3 +33,7 @@ Minecraft `com.mojang:minecraft:26.2`，Java 25，Fabric Loader `0.19.5`，Fabri
 ## 0.1.1 启动崩溃修复
 
 用户实机确认 0.1.0 在 client entrypoint 阶段发生 `IllegalClassLoadError`：mixins JSON 将整个 `com.voxellight.adapter` 声明为保留包，普通 `RenderProbe` 因此无法加载。0.1.1 将 mixin 单独放在 `com.voxellight.mixin.client`，适配器保持原包；不修改其他 mod。新增最终 JAR 包布局回归测试，在 0.1.0 上重现失败后验证修复。benchmark 导出版本改为从 Fabric mod 元数据读取。此修复针对已报告的启动错误，尚未替代后续实机渲染验证。
+
+## 0.1.2 诊断画面修复
+
+用户实机确认 Vulkan 下 `diagnostic active`、GPU timestamp 可用且样本增长，但 depth 画面仍与 vanilla 相同。根因是误用了 `RenderPass.draw` 参数顺序：26.2 实际签名为 `(vertexCount, instanceCount, firstVertex, firstInstance)`，原调用 `(0, 3, 0, 1)` 提交零顶点。0.1.2 改为 `(3, 1, 0, 0)`，提交一个 fullscreen triangle。新增最终 JAR draw 参数检查，在 0.1.1 上重现失败，再验证修复。活动状态/采样只能证明命令路径执行，不能单独证明最终像素正确；修复后的实机画面仍待确认。

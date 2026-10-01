@@ -140,7 +140,8 @@ public final class RenderProbe {
                 pass.setPipeline(pipeline);
                 pass.bindTexture("SceneSampler", mode == Mode.COLOR ? scratchView : target.getDepthTextureView(),
                         RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-                pass.draw(0, 3, 0, 1);
+                // 26.2: vertexCount, instanceCount, firstVertex, firstInstance.
+                pass.draw(3, 1, 0, 0);
             }
             if (timer != null) {
                 try {
