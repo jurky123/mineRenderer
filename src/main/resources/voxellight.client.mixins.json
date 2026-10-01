@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.voxellight.adapter",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["GameRendererMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

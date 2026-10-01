@@ -1,6 +1,6 @@
 # VoxelLight 实施计划
 
-状态：设计阶段，以下阶段均未开始。原始 v0.2 保留历史，本计划纳入 [评审意见](REVIEW.md)。先证明接入和缓存收益，不提前搭完整视觉管线。
+状态：P0a 的 26.2 原型已实现并通过构建/离线测试，实机 smoke 待验证；P0b 和后续阶段尚未通过。按用户要求开发基线改为 Minecraft 26.2，原始 v0.2 保留历史。本计划纳入 [评审意见](REVIEW.md)，实现证据见 [接入记录](INTEGRATION.md)。先证明接入和缓存收益，不提前搭完整视觉管线。
 
 ## 阶段与验收
 
@@ -20,7 +20,7 @@
 
 ## P0 可直接执行的任务
 
-1. 锁定一组实际可解析的 Minecraft 26.3、Java、Fabric Loader/API、Loom 和映射版本，记录坐标、开发 GPU/驱动和依赖来源；建立 `./gradlew build`，仅打包客户端入口。
+1. 锁定一组实际可解析的 Minecraft 26.2、Java、Fabric Loader/API、Loom 和映射版本，记录坐标、开发 GPU/驱动和依赖来源；建立 `./gradlew build`，仅打包客户端入口。
 2. 从生成源码列出所需 hook：world pass 边界、depth lifetime、颜色/材质来源、normal、terrain caster 提交、透明合成、UI、资源销毁。每项记录 exact symbol 和验证证据；不能把设计里的伪接口当实际 API。
 3. 最小 pass 实验逐项验证 depth 约定、颜色空间、resize 和 disabled path，再扩展最小 GBuffer；完整 velocity 延后。缺能力时原生渲染继续运行，日志说明功能关闭原因。
 4. Timestamp 采用延迟读取，不阻塞当前帧；记录 query 支持、有效位、单位和 unavailable 状态。CPU 计时不能伪称 GPU 时间。
@@ -53,4 +53,4 @@ P0 首次实测后锁定资源表：每个 target 的格式/分辨率/历史/fra
 
 文档阶段检查相对链接、源文档提取和 Git 忽略规则，无可构建代码。实现阶段运行 `./gradlew build` 和相关逻辑测试；render 正确性通过实机 smoke/对比截图验证。客户端交付文件名含游戏和 mod 版本，只包含本 mod 产物。
 
-仓库远程 URL 尚未提供；本次仅创建本地独立仓库与初始提交。汇总仓库索引后续需登记 mineRenderer；本次不修改其他仓库或子模块指针。
+仓库远程 URL 尚未提供，提交保留在本地。汇总仓库索引后续需登记 mineRenderer；不修改其他仓库或子模块指针。
