@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.17.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.18.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.17.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.18.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -24,6 +24,10 @@
 | `/voxellight mode normal` | 用深度和当前 projection 重建表面方向并着色；天空黑色，无新增世界光照。 |
 | `/voxellight mode shadow` | 世界太阳/月亮阴影、月光 fill 与人工灯；自动启用 scene，caster 准备完成后生效。 |
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
+| `/voxellight look polished` / `reference` | foundation 默认polished；reference恢复0.17光照/Reinhard输出，关闭新增bloom/exposure/距离blend；AO/history保持独立。 |
+| `/voxellight exposure 0.75` | polished默认+0.75EV，允许-2..2，手动曝光，无自动变化。 |
+| `/voxellight bloom on` / `off` | polished默认on；已捕获torch/glowstone等terrain emission的quarter-res glow，非lava/透明/天空bloom或GI。 |
+| `/voxellight coverage_blend on` / `off` | polished默认on；24–32格连续淡回native，避免5³材质窗硬边；off比较原receiver范围。 |
 | `/voxellight ao on` / `off` / `view` | foundation terrain AO，默认on；view自动进入foundation并显示AO灰度，on恢复正常光照。 |
 | `/voxellight temporal_shadows on` / `off` | foundation directional visibility history比较，默认on；静止画面可能无差别，非full TAA。 |
 | `/voxellight entity_materials on` / `off` | 默认on；支持的opaque实体模型使用材质/normal分离lighting，off保留native实体颜色；不关闭terrain或实体阴影。 |
@@ -46,7 +50,7 @@ CSV 的 CPU 字段只表示该 pass 的命令准备时间，GPU 字段表示 col
 
 OpenGL/未知 backend 或不支持的 scene format 保留原生画面，status 会显示原因。shader/pass 出错时自动关闭并写日志，下一帧恢复原生渲染；可用 mode 命令重试。已有 vanilla spectator/post effects 会继续处理诊断结果。
 
-当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.17.0。
+当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.18.0。
 
 ## 实机 smoke checklist
 
@@ -316,3 +320,9 @@ status新增materialStale（等待replacement的resident数）、materialReplace
 5. 检查发光块与太阳照射面：AO不应把emission或sun/direct lamps一同压暗。
 
 status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world radius、最大80 full-res pixel search，4 slices×4 steps×2 sides；5×5 bilateral spatial filter、四guide bilateral upsample，两个RGBA16F half targets总32 MiB cap（1440p14.1 MiB，4K31.6 MiB）。另16-byte neutral target +32-byte settings。超预算只关闭AO并保留foundation。无额外SceneColor copy/native depth写入，无新增history；GPU耗时未实机测量。算法范围/参考见[AO.md](https://github.com/jurky123/mineRenderer/blob/main/docs/AO.md)。
+
+## 0.18.0 lighting/color polish 验收
+
+进入`mode foundation`，同一位置轮流`look reference`和`look polished`，比较白墙明暗面、晨昏墙面、夜间torch/glowstone。新增film曲线、手动曝光、天空半球色和emission-only bloom；无需另开scene。`exposure 0.75`为默认，可试`0`或`1`；`bloom off/on`单独比较光晕。`coverage_blend off`可隔离色彩变化，on为24–32格淡回native，旧shadow receiver参数不变。AO view仍灰度。
+
+检查植物/动物、F3+T、resize、下界/回主世界、off后恢复。透明/水/lava、sky halo和未捕获表面仍native；bloom不是GI。status新增look/exposureEV/coverageBlend/bloomBytes。预算和边界见[POLISH.md](https://github.com/jurky123/mineRenderer/blob/main/docs/POLISH.md)。

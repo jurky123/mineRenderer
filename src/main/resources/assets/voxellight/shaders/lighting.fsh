@@ -35,6 +35,7 @@ layout(std140) uniform LocalLightSettings {
 layout(std140) uniform LightingEnvironment {
     vec4 DirectColorStrength;
     vec4 SkyColorStrength;
+    vec4 HorizonColorLower;
 };
 layout(std140) uniform AoSettings {
     vec4 AoParameters; // Radius, strength, plane bias, maximum full-resolution screen radius.
@@ -243,8 +244,9 @@ void main() {
     float occlusion = coverage > 0.0 && Coverage.z > 0.0 ? cascadeOcclusion(distanceToCamera, position, normal) : 0.0;
     float visibility = 1.0 - occlusion * coverage;
     float skyAccess = clamp(properties.b, 0.0, 1.0);
-    vec3 sky = SkyColorStrength.rgb * SkyColorStrength.a * skyAccess
-        * mix(0.45, 1.0, (foliage ? abs(normal.y) : normal.y) * 0.5 + 0.5);
+    float skyFacing = (foliage ? abs(normal.y) : normal.y) * 0.5 + 0.5;
+    vec3 sky = mix(HorizonColorLower.rgb, SkyColorStrength.rgb, max(normal.y, 0.0))
+        * SkyColorStrength.a * skyAccess * mix(HorizonColorLower.a, 1.0, skyFacing);
     float directFacing = dot(normal, LightDirectionAndMask.xyz);
     vec3 direct = DirectColorStrength.rgb * DirectColorStrength.a
         * (foliage ? abs(directFacing) : max(directFacing, 0.0)) * skyAccess;

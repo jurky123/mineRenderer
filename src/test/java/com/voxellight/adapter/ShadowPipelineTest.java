@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX,pipeline.getShaderDefines());
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT,pipeline.getShaderDefines())) {
@@ -192,6 +192,28 @@ class ShadowPipelineTest {
     }
 
     @Test
+    void bloomPassUsesExplicitAreaAndIndependentTargetsWithoutDepthWrites() throws Exception {
+        try(var loader=shippedLoader()) {
+            var factory=Class.forName("com.voxellight.adapter.EmissiveBloom",true,loader)
+                    .getDeclaredMethod("descriptor",com.mojang.blaze3d.textures.GpuTextureView.class,int.class,int.class);
+            factory.setAccessible(true);
+            for(int[] full:new int[][]{{2560,1440},{853,479},{3840,2160}}) {
+                int width=com.voxellight.world.VisualPolish.quarterSize(full[0]),height=com.voxellight.world.VisualPolish.quarterSize(full[1]);
+                var descriptor=(com.mojang.blaze3d.systems.RenderPassDescriptor)factory.invoke(null,null,width,height);
+                assertEquals(new com.mojang.blaze3d.systems.RenderPass.RenderArea(0,0,width,height),descriptor.renderArea);
+                assertNull(descriptor.depthAttachment);
+                assertEquals(new org.joml.Vector4f(0),descriptor.colorAttachments.getFirst().clearValue().orElseThrow());
+            }
+            for(String name:List.of("BLOOM_EXTRACT","BLOOM_BLUR")) {
+                var pipeline=pipeline(loader,name);
+                assertNull(pipeline.getDepthStencilState());
+                assertEquals(GpuFormat.RGBA16_FLOAT,pipeline.getColorTargetState().format());
+                assertTrue(pipeline.getColorTargetState().blendFunction().isEmpty());
+            }
+        }
+    }
+
+    @Test
     void shippedMaterialDescriptorCoversTheFullTargetAfterResize() throws Exception {
         try (var loader = shippedLoader()) {
             var factory = Class.forName("com.voxellight.adapter.MaterialCapture", true, loader)
@@ -231,6 +253,7 @@ class ShadowPipelineTest {
             var lighting = pipeline(loader,"LIGHTING");
             assertEquals(GpuFormat.RGBA16_FLOAT,lighting.getColorTargetState().format());
             assertTrue(lighting.getColorTargetState().blendFunction().isEmpty());
+            assertEquals(com.mojang.blaze3d.pipeline.BlendFunction.ENTITY_OUTLINE_BLIT,pipeline(loader,"OUTPUT").getColorTargetState().blendFunction().orElseThrow(),"Distance blend preserves native target alpha without a SceneColor copy");
             for (String name : List.of("LIGHTING","OUTPUT")) {
                 var pipeline = pipeline(loader,name);
                 assertNull(pipeline.getDepthStencilState());
@@ -251,7 +274,7 @@ class ShadowPipelineTest {
     @Test
     void foundationUniformsAndVisibilityKernelsMatchTheirProducers() throws Exception {
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String shader : List.of("lighting","lighting_output","temporal_shadow","ao","ao_filter")) {
+            for (String shader : List.of("lighting","lighting_output","temporal_shadow","ao","ao_filter","bloom_blur")) {
                 try (var module = compile(compiler,loader,shader,ShaderType.FRAGMENT);var stack = MemoryStack.stackPush()) {
                     var pointer = stack.callocPointer(1);
                     assertEquals(0,Spvc.spvc_context_create(pointer));long context = pointer.get(0);
@@ -274,6 +297,14 @@ class ShadowPipelineTest {
                                 assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,6,offset));
                                 assertEquals(368,offset.get(0),"Normal matrix array matches CPU std140 packing");
                             }
+                            if(uniform.nameString().equals("VisualSettings")) {
+                                long block=Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
+                                assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,block,pointer));
+                                assertEquals(com.voxellight.world.VisualPolish.SETTINGS_BYTES,pointer.get(0));
+                                var offset=stack.callocInt(1);
+                                assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,1,offset));
+                                assertEquals(16,offset.get(0));
+                            }
                             if(uniform.nameString().equals("AoSettings")) {
                                 long block=Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
                                 assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,block,pointer));
@@ -282,11 +313,11 @@ class ShadowPipelineTest {
                                 assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,1,offset));
                                 assertEquals(16,offset.get(0),"Filter/enabled/debug flags follow the uploaded parameters");
                             }
-                            String expected = shader.equals("lighting") ? "LightingEnvironment" : shader.equals("temporal_shadow") ? "TemporalSettings" : shader.startsWith("ao") ? "AoSettings" : "Fog";
+                            String expected = shader.equals("bloom_blur") ? "BloomSettings" : shader.equals("lighting") ? "LightingEnvironment" : shader.equals("temporal_shadow") ? "TemporalSettings" : shader.startsWith("ao") ? "AoSettings" : "Fog";
                             if (!uniform.nameString().equals(expected)) continue;
                             long struct = Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
                             assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,struct,pointer));
-                            assertEquals(shader.equals("lighting") ? com.voxellight.world.LightingEnvironment.SETTINGS_BYTES : shader.equals("temporal_shadow") ? com.voxellight.world.TemporalShadowState.SETTINGS_BYTES : shader.startsWith("ao") ? com.voxellight.world.AmbientOcclusion.SETTINGS_BYTES : 40,pointer.get(0));
+                            assertEquals(shader.equals("bloom_blur") ? 16 : shader.equals("lighting") ? com.voxellight.world.LightingEnvironment.SETTINGS_BYTES : shader.equals("temporal_shadow") ? com.voxellight.world.TemporalShadowState.SETTINGS_BYTES : shader.startsWith("ao") ? com.voxellight.world.AmbientOcclusion.SETTINGS_BYTES : 40,pointer.get(0));
                             found = true;
                         }
                         assertTrue(found);
@@ -322,7 +353,7 @@ class ShadowPipelineTest {
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
-        var field = Class.forName("com.voxellight.adapter." + (name.equals("AO") || name.equals("AO_FILTER") ? "AmbientOcclusionPass" : name.equals("TEMPORAL") ? "TemporalShadowHistory" : name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("LIGHTING_TEMPORAL") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
+        var field = Class.forName("com.voxellight.adapter." + (name.startsWith("BLOOM_") ? "EmissiveBloom" : name.equals("AO") || name.equals("AO_FILTER") ? "AmbientOcclusionPass" : name.equals("TEMPORAL") ? "TemporalShadowHistory" : name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("LIGHTING_TEMPORAL") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);
     }

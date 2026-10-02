@@ -80,6 +80,10 @@ public final class RenderProbe {
 
     public void captureWorldProjection(org.joml.Matrix4f projection) { shadows.captureProjection(projection); if(mode==Mode.FOUNDATION)lighting.captureProjection(projection); }
     public void setAmbientOcclusion(boolean enabled,boolean debug) { RenderSystem.assertOnRenderThread(); lighting.setAmbientOcclusion(enabled,debug); resetTiming(); }
+    public void setPolished(boolean value) {RenderSystem.assertOnRenderThread();lighting.setPolished(value);resetTiming();}
+    public void setBloom(boolean value) {RenderSystem.assertOnRenderThread();lighting.setBloom(value);}
+    public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
+    public void setExposure(float ev) {RenderSystem.assertOnRenderThread();lighting.setExposure(ev);}
     public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
 
     public void setEntityMaterials(boolean value) { RenderSystem.assertOnRenderThread(); entityMaterials.setEnabled(value); resetTiming(); }

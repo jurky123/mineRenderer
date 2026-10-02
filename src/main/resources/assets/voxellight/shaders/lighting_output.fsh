@@ -2,6 +2,11 @@
 #extension GL_ARB_separate_shader_objects : require
 uniform sampler2D LightingHdr;
 uniform sampler2D SceneDepth;
+uniform sampler2D EmissiveBloom;
+layout(std140) uniform VisualSettings {
+    vec4 ToneBloom; // exposure scale, filmic enabled, bloom strength, coverage blend enabled
+    vec4 MaterialFade; // camera distance fade start/end
+};
 layout(std140) uniform Projection { mat4 ProjMat; };
 layout(std140) uniform ShadowResolveSettings {
     mat4 LightMatrix[3];
@@ -36,6 +41,9 @@ float fogAmount(float distanceToCamera, float start, float end) {
     if (distanceToCamera >= end) return 1.0;
     return (distanceToCamera - start) / (end - start);
 }
+vec3 filmicCurve(vec3 x) {
+    return (x*(.15*x+.05)+.004)/(x*(.15*x+.5)+.06)-.02/.3;
+}
 void main() {
     vec4 hdr = texture(LightingHdr, texCoord);
     // Unsupported pixels keep their original native color without a SceneColor copy.
@@ -44,10 +52,13 @@ void main() {
     float depth = texture(SceneDepth, texCoord).r;
     vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;
-    vec3 mapped = max(hdr.rgb, vec3(0.0)) / (vec3(1.0) + max(hdr.rgb, vec3(0.0)));
+    vec3 radiance = max(hdr.rgb + texture(EmissiveBloom,texCoord).rgb * ToneBloom.z,vec3(0.0)) * ToneBloom.x;
+    vec3 mapped = ToneBloom.y>.5 ? clamp(filmicCurve(radiance)/filmicCurve(vec3(6.0)),0.0,1.0)
+        : radiance/(vec3(1.0)+radiance);
     vec3 encoded = linearToSrgb(mapped);
     float fog = max(fogAmount(length(position), FogEnvironmentalStart, FogEnvironmentalEnd),
         fogAmount(max(length(position.xz), abs(position.y)), FogRenderDistanceStart, FogRenderDistanceEnd));
     // Native FogColor and main RGBA8 contain display-encoded color. Apply fog once, after tone mapping.
-    fragColor = vec4(mix(encoded, FogColor.rgb, fog * FogColor.a), 1.0);
+    float coverage = ToneBloom.w>.5 ? 1.0-smoothstep(MaterialFade.x,MaterialFade.y,length(position)) : 1.0;
+    fragColor = vec4(mix(encoded, FogColor.rgb, fog * FogColor.a), coverage);
 }

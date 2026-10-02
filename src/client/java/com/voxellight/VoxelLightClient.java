@@ -2,6 +2,7 @@ package com.voxellight;
 
 import net.fabricmc.api.ClientModInitializer;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.voxellight.adapter.RenderProbe;
 import com.voxellight.adapter.ClientScene;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -130,6 +131,21 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var lookCommand=literal("look");
+            for(String choice:new String[]{"polished","reference"})lookCommand.then(literal(choice).executes(context->{
+                PROBE.setPolished(choice.equals("polished"));
+                context.getSource().sendFeedback(Component.literal("VoxelLight: "+choice+" lighting (foundation)"));return 1;
+            }));
+            var bloomCommand=literal("bloom");
+            var coverageCommand=literal("coverage_blend");
+            for(boolean enabled:new boolean[]{true,false}) {
+                bloomCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setBloom(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: emissive bloom "+enabled));return 1;}));
+                coverageCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setCoverageBlend(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: material distance blend "+enabled));return 1;}));
+            }
+            var exposureCommand=literal("exposure").then(argument("ev",FloatArgumentType.floatArg(-2,2)).executes(context->{
+                float ev=FloatArgumentType.getFloat(context,"ev");PROBE.setExposure(ev);
+                context.getSource().sendFeedback(Component.literal("VoxelLight: exposure "+ev+" EV (polished foundation)"));return 1;
+            }));
             var temporalCommand = literal("temporal_shadows");
             for (boolean enabled : new boolean[]{true, false}) {
                 temporalCommand.then(literal(enabled ? "on" : "off").executes(context -> {
@@ -185,7 +201,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand));
         });
     }
 }

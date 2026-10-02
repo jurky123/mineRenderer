@@ -2,6 +2,14 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.18.0 lighting/color polish
+
+- Manual EV and rational filmic tone curve, continuous hemisphere sky colors and weather/night policy.
+- Emissive terrain bloom: quarter-resolution extraction + separable blur,16MiB target cap, no extra geometry or SceneColor copy.
+- Supported foundation output fades24–32 blocks to native inside the guaranteed material window; main alpha preserved.
+- `look polished|reference`, `exposure -2..2`, `bloom on|off`, `coverage_blend on|off`; reference restores0.17 color policy.
+- AO confirmed operational by user but visually modest.0.18 visual acceptance remains pending; lava/transparent/sky bloom and atmosphere/water remain outside this phase.
+
 ## 0.17.0 basic terrain AO
 
 - Half-resolution horizon AO, depth/normal bilateral spatial filter and full-resolution upsample.
