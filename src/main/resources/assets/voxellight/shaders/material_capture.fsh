@@ -115,5 +115,5 @@ void main() {
     outAlbedo = vec4(linearToSrgb(srgbToLinear(texel.rgb) * srgbToLinear(unlitTint.rgb)), float(flags) / 255.0);
     outNormal = vec4(normalize(surfaceNormal), 1.0);
     // Material strengths only. This is deliberately not a claim of emissive RGB radiance.
-    outEmission = vec4(float(emissionFlags.x) / 15.0, float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), 1.0);
+    outEmission = vec4(float(emissionFlags.x) / 15.0, float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));
 }

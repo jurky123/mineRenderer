@@ -140,3 +140,9 @@ CPU tests 覆盖所有 range 的 sphere/clip/guard（含 maximal anchor offset�
 实机检查：先 `material_coverage` 等待数秒，附近普通 terrain 应逐渐变绿；然后 albedo 看六面白色方块不再有 face lighting、火把开关不改变材质值；surface_normal 看台阶/半砖/斜面/栏杆与转动镜头时的世界空间 normal；emission 看 glowstone/torch 亮而受火把照明的墙 emission=0。保持这些模式测试移动、破坏/放置、F3+T、切维度、fullscreen/resize、bob/hurt/nausea；看 unsupported实体/水/玻璃/手/UI仍native。若广泛 magenta、全 vanilla 或 crash，请保留截图、status 与日志，不认为自动测试等于实机验证。
 
 同时补齐独立 entity shadow pipeline 的 native shader precompile 注册，避免其首次 draw 依赖默认 shader 路径解析。
+
+## 0.12.0 separated lighting boundary
+
+B1 的 opaque `ChunkSectionsToRender.renderGroup` TAIL 同时用于 `FOUNDATION`。`MaterialCapture.capture` 只输出 material；`ShadowRenderer.updateLighting/bindLighting` 只生产/绑定 visibility，不执行 legacy composite；`LightingResolvePass` 拥有独立 RGBA16F lighting 与 main-target tone/fog output。输出 invalid pixels discard，不依赖 scene copy。使用 native `RenderSystem.getShaderFog()`（LevelRenderer 在 opaque 前设 terrainFog）。borrowed main depth 只采样，不作 attachment/write；后续 entities/transparency/particles 仍native。
+
+新SurfaceToken包含LIGHT revision，不改 caster GeometryToken 规则；material store限额/loaded-only/一section-per-frame/失效撤销规则保留。实际颜色模型/显存cap/视觉验收见 VISUAL-FOUNDATION.md 与 INSTALL.md。Shader binding/SPIR-V checks覆盖新增pipeline与HDR格式，视觉验收仍须用户实机。

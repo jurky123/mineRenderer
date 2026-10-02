@@ -27,9 +27,9 @@ import java.util.Optional;
 /** Version-specific diagnostic pass. Owns no Minecraft device, queue or framebuffer. */
 public final class RenderProbe {
     public enum Mode {
-        OFF, COLOR, DEPTH, NORMAL, SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES, ALBEDO, SURFACE_NORMAL, EMISSION, MATERIAL_FLAGS, MATERIAL_COVERAGE;
+        OFF, COLOR, DEPTH, NORMAL, SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES, ALBEDO, SURFACE_NORMAL, EMISSION, MATERIAL_FLAGS, MATERIAL_COVERAGE, FOUNDATION;
 
-        public boolean isMaterial() { return this == ALBEDO || this == SURFACE_NORMAL || this == EMISSION || this == MATERIAL_FLAGS || this == MATERIAL_COVERAGE; }
+        public boolean isMaterial() { return this == FOUNDATION || this == ALBEDO || this == SURFACE_NORMAL || this == EMISSION || this == MATERIAL_FLAGS || this == MATERIAL_COVERAGE; }
 
         public boolean isShadow() {
             return this == SHADOW || this == SHADOW_MASK || this == SHADOW_MAP || this == SHADOW_RANGES;
@@ -44,6 +44,7 @@ public final class RenderProbe {
     private final PassMetrics metrics = new PassMetrics(14_400);
     private final ShadowRenderer shadows = new ShadowRenderer();
     private final MaterialCapture material = new MaterialCapture();
+    private final LightingResolvePass lighting = new LightingResolvePass();
     private Mode mode = Mode.OFF;
     private GpuTexture scratch;
     private GpuTextureView scratchView;
@@ -107,7 +108,8 @@ public final class RenderProbe {
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
                 + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
                 + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
-                + (mode.isShadow() ? ", " + shadows.status() : mode.isMaterial() ? ", " + material.status() : "");
+                + (mode == Mode.FOUNDATION ? ", " + lighting.status() + ", " + material.status() + ", " + shadows.status()
+                : mode.isShadow() ? ", " + shadows.status() : mode.isMaterial() ? ", " + material.status() : "");
     }
 
     public long scratchBytes() {
@@ -156,7 +158,7 @@ public final class RenderProbe {
 
         frame++;
         try {
-            if (mode.isShadow() && !shadows.prepare()) {
+            if ((mode.isShadow() || mode == Mode.FOUNDATION) && !shadows.prepare()) {
                 releaseScratch();
                 state = "shadow not ready; vanilla rendering retained";
                 return;
@@ -164,18 +166,21 @@ public final class RenderProbe {
             if (mode.isMaterial() && !material.prepare(target)) {
                 releaseScratch(); state = "material unavailable; vanilla retained"; return;
             }
+            if (mode == Mode.FOUNDATION && !lighting.prepare(target)) {
+                releaseScratch(); state = "foundation target budget/fog unavailable; vanilla retained"; return;
+            }
             RenderPipeline pipeline = switch (mode) {
                 case COLOR -> COLOR;
                 case DEPTH -> DEPTH;
                 case NORMAL -> NORMAL;
-                case SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES, ALBEDO, SURFACE_NORMAL, EMISSION, MATERIAL_FLAGS, MATERIAL_COVERAGE -> null;
+                case SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES, ALBEDO, SURFACE_NORMAL, EMISSION, MATERIAL_FLAGS, MATERIAL_COVERAGE, FOUNDATION -> null;
                 case OFF -> throw new IllegalStateException("Off mode cannot render");
             };
             // Minecraft owns compilation/cache destruction. Only our shaders are supplied here.
             if (pipeline != null && !device.precompilePipeline(pipeline, SHADERS).isValid()) {
                 throw new IllegalStateException("Diagnostic shader compilation failed");
             }
-            if (mode == Mode.COLOR || mode.isShadow() || mode.isMaterial()) {
+            if (mode == Mode.COLOR || mode.isShadow() || (mode.isMaterial() && mode != Mode.FOUNDATION)) {
                 ensureScratch(target);
             }
             if (!timerAttempted) {
@@ -206,10 +211,13 @@ public final class RenderProbe {
                     disableTimer(e);
                 }
             }
-            if (mode == Mode.COLOR || mode.isShadow() || mode.isMaterial()) {
+            if (mode == Mode.COLOR || mode.isShadow() || (mode.isMaterial() && mode != Mode.FOUNDATION)) {
                 encoder.copyTextureToTexture(target.getColorTexture(), scratch, 0, 0, 0, 0, 0, target.width, target.height);
             }
-            if (mode.isMaterial()) {
+            if (mode == Mode.FOUNDATION) {
+                releaseScratch();
+                lighting.render(encoder,target,material,shadows,terrainSampler);
+            } else if (mode.isMaterial()) {
                 material.render(encoder, target, scratchView, mode, terrainSampler);
             } else if (mode.isShadow()) {
                 shadows.render(encoder, target, scratchView, mode);
@@ -232,7 +240,7 @@ public final class RenderProbe {
             }
             // Leave submission/frame lifecycle to Minecraft's shared encoder.
             metrics.record(frame, mode.name(), target.width, target.height, System.nanoTime() - cpuStart);
-            state = mode.isShadow() ? "terrain lighting active" : mode.isMaterial() ? "material diagnostic active" : "diagnostic active";
+            state = mode == Mode.FOUNDATION ? "separated opaque lighting active" : mode.isShadow() ? "terrain lighting active" : mode.isMaterial() ? "material diagnostic active" : "diagnostic active";
         } catch (RuntimeException e) {
             LOGGER.error("Diagnostic pass disabled after failure", e);
             reset();
@@ -247,6 +255,7 @@ public final class RenderProbe {
         releaseScratch();
         shadows.close();
         material.close();
+        lighting.close();
         materialPointObserved = false;
         resetTiming();
         state = mode == Mode.OFF ? "off" : "waiting for world render";

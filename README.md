@@ -2,7 +2,7 @@
 
 VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
 
-当前是 **Minecraft 26.2 的 P1a/P1b 局部地形阴影与 tile 缓存原型**：已有颜色/深度/法线诊断 pass、backend 检测、非阻塞 GPU timestamp、统一世界脏区、局部 section 快照和 CSV 导出。0.1.2 的 Vulkan 深度视图已获用户实机确认。用户已确认 0.2.0 的 normal、125 section 场景、F3+T 和下界切换正常。用户认可 0.4.0 效果；用户确认 0.5.0 tile 和 0.5.1 编辑修复效果；用户认可 0.7.0 月光/人工灯与稳定性，但反馈特定视角下阴影突变；0.8.0 加入三层重叠阴影、48 格平滑淡出、两步深度邻域平面识别和连续法线稳定，用户已确认距离控制有效；0.9.0 增加人工灯原生形状遮挡和增量 atlas 上传，用户已确认形状遮挡有效；0.10.0 增加独立动态实体模型阴影，新行为待实机验证；没有方块实体阴影、虚拟分页/滚动 clipmap、真正的 GBuffer 材质输出或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
+当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。Foundation 尚待实机验收；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla，尚无实体材质迁移、方块实体阴影、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
 
 ## 文档
 
@@ -30,7 +30,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 ./gradlew build clientKit
 ```
 
-mod：`build/libs/voxellight-client-26.2-0.11.2.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.11.2.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
+mod：`build/libs/voxellight-client-26.2-0.12.0.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.12.0.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
 
 进入世界后使用 `/voxellight mode color` 检查原画面复制，`/voxellight mode depth` 查看世界深度，`/voxellight mode off` 恢复原画面。`/voxellight status` 查看状态，`/voxellight export` 导出最近最多 14,400 个 pass 样本。仅 Vulkan 执行诊断，OpenGL 保留 vanilla。所有命令均在本地执行，无服务端要求。
 
@@ -74,4 +74,8 @@ mod：`build/libs/voxellight-client-26.2-0.11.2.jar`；安装包：`build/distri
 
 ## 0.11.0 Material diagnostics（B1）
 
-新增 `/voxellight mode albedo`、`surface_normal`、`emission`、`material_flags`、`material_coverage`。捕获原生 quad geometry normal、未照明 texture/tint 与 emission strength，使用三 target MRT 和独立 reversed-Z；仅局部 terrain，支持 coverage 可观测。现有 `shadow` 与 depth `normal` 保留；新的分离 lighting/HDR 将在 B2 实施。详细范围、显存和实机门槛见 [安装说明](docs/INSTALL.md)。
+新增 `/voxellight mode albedo`、`surface_normal`、`emission`、`material_flags`、`material_coverage`。捕获原生 quad geometry normal、未照明 texture/tint 与 emission strength，使用三 target MRT 和独立 reversed-Z；仅局部 terrain，支持 coverage 可观测。现有 `shadow` 与 depth `normal` 保留；0.12.0 新增分离 lighting/HDR，见下文。详细范围、显存和实机门槛见 [安装说明](docs/INSTALL.md)。
+
+## 0.12.0 separated terrain lighting（B2）
+
+`/voxellight mode foundation` 从 unlit material/真实 normal 计算 sun/moon、hemisphere sky、block/local light 和参考 emission，输出 linear HDR，再 tone map 与 native fog。太阳阴影只影响 direct term；unsupported geometry 保留 native，entities/transparency/UI 随后合成。`mode shadow` 是旧版比较，`mode off` 恢复 vanilla。无 SceneColor copy，现有 material/caster 窗口与预算仍有限，实机验收待完成。具体光照模型、显存与测试步骤见 [安装说明](docs/INSTALL.md) 和 [Foundation contract](docs/VISUAL-FOUNDATION.md)。

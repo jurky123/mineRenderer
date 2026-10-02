@@ -1,6 +1,6 @@
 # Visual Foundation: implementation contract
 
-Status: B1 terrain material diagnostics implemented in 0.11.0; in-game acceptance remains pending. B2/B3 are not implemented. The 0.10.0 lighting path remains the legacy comparison. Actual B1 formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
+Status: the user confirmed corrected B1 diagnostics in 0.11.2. B2 terrain reference lighting is implemented in 0.12.0 and awaits in-game acceptance. B3 is not implemented. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
 
 ## Objective
 
@@ -8,7 +8,7 @@ Produce lighting from unlit material data, geometry normals, separated illuminat
 
 The foundation must make the following scene meaningful: a torch-lit wall behind a sun-shadowing obstruction retains its local illumination, while the direct sun contribution disappears; an emissive surface retains its own radiance.
 
-## B1: material capture proof — 0.11.0 implementation, validation pending
+## B1: material capture proof — corrected diagnostics accepted in 0.11.2
 
 Start with native opaque/cutout terrain. Add independently inspectable material/albedo, geometry-normal, emission and coverage modes. Render actual geometry using the native camera projection, section offsets, alpha texture and depth convention. Do not derive normals from neighboring screen depth. Do not use the already-lit SceneColor as albedo.
 
@@ -81,3 +81,19 @@ A renderer coordinator owns enhanced-mode frame order and resets. Keep COLOR/DEP
 Temporal shadow/lighting reprojection with depth/normal rejection comes before GI. Reject unsupported dynamic pixels without motion data. Add basic AO, data-driven light materials, improved emitter aggregation and bounded dynamic sources next. Water/atmosphere/SSR are separate optional features after composition and histories are correct. GPU voxel database and probe GI follow verified material/normal/emission and lighting inputs.
 
 Maintain a quality reference while later measuring dual-angle shadow epochs, static-vs-animated cutout, native caster reuse, clustered lights, rolling voxel uploads, lower-cost PCF and dynamic batching. “Visual first” does not waive memory/upload caps, lifecycle safety or accurate metrics. No performance benefit is accepted without comparisons.
+
+## 0.12.0 B2 reference implementation
+
+`mode foundation` reuses accepted terrain materials and the existing directional/entity shadow maps and local-light voxel reference. `LightingResolvePass` owns linear RGBA16F HDR, a 32-byte environment UBO and the two lighting/output pipelines. `ShadowRenderer.updateLighting` produces visibility resources without touching SceneColor; material capture and resolve have separate owners.
+
+The reference emission properties target now stores block/quad emission strength in R/G, interpolated native sky-light level in B and block-light level in A; normal alpha remains coverage. Emission radiance is decoded authored albedo × max(R,G) × 2.4. This is a declared reference color convention, not authored emissive texture support or a material registry. `emission` diagnostic still displays strength R/G.
+
+Directional diffuse uses the actual geometry normal, a warm elevation-dependent sun or cool moon, native celestial/weather intensity and sky access. Hemisphere sky and a small constant visibility floor remain independent of directional occlusion. Block compatibility uses native packed per-vertex light **levels**, with a declared warm squared-level response rather than claiming exact native lightmap/night-vision/gamma parity. Selected local sources retain shape-aware visibility; a smooth energy comparison replaces the baseline with stronger selected illumination instead of adding the same complete term twice. Disabling `local_lights` disables selected local sources, not this compatibility baseline. There is no exact per-source subtraction or clustered lighting yet.
+
+Linear lighting is tone mapped with fixed exposure 1 and Reinhard, encoded to display sRGB, then mixed with the native encoded FogColor using native environmental and render-distance fog ranges. Distances are reconstructed per pixel, rather than native vertex-interpolated fog distances. The main target is the same native RGBA8_UNORM convention as terrain textures/fog, and does not apply a hardware sRGB conversion. Native entities, fluids, glass, weather, particles, hand and UI continue afterward; they retain vanilla shading.
+
+Unsupported/unaligned HDR pixels have alpha 0; output discards them, retaining the already present native main color without sampling or copying it. Both new fullscreen passes have no depth attachment/write. At 1440p HDR is 28.125 MiB, total material+HDR 112.5 MiB (32 bytes/pixel); combined active target limit 256 MiB, material sublimit 192 MiB. Existing shadow/local-light/geometry budgets remain independent. Material diagnostics still own a 4-byte/pixel scratch copy; foundation reports scratchBytes=0. Residency is still the finite 125-section material window; camera movement can reveal unsupported native fallback pixels, not a complete view-distance renderer.
+
+`SurfaceToken` includes LIGHT changes to retire stale packed light immediately; existing `GeometryToken` behavior for shadow casters is unchanged. Surface rebuild is one section/frame, so a large light update can briefly expose native fallback while rebuilding. Resize/world/resource lifecycle closes owned targets through existing reset hooks; HDR coverage is cleared/replaced every frame.
+
+Acceptance remains: torch-lit sun-shadowed wall, glowstone under shadow, full/new moon, caves/Nether/rain, glass/water/particles/fog/UI composition, >16 nearby emitters, placing/breaking lights, reload/resize/dimension travel. CPU/native shader/binding tests do not replace these visual checks. B3 entity materials/block-entity casters/light-aware volume and later temporal work remain ahead.

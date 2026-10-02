@@ -14,6 +14,7 @@ public final class WorldSceneBridge {
 
     public record Request(SectionKey key, long worldGeneration, long resourceGeneration, long version, int reasons) { }
     public record GeometryToken(SectionKey key, long worldGeneration, long resourceGeneration, long version) { }
+    public record SurfaceToken(SectionKey key, long worldGeneration, long resourceGeneration, long version) { }
     public record Stats(long worldGeneration, long resourceGeneration, int tracked, int dirty, int inFlight,
                         int resident, long payloadBytes, long accepted, long stale, long coalesced, long unloaded) { }
 
@@ -173,6 +174,18 @@ public final class WorldSceneBridge {
         Entry entry = entries.get(token.key());
         return entry != null && worldGeneration == token.worldGeneration() && resourceGeneration == token.resourceGeneration()
                 && entry.geometryVersion == token.version();
+    }
+
+    /** Material surfaces include packed light levels, so light-only updates invalidate them. */
+    public synchronized SurfaceToken surfaceToken(SectionKey key) {
+        Entry entry = entries.get(key);
+        return entry == null ? null : new SurfaceToken(key, worldGeneration, resourceGeneration, entry.version);
+    }
+
+    public synchronized boolean isCurrent(SurfaceToken token) {
+        Entry entry = entries.get(token.key());
+        return entry != null && worldGeneration == token.worldGeneration() && resourceGeneration == token.resourceGeneration()
+                && entry.version == token.version();
     }
 
     /** Atomically capture a geometry token only for a snapshot that is still current. */

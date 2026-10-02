@@ -204,6 +204,23 @@ class WorldSceneBridgeTest {
     }
 
     @Test
+    void packedSurfaceLightInvalidatesWithoutInvalidatingShadowGeometry() {
+        var scene = new WorldSceneBridge(1);
+        scene.reconcile(List.of(A));
+        var geometry = scene.geometryToken(A);
+        var material = scene.surfaceToken(A);
+        scene.markDirty(A,WorldSceneBridge.LIGHT);
+        assertTrue(scene.isCurrent(geometry));
+        assertFalse(scene.isCurrent(material));
+        var replacement = scene.surfaceToken(A);
+        assertTrue(scene.isCurrent(replacement));
+        scene.reloadResources();
+        assertFalse(scene.isCurrent(replacement));
+        scene.changeWorld();
+        assertNull(scene.surfaceToken(A));
+    }
+
+    @Test
     void supersedingLightUpdateDoesNotEraseAnUnpublishedGeometryChange() {
         var scene = new WorldSceneBridge(1);
         scene.reconcile(List.of(A));

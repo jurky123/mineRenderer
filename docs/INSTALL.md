@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.11.2。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.12.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，保留有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.11.2.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.12.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -205,3 +205,26 @@ map+attachment 从 20 增为 30 MiB；caster GPU uniform 3×160 字节，resolve
 ## 0.11.2 material input and cutout fixes
 
 修复未使用 UV2 导致 native Vulkan 压缩 shader input location、Normal 读取错误 attribute。UV2 现在保留 skylight strength 到 emission B，回归检查实际 SPIR-V input location 与完整 vertex format 一致。capture 使用原生 opaque terrain sampler，并匹配 vanilla nearest/RGSS 采样与 cutout alpha；不放宽 depth rejection。ALBEDO 无阴影是预期诊断行为；SURFACE_NORMAL 应显示面方向颜色。植物紫色表示捕获深度不匹配，实机仍需复测。
+
+## 0.12.0 B2 separated terrain lighting
+
+0.11.2 的 material diagnostics 已获用户确认。新版默认仍 OFF，进入 Vulkan 世界后运行：
+
+```text
+/voxellight mode foundation
+/voxellight sun world
+/voxellight status
+```
+
+等待数秒 materialSections/casters 暖机。此模式以 unlit albedo/实际 geometry normal 分离太阳/月亮、hemisphere sky、block/local light、emission，RGBA16F HDR → 固定 exposure 1/Reinhard → sRGB display encode → native fog。太阳遮挡只调制 direct illumination，不压暗 emission 或火把 baseline。`mode shadow` 可比较旧版，`mode off` 看原版；材质诊断命令保持可用。
+
+验收顺序：
+
+1. 白天在建筑阴影中的墙边放火把，比较 foundation/shadow/off；遮住阳光后墙应保留火把照明。glowstone/sea lantern 等已支持材质 emission 不应跟太阳 visibility 一起压暗。
+2. 正午/低太阳/月夜/新月与雨，洞穴和 Nether；月亮为较弱冷色 direct，夜 sky ambient 独立。`sun fixed` 可固定方向隔离时间变化。
+3. 放/破坏火把与遮挡块，移动跨 section、F3+T、resize/fullscreen、切维度。material light-only 更新会撤销旧 surface，限一 section/frame 重建，较大更新暂时回退 native。
+4. 检查玻璃/水/实体/particles/weather/手/UI 未被 opaque lighting 覆盖，fog 没重复变浓；测试超过16个 nearby emitters。status 在 foundation 应有 `scratchBytes=0`、`hdrBytes`、materialSections 与 caster/local counters；可 export CSV。
+
+这是有限局部 terrain reference：125 material sections，未支持/深度不匹配 pixels 留 native；entities/block entities/fluids/translucency 自身仍 vanilla lighting。local_lights off 仅关闭选中光源的 colored visibility term；保留 native per-vertex block-light **level** 兼容 baseline，以免16灯限制丢光。baseline squared response 与 stronger selected light 平滑替换而非相加，不是 exact native lightmap/night vision/gamma parity。Emission radiance 以 authored albedo × emission strength ×2.4 定义，尚不支持资源包独立 emissive texture 或 bloom。
+
+MRT emission properties R/G=block/quad strength，B=sky level，A=block level；normal alpha=coverage。HDR8 bytes/pixel，material+HDR32 bytes/pixel；1440p112.5 MiB（不含独立 shadows/local/geometry），combined cap256 MiB、material cap192 MiB，超限保留 native。foundation 不复制 SceneColor；diagnostics/legacy 仍用 scratch。当前同步双套 terrain 构建与现有 PCF/DDA 是视觉 reference，未宣称性能验收。B3 entity materials/block-entity shadows/light-aware caster volume 和 temporal/GI 后续实施。

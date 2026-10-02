@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX);
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT)) {
@@ -189,12 +189,73 @@ class ShadowPipelineTest {
         }
     }
 
+    @Test
+    void foundationUsesHdrWithoutSamplingTheAlreadyLitScene() throws Exception {
+        try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
+            var lighting = pipeline(loader,"LIGHTING");
+            assertEquals(GpuFormat.RGBA16_FLOAT,lighting.getColorTargetState().format());
+            assertTrue(lighting.getColorTargetState().blendFunction().isEmpty());
+            for (String name : List.of("LIGHTING","OUTPUT")) {
+                var pipeline = pipeline(loader,name);
+                assertNull(pipeline.getDepthStencilState());
+                try (var module = compile(compiler,loader,pipeline.getFragmentShader().getPath(),ShaderType.FRAGMENT)) {
+                    var samplers = new ArrayList<String>();
+                    for (Object sampler : module.samplers()) {
+                        var method = sampler.getClass().getDeclaredMethod("name");method.setAccessible(true);
+                        samplers.add((String)method.invoke(sampler));
+                    }
+                    assertFalse(samplers.contains("SceneColor"),"Foundation must use actual materials, not relight native SceneColor");
+                    assertTrue(samplers.contains("SceneDepth"));
+                    assertTrue(samplers.contains(name.equals("LIGHTING") ? "MaterialNormal" : "LightingHdr"));
+                }
+            }
+        }
+    }
+
+    @Test
+    void foundationUniformsAndVisibilityKernelsMatchTheirProducers() throws Exception {
+        try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
+            for (String shader : List.of("lighting","lighting_output")) {
+                try (var module = compile(compiler,loader,shader,ShaderType.FRAGMENT);var stack = MemoryStack.stackPush()) {
+                    var pointer = stack.callocPointer(1);
+                    assertEquals(0,Spvc.spvc_context_create(pointer));long context = pointer.get(0);
+                    try {
+                        assertEquals(0,Spvc.spvc_context_parse_spirv(context,module.spirv().asIntBuffer(),module.spirv().remaining()/4,pointer));
+                        long ir = pointer.get(0);
+                        assertEquals(0,Spvc.spvc_context_create_compiler(context,0,ir,1,pointer));long reflection = pointer.get(0);
+                        assertEquals(0,Spvc.spvc_compiler_create_shader_resources(reflection,pointer));long resources = pointer.get(0);
+                        var count = stack.callocPointer(1);
+                        assertEquals(0,Spvc.spvc_resources_get_resource_list_for_type(resources,1,pointer,count));
+                        boolean found = false;
+                        for (var uniform : SpvcReflectedResource.create(pointer.get(0),(int)count.get(0))) {
+                            String expected = shader.equals("lighting") ? "LightingEnvironment" : "Fog";
+                            if (!uniform.nameString().equals(expected)) continue;
+                            long struct = Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
+                            assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,struct,pointer));
+                            assertEquals(shader.equals("lighting") ? com.voxellight.world.LightingEnvironment.SETTINGS_BYTES : 40,pointer.get(0));
+                            found = true;
+                        }
+                        assertTrue(found);
+                    } finally { Spvc.spvc_context_destroy(context); }
+                }
+            }
+            try (var legacyStream = loader.findResource("assets/voxellight/shaders/shadow.fsh").openStream();
+                 var foundationStream = loader.findResource("assets/voxellight/shaders/lighting.fsh").openStream()) {
+                var legacy = new String(legacyStream.readAllBytes(),StandardCharsets.UTF_8);
+                var foundation = new String(foundationStream.readAllBytes(),StandardCharsets.UTF_8);
+                String visibility = legacy.substring(legacy.indexOf("bool intersectsBox"),legacy.indexOf("float planeError"));
+                assertTrue(foundation.contains(visibility),"Use the same accepted caster PCF/DDA visibility during lighting migration");
+                assertFalse(foundation.contains("planeError"),"Foundation uses real material normals");
+            }
+        }
+    }
+
     private static URLClassLoader shippedLoader() throws Exception {
         return new URLClassLoader(new java.net.URL[]{Path.of(System.getProperty("voxellight.modJar")).toUri().toURL()}, ShadowPipelineTest.class.getClassLoader());
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
-        var field = Class.forName("com.voxellight.adapter." + (name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
+        var field = Class.forName("com.voxellight.adapter." + (name.equals("LIGHTING") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);
     }

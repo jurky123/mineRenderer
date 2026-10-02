@@ -52,7 +52,7 @@ final class MaterialCapture implements AutoCloseable {
         surfaces.prepare(minecraft, bridge, center);
         draws = 0;
         if (targets[0] == null || width != target.width || height != target.height) allocate(target.width, target.height);
-        state = "terrain material diagnostic; partial supported coverage";
+        state = "terrain material capture; partial supported coverage";
         return true;
     }
     private void allocate(int w,int h) {
@@ -65,6 +65,20 @@ final class MaterialCapture implements AutoCloseable {
         settings=RenderSystem.getDevice().createBuffer(() -> "VoxelLight material diagnostic settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,SETTINGS_BYTES);
     }
     void render(CommandEncoder encoder,RenderTarget output,GpuTextureView sceneColor,RenderProbe.Mode mode,com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
+        capture(encoder,terrainSampler);
+        int diagnostic=switch(mode){case ALBEDO->0;case SURFACE_NORMAL->1;case EMISSION->2;case MATERIAL_FLAGS->3;case MATERIAL_COVERAGE->4;default->throw new IllegalArgumentException("Not a material mode");};
+        try(var stack=MemoryStack.stackPush()) {
+            encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,SETTINGS_BYTES).putVec4(diagnostic,0,0,0).get());
+        }
+        try(var pass=encoder.createRenderPass(()->"VoxelLight material diagnostic display",output.getColorTextureView(),Optional.empty())) {
+            pass.setPipeline(DISPLAY);
+            pass.bindTexture("SceneColor",sceneColor,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            pass.bindTexture("SceneDepth",output.getDepthTextureView(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            for(int i=0;i<4;i++)pass.bindTexture(new String[]{"MaterialAlbedo","MaterialNormal","MaterialEmission","MaterialDepth"}[i],views[i],RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            pass.setUniform("MaterialSettings",settings);pass.draw(3,1,0,0);
+        }
+    }
+    void capture(CommandEncoder encoder,GpuSampler terrainSampler) {
         var minecraft=Minecraft.getInstance();
         var camera=minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState;
         var atlas=minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
@@ -87,18 +101,10 @@ final class MaterialCapture implements AutoCloseable {
             if(!submissions.isEmpty())pass.drawMultipleIndexed(submissions,indices,sequence.type(),List.of("ChunkSection"),ubos);
         }
         draws=submissions.size();
-        int diagnostic=switch(mode){case ALBEDO->0;case SURFACE_NORMAL->1;case EMISSION->2;case MATERIAL_FLAGS->3;case MATERIAL_COVERAGE->4;default->throw new IllegalArgumentException("Not a material mode");};
-        try(var stack=MemoryStack.stackPush()) {
-            encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,SETTINGS_BYTES).putVec4(diagnostic,0,0,0).get());
-        }
-        try(var pass=encoder.createRenderPass(()->"VoxelLight material diagnostic display",output.getColorTextureView(),Optional.empty())) {
-            pass.setPipeline(DISPLAY);
-            pass.bindTexture("SceneColor",sceneColor,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("SceneDepth",output.getDepthTextureView(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            for(int i=0;i<4;i++)pass.bindTexture(new String[]{"MaterialAlbedo","MaterialNormal","MaterialEmission","MaterialDepth"}[i],views[i],RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.setUniform("MaterialSettings",settings);pass.draw(3,1,0,0);
-        }
     }
+
+    GpuTextureView view(int index) { return views[index]; }
+
     static RenderPassDescriptor captureDescriptor(GpuTextureView[] views,int width,int height) {
         // Explicit MRT descriptors do not inherit the convenience overload's full-texture area.
         var descriptor=RenderPassDescriptor.create(()->"VoxelLight material MRT capture")

@@ -4,11 +4,11 @@
 
 用户评审针对 `2808397807449f7b7e490907a9f2b57d470d18ae`。采纳材质/光照分离优先，停止向 legacy `shadow.fsh` 堆叠 AO/GI/水/体积效果。0.9.0 shape 遮挡已获用户确认，0.10.0 实体视觉仍待验收；81 个自动测试不代替实机。
 
-下一实施任务为 **B1 material capture proof（0.11.0 已实现，实机验收待完成）**：真实 geometry normal、未照明纹理/tint、emission、flags/coverage 的独立诊断；验证 26.2 原生 MRT、opaque 提交与 depth/cutout 对齐。Native BLOCK 无 Normal 且 Color 已含 cardinal shade，不能直接充当完整 GBuffer。随后 B2 分离 sun/sky/block/local/emission、HDR/颜色空间/fog 与 opaque→transparent 次序；B3 补实体 material、block entity caster、receiver-driven light-aware caster volume 并完成实机验收。
+B1 corrected material/normal/cutout diagnostics（0.11.2）已获用户确认。**B2 separated terrain lighting（0.12.0）已实现，等待实机验收**：真实材质/法线驱动 sun/moon、hemisphere sky、保留 block-light baseline 的 local light、参考 emission；独立 HDR/tonemap/native fog 在 opaque hook 执行。B3 随后补实体 material、block entity caster、receiver-driven light-aware caster volume 与对应验收。
 
 | 顺序 | 下一里程碑 | 门槛 |
 | --- | --- | --- |
-| B1 | Material/GBuffer capture proof（当前实现，待实机验收） | 材质不含 lightmap/AO/fog；geometry normals 与 native depth/cutout 对齐；状态/预算和实机诊断。 |
+| B1 | Material/GBuffer capture proof（0.11.2 用户确认） | 材质不含 lightmap/AO/fog；geometry normals 与 native depth/cutout 对齐；状态/预算和实机诊断。 |
 | B2 | 分离 opaque lighting | 太阳阴影只作用于 direct；保留声明的 vanilla block-light baseline；HDR/tonemap/fog 一次应用；透明/UI 合成正确。 |
 | B3 | Geometry/caster 完整性 | 实体验收与材质迁移，block entity shadow，沿 receiver-to-light 方向扩展已加载 caster 搜索。 |
 | D | Temporal + basic AO | camera reprojection、depth/normal rejection，动态无 motion pixels 拒绝 history。 |
@@ -16,7 +16,7 @@
 | F | 可选水/大气/SSR | 原生透明合成与独立 history/资源预算已验证。 |
 | G | GPU Voxel DB / Probe GI | 真实 material/normal/emission 和基本 lighting/temporal 已通过，不使用 legacy 已照明色作为 GI 材质输入。 |
 
-保留 legacy 效果与 profiler 作为可比较 reference。预算调度、dual-angle cache、cutout 动画分类、mesh reuse、clustered lights 等性能改造按实测推进；不声明当前 world-sun cache 已达到原 P1b 收益门槛。0.11.0 已实现 B1 terrain MRT/material diagnostics，尚待实机验收；B2/B3 未实施。
+保留 legacy 效果与 profiler 作为可比较 reference。预算调度、dual-angle cache、cutout 动画分类、mesh reuse、clustered lights 等性能改造按实测推进；不声明当前 world-sun cache 已达到原 P1b 收益门槛。B1 已获用户确认；B2 reference implemented，实机验收 pending；B3 未实施。
 
 具体依据：[0.10.0 评审决策](REVIEW-0.10.0.md)。下一阶段输入/格式/owner/验收：[Visual Foundation contract](VISUAL-FOUNDATION.md)。文后原计划和逐版记录保留为历史。
 
@@ -137,3 +137,11 @@ P0 首次实测后锁定资源表：每个 target 的格式/分辨率/历史/fra
 实机检查：先 `material_coverage` 等待数秒，附近普通 terrain 应逐渐变绿；然后 albedo 看六面白色方块不再有 face lighting、火把开关不改变材质值；surface_normal 看台阶/半砖/斜面/栏杆与转动镜头时的世界空间 normal；emission 看 glowstone/torch 亮而受火把照明的墙 emission=0。保持这些模式测试移动、破坏/放置、F3+T、切维度、fullscreen/resize、bob/hurt/nausea；看 unsupported实体/水/玻璃/手/UI仍native。若广泛 magenta、全 vanilla 或 crash，请保留截图、status 与日志，不认为自动测试等于实机验证。
 
 同时补齐独立 entity shadow pipeline 的 native shader precompile 注册，避免其首次 draw 依赖默认 shader 路径解析。
+
+## 0.12.0 B2 separated terrain lighting
+
+新增 `mode foundation`；`shadow` 保留 legacy comparison。独立 LightingResolvePass 负责 RGBA16F HDR、linear lighting、固定曝光/Reinhard/display encode/native fog。使用 B1 实际 geometry normal/material，不再给 SceneColor 二次打光。主 depth 不写入，unsupported pixels discard，native entities/transparency/UI 随后正常绘制；foundation 不复制 SceneColor。
+
+SurfaceToken 单独跟踪 light-only packed light 失效，保留 shadow GeometryToken。局部灯使用 native block-light level baseline + smooth energy replacement，保留未入选 sources，避免 baseline 与 selected fill 整项相加。参考 emission 使用 material albedo 色与 emission strength；资源包 emissive radiance 和 exact native lightmap parity 尚未实现。
+
+用户须验收火把墙/发光块太阳遮挡、昼夜/月相/雨/洞穴、玻璃水与 fog 顺序、灯更新与 F3+T/resize/维度切换。预算/格式/边界见 VISUAL-FOUNDATION.md 最新章节。B3 和 temporal/GI 仍未开始。

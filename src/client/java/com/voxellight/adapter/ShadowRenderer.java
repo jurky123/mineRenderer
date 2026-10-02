@@ -213,6 +213,17 @@ public final class ShadowRenderer implements AutoCloseable {
     }
 
     public void render(CommandEncoder encoder, RenderTarget target, GpuTextureView sceneColor, RenderProbe.Mode mode) {
+        updateLighting(encoder, mode);
+        try (var pass = encoder.createRenderPass(() -> "VoxelLight cascade lighting resolve", target.getColorTextureView(), Optional.empty())) {
+            pass.setPipeline(mode == RenderProbe.Mode.SHADOW_MAP ? MAP : mode == RenderProbe.Mode.SHADOW_MASK ? MASK : COMPOSITE);
+            pass.bindTexture("SceneColor", sceneColor, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            pass.bindTexture("SceneDepth", target.getDepthTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            bindLighting(pass);
+            pass.draw(3, 1, 0, 0);
+        }
+    }
+
+    void updateLighting(CommandEncoder encoder, RenderProbe.Mode mode) {
         var minecraft = Minecraft.getInstance();
         var camera = minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState;
         var light = frameLight.direction();
@@ -242,22 +253,26 @@ public final class ShadowRenderer implements AutoCloseable {
             renderCascade(encoder, minecraft, key, cascade);
             renderEntities(encoder, cascade);
         }
-        try (var pass = encoder.createRenderPass(() -> "VoxelLight cascade lighting resolve", target.getColorTextureView(), Optional.empty())) {
-            pass.setPipeline(mode == RenderProbe.Mode.SHADOW_MAP ? MAP : mode == RenderProbe.Mode.SHADOW_MASK ? MASK : COMPOSITE);
-            pass.bindTexture("SceneColor", sceneColor, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("SceneDepth", target.getDepthTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("ShadowMap", cascades[0].depthView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("MiddleShadowMap", cascades[1].depthView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("FarShadowMap", cascades[2].depthView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("EntityShadowMap", cascades[0].dynamicView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("MiddleEntityShadowMap", cascades[1].dynamicView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("FarEntityShadowMap", cascades[2].dynamicView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            if (mode != RenderProbe.Mode.SHADOW_MAP) artificial.bind(pass);
-            pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
-            pass.setUniform("ShadowResolveSettings", resolveSettings);
-            pass.draw(3, 1, 0, 0);
-        }
     }
+
+    void bindLighting(RenderPass pass) {
+        pass.bindTexture("ShadowMap", cascades[0].depthView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        pass.bindTexture("MiddleShadowMap", cascades[1].depthView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        pass.bindTexture("FarShadowMap", cascades[2].depthView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        pass.bindTexture("EntityShadowMap", cascades[0].dynamicView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        pass.bindTexture("MiddleEntityShadowMap", cascades[1].dynamicView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        pass.bindTexture("FarEntityShadowMap", cascades[2].dynamicView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        artificial.bind(pass);
+        pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+        pass.setUniform("ShadowResolveSettings", resolveSettings);
+    }
+
+    void bindTransform(RenderPass pass) {
+        pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+        pass.setUniform("ShadowResolveSettings", resolveSettings);
+    }
+
+    ShadowLight light() { return frameLight; }
 
     private void clearEntities(CommandEncoder encoder, Cascade cascade) {
         if (!cascade.dynamicInitialized || cascade.dynamicHadModels) {

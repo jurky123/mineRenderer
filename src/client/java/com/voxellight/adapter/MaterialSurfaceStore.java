@@ -17,10 +17,10 @@ import java.util.*;
 
 /** Owns bounded, unlit terrain meshes and token/residency state; owns no render targets. */
 final class MaterialSurfaceStore implements AutoCloseable {
-    record Mesh(WorldSceneBridge.GeometryToken token, GpuBuffer vertices, int indices, int bytes) {
+    record Mesh(WorldSceneBridge.SurfaceToken token, GpuBuffer vertices, int indices, int bytes) {
         void close() { if (vertices != null) vertices.close(); }
     }
-    private record Blocked(WorldSceneBridge.GeometryToken token, int bytes) { }
+    private record Blocked(WorldSceneBridge.SurfaceToken token, int bytes) { }
     private final LinkedHashMap<SectionKey, Mesh> meshes = new LinkedHashMap<>();
     private final Map<SectionKey, Blocked> blocked = new HashMap<>();
     private long geometryBytes, buildNs, uploadBytes;
@@ -36,7 +36,7 @@ final class MaterialSurfaceStore implements AutoCloseable {
         blocked.entrySet().removeIf(e -> !allowed.contains(e.getKey()) || !bridge.isCurrent(e.getValue().token()));
         for (var key : desired) {
             if (meshes.containsKey(key) || !loaded(minecraft, key)) continue;
-            var token = bridge.geometryToken(key); if (token == null) continue;
+            var token = bridge.surfaceToken(key); if (token == null) continue;
             var deferred = blocked.get(key);
             if (deferred != null) {
                 if (deferred.bytes() > MaterialEncoding.SECTION_LIMIT) continue;
@@ -56,7 +56,7 @@ final class MaterialSurfaceStore implements AutoCloseable {
     private void makeRoom(SectionKey key,SectionKey center,int bytes,WorldSceneBridge bridge) {
         var sizes=new LinkedHashMap<SectionKey,Long>(); meshes.forEach((k,v)->sizes.put(k,(long)v.bytes()));
         for(var victim:CasterResidency.evictions(sizes,key,center,geometryBytes,bytes,MaterialEncoding.RESIDENT_LIMIT)) {
-            var old=meshes.remove(victim);var token=bridge.geometryToken(victim);
+            var old=meshes.remove(victim);var token=bridge.surfaceToken(victim);
             if(token!=null)blocked.put(victim,new Blocked(token,old.bytes()));
             geometryBytes-=old.bytes();old.close();
         }
@@ -70,7 +70,7 @@ final class MaterialSurfaceStore implements AutoCloseable {
         final int bytes;
         BudgetExceeded(int bytes) { this.bytes = bytes; }
     }
-    private Mesh build(Minecraft minecraft, SectionKey key, WorldSceneBridge.GeometryToken token) {
+    private Mesh build(Minecraft minecraft, SectionKey key, WorldSceneBridge.SurfaceToken token) {
         var region = new RenderRegionCache().createRegion(minecraft.level, SectionPos.asLong(key.x(),key.y(),key.z()));
         if (region == null) return new Mesh(token,null,0,0);
         var renderer = new ModelBlockRenderer(false, true, minecraft.getBlockColors());
