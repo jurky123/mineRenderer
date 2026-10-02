@@ -142,6 +142,26 @@ class ShadowPipelineTest {
         }
     }
 
+    @Test
+    void shippedMaterialDescriptorCoversTheFullTargetAfterResize() throws Exception {
+        try (var loader = shippedLoader()) {
+            var factory = Class.forName("com.voxellight.adapter.MaterialCapture", true, loader)
+                    .getDeclaredMethod("captureDescriptor", com.mojang.blaze3d.textures.GpuTextureView[].class, int.class, int.class);
+            factory.setAccessible(true);
+            // Descriptor construction is CPU-only; GPU views are not dereferenced here.
+            var views = new com.mojang.blaze3d.textures.GpuTextureView[4];
+            for (int[] size : new int[][]{{1920,1080},{853,479},{2560,1440}}) {
+                var descriptor = (com.mojang.blaze3d.systems.RenderPassDescriptor) factory.invoke(null,views,size[0],size[1]);
+                assertEquals(new com.mojang.blaze3d.systems.RenderPass.RenderArea(0,0,size[0],size[1]),descriptor.renderArea);
+                assertEquals(3,descriptor.colorAttachments.size());
+                for (var attachment : descriptor.colorAttachments) {
+                    assertEquals(new org.joml.Vector4f(0,0,0,0),attachment.clearValue().orElseThrow());
+                }
+                assertEquals(0.0,descriptor.depthAttachment.clearValue().orElseThrow());
+            }
+        }
+    }
+
     private static URLClassLoader shippedLoader() throws Exception {
         return new URLClassLoader(new java.net.URL[]{Path.of(System.getProperty("voxellight.modJar")).toUri().toURL()}, ShadowPipelineTest.class.getClassLoader());
     }

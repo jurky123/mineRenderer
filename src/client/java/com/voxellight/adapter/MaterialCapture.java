@@ -80,9 +80,7 @@ final class MaterialCapture implements AutoCloseable {
         }
         var ubos=RenderSystem.getDynamicUniforms().writeChunkSections(infos.toArray(new DynamicUniforms.ChunkSectionInfo[0]));
         var sequence=RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS); var indices=max==0?null:sequence.getBuffer(max);
-        var descriptor=RenderPassDescriptor.create(()->"VoxelLight material MRT capture");
-        for(int i=0;i<3;i++)descriptor.withColorAttachment(views[i],Optional.of(new Vector4f(0,0,0,0)));
-        descriptor.withDepthAttachment(views[3],OptionalDouble.of(0));
+        var descriptor=captureDescriptor(views,width,height);
         try(var pass=encoder.createRenderPass(descriptor)) {
             pass.setPipeline(CAPTURE);RenderSystem.bindDefaultUniforms(pass);
             pass.bindTexture("Sampler0",atlas,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
@@ -100,6 +98,13 @@ final class MaterialCapture implements AutoCloseable {
             for(int i=0;i<4;i++)pass.bindTexture(new String[]{"MaterialAlbedo","MaterialNormal","MaterialEmission","MaterialDepth"}[i],views[i],RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
             pass.setUniform("MaterialSettings",settings);pass.draw(3,1,0,0);
         }
+    }
+    static RenderPassDescriptor captureDescriptor(GpuTextureView[] views,int width,int height) {
+        // Explicit MRT descriptors do not inherit the convenience overload's full-texture area.
+        var descriptor=RenderPassDescriptor.create(()->"VoxelLight material MRT capture")
+                .withRenderArea(new RenderPass.RenderArea(0,0,width,height));
+        for(int i=0;i<3;i++)descriptor.withColorAttachment(views[i],Optional.of(new Vector4f(0,0,0,0)));
+        return descriptor.withDepthAttachment(views[3],OptionalDouble.of(0));
     }
     String status() {
         return "material=" + state + surfaces.status()
