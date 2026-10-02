@@ -155,3 +155,10 @@ SurfaceToken 单独跟踪 light-only packed light 失效，保留 shadow Geometr
 进入 geometry coverage 的第一步：DynamicCasterSystem 分离动/静 ownership，EntityShadows/BlockEntityShadows 负责原生对象选择/extract/submit，DynamicModelBuffer 统一限额顶点/sprite转换/rollback/上传。block-entity loaded-only selection 与 native camera visible list 无关，默认独立开关。已有 dynamic depth 共享，不因 animation 失效 terrain cache。完整 64-bit block position tie-break、原生 atlas/animated pose/预算/rollback/loaded-only/index refresh 合约加入测试。
 
 实机验收 chest/shulker/banner/off-camera/removal/reload 等后，B3 下一步为 entity material/normal migration 与 light-aware caster volume；native26.2 BedBlock 是普通模型，已由 terrain 路径处理。当前不宣称 B3 完成。
+
+
+## 0.14.0 B3b light-aware terrain caster selection
+
+用户已确认0.13 block-entity阴影工作。本阶段先完成caster correctness子项：实际render camera48格receiver球，向当前sun/moon扫掠16..48格；native已加载chunk过滤后最多384sections，本地125优先，terrain32 MiB/staging8 MiB与material/local-light budgets保持不变。提供caster_volume light/cube比较与candidate/eligible/deferred/extrusion/selection计数，shadow准备读取keys前更新volume。自动测试覆盖光源方向/高低角度、真实camera offset/大坐标、local125优先、加载过滤先于cap、section距离独立数值验证及shipped loaded-only/调用顺序合约。
+
+实机验收低角度上游远墙、第三人称/移动/编辑/卸载/F3+T/teleport/维度切换待用户执行；有限volume与budget不能宣称完整coverage。B3下一步仍为entity material/normal migration，然后才temporal与后续visual polish/GI。

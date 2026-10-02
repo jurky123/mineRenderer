@@ -2,7 +2,7 @@
 
 VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
 
-当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 增加 block-entity dynamic shadows，尚无实体材质迁移、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
+当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 block-entity dynamic shadows 已获用户确认；0.14.0 增加 light-aware terrain caster selection，尚无实体材质迁移、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
 
 ## 文档
 
@@ -36,7 +36,7 @@ mod：`build/libs/voxellight-client-26.2-0.13.0.jar`；安装包：`build/distri
 
 新增 `/voxellight mode normal`：深度重建的视空间表面方向着色，不是模型/PBR 法线。`/voxellight scene on` 启用 CPU 场景跟踪，`/voxellight scene` 查看队列与版本统计，`/voxellight scene inspect` 查看准星方块的快照材质，`/voxellight scene off` 关闭并清空快照。场景默认关闭，与视觉 mode 独立。
 
-场景仅跟踪相机实体附近最多 343 个已加载 section（7×7×7）；人工灯另限定为近处 125 section/80³。客户端线程每 tick 最多复制两份 palette、以 2 ms 作为软预算；单 worker 编码，最多两个提交任务。变化合并成有界 marker，拒绝旧 generation/version 的结果；离开局部窗口的 section 立即撤销。详见 [场景设计与预算](docs/SCENE.md)。
+场景仅跟踪light-aware volume 内最多384个已加载section（cube比较为7×7×7=343）；人工灯另限定为近处 125 section/80³。客户端线程每 tick 最多复制两份 palette、以 2 ms 作为软预算；单 worker 编码，最多两个提交任务。变化合并成有界 marker，拒绝旧 generation/version 的结果；离开局部窗口的 section 立即撤销。详见 [场景设计与预算](docs/SCENE.md)。
 
 新增 `/voxellight mode shadow`：自动启用 scene，在主世界附近生成随原生 sun/moon angle 变化的地形阴影，并在已加载世界添加发光方块的局部灯。暖机后生效；32 MiB geometry 压力下优先保留近处 caster，status 会显示 budgetDeferred，而非要求永远 N/N；`mode shadow_mask` 查看白=无遮挡/黑=遮挡，`mode shadow_map` 查看光相机深度。默认复用有效 map；`/voxellight shadow_cache off` 用同一投影/过滤每帧重绘作为参考，`on` 恢复缓存。cutout 所覆盖的 tile 每帧重绘，其他有效 tile 可复用。模型沿用 vanilla，包含 slab/fence/cutout；不依赖主相机可见集合。方向阴影/月光默认接收 48 格内、40–48 格淡出，12–16 与 26–32 格重叠混合；人工灯仍为 24 格内、16–24 淡出；重建期间保留当前有效 caster 已确认的阴影，缺失 caster 仍可能造成局部漏影；无 skylight 维度只运行局部灯；资源超预算时保留原画面。详见 [参考阴影](docs/SHADOWS.md)。
 
@@ -82,4 +82,9 @@ mod：`build/libs/voxellight-client-26.2-0.13.0.jar`；安装包：`build/distri
 
 ## 0.13.0 B3a block-entity shadows
 
-新增 chest/shulker/banner 等 native model submit 的动态投影，默认开启；`/voxellight block_entity_shadows off` 可比较。来自已加载 chunk 的独立最近32个选择，不依赖 camera visible list；与 mob 共用已有 dynamic depth，单独1 MiB/128 model budget。`foundation`/`shadow`/`shadow_map` 均复用此层。Native26.2 beds 已为普通模型，仍走 terrain。实机检查与边界见 [安装说明](docs/INSTALL.md)。B3 实体材质迁移与 light-aware caster volume 将随后推进。
+新增 chest/shulker/banner 等 native model submit 的动态投影，默认开启；`/voxellight block_entity_shadows off` 可比较。来自已加载 chunk 的独立最近32个选择，不依赖 camera visible list；与 mob 共用已有 dynamic depth，单独1 MiB/128 model budget。`foundation`/`shadow`/`shadow_map` 均复用此层。Native26.2 beds 已为普通模型，仍走 terrain。实机检查与边界见 [安装说明](docs/INSTALL.md)。B3 实体材质迁移将随后推进；light-aware caster volume 见0.14.0。
+
+
+## 0.14.0 B3b light-aware caster selection
+
+默认从48格 receiver 球向 sun/moon 扩展16..48格，优先本地125 sections，只选择已加载地形，scene cap384与terrain32 MiB预算不变。`/voxellight caster_volume cube` / `light` 比较旧窗口；低太阳角度、较远建筑的附近阴影最容易看到差异。scene status显示搜索/已加载候选/限额排除与扩展距离；未加载或预算排除的caster仍可能缺失。完整实机检查见安装说明。下一步仍为B3实体材质迁移，未进入GI。

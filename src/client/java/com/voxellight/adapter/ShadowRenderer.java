@@ -137,6 +137,8 @@ public final class ShadowRenderer implements AutoCloseable {
                 ? sky.skybox == net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD
                     ? ShadowLight.world(sky.sunAngle, sky.moonAngle, sky.rainBrightness, sky.moonPhase.index()) : ShadowLight.none()
                 : ShadowLight.fixed();
+        var camera = minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.pos;
+        scene.updateCasterVolume(camera, frameLight);
         var bridge = scene.bridge();
         var sampledLight = frameLight;
         var stats = bridge.stats();
@@ -146,7 +148,6 @@ public final class ShadowRenderer implements AutoCloseable {
         resourceGeneration = stats.resourceGeneration();
         var keys = bridge.keys();
         expected = keys.size();
-        var camera = minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.pos;
         var center = SectionKey.fromBlock((int)Math.floor(camera.x()), (int)Math.floor(camera.y()), (int)Math.floor(camera.z()));
         artificial.prepare(bridge, center);
         deferred.entrySet().removeIf(entry -> !bridge.isCurrent(entry.getValue().token()));

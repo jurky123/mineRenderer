@@ -4,7 +4,7 @@
 
 ## 数据路径
 
-`mode shadow` 自动开启原有 scene。WorldSceneBridge 提供最多 343 个局部 section 的 world/resource/geometry token；客户端模型编译不再等待独立 occupancy 快照。ShadowRenderer 创建自有 SectionBufferBuilderPack，调用 vanilla SectionCompiler(false, true, ...)；关闭 AO、启用 cutout leaves，使用现有模型/材质 atlas。solid/cutout 保留原模型顶点与 UV，translucent layer 不进入 caster 集；不是 full-cube occupancy 替代。原 CPU occupancy 数据仍可用于 scene inspect。
+`mode shadow` 自动开启原有 scene。WorldSceneBridge 提供最多384个已加载 section（0.14 light-aware；cube比较343个） 的 world/resource/geometry token；客户端模型编译不再等待独立 occupancy 快照。ShadowRenderer 创建自有 SectionBufferBuilderPack，调用 vanilla SectionCompiler(false, true, ...)；关闭 AO、启用 cutout leaves，使用现有模型/材质 atlas。solid/cutout 保留原模型顶点与 UV，translucent layer 不进入 caster 集；不是 full-cube occupancy 替代。原 CPU occupancy 数据仍可用于 scene inspect。
 
 新增驻留每帧至多编译/上传一个 section；已驻留的编辑组最多 8 个 section 同帧替换，空 section 无顶点。先要求邻域九个 chunk 已加载，再在客户端线程通过 RenderRegionCache 复制真实邻域并同步编译，worker 不访问新引入的实时模型/tint 数据。此路径会出现 CPU 暖机开销，不承诺帧时间预算；需要在实机记录 lastBuildNs。自有 mesh 不进入 vanilla 的编译队列或可见列表。
 
@@ -14,7 +14,7 @@ geometryVersion 在 LOAD/GEOMETRY/RESOURCE 变化时递增，LIGHT 单独更新�
 
 ## GPU pass
 
-光相机位于 8 格世界 cell anchor 的光源方向 128 格处，以当前相机相对坐标上传，三层正交范围 ±32/±64/±96、near=1/far=256，D32_FLOAT depth 清为 1、LESS_THAN_OR_EQUAL，双面绘制。方向接收距离默认 48 格，在 40–48 格平滑淡出；12–16 和 26–32 格重叠混合，人工灯仍 24 格。caster 来源为 7×7×7 局部窗口；更远的遮挡物不会产生近处影子，未承诺整个视距的覆盖。
+光相机位于 8 格世界 cell anchor 的光源方向 128 格处，以当前相机相对坐标上传，三层正交范围 ±32/±64/±96、near=1/far=256，D32_FLOAT depth 清为 1、LESS_THAN_OR_EQUAL，双面绘制。方向接收距离默认 48 格，在 40–48 格平滑淡出；12–16 和 26–32 格重叠混合，人工灯仍 24 格。caster 默认来自0.14 light-aware有界窗口；cube比较恢复7×7×7，超出已选择体积的遮挡物不会产生近处影子，未承诺整个视距的覆盖。
 
 26.2 builder 自动声明一个 color slot；当前配 R8_UNORM、禁用全部 color write 的 attachment，shadow shader 不写颜色。cutout 的 alpha cutoff=0.5，采样当前 block atlas，包括动画材质；主世界的 depth/颜色完全独立，不修改游戏 projection、编译缓存或 framebuffer owner。参考模式每帧全图清空重绘；默认路径仅清空重建脏 tile，cutout 投影覆盖的 tile 每帧更新。
 
@@ -160,3 +160,10 @@ scene token/palette 窗口扩大到 7³=343（bridge cap384），worker job/copy
 EntityShadows 的模型/GPU内存迁到 DynamicModelBuffer；DynamicCasterSystem 协调 mobs 与 BlockEntityShadows，使用同一三 cascade dynamic depth。新选择来自 loaded chunk.getBlockEntities，不依赖 visible section list；原生 tryExtractRenderState/submit 及 Model/ModelPart/SpriteGetter 默认路径捕获动画与 atlas UV。每类32对象/128模型/1 MiB frame/256 KiB scratch，block_entity_shadows 默认on，status独立；全64位 BlockPos tie-break。每cascade在 terrain 结束后重新借当前共享 indexbuffer，统一较大请求，pass内不触发 growth。动态失败rollback和删除/开关清空保持有效。
 
 Native26.2床是普通模型，其他block-entity仅native model submit支持；item/text/transparent/custom geometry不支持。自身 material 仍vanilla，人工灯DDA不检测动态对象。B3a实机待验收，后续entity material/light-aware caster volume见PLAN。
+
+
+## 0.14.0 light-aware terrain volume
+
+0.13 block-entity caster 用户已确认。默认由 actual render camera 的48格球沿 light.direction() 向光源扫掠16..48格，按光源高度连续调整长度；section AABB 与线段的精确最短距离决定与扫掠球相交。camera相对section midpoint的double offset用于边界，避免大世界坐标float误差；无光/legacy cube恢复343条旧候选。选择不取决于camera yaw/frustum。
+
+先保留近处125 sections，再receiver球，再upstream；加载过滤在384条cap之前，且不请求生成chunk。几何resident/staging/worker与人工灯、material预算不变。上游结构可能超出旧±3section立方体，但有限体积、marker cap、geometry budget/暖机仍可能省略caster。scene counters单列candidate/eligible/windowDeferred/extrusion/selectionNs；mesh budgetDeferred另行报告。投影depth span和receiver fade保持原值，动态对象的64格窗口不变。本版没有完整light-space clipmap或无限距离coverage。

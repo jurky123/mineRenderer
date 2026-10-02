@@ -45,6 +45,36 @@ class RenderingContractTest {
     }
 
     @Test
+    void shippedLightAwareSelectionPrecedesCasterKeysAndNeverLoadsMissingChunks() throws Exception {
+        try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {
+            var scene=new ClassNode(Opcodes.ASM9);
+            try(var stream=jar.getInputStream(jar.getEntry("com/voxellight/adapter/ClientScene.class"))) {
+                new ClassReader(stream).accept(scene,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+            }
+            int loads=0;
+            for(var method:scene.methods)for(var instruction:method.instructions)if(instruction instanceof MethodInsnNode call && call.name.equals("getChunk")) {
+                assertEquals(Opcodes.ICONST_0,call.getPrevious().getOpcode());
+                loads++;
+            }
+            assertTrue(loads>=2);
+            var renderer=new ClassNode(Opcodes.ASM9);
+            try(var stream=jar.getInputStream(jar.getEntry("com/voxellight/adapter/ShadowRenderer.class"))) {
+                new ClassReader(stream).accept(renderer,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+            }
+            var prepare=renderer.methods.stream().filter(method->method.name.equals("prepare")).findFirst().orElseThrow();
+            int selection=-1,keys=-1,index=0;
+            for(var instruction:prepare.instructions) {
+                if(instruction instanceof MethodInsnNode call) {
+                    if(call.name.equals("updateCasterVolume"))selection=index;
+                    if(call.name.equals("keys"))keys=index;
+                }
+                index++;
+            }
+            assertTrue(selection>=0 && keys>selection);
+        }
+    }
+
+    @Test
     void shippedBlockEntityCaptureUsesLoadedChunksAndRefreshesSharedIndicesOutsideThePass() throws Exception {
         try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {
             var blocks=new ClassNode(Opcodes.ASM9);

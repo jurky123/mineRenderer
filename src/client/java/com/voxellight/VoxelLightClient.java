@@ -137,6 +137,14 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var casterCommand = literal("caster_volume");
+            for (boolean lightAware : new boolean[]{true, false}) {
+                casterCommand.then(literal(lightAware ? "light" : "cube").executes(context -> {
+                    PROBE.setLightAwareCasters(lightAware);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: caster volume " + (lightAware ? "light-aware" : "legacy cube")));
+                    return 1;
+                }));
+            }
             var occlusionCommand = literal("light_occlusion");
             for (boolean fine : new boolean[]{true, false}) {
                 occlusionCommand.then(literal(fine ? "shapes" : "full").executes(context -> {
@@ -152,7 +160,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand));
         });
     }
 }

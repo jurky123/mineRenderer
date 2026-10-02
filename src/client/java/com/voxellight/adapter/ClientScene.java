@@ -1,6 +1,9 @@
 package com.voxellight.adapter;
 
 import com.voxellight.world.SectionKey;
+import com.voxellight.world.CasterVolume;
+import com.voxellight.world.ShadowLight;
+import net.minecraft.world.phys.Vec3;
 import com.voxellight.world.SectionSnapshot;
 import com.voxellight.world.WorldSceneBridge;
 import com.voxellight.world.LightUpdateScope;
@@ -20,7 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -31,10 +33,9 @@ import java.util.concurrent.TimeUnit;
 /** Copies palettes on the client thread; the worker never reads the live world. */
 public final class ClientScene implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger("VoxelLight");
-    private static final int RADIUS = 3;
     private static final int MAX_JOBS = 2;
     private static final long COPY_BUDGET_NS = 2_000_000;
-    private final WorldSceneBridge bridge = new WorldSceneBridge(384);
+    private final WorldSceneBridge bridge = new WorldSceneBridge(CasterVolume.MAX_SECTIONS);
     private final LightUpdateScope lightUpdates = new LightUpdateScope();
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<>(MAX_JOBS), runnable -> {
@@ -51,6 +52,36 @@ public final class ClientScene implements AutoCloseable {
     private long encodeNanos;
     private long copied;
     private String state = "off";
+    private boolean lightAware = true;
+    private ShadowLight casterLight = ShadowLight.none();
+    private Vec3 renderCamera;
+    private int casterCandidates, casterEligible, casterDeferred;
+    private float casterExtrusion;
+    private long casterSelectionNanos;
+
+    public void setLightAware(boolean value) { lightAware = value; }
+
+    public void updateCasterVolume(Vec3 camera, ShadowLight light) {
+        renderCamera = camera;
+        casterLight = light;
+        if (!enabled || level == null) return;
+        long start = System.nanoTime();
+        var center = SectionKey.fromBlock((int)Math.floor(camera.x()), (int)Math.floor(camera.y()), (int)Math.floor(camera.z()));
+        var window = CasterVolume.select(center, light, lightAware,
+                camera.x() - (center.x() * 16.0 + 8), camera.y() - (center.y() * 16.0 + 8), camera.z() - (center.z() * 16.0 + 8));
+        var loaded = new HashMap<Long, Boolean>();
+        var admission = CasterVolume.admit(window, level.getMinSectionY(), level.getMaxSectionY(), key -> {
+            long column = ((long)key.x() << 32) ^ (key.z() & 0xffffffffL);
+            return loaded.computeIfAbsent(column, ignored ->
+                    level.getChunkSource().getChunk(key.x(), key.z(), ChunkStatus.FULL, false) != null);
+        });
+        bridge.reconcile(admission.sections());
+        casterCandidates = window.candidates().size();
+        casterEligible = admission.eligible();
+        casterDeferred = admission.deferred();
+        casterExtrusion = window.extrusion();
+        casterSelectionNanos = System.nanoTime() - start;
+    }
 
     public void setEnabled(boolean enabled) {
         if (!Minecraft.getInstance().isSameThread()) throw new IllegalStateException("Scene switch must run on client thread");
@@ -70,6 +101,10 @@ public final class ClientScene implements AutoCloseable {
     public void changeLevel(ClientLevel level) {
         this.level = level;
         bridge.changeWorld();
+        renderCamera = null;
+        casterLight = ShadowLight.none();
+        casterCandidates = casterEligible = casterDeferred = 0;
+        casterExtrusion = 0;
         cancelJobs();
         copyNanos = 0;
         encodeNanos = 0;
@@ -121,22 +156,11 @@ public final class ClientScene implements AutoCloseable {
         }
         if (!enabled || level == null || minecraft.getCameraEntity() == null) return;
         try {
-            var camera = minecraft.getCameraEntity().blockPosition();
-            var center = SectionKey.fromBlock(camera.getX(), camera.getY(), camera.getZ());
-            List<SectionKey> desired = new ArrayList<>(343);
-            for (int x = center.x() - RADIUS; x <= center.x() + RADIUS; x++) {
-                for (int z = center.z() - RADIUS; z <= center.z() + RADIUS; z++) {
-                    // Never ask the client chunk cache to generate/load a missing chunk.
-                    if (level.getChunkSource().getChunk(x, z, ChunkStatus.FULL, false) == null) continue;
-                    for (int y = Math.max(center.y() - RADIUS, level.getMinSectionY());
-                         y <= Math.min(center.y() + RADIUS, level.getMaxSectionY()); y++) {
-                        desired.add(new SectionKey(x, y, z));
-                    }
-                }
-            }
-            desired.sort(Comparator.comparingInt(key -> Math.abs(key.x() - center.x())
-                    + Math.abs(key.y() - center.y()) + Math.abs(key.z() - center.z())));
-            bridge.reconcile(desired);
+            var body = minecraft.getCameraEntity().position();
+            // Reuse the previous frame's actual camera (including third person) until a teleport.
+            var previous = minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.pos;
+            var camera = renderCamera != null && previous.distanceToSqr(body) < 256 ? previous : body;
+            updateCasterVolume(camera, casterLight);
             for (var iterator = jobs.iterator(); iterator.hasNext();) {
                 Job job = iterator.next();
                 if (!job.future().isDone()) continue;
@@ -161,7 +185,7 @@ public final class ClientScene implements AutoCloseable {
                 copied++;
             }
             copyNanos = System.nanoTime() - start;
-            state = "tracking local 7x7x7 section window";
+            state = lightAware && casterLight.source() != ShadowLight.Source.NONE ? "tracking light-aware caster volume" : "tracking local 7x7x7 section window";
         } catch (Exception e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             LOGGER.error("Scene tracking disabled after failure", e);
@@ -180,7 +204,10 @@ public final class ClientScene implements AutoCloseable {
                 + ", inFlight=" + stats.inFlight() + ", payloadBytes=" + stats.payloadBytes()
                 + ", accepted=" + stats.accepted() + ", stale=" + stats.stale() + ", merged=" + stats.coalesced()
                 + ", copyNs=" + copyNanos + ", lastEncodeNs=" + encodeNanos + ", copied=" + copied
-                + ", queuedJobs=" + jobs.size();
+                + ", queuedJobs=" + jobs.size()
+                + ", casterVolume=" + (lightAware ? "light" : "cube") + ", casterCandidates=" + casterCandidates
+                + ", casterEligible=" + casterEligible + ", casterWindowDeferred=" + casterDeferred
+                + ", casterExtrusion=" + casterExtrusion + ", casterSelectionNs=" + casterSelectionNanos;
     }
 
     public String inspect(Minecraft minecraft) {

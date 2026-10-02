@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.13.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.14.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.13.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.14.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -23,6 +23,7 @@
 | `/voxellight mode material_coverage` | 0.11：green=支持且 depth 匹配，magenta=已捕获但 depth 不匹配，gray=未捕获。 |
 | `/voxellight mode normal` | 用深度和当前 projection 重建表面方向并着色；天空黑色，无新增世界光照。 |
 | `/voxellight mode shadow` | 世界太阳/月亮阴影、月光 fill 与人工灯；自动启用 scene，caster 准备完成后生效。 |
+| `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
 | `/voxellight entity_shadows on` / `off` | 默认 on；开关新增太阳/月亮实体模型阴影，保留地形阴影与原生 blob shadow。 |
 | `/voxellight light_occlusion shapes` / `full` | 默认 shapes；比较人工灯形状遮挡与 full-block 参考。 |
 | `/voxellight local_lights on` / `off` | 默认 on，独立开关新增人工灯；保留 vanilla lightmap 和 sun/moon。 |
@@ -235,7 +236,7 @@ MRT emission properties R/G=block/quad strength，B=sky level，A=block level；
 
 替换旧 jar 后 `mode foundation`，在草/花/树叶附近慢转、移动，尤其绕过 plant plane 的侧面；比较 `sun fixed` 与 `sun world`，附近放火把观察彩光。`mode material_coverage` 检查植物是否出现 green/magenta 来回切换。请同时比较 `mode off`：native cutout 边缘仍可能有 subpixel aliasing，本版未做 TAA/temporal，不能宣称消除全部闪烁。固定相机的 flicker、更新触发的 native fallback 需另行定位。
 
-## 0.13.0 B3a animated block-entity shadows
+## 0.14.0 B3a animated block-entity shadows
 
 用户已确认 0.12.1 foundation/plant fix。新版默认 block_entity_shadows on。在 Vulkan 世界执行：
 
@@ -256,3 +257,14 @@ DynamicCasterSystem 统一 entity/block-entity depth，DynamicModelBuffer 统一
 status 新增 blockEntityCasters/Models/Skipped/Failures/Overflow、Chunks/CaptureNs/UploadBytes/BufferBytes。没有 GPU 时自动测试不代替 chest/sprite/动画实机验收。依次测开关、破坏/放置、离开相机、F3+T、切维度、resize、第三人称 mob 并存，检查无残影且 entity baseline 不回归。动态模型仍只为 sun/moon shadow caster，本身继续 vanilla shading；人工灯 DDA 仍不遮挡动态对象。超预算可能缺 caster，未实现选入/淘汰 fade。
 
 B3a 是 geometry coverage 的第一步；entity material/normal migration、block-entity material 和 receiver-driven light-aware caster search 仍未完成，不宣称完整 B3 验收。
+
+
+## 0.14.0 B3b light-aware terrain caster volume
+
+0.13 block-entity shadows 已获用户实机确认。本阶段改进低太阳/月亮角度的 terrain caster coverage：从实际 render camera 的 48 格 receiver 球沿 receiver→light 方向扩展 16..48 格，光源越低扩展越长。使用 section AABB 与 swept sphere 的相交距离，不扩大整个立方体；无 celestial light 时退回旧 7³ 窗口。投影、receiver fade 和 shadow_distance 保持原有语义。
+
+只从已加载 chunk 选择，先过滤世界高度/缺失 chunk，再准入最多384 sections。附近 ±2 section 的125条优先，随后 receiver 范围，再是向光源的额外 caster；material125/16 MiB、local-light125/80³、terrain32 MiB+8 MiB staging、单 worker/two jobs 保持既有预算。不能保证所有远处建筑投影：section cap、未加载 chunk、mesh budget、暖机和有限 extrusion 仍会缺失 coverage。动态实体/方块实体仍使用64格选择，不受本次扩展影响。
+
+Vulkan 中 `/voxellight mode foundation`、`/voxellight sun world`；在晨昏观察向光源约60–80格的已加载高墙向附近投影，比较 `/voxellight caster_volume cube` 与 `light`，每次等待 caster 暖机。正午/近处小场景可能没有明显差异。测试转动视角、跨 section、编辑远处墙、chunk 卸载、F3+T、切维度、第三人称与 teleport；用 `/voxellight scene` 查看 casterCandidates、casterEligible、casterWindowDeferred、casterExtrusion、casterSelectionNs，以及 shadow 的 geometry budgetDeferred。自动测试通过不能替代这些 GPU 检查。
+
+B3 entity material/normal migration 仍未实施；本版不新增 temporal、GI 或无限距离阴影。

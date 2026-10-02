@@ -1,6 +1,6 @@
 # Visual Foundation: implementation contract
 
-Status: the user confirmed corrected B1 diagnostics in 0.11.2. The user confirmed B2 terrain reference lighting and the 0.12.1 foliage fix. B3a block-entity casters are implemented in 0.13.0 and await in-game acceptance; entity materials/light-aware caster selection remain ahead. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
+Status: the user confirmed corrected B1 diagnostics in 0.11.2. The user confirmed B2 terrain reference lighting and the 0.12.1 foliage fix. The user accepted B3a block-entity casters in 0.13.0. B3b light-aware terrain caster selection is implemented in 0.14.0 and awaits in-game acceptance; entity material migration remains ahead. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
 
 ## Objective
 
