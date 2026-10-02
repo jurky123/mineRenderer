@@ -35,6 +35,10 @@ layout(std140) uniform LightingEnvironment {
 };
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
+#ifdef TEMPORAL_SHADOW
+layout(location = 1) out vec4 shadowTemporalInput;
+bool dynamicAffected = false;
+#endif
 
 vec3 reconstruct(vec2 uv, float depth, mat4 inverseProjection) {
     vec4 position = inverseProjection * vec4(uv * 2.0 - 1.0, depth, 1.0);
@@ -114,7 +118,14 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, vec3 posit
             float receiverDepth = projected.z + dot(gradient, sampleUv - shadowUv);
             // All cascades have the same 255-block depth span; this bias is about 0.036 world blocks.
             float casterDepth = texture(map, sampleUv).r;
-            if (MoonLight.z > 0.5) casterDepth = min(casterDepth, texture(entities, sampleUv).r);
+            if (MoonLight.z > 0.5) {
+                float dynamicDepth = texture(entities, sampleUv).r;
+#ifdef TEMPORAL_SHADOW
+                // Includes animated block entities. Invalidate history wherever a dynamic tap contributes.
+                if (dynamicDepth <= casterDepth && receiverDepth - 0.00014 > dynamicDepth) dynamicAffected = true;
+#endif
+                casterDepth = min(casterDepth, dynamicDepth);
+            }
             blocked += (receiverDepth - 0.00014 > casterDepth ? 1.0 : 0.0) * wx * wy;
         }
     }
@@ -145,12 +156,16 @@ vec3 srgbToLinear(vec3 c) {
 }
 float energy(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 void main() {
+    fragColor = vec4(0.0);
+#ifdef TEMPORAL_SHADOW
+    shadowTemporalInput = vec4(1.0,0.0,0.0,0.0);
+#endif
     float depth = texture(SceneDepth, texCoord).r;
     float capturedDepth = texture(MaterialDepth, texCoord).r;
     vec4 geometryNormal = texture(MaterialNormal, texCoord);
     int difference = abs(int(floatBitsToUint(depth)) - int(floatBitsToUint(capturedDepth)));
     if (depth <= 0.0 || capturedDepth <= 0.0 || difference > 8 || geometryNormal.a < 0.5) {
-        fragColor = vec4(0.0); return;
+        return;
     }
     vec4 material = texture(MaterialAlbedo, texCoord);
     vec4 properties = texture(MaterialEmission, texCoord);
@@ -200,4 +215,9 @@ void main() {
     vec3 emission = albedo * max(properties.r, properties.g) * 2.4;
     vec3 radiance = albedo * (vec3(0.012) + sky + direct * visibility + local) + emission;
     fragColor = vec4(radiance, 1.0);
+#ifdef TEMPORAL_SHADOW
+    shadowTemporalInput = vec4(visibility, albedo * direct);
+    // Display coverage stays valid; .75 marks pixels that must never enter shadow history.
+    if (dynamicAffected || (flags & 24) != 0) fragColor.a = 0.75;
+#endif
 }

@@ -78,6 +78,9 @@ public final class RenderProbe {
         resetTiming();
     }
 
+    public void captureWorldProjection(org.joml.Matrix4f projection) { if(mode==Mode.FOUNDATION)lighting.captureProjection(projection); }
+    public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
+
     public void setEntityMaterials(boolean value) { RenderSystem.assertOnRenderThread(); entityMaterials.setEnabled(value); resetTiming(); }
 
     public void setEntityShadows(boolean value) { RenderSystem.assertOnRenderThread(); shadows.setEntityShadows(value); resetTiming(); }
@@ -164,6 +167,7 @@ public final class RenderProbe {
     public void render(RenderTarget target) {
         entityCaptureScope=false;
         entityMaterials.endFrame();
+        lighting.endFrame();
         if (mode.isMaterial()) {
             if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
             materialPointObserved = false;
@@ -313,6 +317,7 @@ public final class RenderProbe {
     }
 
     private void resetTiming() {
+        lighting.invalidateHistory();
         if (timer != null) {
             timer.close();
             timer = null;

@@ -31,6 +31,7 @@ public final class WorldSceneBridge {
     private final LinkedHashMap<SectionKey, Entry> entries = new LinkedHashMap<>();
     private long worldGeneration = 1;
     private long resourceGeneration = 1;
+    private long changeRevision;
     private long sequence;
     private long accepted;
     private long stale;
@@ -52,6 +53,7 @@ public final class WorldSceneBridge {
         entries.entrySet().removeIf(entry -> {
             if (!keys.contains(entry.getKey())) {
                 unloaded++;
+                changeRevision++;
                 return true;
             }
             return false;
@@ -75,6 +77,7 @@ public final class WorldSceneBridge {
     public synchronized void unload(SectionKey key) {
         if (entries.remove(key) != null) {
             unloaded++;
+            changeRevision++;
         }
     }
 
@@ -93,6 +96,7 @@ public final class WorldSceneBridge {
         entries.entrySet().removeIf(entry -> {
             if (entry.getKey().x() == x && entry.getKey().z() == z) {
                 unloaded++;
+                changeRevision++;
                 return true;
             }
             return false;
@@ -143,11 +147,13 @@ public final class WorldSceneBridge {
 
     public synchronized void changeWorld() {
         worldGeneration++;
+        changeRevision++;
         entries.clear();
     }
 
     public synchronized void reloadResources() {
         resourceGeneration++;
+        changeRevision++;
         for (Entry entry : entries.values()) {
             invalidate(entry, RESOURCE);
         }
@@ -219,7 +225,10 @@ public final class WorldSceneBridge {
                 bytes, accepted, stale, coalesced, unloaded);
     }
 
+    public synchronized long changeRevision() { return changeRevision; }
+
     private void invalidate(Entry entry, int reasons) {
+        changeRevision++;
         if (entry.reasons != 0) {
             coalesced++;
         } else {

@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.15.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.16.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.15.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.16.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -284,3 +284,11 @@ opaque terrain先完成已有foundation。native solid features绘制后，复�
 测试Vulkan `/voxellight mode foundation`，观察行走的牛/猪/僵尸进入/离开建筑太阳阴影，再用`entity_materials off/on`比较实体颜色（terrain应保持同一效果）。看夜间/月光、火把照明与hurt tint；第三人称玩家目前仍native。检查普通/染色armor与trim/glint不消失、胸箱开合、cutout缺口、实体重叠/behind terrain、移除/大量模型、F3+T、resize/fullscreen、teleport/维度切换。`mode albedo`/`surface_normal`/`material_coverage`可直接检查支持模型；late coverage在未捕获区域保留之前的terrain诊断和native实体颜色，不整屏改灰。entity emission图黑色是预期。status看entityMaterialPass/models/skipped/failures/uploadBytes/captureNs/overlayFallback；CSV新增 *_ENTITIES pass行，terrain与实体GPU耗时分列。自动CPU/原生GLSL→SPIR-V/绑定/调用合约已验证，GPU实机尚待确认。
 
 这是一版有界opaque model迁移，不表示所有entity material都已完成；blended玩家/模型与custom submit仍是已知缺口。B3本版实机验证之后再考虑temporal稳定性，不进入GI。
+
+## 0.16.0 D1 temporal directional shadows
+
+0.15.0 opaque entity material lighting 已获用户确认。`foundation` 默认开启 terrain sun/moon shadow visibility history；这不是全画面 TAA。纹理、emission、local lights 与晚绘制实体材质每帧保持当前值。动态 caster 阴影区域、animated/ENTITY material 不保存 history；真实 projection（包括 bob/hurt/nausea）参与 camera reprojection，使用 depth/normal rejection、3×3 clamp 和强变化即时响应。
+
+使用 `/voxellight temporal_shadows off` / `on` 比较。先 `/voxellight mode foundation`，可用 `/voxellight sun fixed` 固定光源；等待 caster 准备完成后沿阴影墙缓慢走动/转视角。目标是降低小幅 PCF/shadow crawl，静止画面可能没有明显差异，不处理植物纹理本身的亚像素 aliasing。检查移动实体、开箱、banner 没有拖影；编辑、teleport、快速转向、F3+T、resize、维度切换应重置 history。
+
+额外四张 RGBA16F texture 共32 bytes/pixel，独立128 MiB cap：1440p约112.5 MiB，4K超限自动保留当前 foundation shadows。另有96-byte settings UBO；不新增 SceneColor copy，不修改 native depth。status 的 temporalSeeds/Reuses/Resets 是 CPU frame admission 数量，不是 GPU 实际接受像素数量。scene/caster/light变化、长帧间隔与 camera cut 会重新seed。实机稳定性仍待验收；full RGB TAA、motion vectors、AO、GI 尚未实现。

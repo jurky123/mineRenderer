@@ -15,6 +15,18 @@ class WorldSceneBridgeTest {
     }
 
     @Test
+    void historyRevisionChangesOnEditsUnloadsAndGenerationsButNotRepeatedReconcileOrAcquire() {
+        var scene=new WorldSceneBridge(2);
+        long initial=scene.changeRevision();scene.reconcile(List.of(A));assertTrue(scene.changeRevision()>initial);
+        long loaded=scene.changeRevision();scene.reconcile(List.of(A));scene.acquire();assertEquals(loaded,scene.changeRevision());
+        scene.markDirty(A,WorldSceneBridge.LIGHT);assertTrue(scene.changeRevision()>loaded);
+        long light=scene.changeRevision();scene.markDirty(A,WorldSceneBridge.GEOMETRY);assertTrue(scene.changeRevision()>light);
+        long edited=scene.changeRevision();scene.unload(A);assertTrue(scene.changeRevision()>edited);
+        long removed=scene.changeRevision();scene.reloadResources();assertTrue(scene.changeRevision()>removed);
+        long resources=scene.changeRevision();scene.changeWorld();assertTrue(scene.changeRevision()>resources);
+    }
+
+    @Test
     void liveGeometryTokenIsReadyDuringPaletteEncodingAndSurvivesLightCompletion() {
         var scene = new WorldSceneBridge(1);
         scene.reconcile(List.of(A));

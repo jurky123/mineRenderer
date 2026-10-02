@@ -1,6 +1,6 @@
 # Visual Foundation: implementation contract
 
-Status: the user confirmed corrected B1 diagnostics in 0.11.2. The user confirmed B2 terrain reference lighting and the 0.12.1 foliage fix. The user accepted B3a block-entity casters in 0.13.0. The user accepted B3b light-aware terrain caster selection in 0.14.0. B3c actual opaque model material capture/lighting is implemented in 0.15.0 and awaits in-game acceptance; blended player materials and custom submit paths remain native. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
+Status: the user confirmed corrected B1 diagnostics in 0.11.2. The user confirmed B2 terrain reference lighting and the 0.12.1 foliage fix. The user accepted B3a block-entity casters in 0.13.0. The user accepted B3b light-aware terrain caster selection in 0.14.0. B3c actual opaque model material capture/lighting is implemented in 0.15.0 and accepted by the user; blended player materials and custom submit paths remain native. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
 
 ## Objective
 
@@ -118,3 +118,11 @@ Actual ModelFeatureRenderer.renderToBuffer is evaluated once: a bounded tee copi
 The late boundary is PreparedFrame.executeSolid TAIL inside world rendering, before depth copies and executeTranslucent. Reuse material/HDR targets after terrain output; clear coverage/depth, capture models, match native scene depth (8 ULP), reuse prepared shadow/local-light data, resolve/tone/native fog without main-depth writes or SceneColor copy. Armor-decal trim gets a coverage exclusion after supported surfaces; any dropped trim mask disables entity relighting for that frame. Later native translucent/glint/particles/UI remain in their original order.
 
 128 attempts/1 MiB CPU+GPU frame/256 KiB scratch; borrowed native textures/uniforms remain frame-local. No new fullscreen textures; settings total64 bytes. Counters and separate *_ENTITIES pass metrics are included. Ordinary mobs/armor and some opaque block entities are covered; blended player skins, emissive/dissolve/custom effects, held items and arbitrary custom coplanar layers are not fully migrated. User acceptance must check animation/depth/cutout/normal/lighting/overlays/removal/reload/resize/world travel. B3 is not declared universally complete and no motion history/GI is introduced.
+
+## 0.16.0 D1 directional visibility history
+
+用户确认0.15.0 opaque entity material lighting，进入temporal第一步。仅terrain direct sun/moon visibility过滤，MRT保留current HDR + visibility/direct term，额外pass重建position并reproject至上一帧packed visibility/oct-normal/radial-distance history，再修正current direct radiance。不会积累RGB；late entity material lighting仍current。dynamic caster遮挡足迹与animated/ENTITY材料拒绝history，强visibility变化立即响应。
+
+GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4f)，包含bob/hurt/nausea；不能使用nominal camera projection替代。world/resource/scene changeRevision、caster geometryRevision、light source/jump、camera cut、frame gap、settings/resize使history失效。Bridge changeRevision仅增加可观测dirty-stream序号，不改变geometry/light-only契约。
+
+四张RGBA16F、32 bytes/pixel、128 MiB额外cap和96-byte UBO；超过cap退回unfiltered foundation。两个MRT render descriptors显式renderArea，不写native depth。CPU admission counters不代表GPU pixel acceptance。native shader binding/阶段编译与CPU reprojection/invalidation/budget检查通过；移动阴影/编辑/plant/model/reload/resize实机验收待用户。下一步在D1验收后做basic AO或后续temporal覆盖，full TAA/motion vectors/GI未完成。

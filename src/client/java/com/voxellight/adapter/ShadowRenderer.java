@@ -101,6 +101,8 @@ public final class ShadowRenderer implements AutoCloseable {
     private boolean cacheEnabled = true;
     private boolean worldSun = true;
     private int receiverDistance = (int)ShadowCascades.RADIUS;
+    private long geometryRevision;
+    long geometryRevision() { return geometryRevision; }
     private ShadowLight frameLight = ShadowLight.none();
     private SectionBufferBuilderPack builders;
     private long geometryBytes;
@@ -190,7 +192,7 @@ public final class ShadowRenderer implements AutoCloseable {
                     Mesh mesh = build(minecraft, token, 0, 0);
                     uploadBytes += mesh.bytes();
                     if (!bridge.isCurrent(token)) { mesh.close(); break; }
-                    meshes.put(key, mesh);
+                    meshes.put(key, mesh);geometryRevision++;
                     deferred.remove(key);
                     invalidate(mesh.bounds());
                     geometryBytes += mesh.bytes();
@@ -392,6 +394,7 @@ public final class ShadowRenderer implements AutoCloseable {
     }
 
     private void retire(Mesh mesh) {
+        geometryRevision++;
         invalidate(mesh.bounds());
         geometryBytes -= mesh.bytes();
         mesh.close();
@@ -449,7 +452,7 @@ public final class ShadowRenderer implements AutoCloseable {
                 var key = entry.getKey();
                 var mesh = entry.getValue();
                 iterator.remove(); // Ownership transfers to meshes; finally closes only unpublished buffers.
-                var old = meshes.put(key, mesh);
+                var old = meshes.put(key, mesh);geometryRevision++;
                 invalidate(old.bounds());
                 invalidate(mesh.bounds());
                 geometryBytes += mesh.bytes() - old.bytes();
@@ -535,6 +538,7 @@ public final class ShadowRenderer implements AutoCloseable {
 
     @Override
     public void close() {
+        geometryRevision++;
         meshes.values().forEach(Mesh::close);
         meshes.clear();
         for (var c : cascades) c.close();

@@ -107,7 +107,14 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, vec3 posit
             float receiverDepth = projected.z + dot(gradient, sampleUv - shadowUv);
             // All cascades have the same 255-block depth span; this bias is about 0.036 world blocks.
             float casterDepth = texture(map, sampleUv).r;
-            if (MoonLight.z > 0.5) casterDepth = min(casterDepth, texture(entities, sampleUv).r);
+            if (MoonLight.z > 0.5) {
+                float dynamicDepth = texture(entities, sampleUv).r;
+#ifdef TEMPORAL_SHADOW
+                // Includes animated block entities. Invalidate history wherever a dynamic tap contributes.
+                if (dynamicDepth <= casterDepth && receiverDepth - 0.00014 > dynamicDepth) dynamicAffected = true;
+#endif
+                casterDepth = min(casterDepth, dynamicDepth);
+            }
             blocked += (receiverDepth - 0.00014 > casterDepth ? 1.0 : 0.0) * wx * wy;
         }
     }

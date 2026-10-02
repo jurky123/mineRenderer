@@ -89,10 +89,10 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL")) {
                 var pipeline = pipeline(loader, field);
-                try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX);
-                     var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT)) {
+                try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX,pipeline.getShaderDefines());
+                     var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT,pipeline.getShaderDefines())) {
                     var entries = new ArrayList<VulkanBindGroupLayout.Entry>();
                     addBindings.invoke(null, entries, vertex, pipeline);
                     addBindings.invoke(null, entries, fragment, pipeline);
@@ -130,6 +130,15 @@ class ShadowPipelineTest {
                         }
                         assertEquals(List.of("outAlbedo", "outNormal", "outEmission"), names,
                                 "Native output rebinding order must match the actual MRT attachments");
+                    }
+                    if (field.equals("LIGHTING_TEMPORAL") || field.equals("TEMPORAL")) {
+                        assertEquals(2,pipeline.getColorTargetStates().length);
+                        var names = new ArrayList<String>();
+                        for (Object output : fragment.outputs()) {
+                            var name = output.getClass().getDeclaredMethod("name"); name.setAccessible(true);
+                            names.add((String)name.invoke(output));
+                        }
+                        assertEquals(field.equals("TEMPORAL") ? List.of("resolvedHdr","nextHistory") : List.of("fragColor","shadowTemporalInput"),names);
                     }
                     if (!field.equals("CASTER") && !field.equals("ENTITY") && !field.equals("CAPTURE") && !field.equals("CULL") && !field.equals("NO_CULL")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
                 }
@@ -218,7 +227,7 @@ class ShadowPipelineTest {
     @Test
     void foundationUniformsAndVisibilityKernelsMatchTheirProducers() throws Exception {
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String shader : List.of("lighting","lighting_output")) {
+            for (String shader : List.of("lighting","lighting_output","temporal_shadow")) {
                 try (var module = compile(compiler,loader,shader,ShaderType.FRAGMENT);var stack = MemoryStack.stackPush()) {
                     var pointer = stack.callocPointer(1);
                     assertEquals(0,Spvc.spvc_context_create(pointer));long context = pointer.get(0);
@@ -231,11 +240,11 @@ class ShadowPipelineTest {
                         assertEquals(0,Spvc.spvc_resources_get_resource_list_for_type(resources,1,pointer,count));
                         boolean found = false;
                         for (var uniform : SpvcReflectedResource.create(pointer.get(0),(int)count.get(0))) {
-                            String expected = shader.equals("lighting") ? "LightingEnvironment" : "Fog";
+                            String expected = shader.equals("lighting") ? "LightingEnvironment" : shader.equals("temporal_shadow") ? "TemporalSettings" : "Fog";
                             if (!uniform.nameString().equals(expected)) continue;
                             long struct = Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
                             assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,struct,pointer));
-                            assertEquals(shader.equals("lighting") ? com.voxellight.world.LightingEnvironment.SETTINGS_BYTES : 40,pointer.get(0));
+                            assertEquals(shader.equals("lighting") ? com.voxellight.world.LightingEnvironment.SETTINGS_BYTES : shader.equals("temporal_shadow") ? com.voxellight.world.TemporalShadowState.SETTINGS_BYTES : 40,pointer.get(0));
                             found = true;
                         }
                         assertTrue(found);
@@ -271,17 +280,20 @@ class ShadowPipelineTest {
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
-        var field = Class.forName("com.voxellight.adapter." + (name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
+        var field = Class.forName("com.voxellight.adapter." + (name.equals("TEMPORAL") ? "TemporalShadowHistory" : name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("LIGHTING_TEMPORAL") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);
     }
 
     private static IntermediaryShaderModule compile(GlslCompiler compiler, URLClassLoader loader, String name, ShaderType type) throws Exception {
+        return compile(compiler,loader,name,type,net.minecraft.client.renderer.ShaderDefines.EMPTY);
+    }
+    private static IntermediaryShaderModule compile(GlslCompiler compiler,URLClassLoader loader,String name,ShaderType type,net.minecraft.client.renderer.ShaderDefines defines) throws Exception {
         String path = "assets/voxellight/shaders/" + name + (type == ShaderType.VERTEX ? ".vsh" : ".fsh");
         var resource = loader.findResource(path);
         assertNotNull(resource, path);
         try (var stream = resource.openStream()) {
-            return compiler.createIntermediary(path, new String(stream.readAllBytes(), StandardCharsets.UTF_8), type);
+            return compiler.createIntermediary(path, com.mojang.blaze3d.preprocessor.GlslPreprocessor.injectDefines(new String(stream.readAllBytes(), StandardCharsets.UTF_8),defines), type);
         }
     }
 }

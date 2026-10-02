@@ -157,3 +157,11 @@ Native26.2床是普通模型，其他block-entity仅native model submit支持；
 ## 0.15 opaque model capture boundary
 
 GameRenderer.renderLevel's LevelRenderer.render invocation scopes the world-only capture. ModelFeatureRenderer.prepareModel's single native Model.renderToBuffer call is wrapped to tee ENTITY attributes without a second animation/render invocation; normal consumers continue even on private stream failure. PreparedFrame.executeSolid TAIL resolves supported models after their native depth writes and before LevelRenderer copies depth or executes translucent features. Same-frame PreparedRenderType textures/DynamicTransforms are borrowed, known solid/cutout pipelines only; opaque armor decal masks retain native trim pixels. CPU/native shader/mixin contracts validate the pinned26.2 boundaries; actual GPU replay/depth/overlay/animation correctness still needs in-game acceptance. Full blended entity/player migration is not claimed.
+
+## 0.16.0 D1 directional visibility history
+
+用户确认0.15.0 opaque entity material lighting，进入temporal第一步。仅terrain direct sun/moon visibility过滤，MRT保留current HDR + visibility/direct term，额外pass重建position并reproject至上一帧packed visibility/oct-normal/radial-distance history，再修正current direct radiance。不会积累RGB；late entity material lighting仍current。dynamic caster遮挡足迹与animated/ENTITY材料拒绝history，强visibility变化立即响应。
+
+GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4f)，包含bob/hurt/nausea；不能使用nominal camera projection替代。world/resource/scene changeRevision、caster geometryRevision、light source/jump、camera cut、frame gap、settings/resize使history失效。Bridge changeRevision仅增加可观测dirty-stream序号，不改变geometry/light-only契约。
+
+四张RGBA16F、32 bytes/pixel、128 MiB额外cap和96-byte UBO；超过cap退回unfiltered foundation。两个MRT render descriptors显式renderArea，不写native depth。CPU admission counters不代表GPU pixel acceptance。native shader binding/阶段编译与CPU reprojection/invalidation/budget检查通过；移动阴影/编辑/plant/model/reload/resize实机验收待用户。下一步在D1验收后做basic AO或后续temporal覆盖，full TAA/motion vectors/GI未完成。

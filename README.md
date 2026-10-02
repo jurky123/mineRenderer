@@ -2,7 +2,7 @@
 
 VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
 
-当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 block-entity dynamic shadows 已获用户确认；0.14.0 light-aware terrain caster selection 已获用户确认；0.15.0 增加实际native opaque模型材质/normal lighting，blended玩家皮肤与custom geometry仍native、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
+当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 block-entity dynamic shadows 已获用户确认；0.14.0 light-aware terrain caster selection 已获用户确认；0.15.0 已获用户确认，增加实际native opaque模型材质/normal lighting，blended玩家皮肤与custom geometry仍native；0.16.0 新增 terrain directional shadow temporal history，尚无虚拟分页/滚动 clipmap、全画面 TAA 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
 
 ## 文档
 
@@ -94,4 +94,8 @@ mod：`build/libs/voxellight-client-26.2-0.13.0.jar`；安装包：`build/distri
 
 实际native ModelFeatureRenderer顶点在原render调用中同步捕获ENTITY格式，保留pose、sprite UV、unlit tint、overlay、packed light与normal，不重新提取/运行动画。支持原生solid/cutout模型与普通armor，部分opaque block-entity模型也走同一路径；在solid feature结束后、translucency前使用同帧shadow/local-light数据完成分离HDR lighting。`/voxellight entity_materials off` / `on` 比较仅新增的实体材质光照，terrain与shadow仍启用。
 
-最多128 model attempts/1 MiB frame/256 KiB model scratch，复用现有MRT/HDR，不新增全屏targets。玩家blended skin、eyes/glow、held item/custom submits仍native；armor trim以coverage exclusion保留native像素，glint/transparency随后native绘制。该阶段支持范围与实机验收见INSTALL；temporal/GI尚未开始。
+最多128 model attempts/1 MiB frame/256 KiB model scratch，复用现有MRT/HDR，不新增全屏targets。玩家blended skin、eyes/glow、held item/custom submits仍native；armor trim以coverage exclusion保留native像素，glint/transparency随后native绘制。该阶段支持范围与实机验收见安装说明；用户已确认。
+
+## 0.16.0 D1 temporal shadow stability
+
+`foundation` 默认对静态terrain太阳/月亮阴影visibility做camera reprojection与depth/normal rejection，保留当前texture/emission/local lighting；动态阴影区域不进入history。`/voxellight temporal_shadows off` / `on`比较小幅shadow crawl。新增32 bytes/pixel、128 MiB cap，1440p支持，4K回退当前阴影。编辑/reload/camera cut重置history；不是full TAA。详细验收见[安装说明](docs/INSTALL.md)。
