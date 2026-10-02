@@ -171,3 +171,9 @@ GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4
 现有actualProjection hook同时供ShadowRenderer上传InvProjection，不依赖nominal CameraRenderState projection。共享ShadowResolveSettings从304扩为560 bytes；三层normal matrix为CPU affine inverse-transpose，legacy/foundation PCF使用同一更新后的kernel。lighting/output/temporal/shadow fragment不再调用inverse。
 
 MaterialSurfaceStore具有同一生产prepare路径的可注入extractor，用无GPU buffer double验证原mesh在rebuild期间仍可见、obsolete结果仅关闭自身、verified swap后旧buffer关闭一次、oversized等待、unload/resource/window retirement与cap处replacement admission。增加geometryChangeRevision区别LIGHT-only与shadow-changing dirties。native编译/reflection通过不代表实机画质验收。
+
+## 0.17.0 AO integration
+
+Terrain material capture后、entity/translucency前额外两个fullscreen raster passes：half-res horizon search与half-res bilateral spatial filter。RGBA16F guides固定取2×2中的(1,1) full pixel，odd-size末尾clamp；linear view depth + oct view normal与actualInvProjection配合，full lighting四guide upsample。所有descriptor显式half renderArea、无depth attachment；1×1neutral在off/cap fallback提供有效sampler binding。
+
+AoSettings含两个vec4（32 bytes），参数与enabled/debug flags由owner当前frame上传。material/entity lighting和OUTPUT binding均验证；实体路径不重跑terrain AO，ENTITY flags保持neutral。MODE off/resource/world reset释放AO owner，尺寸变化重建，状态报告half-size/bytes。CPU integral与独立numerical quadrature、guide/budget/descriptor/nativeSPIR-V checks不替代GPU视觉验收。

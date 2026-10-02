@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.16.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.17.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.16.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.17.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -24,6 +24,7 @@
 | `/voxellight mode normal` | 用深度和当前 projection 重建表面方向并着色；天空黑色，无新增世界光照。 |
 | `/voxellight mode shadow` | 世界太阳/月亮阴影、月光 fill 与人工灯；自动启用 scene，caster 准备完成后生效。 |
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
+| `/voxellight ao on` / `off` / `view` | foundation terrain AO，默认on；view自动进入foundation并显示AO灰度，on恢复正常光照。 |
 | `/voxellight temporal_shadows on` / `off` | foundation directional visibility history比较，默认on；静止画面可能无差别，非full TAA。 |
 | `/voxellight entity_materials on` / `off` | 默认on；支持的opaque实体模型使用材质/normal分离lighting，off保留native实体颜色；不关闭terrain或实体阴影。 |
 | `/voxellight entity_shadows on` / `off` | 默认 on；开关新增太阳/月亮实体模型阴影，保留地形阴影与原生 blob shadow。 |
@@ -45,7 +46,7 @@ CSV 的 CPU 字段只表示该 pass 的命令准备时间，GPU 字段表示 col
 
 OpenGL/未知 backend 或不支持的 scene format 保留原生画面，status 会显示原因。shader/pass 出错时自动关闭并写日志，下一帧恢复原生渲染；可用 mode 命令重试。已有 vanilla spectator/post effects 会继续处理诊断结果。
 
-当前scope和预算汇总见[CURRENT.md](CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.16.1。
+当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.17.0。
 
 ## 实机 smoke checklist
 
@@ -303,3 +304,15 @@ opaque terrain先完成已有foundation。native solid features绘制后，复�
 status新增materialStale（等待replacement的resident数）、materialReplacements与materialDiscarded。每帧仍只编译一个surface；stale的packed light/material短暂保留，超大/超预算replacement可延后。16 MiB steady geometry外最多1 MiB temporary replacement，world/F3+T/卸载/window退出立即清理旧surface。检查resource reload、移动跨section、快速编辑和维度切换没有旧块残留。
 
 纯LIGHT dirty不再reset directional history，实际torch geometry编辑仍reset；D1支持范围和128 MiB cap不变。CPU上传actual inverse projection与light normal matrices；输出应与此前一致。完整ghosting/cascade边界验证仍需实机，用户对0.16改善目前无明显观察；下一视觉阶段为Basic AO。
+
+## 0.17.0 basic terrain AO
+
+用户已确认0.16.1稳定性修复。本版新增半分辨率horizon AO，默认随foundation开启。第一版仅opaque terrain；cutout植物、unshaded、实体receivers以及不支持的coverage保持neutral。作用于sky/ambient与未被selected lamp替换的block-light fill；太阳/月亮direct、selected local lamp direct和emission保持当前光照。
+
+1. 替换旧jar，进入Vulkan测试世界，`/voxellight mode foundation`。等待material caster暖机。
+2. 看墙角、楼梯、树根、台阶和建筑内部，比较`/voxellight ao off`与`/voxellight ao on`。应出现柔和contact shading，空旷平面基本不变。
+3. `/voxellight ao view`查看应用后的AO factor：支持的空旷面白，角落/接缝灰。天空和unsupported pixels保留native画面，cutout/entity receivers为neutral白。`ao on`恢复正常HDR/tone/fog。
+4. 走动、改变FOV和窗口尺寸（含odd尺寸）、F3+T、编辑方块/放火把/切维度。观察墙角没有整片闪回，轮廓没有大范围黑色halo；植物光照/透明/UI顺序应保持。AO是screen-space参考，会遗漏屏幕外/半分辨率薄细节，无AO temporal，不承诺完全无crawl。
+5. 检查发光块与太阳照射面：AO不应把emission或sun/direct lamps一同压暗。
+
+status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world radius、最大80 full-res pixel search，4 slices×4 steps×2 sides；5×5 bilateral spatial filter、四guide bilateral upsample，两个RGBA16F half targets总32 MiB cap（1440p14.1 MiB，4K31.6 MiB）。另16-byte neutral target +32-byte settings。超预算只关闭AO并保留foundation。无额外SceneColor copy/native depth写入，无新增history；GPU耗时未实机测量。算法范围/参考见[AO.md](https://github.com/jurky123/mineRenderer/blob/main/docs/AO.md)。

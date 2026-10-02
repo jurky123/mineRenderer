@@ -21,6 +21,10 @@ layout(std140) uniform Fog {
     float FogSkyEnd;
     float FogCloudsEnd;
 };
+layout(std140) uniform AoSettings {
+    vec4 AoParameters; // Radius, strength, plane bias, maximum full-resolution screen radius.
+    vec4 AoFilter; // Plane tolerance, normal threshold, enabled, debug view.
+};
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 vec3 linearToSrgb(vec3 c) {
@@ -36,6 +40,7 @@ void main() {
     vec4 hdr = texture(LightingHdr, texCoord);
     // Unsupported pixels keep their original native color without a SceneColor copy.
     if (hdr.a < 0.5) discard;
+    if(AoFilter.w>.5) { fragColor=vec4(hdr.rgb,1.0);return; }
     float depth = texture(SceneDepth, texCoord).r;
     vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;

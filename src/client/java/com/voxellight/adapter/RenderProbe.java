@@ -79,6 +79,7 @@ public final class RenderProbe {
     }
 
     public void captureWorldProjection(org.joml.Matrix4f projection) { shadows.captureProjection(projection); if(mode==Mode.FOUNDATION)lighting.captureProjection(projection); }
+    public void setAmbientOcclusion(boolean enabled,boolean debug) { RenderSystem.assertOnRenderThread(); lighting.setAmbientOcclusion(enabled,debug); resetTiming(); }
     public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
 
     public void setEntityMaterials(boolean value) { RenderSystem.assertOnRenderThread(); entityMaterials.setEnabled(value); resetTiming(); }

@@ -134,3 +134,11 @@ SurfaceToken仍推进packed light版本，但同一section lifetime内可以reta
 ShadowResolveSettings增加InvProjection和三张LightNormalMatrix（mat4 upper3×3），总560 bytes，所有四个fragment消费者共用反射验证。actual world projection通过现有hook同步CPU inverse，caster矩阵每frame CPU inverse-transpose；不改变native depth、PCF、fog或HDR tone模型。没有实测GPU性能提升。
 
 D1 history key使用geometryChangeRevision，不受纯LIGHT dirty影响；动态阴影上一帧eligible=false会保存negative visibility，因此刚移开dynamic caster也拒绝该history。完整移动动物/开箱/banner/camera/cascade实机验收仍pending，不扩大temporal系统。
+
+## 0.17.0 D2 ambient occlusion composition
+
+`AmbientOcclusionPass`位于terrain MaterialCapture与current lighting之间；只输出/过滤visibility + view normal + linear view depth。AoSettings32 bytes，各fragment consumer反射验证。Lighting中ambient=minimum fill + sky + (1-replacement)×native block-light fill，AO仅作用于ambient；selected lamp term、sun/moon direct与emission独立不受AO。
+
+Late native entity material capture复用已有terrain AO targets和同帧lighting inputs，但ENTITY receiver明确返回AO=1，不重新搜索/accumulate动态AO。AO view在tone/fog前直接显示应用后factor，不混入directional history的directRGB；settings change重置原shadow history。full depth仍只读。
+
+32 MiB half-target cap、frame-current空间滤波与现有5³coverage不扩张；texture/cutout/entity AO和full TAA仍未实现。实现与实机门槛见[AO.md](AO.md)。

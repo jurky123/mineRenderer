@@ -2,7 +2,7 @@
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 
-当前实现、用户验收与下一任务统一见[CURRENT.md](CURRENT.md)，本文件保留路线和历史实施记录。当前决策是先修0.16.x material refresh与frame transforms，保持D1 scope，之后进入Basic AO；不以temporal细微差异宣称完整验收。
+当前实现、用户验收与下一任务统一见[CURRENT.md](CURRENT.md)，本文件保留路线和历史实施记录。0.16.1 material refresh/frame transforms已获用户确认，D1 scope保持有限，0.17实现Basic AO并等待实机；不以temporal细微差异宣称完整验收。
 
 | 顺序 | 下一里程碑 | 门槛 |
 | --- | --- | --- |
@@ -183,3 +183,9 @@ GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4
 不扩展temporal或直接叠AO：先修LIGHT/material coverage闪回与移除fragment matrix inverses。retain-old/build/token-verify/swap使旧surface继续有效，steady16 MiB、每section1 MiB、temporary GPU replacement至多1 MiB；优先replacements，每帧仍最多一次build，oversized token不会反复编译。world/resource/unload/window退出立即退休。LIGHT仍重建packed light，独立dynamic light-data stream后置。
 
 Directional history改用geometryChangeRevision，纯LIGHT dirty不全局reset；torch的实际geometry改变仍reset。其他D1算法/内存cap不扩张。用户目前无法辨认0.16改善，完整ghosting/稳定性验收仍pending。下一视觉功能选择半分辨率Basic AO + bilateral upsample，先不加AO temporal；tone/sky/local polish后续。
+
+## 0.17.0 D2 basic horizon AO
+
+先实现GTAO-inspired normalized horizon slice reference，非完整XeGTAO移植。half-res native-depth validated material normal/opaque inputs、5×5 spatial bilateral和full-res四guide upsample。ambient/sky与未shadowed的block-fill乘AO，sun/moon、selected direct lights和emission不乘AO。纹理与shadow history仍独立current，不引入AO temporal或geometry窗口扩张。
+
+控制`ao on/off/view`、32 MiB target cap、neutral fallback、odd-size guide matching与lifecycle由AmbientOcclusionPass管理。native binding/UBO/descriptor和数学数值积分验证通过；墙角/楼梯/树根/洞穴、halo/FOV/reload/resize/维度实机检查pending。验收后进入tone/sky polish；性能和GI仍后置。

@@ -21,6 +21,7 @@ import java.util.Optional;
 final class LightingResolvePass implements AutoCloseable {
     static final RenderPipeline LIGHTING = lightingPipeline(false);
     static final RenderPipeline LIGHTING_TEMPORAL = lightingPipeline(true);
+    private final AmbientOcclusionPass ao = new AmbientOcclusionPass();
     private final TemporalShadowHistory temporal = new TemporalShadowHistory();
     private final Matrix4f actualProjection = new Matrix4f();
     private boolean projectionObserved;
@@ -48,6 +49,7 @@ final class LightingResolvePass implements AutoCloseable {
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuSampler terrainSampler) {
         material.capture(encoder,terrainSampler);
         shadows.updateLighting(encoder,RenderProbe.Mode.FOUNDATION);
+        ao.render(encoder,output,material,shadows);
         boolean useTemporal = temporal.prepare(output,projectionObserved);
         if(useTemporal && !RenderSystem.getDevice().precompilePipeline(LIGHTING_TEMPORAL,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Temporal lighting shader compilation failed");
         renderCurrent(encoder,output,material,shadows,useTemporal);
@@ -56,6 +58,7 @@ final class LightingResolvePass implements AutoCloseable {
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
     void endFrame(){projectionObserved=false;}
+    void setAmbientOcclusion(boolean enabled,boolean debug){ao.setEnabled(enabled,debug);}
     void setTemporal(boolean enabled){temporal.setEnabled(enabled);}
     void invalidateHistory(){temporal.invalidate();}
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
@@ -78,6 +81,7 @@ final class LightingResolvePass implements AutoCloseable {
             for (int i=0;i<names.length;i++) pass.bindTexture(names[i],material.view(i),nearest);
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindLighting(pass);
+            ao.bind(pass);
             pass.setUniform("LightingEnvironment",environment);
             pass.draw(3,1,0,0);
         }
@@ -90,6 +94,7 @@ final class LightingResolvePass implements AutoCloseable {
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindTransform(pass);
             pass.setUniform("Fog",RenderSystem.getShaderFog());
+            ao.bindSettings(pass);
             pass.draw(3,1,0,0);
         }
     }
@@ -98,8 +103,8 @@ final class LightingResolvePass implements AutoCloseable {
                 .withRenderArea(new RenderPass.RenderArea(0,0,width,height))
                 .withColorAttachment(hdr,Optional.of(new Vector4f(0))).withColorAttachment(shadow,Optional.of(new Vector4f(1,0,0,0)));
     }
-    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + temporal.status(); }
-    @Override public void close() {releaseBuffers();temporal.close();projectionObserved=false;}
+    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + temporal.status() + ao.status(); }
+    @Override public void close() {releaseBuffers();temporal.close();ao.close();projectionObserved=false;}
     private void releaseBuffers() {
         if (hdrView != null) { hdrView.close(); hdrView=null; }
         if (hdr != null) { hdr.close(); hdr=null; }
@@ -113,9 +118,9 @@ final class LightingResolvePass implements AutoCloseable {
                         .withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
                         .withSampler("ShadowMap").withSampler("MiddleShadowMap").withSampler("FarShadowMap")
                         .withSampler("EntityShadowMap").withSampler("MiddleEntityShadowMap").withSampler("FarEntityShadowMap")
-                        .withSampler("VoxelOpacity").withSampler("ShapeBounds")
+                        .withSampler("VoxelOpacity").withSampler("ShapeBounds").withSampler("AmbientVisibility")
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
-                        .withUniform("LocalLightSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER).build())
+                        .withUniform("LocalLightSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())
                 .withColorTargetState(new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL))
                 .withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false);
         if(history)builder.withShaderDefine("TEMPORAL_SHADOW").withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL));
@@ -127,7 +132,7 @@ final class LightingResolvePass implements AutoCloseable {
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting_output"))
                 .withBindGroupLayout(BindGroupLayout.builder().withSampler("LightingHdr").withSampler("SceneDepth")
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
-                        .withUniform("Fog",UniformType.UNIFORM_BUFFER).build())
+                        .withUniform("Fog",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())
                 .withColorTargetState(ColorTargetState.DEFAULT).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false).build();
     }
 }

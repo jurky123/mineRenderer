@@ -2,6 +2,13 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.17.0 basic terrain AO
+
+- Half-resolution horizon AO, depth/normal bilateral spatial filter and full-resolution upsample.
+- Ambient/sky and unshadowed block fill receive AO; direct sun/moon/local lamps and emission remain current.
+- `/voxellight ao on|off|view`, neutral fallback,32 MiB extra target cap; no AO history.
+- 0.16.1 stability accepted by user; AO awaits in-game acceptance.
+
 ## 0.16.1 stability follow-up
 
 - Retain stale material meshes until a verified replacement; bounded1 MiB staging over16 MiB resident cap. No cross-world/resource/unload retention.

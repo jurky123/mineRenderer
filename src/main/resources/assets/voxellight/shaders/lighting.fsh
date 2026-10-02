@@ -14,6 +14,7 @@ uniform sampler2D MiddleEntityShadowMap;
 uniform sampler2D FarEntityShadowMap;
 uniform usampler2D VoxelOpacity;
 uniform sampler2D ShapeBounds;
+uniform sampler2D AmbientVisibility;
 layout(std140) uniform Projection { mat4 ProjMat; };
 layout(std140) uniform ShadowResolveSettings {
     mat4 LightMatrix[3];
@@ -35,12 +36,68 @@ layout(std140) uniform LightingEnvironment {
     vec4 DirectColorStrength;
     vec4 SkyColorStrength;
 };
+layout(std140) uniform AoSettings {
+    vec4 AoParameters; // Radius, strength, plane bias, maximum full-resolution screen radius.
+    vec4 AoFilter; // Plane tolerance, normal threshold, enabled, debug view.
+};
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 #ifdef TEMPORAL_SHADOW
 layout(location = 1) out vec4 shadowTemporalInput;
 bool dynamicAffected = false;
 #endif
+
+vec2 aoSign(vec2 v) { return mix(vec2(-1),vec2(1),greaterThanEqual(v,vec2(0))); }
+vec3 aoDecode(vec2 encoded) {
+    vec2 p=encoded*2.0-1.0;
+    vec3 n=vec3(p,1.0-abs(p.x)-abs(p.y));
+    if(n.z<0.0)n.xy=(1.0-abs(n.yx))*aoSign(n.xy);
+    return normalize(n);
+}
+vec2 aoEncode(vec3 n) {
+    n/=abs(n.x)+abs(n.y)+abs(n.z);
+    return (n.z>=0.0?n.xy:(1.0-abs(n.yx))*aoSign(n.xy))*.5+.5;
+}
+vec3 aoUnproject(vec2 uv,float depth) {
+    vec4 p=InvProjection*vec4(uv*2.0-1.0,depth,1.0);
+    return p.xyz/p.w;
+}
+// Guides correspond to the fixed (1,1) texel of each 2x2 group, clamped at odd dimensions.
+vec3 aoGuidePosition(ivec2 halfPixel,float linearDepth,ivec2 fullSize) {
+    vec2 uv=(vec2(min(halfPixel*2+1,fullSize-1))+.5)/vec2(fullSize);
+    vec3 a=aoUnproject(uv,1.0),b=aoUnproject(uv,.5);
+    vec3 ray=b-a;
+    return a+ray*((-linearDepth-a.z)/ray.z);
+}
+float aoGuideWeight(vec3 center,vec3 normal,vec3 samplePosition,vec3 sampleNormal) {
+    float facing=dot(normal,sampleNormal);
+    float plane=abs(dot(normal,samplePosition-center));
+    float tolerance=AoFilter.x+.002*abs(center.z);
+    if(facing<AoFilter.y || plane>tolerance || length(samplePosition-center)>AoParameters.x)return 0.0;
+    return pow(max(facing,0.0),8.0)*exp(-plane*plane/(tolerance*tolerance*.25));
+}
+float ambientVisibility(vec3 worldNormal,vec3 position,int flags) {
+    // First AO phase is opaque terrain only; cutout, unshaded and entity receivers stay neutral.
+    if(AoFilter.z<.5 || (flags&21)!=0)return 1.0;
+    ivec2 size=textureSize(AmbientVisibility,0),fullSize=textureSize(SceneDepth,0);
+    ivec2 fullPixel=ivec2(gl_FragCoord.xy);
+    vec2 grid=(vec2(fullPixel)-1.0)*.5;
+    if((fullSize.x&1)!=0 && fullPixel.x==fullSize.x-1)grid.x=float(size.x-1);
+    if((fullSize.y&1)!=0 && fullPixel.y==fullSize.y-1)grid.y=float(size.y-1);
+    ivec2 base=ivec2(floor(grid));vec2 phase=fract(grid);
+    vec3 normal=normalize(transpose(mat3(ViewToWorld))*worldNormal);
+    float sum=0.0,weight=0.0;
+    for(int y=0;y<2;y++)for(int x=0;x<2;x++) {
+        ivec2 pixel=base+ivec2(x,y);
+        if(any(lessThan(pixel,ivec2(0))) || any(greaterThanEqual(pixel,size)))continue;
+        vec4 guide=texelFetch(AmbientVisibility,pixel,0);
+        if(guide.a<=0.0)continue;
+        float w=(x==0?1.0-phase.x:phase.x)*(y==0?1.0-phase.y:phase.y)
+            *aoGuideWeight(position,normal,aoGuidePosition(pixel,guide.a,fullSize),aoDecode(guide.gb));
+        sum+=guide.r*w;weight+=w;
+    }
+    return weight>.00001?mix(1.0,sum/weight,AoParameters.y):1.0;
+}
 
 vec3 reconstruct(vec2 uv, float depth, mat4 inverseProjection) {
     vec4 position = inverseProjection * vec4(uv * 2.0 - 1.0, depth, 1.0);
@@ -176,6 +233,9 @@ void main() {
     float distanceToCamera = length(position);
     vec3 normal = normalize(geometryNormal.xyz);
     int flags = int(round(material.a * 255.0));
+    vec3 viewPosition=reconstruct(texCoord,depth,InvProjection);
+    float ao=ambientVisibility(normal,viewPosition,flags);
+    if(AoFilter.w>.5) { fragColor=vec4(vec3(ao),1.0);return; }
     // Cutout foliage receives two-sided diffuse light. Never orient its normal to the camera:
     // crossed models contain opposing quads, and camera-facing flips change lighting at grazing angles.
     bool foliage = (flags & 1) != 0 && (flags & 16) == 0;
@@ -212,10 +272,11 @@ void main() {
     }
     float baselineEnergy = energy(blockBaseline);
     float replacement = smoothstep(baselineEnergy, baselineEnergy * 1.25 + 0.001, energy(selectedLocal));
-    vec3 local = mix(blockBaseline, selectedLocal, replacement);
     // Reference emission color uses authored albedo, not the already-lit scene or block light.
     vec3 emission = albedo * max(properties.r, properties.g) * 2.4;
-    vec3 radiance = albedo * (vec3(0.012) + sky + direct * visibility + local) + emission;
+    // AO modulates diffuse ambient/unshadowed block fill, never direct lamps, sun/moon or emission.
+    vec3 ambient=vec3(0.012)+sky+blockBaseline*(1.0-replacement);
+    vec3 radiance=albedo*(ambient*ao+direct*visibility+selectedLocal*replacement)+emission;
     fragColor = vec4(radiance, 1.0);
 #ifdef TEMPORAL_SHADOW
     shadowTemporalInput = vec4(visibility, albedo * direct);

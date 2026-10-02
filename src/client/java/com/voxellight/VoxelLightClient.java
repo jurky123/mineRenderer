@@ -121,6 +121,15 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var aoCommand=literal("ao");
+            for(String choice:new String[]{"on","off","view"}) {
+                aoCommand.then(literal(choice).executes(context -> {
+                    if(choice.equals("view"))PROBE.setMode(RenderProbe.Mode.FOUNDATION);
+                    PROBE.setAmbientOcclusion(!choice.equals("off"),choice.equals("view"));
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: terrain AO "+choice+" (foundation)"));
+                    return 1;
+                }));
+            }
             var temporalCommand = literal("temporal_shadows");
             for (boolean enabled : new boolean[]{true, false}) {
                 temporalCommand.then(literal(enabled ? "on" : "off").executes(context -> {
@@ -176,7 +185,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand));
         });
     }
 }
