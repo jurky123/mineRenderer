@@ -30,7 +30,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 ./gradlew build clientKit
 ```
 
-mod：`build/libs/voxellight-client-26.2-0.12.0.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.12.0.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
+mod：`build/libs/voxellight-client-26.2-0.12.1.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.12.1.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
 
 进入世界后使用 `/voxellight mode color` 检查原画面复制，`/voxellight mode depth` 查看世界深度，`/voxellight mode off` 恢复原画面。`/voxellight status` 查看状态，`/voxellight export` 导出最近最多 14,400 个 pass 样本。仅 Vulkan 执行诊断，OpenGL 保留 vanilla。所有命令均在本地执行，无服务端要求。
 

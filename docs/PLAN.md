@@ -145,3 +145,7 @@ P0 首次实测后锁定资源表：每个 target 的格式/分辨率/历史/fra
 SurfaceToken 单独跟踪 light-only packed light 失效，保留 shadow GeometryToken。局部灯使用 native block-light level baseline + smooth energy replacement，保留未入选 sources，避免 baseline 与 selected fill 整项相加。参考 emission 使用 material albedo 色与 emission strength；资源包 emissive radiance 和 exact native lightmap parity 尚未实现。
 
 用户须验收火把墙/发光块太阳遮挡、昼夜/月相/雨/洞穴、玻璃水与 fog 顺序、灯更新与 F3+T/resize/维度切换。预算/格式/边界见 VISUAL-FOUNDATION.md 最新章节。B3 和 temporal/GI 仍未开始。
+
+## 0.12.1 plant stability follow-up
+
+0.12.0 overall foundation 获用户确认；植物 flicker 单独修复：capture native culling parity，取消 camera-driven foliage normal flip，双面 diffuse/sky 与 emitter-facing local ray offset。保留 8 ULP/采样/预算。实机复测后继续 B3；未借此宣称 temporal 已完成。

@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.12.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，保留有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.12.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，保留有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.12.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.12.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -228,3 +228,9 @@ map+attachment 从 20 增为 30 MiB；caster GPU uniform 3×160 字节，resolve
 这是有限局部 terrain reference：125 material sections，未支持/深度不匹配 pixels 留 native；entities/block entities/fluids/translucency 自身仍 vanilla lighting。local_lights off 仅关闭选中光源的 colored visibility term；保留 native per-vertex block-light **level** 兼容 baseline，以免16灯限制丢光。baseline squared response 与 stronger selected light 平滑替换而非相加，不是 exact native lightmap/night vision/gamma parity。Emission radiance 以 authored albedo × emission strength ×2.4 定义，尚不支持资源包独立 emissive texture 或 bloom。
 
 MRT emission properties R/G=block/quad strength，B=sky level，A=block level；normal alpha=coverage。HDR8 bytes/pixel，material+HDR32 bytes/pixel；1440p112.5 MiB（不含独立 shadows/local/geometry），combined cap256 MiB、material cap192 MiB，超限保留 native。foundation 不复制 SceneColor；diagnostics/legacy 仍用 scratch。当前同步双套 terrain 构建与现有 PCF/DDA 是视觉 reference，未宣称性能验收。B3 entity materials/block-entity shadows/light-aware caster volume 和 temporal/GI 后续实施。
+
+## 0.12.1 plant stability fix
+
+用户确认 0.12.0 foundation 效果正常，但反馈植物 flicker。Material capture 改为与 native CUTOUT_TERRAIN 相同的 backface culling，避免 opposing plant quads 同时覆盖 coplanar depth。Foundation foliage 改为与视角无关的双面 diffuse/sky response；local visibility offset 朝光源侧，不再按相机翻转 normal。8 ULP depth rejection 与 native nearest/RGSS sampling 保持不变，没有扩大容差或新增 history。
+
+替换旧 jar 后 `mode foundation`，在草/花/树叶附近慢转、移动，尤其绕过 plant plane 的侧面；比较 `sun fixed` 与 `sun world`，附近放火把观察彩光。`mode material_coverage` 检查植物是否出现 green/magenta 来回切换。请同时比较 `mode off`：native cutout 边缘仍可能有 subpixel aliasing，本版未做 TAA/temporal，不能宣称消除全部闪烁。固定相机的 flicker、更新触发的 native fallback 需另行定位。

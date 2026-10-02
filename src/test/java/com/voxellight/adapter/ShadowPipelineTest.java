@@ -141,6 +141,9 @@ class ShadowPipelineTest {
     void materialMrtHasThreeExplicitTargetsAndUsesNormalsAndReversedDepth() throws Exception {
         try (var loader = shippedLoader()) {
             var capture = pipeline(loader, "CAPTURE");
+            assertEquals(net.minecraft.client.renderer.RenderPipelines.CUTOUT_TERRAIN.isCull(),capture.isCull(),
+                    "Native foliage contains opposing quads; capture must not draw extra coplanar backfaces");
+            assertTrue(capture.isCull());
             assertEquals(3, capture.getColorTargetStates().length);
             assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[0].format());
             assertEquals(GpuFormat.RGBA16_FLOAT, capture.getColorTargetStates()[1].format());
@@ -247,6 +250,19 @@ class ShadowPipelineTest {
                 assertTrue(foundation.contains(visibility),"Use the same accepted caster PCF/DDA visibility during lighting migration");
                 assertFalse(foundation.contains("planeError"),"Foundation uses real material normals");
             }
+        }
+    }
+
+    @Test
+    void shippedFoliageLightingDoesNotFlipNormalsWithTheView() throws Exception {
+        try (var loader = shippedLoader();
+             var stream = loader.findResource("assets/voxellight/shaders/lighting.fsh").openStream()) {
+            var shader = new String(stream.readAllBytes(),StandardCharsets.UTF_8);
+            assertFalse(shader.contains("dot(normal, position)"),
+                    "Camera-facing normal flips caused plant brightness/ray-origin discontinuities");
+            assertTrue(shader.contains("foliage ? abs(directFacing)"));
+            assertTrue(shader.contains("foliage ? abs(lightFacing)"));
+            assertTrue(shader.contains("foliage && lightFacing < 0.0 ? -normal : normal"));
         }
     }
 

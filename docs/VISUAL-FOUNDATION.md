@@ -97,3 +97,7 @@ Unsupported/unaligned HDR pixels have alpha 0; output discards them, retaining t
 `SurfaceToken` includes LIGHT changes to retire stale packed light immediately; existing `GeometryToken` behavior for shadow casters is unchanged. Surface rebuild is one section/frame, so a large light update can briefly expose native fallback while rebuilding. Resize/world/resource lifecycle closes owned targets through existing reset hooks; HDR coverage is cleared/replaced every frame.
 
 Acceptance remains: torch-lit sun-shadowed wall, glowstone under shadow, full/new moon, caves/Nether/rain, glass/water/particles/fog/UI composition, >16 nearby emitters, placing/breaking lights, reload/resize/dimension travel. CPU/native shader/binding tests do not replace these visual checks. B3 entity materials/block-entity casters/light-aware volume and later temporal work remain ahead.
+
+## 0.12.1 foliage stability
+
+The user confirmed the overall 0.12.0 foundation effect and reported plant flicker. Capture now matches native terrain backface culling; native plant models provide opposing faces and should not receive additional coplanar backface writes. Cutout diffuse/hemisphere response uses a two-sided convention, and local visibility bias selects the emitter-facing side instead of flipping with camera position. Both changes preserve strict depth validation and native cutout sampling. Plant fix acceptance is pending; ordinary subpixel cutout aliasing is not a claim of temporal stabilization.

@@ -159,16 +159,18 @@ void main() {
     float distanceToCamera = length(position);
     vec3 normal = normalize(geometryNormal.xyz);
     int flags = int(round(material.a * 255.0));
-    // Native plants are two-sided; orient only their receiver normal to the visible side.
-    if ((flags & 1) != 0 && dot(normal, position) > 0.0) normal = -normal;
+    // Cutout foliage receives two-sided diffuse light. Never orient its normal to the camera:
+    // crossed models contain opposing quads, and camera-facing flips change lighting at grazing angles.
+    bool foliage = (flags & 1) != 0;
     float coverage = 1.0 - smoothstep(Coverage.x, Coverage.y, distanceToCamera);
     float occlusion = coverage > 0.0 && Coverage.z > 0.0 ? cascadeOcclusion(distanceToCamera, position, normal) : 0.0;
     float visibility = 1.0 - occlusion * coverage;
     float skyAccess = clamp(properties.b, 0.0, 1.0);
     vec3 sky = SkyColorStrength.rgb * SkyColorStrength.a * skyAccess
-        * mix(0.45, 1.0, normal.y * 0.5 + 0.5);
+        * mix(0.45, 1.0, (foliage ? abs(normal.y) : normal.y) * 0.5 + 0.5);
+    float directFacing = dot(normal, LightDirectionAndMask.xyz);
     vec3 direct = DirectColorStrength.rgb * DirectColorStrength.a
-        * max(dot(normal, LightDirectionAndMask.xyz), 0.0) * skyAccess;
+        * (foliage ? abs(directFacing) : max(directFacing, 0.0)) * skyAccess;
     // Keep all native block-light sources, including ones beyond the 16-light selection.
     // Replace this baseline only if the selected colored, visible reference has greater energy.
     vec3 blockBaseline = vec3(1.0, 0.78, 0.55) * 0.8 * properties.a * properties.a;
@@ -180,9 +182,12 @@ void main() {
             vec3 toLight = LightPositionRadius[i].xyz - position;
             float distanceToLight = length(toLight), radius = LightPositionRadius[i].w;
             if (distanceToLight >= radius || distanceToLight < 0.001) continue;
-            float lambert = max(dot(normal, toLight / distanceToLight), 0.0);
+            float lightFacing = dot(normal, toLight / distanceToLight);
+            float lambert = foliage ? abs(lightFacing) : max(lightFacing, 0.0);
             if (lambert <= 0.0 || LightColorStrength[i].w <= 0.0) continue;
-            if (!visibleToEmitter(position + normal * 0.04, LightPositionRadius[i].xyz)) continue;
+            // Offset toward the emitter side for thin foliage, independent of the viewing side.
+            vec3 emitterNormal = foliage && lightFacing < 0.0 ? -normal : normal;
+            if (!visibleToEmitter(position + emitterNormal * 0.04, LightPositionRadius[i].xyz)) continue;
             float falloff = 1.0 - distanceToLight / radius;
             selectedLocal += LightColorStrength[i].rgb * LightColorStrength[i].w
                 * falloff * falloff * lambert * 0.7 * localCoverage;
