@@ -496,7 +496,7 @@ public final class ShadowRenderer implements AutoCloseable {
     private void ensureResources() {
         if (resolveSettings != null) return;
         var device = RenderSystem.getDevice();
-        for (var pipeline : List.of(CASTER, COMPOSITE, MASK, MAP)) {
+        for (var pipeline : List.of(CASTER, ENTITY, COMPOSITE, MASK, MAP)) {
             if (!device.precompilePipeline(pipeline, RenderProbe.SHADERS).isValid()) throw new IllegalStateException("Cascade shadow shader compilation failed");
         }
         for (var c : cascades) {

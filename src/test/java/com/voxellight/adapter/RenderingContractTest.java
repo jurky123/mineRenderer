@@ -45,7 +45,7 @@ class RenderingContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"RenderProbe", "ShadowRenderer"})
+    @ValueSource(strings = {"RenderProbe", "ShadowRenderer", "MaterialCapture"})
     void packagedDiagnosticDrawSubmitsGeometry(String className) throws Exception {
         // Check the shipped call, not a separately constructed test triangle.
         try (var jar = new ZipFile(System.getProperty("voxellight.modJar"));

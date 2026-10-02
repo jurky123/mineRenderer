@@ -27,7 +27,9 @@ import java.util.Optional;
 /** Version-specific diagnostic pass. Owns no Minecraft device, queue or framebuffer. */
 public final class RenderProbe {
     public enum Mode {
-        OFF, COLOR, DEPTH, NORMAL, SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES;
+        OFF, COLOR, DEPTH, NORMAL, SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES, ALBEDO, SURFACE_NORMAL, EMISSION, MATERIAL_FLAGS, MATERIAL_COVERAGE;
+
+        public boolean isMaterial() { return this == ALBEDO || this == SURFACE_NORMAL || this == EMISSION || this == MATERIAL_FLAGS || this == MATERIAL_COVERAGE; }
 
         public boolean isShadow() {
             return this == SHADOW || this == SHADOW_MASK || this == SHADOW_MAP || this == SHADOW_RANGES;
@@ -41,6 +43,7 @@ public final class RenderProbe {
     static final ShaderSource SHADERS = (id, type) -> readShader(id, type);
     private final PassMetrics metrics = new PassMetrics(14_400);
     private final ShadowRenderer shadows = new ShadowRenderer();
+    private final MaterialCapture material = new MaterialCapture();
     private Mode mode = Mode.OFF;
     private GpuTexture scratch;
     private GpuTextureView scratchView;
@@ -53,12 +56,13 @@ public final class RenderProbe {
     private String state = "off";
     private String timing = "not observed";
     private boolean zZeroToOne;
+    private boolean materialPointObserved;
 
     public void setMode(Mode mode) {
         RenderSystem.assertOnRenderThread();
-        if (mode.isShadow() && !VoxelLightClient.scene().isEnabled()) VoxelLightClient.scene().setEnabled(true);
+        if ((mode.isShadow() || mode.isMaterial()) && !VoxelLightClient.scene().isEnabled()) VoxelLightClient.scene().setEnabled(true);
         if (this.mode == mode) return;
-        if (this.mode.isShadow() && mode.isShadow()) resetTiming();
+        if ((this.mode.isShadow() && mode.isShadow()) || (this.mode.isMaterial() && mode.isMaterial())) resetTiming();
         else reset();
         this.mode = mode;
         state = mode == Mode.OFF ? "off" : "waiting for world render";
@@ -103,7 +107,7 @@ public final class RenderProbe {
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
                 + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
                 + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
-                + (mode.isShadow() ? ", " + shadows.status() : "");
+                + (mode.isShadow() ? ", " + shadows.status() : mode.isMaterial() ? ", " + material.status() : "");
     }
 
     public long scratchBytes() {
@@ -111,6 +115,21 @@ public final class RenderProbe {
     }
 
     public void render(RenderTarget target) {
+        if (mode.isMaterial()) {
+            if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
+            materialPointObserved = false;
+            return;
+        }
+        renderPass(target);
+    }
+
+    public void renderMaterialTerrain(RenderTarget target) {
+        if (!mode.isMaterial()) return;
+        materialPointObserved = true;
+        renderPass(target);
+    }
+
+    private void renderPass(RenderTarget target) {
         RenderSystem.assertOnRenderThread();
         var device = RenderSystem.getDevice();
         var info = device.getDeviceInfo();
@@ -142,18 +161,21 @@ public final class RenderProbe {
                 state = "shadow not ready; vanilla rendering retained";
                 return;
             }
+            if (mode.isMaterial() && !material.prepare(target)) {
+                releaseScratch(); state = "material unavailable; vanilla retained"; return;
+            }
             RenderPipeline pipeline = switch (mode) {
                 case COLOR -> COLOR;
                 case DEPTH -> DEPTH;
                 case NORMAL -> NORMAL;
-                case SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES -> null;
+                case SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES, ALBEDO, SURFACE_NORMAL, EMISSION, MATERIAL_FLAGS, MATERIAL_COVERAGE -> null;
                 case OFF -> throw new IllegalStateException("Off mode cannot render");
             };
             // Minecraft owns compilation/cache destruction. Only our shaders are supplied here.
             if (pipeline != null && !device.precompilePipeline(pipeline, SHADERS).isValid()) {
                 throw new IllegalStateException("Diagnostic shader compilation failed");
             }
-            if (mode == Mode.COLOR || mode.isShadow()) {
+            if (mode == Mode.COLOR || mode.isShadow() || mode.isMaterial()) {
                 ensureScratch(target);
             }
             if (!timerAttempted) {
@@ -184,10 +206,12 @@ public final class RenderProbe {
                     disableTimer(e);
                 }
             }
-            if (mode == Mode.COLOR || mode.isShadow()) {
+            if (mode == Mode.COLOR || mode.isShadow() || mode.isMaterial()) {
                 encoder.copyTextureToTexture(target.getColorTexture(), scratch, 0, 0, 0, 0, 0, target.width, target.height);
             }
-            if (mode.isShadow()) {
+            if (mode.isMaterial()) {
+                material.render(encoder, target, scratchView, mode);
+            } else if (mode.isShadow()) {
                 shadows.render(encoder, target, scratchView, mode);
             } else try (var pass = encoder.createRenderPass(() -> "VoxelLight diagnostic", target.getColorTextureView(), Optional.empty())) {
                 pass.setPipeline(pipeline);
@@ -208,7 +232,7 @@ public final class RenderProbe {
             }
             // Leave submission/frame lifecycle to Minecraft's shared encoder.
             metrics.record(frame, mode.name(), target.width, target.height, System.nanoTime() - cpuStart);
-            state = mode.isShadow() ? "terrain lighting active" : "diagnostic active";
+            state = mode.isShadow() ? "terrain lighting active" : mode.isMaterial() ? "material diagnostic active" : "diagnostic active";
         } catch (RuntimeException e) {
             LOGGER.error("Diagnostic pass disabled after failure", e);
             reset();
@@ -222,6 +246,8 @@ public final class RenderProbe {
         RenderSystem.assertOnRenderThread();
         releaseScratch();
         shadows.close();
+        material.close();
+        materialPointObserved = false;
         resetTiming();
         state = mode == Mode.OFF ? "off" : "waiting for world render";
     }

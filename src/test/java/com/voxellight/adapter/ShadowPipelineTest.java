@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX);
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT)) {
@@ -109,9 +109,36 @@ class ShadowPipelineTest {
                     }
                     fragment.rebind(outputs, entries);
                     assertFalse(entries.isEmpty());
-                    if (!field.equals("CASTER") && !field.equals("ENTITY")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
+                    if (field.equals("CAPTURE")) {
+                        var names = new ArrayList<String>();
+                        for (Object output : fragment.outputs()) {
+                            var name = output.getClass().getDeclaredMethod("name"); name.setAccessible(true);
+                            names.add((String)name.invoke(output));
+                        }
+                        assertEquals(List.of("outAlbedo", "outNormal", "outEmission"), names,
+                                "Native output rebinding order must match the actual MRT attachments");
+                    }
+                    if (!field.equals("CASTER") && !field.equals("ENTITY") && !field.equals("CAPTURE")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
                 }
             }
+        }
+    }
+
+    @Test
+    void materialMrtHasThreeExplicitTargetsAndUsesNormalsAndReversedDepth() throws Exception {
+        try (var loader = shippedLoader()) {
+            var capture = pipeline(loader, "CAPTURE");
+            assertEquals(3, capture.getColorTargetStates().length);
+            assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[0].format());
+            assertEquals(GpuFormat.RGBA16_FLOAT, capture.getColorTargetStates()[1].format());
+            assertEquals(GpuFormat.RGBA16_FLOAT, capture.getColorTargetStates()[2].format());
+            for (var target : capture.getColorTargetStates()) assertTrue(target.blendFunction().isEmpty());
+            assertEquals(CompareOp.GREATER_THAN_OR_EQUAL, capture.getDepthStencilState().depthTest());
+            assertTrue(capture.getDepthStencilState().writeDepth());
+            assertNotNull(capture.getVertexFormatBinding(0).getElement("Normal"));
+            assertNotNull(capture.getVertexFormatBinding(0).getElement("UV1"));
+            assertEquals(36, capture.getVertexFormatBinding(0).getVertexSize());
+            assertNull(pipeline(loader, "DISPLAY").getDepthStencilState());
         }
     }
 
@@ -120,7 +147,7 @@ class ShadowPipelineTest {
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
-        var field = Class.forName("com.voxellight.adapter.ShadowRenderer", true, loader).getDeclaredField(name);
+        var field = Class.forName("com.voxellight.adapter." + (name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);
     }

@@ -2,6 +2,15 @@
   "required": true,
   "package": "com.voxellight.mixin.client",
   "compatibilityLevel": "JAVA_25",
-  "client": ["GameRendererMixin", "ClientLevelMixin", "ClientChunkCacheMixin", "ClientPacketListenerMixin", "ShaderManagerMixin"],
-  "injectors": { "defaultRequire": 1 }
+  "client": [
+    "GameRendererMixin",
+    "ClientLevelMixin",
+    "ClientChunkCacheMixin",
+    "ClientPacketListenerMixin",
+    "ShaderManagerMixin",
+    "ChunkSectionsToRenderMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

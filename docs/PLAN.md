@@ -1,5 +1,26 @@
 # VoxelLight 实施计划
 
+## 当前决策：Visual Foundation 优先（0.10.0 review 后）
+
+用户评审针对 `2808397807449f7b7e490907a9f2b57d470d18ae`。采纳材质/光照分离优先，停止向 legacy `shadow.fsh` 堆叠 AO/GI/水/体积效果。0.9.0 shape 遮挡已获用户确认，0.10.0 实体视觉仍待验收；81 个自动测试不代替实机。
+
+下一实施任务为 **B1 material capture proof（0.11.0 已实现，实机验收待完成）**：真实 geometry normal、未照明纹理/tint、emission、flags/coverage 的独立诊断；验证 26.2 原生 MRT、opaque 提交与 depth/cutout 对齐。Native BLOCK 无 Normal 且 Color 已含 cardinal shade，不能直接充当完整 GBuffer。随后 B2 分离 sun/sky/block/local/emission、HDR/颜色空间/fog 与 opaque→transparent 次序；B3 补实体 material、block entity caster、receiver-driven light-aware caster volume 并完成实机验收。
+
+| 顺序 | 下一里程碑 | 门槛 |
+| --- | --- | --- |
+| B1 | Material/GBuffer capture proof（当前实现，待实机验收） | 材质不含 lightmap/AO/fog；geometry normals 与 native depth/cutout 对齐；状态/预算和实机诊断。 |
+| B2 | 分离 opaque lighting | 太阳阴影只作用于 direct；保留声明的 vanilla block-light baseline；HDR/tonemap/fog 一次应用；透明/UI 合成正确。 |
+| B3 | Geometry/caster 完整性 | 实体验收与材质迁移，block entity shadow，沿 receiver-to-light 方向扩展已加载 caster 搜索。 |
+| D | Temporal + basic AO | camera reprojection、depth/normal rejection，动态无 motion pixels 拒绝 history。 |
+| E | Local lighting polish | 数据驱动光源色、多 source 聚合、明确 falloff 和有界动态光源。 |
+| F | 可选水/大气/SSR | 原生透明合成与独立 history/资源预算已验证。 |
+| G | GPU Voxel DB / Probe GI | 真实 material/normal/emission 和基本 lighting/temporal 已通过，不使用 legacy 已照明色作为 GI 材质输入。 |
+
+保留 legacy 效果与 profiler 作为可比较 reference。预算调度、dual-angle cache、cutout 动画分类、mesh reuse、clustered lights 等性能改造按实测推进；不声明当前 world-sun cache 已达到原 P1b 收益门槛。0.11.0 已实现 B1 terrain MRT/material diagnostics，尚待实机验收；B2/B3 未实施。
+
+具体依据：[0.10.0 评审决策](REVIEW-0.10.0.md)。下一阶段输入/格式/owner/验收：[Visual Foundation contract](VISUAL-FOUNDATION.md)。文后原计划和逐版记录保留为历史。
+
+
 状态：用户已确认 0.1.2 Vulkan depth，以及 0.2.0 normal、125/125 局部 section、F3+T 和下界切换正常。0.3.0 进入 P1a 的地形参考阴影实验：独立模型 caster、固定太阳、单层非缓存 map、cutout、PCF/bias、近距合成。0.3.0 用户截图已证明 caster map 执行，同时暴露 acne 和全局准备闪灭；0.3.1 后新截图地面改善但侧面仍有条纹，移动时局部消失；0.3.2 改为深度邻域法线平面修正并保留有效 caster 的已确认遮挡，待实机复测；实体/方块实体动态 caster、远距完整覆盖、真正 GBuffer 和完整 benchmark 仍待接入，不宣称完整 P1a 验收通过。按用户要求基线为 Minecraft 26.2。详见 [评审](REVIEW.md)、[接入记录](INTEGRATION.md) 和 [阴影边界](SHADOWS.md)。
 
 0.4.0 推进 P1b 的单层缓存基础：固定 8 格世界 anchor、caster 集版本失效、同质量每帧参考开关、map reuse/update 原因；同时将 map 提升到 2048² 并连续插值 comparison PCF。cutout 每帧重绘保证动画 alpha 当前。P1a 剩余画质/动态层与 P1b 三层 clipmap/分页/动态合成/太阳运动仍未完成；先实机比较当前缓存与参考。
@@ -10,7 +31,7 @@
 
 用户认可 0.5.1。0.6.0 推进 P1b 变化太阳：native sky sun/moon angles、月相/雨天/近地平线强度策略、source/angle cache key、正午稳定 basis、sun world/fixed 比较开关。cache/reference 同样取整方向；方向变化立即全更新，strength-only 不失效。3 层 clipmap/延期页预算/动态 entity 与完整性能验收仍未完成。
 
-## 阶段与验收
+## 原始阶段与验收（历史路线；当前优先级见文首）
 
 | 阶段 | 交付 | 进入下一阶段的条件 |
 | --- | --- | --- |
@@ -96,3 +117,23 @@ P0 首次实测后锁定资源表：每个 target 的格式/分辨率/历史/fra
 三张 dynamic depth（2048²/1024²/1024²）增加 24 MiB，复用既有写禁用 R8 color attachment；总 shadow targets 54 MiB。固定 dynamic GPU vertex buffer 最多 1 MiB，CPU frame pack 1 MiB + scratch<=256 KiB；off mode/reload/world reset 释放自有资源。entity_shadows off 保留已分配资源并清空深度，避免开关重分配。存在动态模型时 PCF 每 tap 最多增加一次深度采样；空层通过统一 flag 跳过动态采样。模型捕获 CPU 时间在 GPU query 之前单列 entityCaptureNs；GPU pass timing 包括动态顶点上传、动态层 draw/clear 和合成。
 
 本阶段没有完成页调度、滚动 clipmap、动态方块实体、完整 frame profiler/GBuffer 或 AO/GI。下一步先实机验证动态层与压力性能，再实现预算页更新或 AO。自动测试验证 nearest admission/overflow、native animated Model→BLOCK 顶点坐标与容量限制、实际 ENTITY pipeline 的 GLSL→SPIR-V 和 Vulkan stage binding。
+
+## 0.11.0 B1 Material capture proof
+
+本版新增 terrain-only GBuffer/MRT 诊断，不替换既有 shadow lighting。新命令为 `mode albedo`、`surface_normal`、`emission`、`material_flags`、`material_coverage`，使用 Vulkan 并自动开启 scene。`mode shadow` 继续作为 0.10 的 lighting reference；`mode normal` 仍是旧 depth-reconstruction diagnostic。
+
+材料捕获使用原生 ModelBlockRenderer 的 quad/seed/offset/culling，以及 BlockColors 原始 tint source；丢弃 QuadInstance 的 baked lighting Color。geometry normal 从 quad 顶点求出，按 quad nominal outward direction 校准，仅支持 planar block faces，不提供 smooth entity normals/normal maps。private ENTITY 格式的 Normal 保留 geometry normal；UV1 存放 block emission/model emission/flags，UV2 保留原生 light coordinates，但捕获 shader 不采样 lightmap。
+
+实际 MRT：RGBA8_UNORM 存储 **sRGB 编码的 unlit albedo** 与独立 flags，避免 dark linear color 的 8-bit 量化损失；后续 lighting 需要解码一次。纹理/tint 各自解码后在线性域相乘，再编码存储。RGBA16_FLOAT 存储 signed normal 与 supported coverage；另一 RGBA16_FLOAT 存储 block/model emission strength，而非 RGB radiance。private D32 存储 reversed-Z，使用 native projection（含 bob/hurt/nausea）和 camera rotation/section offsets。
+
+新增 hook 位于 `ChunkSectionsToRender.renderGroup(OPAQUE)` TAIL，三色 capture 后直接显示诊断，然后继续 native entities/translucency/particles/weather/hand/UI。不在最终已合成图片上用 opaque depth 覆盖玻璃或水。主 depth 不写入；display 比较 private/native depth，最多允许 8 个 positive float ULP；未匹配像素保留 vanilla。主 hook 未执行（例如其他 renderer 改写该路径）时 status 显示 `opaque terrain hook not observed; vanilla retained`，不冒险在 after-world 补画。
+
+局部 window camera±2 sections，最多125 entries；一 section/frame，同帧撤销 edited/unloaded/stale token，暖机缺口保留 native。geometry resident16 MiB、单 section/native scratch1 MiB；容量溢出记录 deferred，已有较近 geometry 优先，不反复编译同 token 的超限 section。material surface store 与 target/capture/display owners 分离；原生 visible mesh 复用尚未实现，当前 proof 仍有独立材质几何构建开销。
+
+三个 color targets + private depth 为24 bytes/pixel：2560×1440为88,473,600 bytes（84.375 MiB），3840×2160约189.84 MiB；capture targets cap192 MiB。另有共享 scene-color scratch4 bytes/pixel（1440p约14.06 MiB），仍用于诊断/fallback，未宣称消除 color copy。target size超限保留 vanilla。material status 显示 sections/deferred/geometryBytes/targetBytes/draws/buildNs/uploadBytes，CSV timer包括color copy、MRT capture、display；geometry build/upload在query外单独记录。
+
+当前不捕获 fluids、translucent models、entities/block entities/held items或特定资源包 emissive texture conventions；这些仍 native 渲染。quad alpha threshold=.5；诊断使用 nearest atlas filtering，不保证与 vanilla RGSS/anisotropic edges 完全一致，coverage 可暴露差异。emission 模式的黑色只表示已支持表面的 emission strength=0，不表示它未受 vanilla block light 照亮。尚未完成 B2 HDR sun/sky/local/emission separation 或完整 B1 实机验收。
+
+实机检查：先 `material_coverage` 等待数秒，附近普通 terrain 应逐渐变绿；然后 albedo 看六面白色方块不再有 face lighting、火把开关不改变材质值；surface_normal 看台阶/半砖/斜面/栏杆与转动镜头时的世界空间 normal；emission 看 glowstone/torch 亮而受火把照明的墙 emission=0。保持这些模式测试移动、破坏/放置、F3+T、切维度、fullscreen/resize、bob/hurt/nausea；看 unsupported实体/水/玻璃/手/UI仍native。若广泛 magenta、全 vanilla 或 crash，请保留截图、status 与日志，不认为自动测试等于实机验证。
+
+同时补齐独立 entity shadow pipeline 的 native shader precompile 注册，避免其首次 draw 依赖默认 shader 路径解析。

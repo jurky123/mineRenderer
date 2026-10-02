@@ -9,6 +9,8 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 - [原始 v0.2 设计文档](VoxelLight_Design_v0.2_Native_Vulkan.docx)：保留原件。
 - [v0.2 可搜索文本](docs/DESIGN-v0.2.md)：按段落提取，表格布局请看 DOCX。
 - [设计评审](docs/REVIEW.md)：已核验依据、工程缺口和建议决策。
+- [0.10.0 评审决策](docs/REVIEW-0.10.0.md)：已核验限制与 Visual Foundation 优先级。
+- [Visual Foundation contract](docs/VISUAL-FOUNDATION.md)：material capture、分离 lighting 与 geometry/caster 的实施门槛。
 - [实施计划](docs/PLAN.md)：修订后的依赖顺序、实验和验收标准；后续实施按此计划推进。
 - [26.2 接入能力与验证记录](docs/INTEGRATION.md)：实际 API、资源生命周期和尚未通过的实机门槛。
 - [参考阴影与资源预算](docs/SHADOWS.md)：固定光源、独立 caster、回退与当前画质边界。
@@ -28,7 +30,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 ./gradlew build clientKit
 ```
 
-mod：`build/libs/voxellight-client-26.2-0.10.0.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.10.0.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
+mod：`build/libs/voxellight-client-26.2-0.11.0.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.11.0.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
 
 进入世界后使用 `/voxellight mode color` 检查原画面复制，`/voxellight mode depth` 查看世界深度，`/voxellight mode off` 恢复原画面。`/voxellight status` 查看状态，`/voxellight export` 导出最近最多 14,400 个 pass 样本。仅 Vulkan 执行诊断，OpenGL 保留 vanilla。所有命令均在本地执行，无服务端要求。
 
@@ -69,3 +71,7 @@ mod：`build/libs/voxellight-client-26.2-0.10.0.jar`；安装包：`build/distri
 0.9.0 默认使用半砖/楼梯/栅栏的原生遮挡形状。`/voxellight light_occlusion shapes|full` 可与此前 full-block 行为比较；详细预算与实机检查见安装说明。
 
 0.10.0 增加独立太阳/月亮动态实体模型阴影：`/voxellight entity_shadows on|off`。最多 32 个附近实体、1 MiB/frame 模型顶点，使用原生动画/纹理 cutout；具体支持范围与 24 MiB 增量深度层预算见安装说明。
+
+## 0.11.0 Material diagnostics（B1）
+
+新增 `/voxellight mode albedo`、`surface_normal`、`emission`、`material_flags`、`material_coverage`。捕获原生 quad geometry normal、未照明 texture/tint 与 emission strength，使用三 target MRT 和独立 reversed-Z；仅局部 terrain，支持 coverage 可观测。现有 `shadow` 与 depth `normal` 保留；新的分离 lighting/HDR 将在 B2 实施。详细范围、显存和实机门槛见 [安装说明](docs/INSTALL.md)。
