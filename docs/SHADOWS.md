@@ -154,3 +154,9 @@ scene token/palette 窗口扩大到 7³=343（bridge cap384），worker job/copy
 三张 dynamic depth（2048²/1024²/1024²）增加 24 MiB，复用既有写禁用 R8 color attachment；总 shadow targets 54 MiB。固定 dynamic GPU vertex buffer 最多 1 MiB，CPU frame pack 1 MiB + scratch<=256 KiB；off mode/reload/world reset 释放自有资源。entity_shadows off 保留已分配资源并清空深度，避免开关重分配。存在动态模型时 PCF 每 tap 最多增加一次深度采样；空层通过统一 flag 跳过动态采样。模型捕获 CPU 时间在 GPU query 之前单列 entityCaptureNs；GPU pass timing 包括动态顶点上传、动态层 draw/clear 和合成。
 
 本阶段没有完成页调度、滚动 clipmap、动态方块实体、完整 frame profiler/GBuffer 或 AO/GI。下一步先实机验证动态层与压力性能，再实现预算页更新或 AO。自动测试验证 nearest admission/overflow、native animated Model→BLOCK 顶点坐标与容量限制、实际 ENTITY pipeline 的 GLSL→SPIR-V 和 Vulkan stage binding。
+
+## 0.13.0 B3a dynamic block-entity casters
+
+EntityShadows 的模型/GPU内存迁到 DynamicModelBuffer；DynamicCasterSystem 协调 mobs 与 BlockEntityShadows，使用同一三 cascade dynamic depth。新选择来自 loaded chunk.getBlockEntities，不依赖 visible section list；原生 tryExtractRenderState/submit 及 Model/ModelPart/SpriteGetter 默认路径捕获动画与 atlas UV。每类32对象/128模型/1 MiB frame/256 KiB scratch，block_entity_shadows 默认on，status独立；全64位 BlockPos tie-break。每cascade在 terrain 结束后重新借当前共享 indexbuffer，统一较大请求，pass内不触发 growth。动态失败rollback和删除/开关清空保持有效。
+
+Native26.2床是普通模型，其他block-entity仅native model submit支持；item/text/transparent/custom geometry不支持。自身 material 仍vanilla，人工灯DDA不检测动态对象。B3a实机待验收，后续entity material/light-aware caster volume见PLAN。

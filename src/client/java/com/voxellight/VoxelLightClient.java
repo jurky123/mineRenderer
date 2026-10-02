@@ -129,6 +129,14 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var blockEntityCommand = literal("block_entity_shadows");
+            for (boolean enabled : new boolean[]{true, false}) {
+                blockEntityCommand.then(literal(enabled ? "on" : "off").executes(context -> {
+                    PROBE.setBlockEntityShadows(enabled);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: block entity shadows " + (enabled ? "on" : "off")));
+                    return 1;
+                }));
+            }
             var occlusionCommand = literal("light_occlusion");
             for (boolean fine : new boolean[]{true, false}) {
                 occlusionCommand.then(literal(fine ? "shapes" : "full").executes(context -> {
@@ -144,7 +152,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand));
         });
     }
 }

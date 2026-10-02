@@ -97,7 +97,7 @@ public final class ShadowRenderer implements AutoCloseable {
     private GpuBuffer resolveSettings;
     private final ShadowAnchor anchor = new ShadowAnchor();
     private final ArtificialLights artificial = new ArtificialLights();
-    private final EntityShadows entities = new EntityShadows();
+    private final DynamicCasterSystem dynamic = new DynamicCasterSystem();
     private boolean cacheEnabled = true;
     private boolean worldSun = true;
     private int receiverDistance = (int)ShadowCascades.RADIUS;
@@ -206,7 +206,7 @@ public final class ShadowRenderer implements AutoCloseable {
             return false;
         }
         ensureResources();
-        entities.prepare();
+        dynamic.prepare();
         state = meshes.size() == expected ? "terrain lighting active; " + (frameLight.strength() == 0 ? "local lights only" : worldSun ? "world sun/moon" : "fixed light")
                 : "partial coverage; " + (deferred.isEmpty() ? "rebuilding " : "geometry budget limits ") + (expected - meshes.size()) + " caster sections";
         return true;
@@ -228,8 +228,8 @@ public final class ShadowRenderer implements AutoCloseable {
         var camera = minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState;
         var light = frameLight.direction();
         var key = anchor.update(camera.pos.x(), camera.pos.y(), camera.pos.z());
-        entities.upload(encoder);
-        artificial.upload(encoder, camera.pos.x(), camera.pos.y(), camera.pos.z(), frameLight, entities.hasModels());
+        dynamic.upload(encoder);
+        artificial.upload(encoder, camera.pos.x(), camera.pos.y(), camera.pos.z(), frameLight, dynamic.hasModels());
         var viewToWorld = new Matrix4f(camera.viewRotationMatrix).invert();
         try (var stack = MemoryStack.stackPush()) {
             var data = Std140Builder.onStack(stack, ShadowCascades.RESOLVE_BYTES);
@@ -283,12 +283,13 @@ public final class ShadowRenderer implements AutoCloseable {
     }
 
     private void renderEntities(CommandEncoder encoder, Cascade cascade) {
-        if (!entities.hasModels()) { clearEntities(encoder, cascade); return; }
-        try (var pass = encoder.createRenderPass(() -> "VoxelLight animated entity shadow layer", cascade.attachmentView,
+        if (!dynamic.hasModels()) { clearEntities(encoder, cascade); return; }
+        dynamic.prepareIndices();
+        try (var pass = encoder.createRenderPass(() -> "VoxelLight animated dynamic caster shadow layer", cascade.attachmentView,
                 Optional.empty(), cascade.dynamicView, OptionalDouble.of(1))) {
             pass.setPipeline(ENTITY);
             pass.setUniform("ShadowSettings", cascade.settings);
-            entities.draw(pass);
+            dynamic.draw(pass);
         }
         cascade.dynamicInitialized = true; cascade.dynamicHadModels = true;
     }
@@ -362,14 +363,15 @@ public final class ShadowRenderer implements AutoCloseable {
                 + ", mapSizes=2048/1024/1024, budgetDeferred=" + deferred.size() + ", budgetEvictions=" + budgetEvictions
                 + ", lastBuildNs=" + buildNanos + ", peakBuildNs=" + peakBuildNanos + ", uploadBytes=" + uploadBytes
                 + ", replacementBatches=" + replacementBatches + ", lastReplacementSections=" + lastReplacementSections
-                + ", replacementFallbacks=" + replacementFallbacks + ", replacement=" + replacementState + artificial.status() + entities.status();
+                + ", replacementFallbacks=" + replacementFallbacks + ", replacement=" + replacementState + artificial.status() + dynamic.status();
     }
 
     public void setShadowDistance(int blocks) {
         if (blocks < 12 || blocks > ShadowCascades.RADIUS) throw new IllegalArgumentException("Shadow distance must be 12..48 blocks");
         receiverDistance = blocks;
     }
-    public void setEntityShadows(boolean value) { entities.setEnabled(value); }
+    public void setEntityShadows(boolean value) { dynamic.setEntitiesEnabled(value); }
+    public void setBlockEntityShadows(boolean value) { dynamic.setBlocksEnabled(value); }
     public void setFineShapes(boolean value) { artificial.setFineShapes(value); }
     public void setLocalLights(boolean enabled) { artificial.setEnabled(enabled); }
     public void setWorldSun(boolean enabled) { worldSun = enabled; for (var c : cascades) c.cache.clear(); }
@@ -538,7 +540,7 @@ public final class ShadowRenderer implements AutoCloseable {
         deferred.clear(); budgetEvictions = 0;
         anchor.clear();
         artificial.close();
-        entities.close();
+        dynamic.close();
         frameLight = ShadowLight.none();
         geometryBytes = 0;
         worldGeneration = 0; resourceGeneration = 0;

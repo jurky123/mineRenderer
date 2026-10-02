@@ -146,3 +146,9 @@ CPU tests 覆盖所有 range 的 sphere/clip/guard（含 maximal anchor offset�
 B1 的 opaque `ChunkSectionsToRender.renderGroup` TAIL 同时用于 `FOUNDATION`。`MaterialCapture.capture` 只输出 material；`ShadowRenderer.updateLighting/bindLighting` 只生产/绑定 visibility，不执行 legacy composite；`LightingResolvePass` 拥有独立 RGBA16F lighting 与 main-target tone/fog output。输出 invalid pixels discard，不依赖 scene copy。使用 native `RenderSystem.getShaderFog()`（LevelRenderer 在 opaque 前设 terrainFog）。borrowed main depth 只采样，不作 attachment/write；后续 entities/transparency/particles 仍native。
 
 新SurfaceToken包含LIGHT revision，不改 caster GeometryToken 规则；material store限额/loaded-only/一section-per-frame/失效撤销规则保留。实际颜色模型/显存cap/视觉验收见 VISUAL-FOUNDATION.md 与 INSTALL.md。Shader binding/SPIR-V checks覆盖新增pipeline与HDR格式，视觉验收仍须用户实机。
+
+## 0.13.0 B3a dynamic block-entity casters
+
+EntityShadows 的模型/GPU内存迁到 DynamicModelBuffer；DynamicCasterSystem 协调 mobs 与 BlockEntityShadows，使用同一三 cascade dynamic depth。新选择来自 loaded chunk.getBlockEntities，不依赖 visible section list；原生 tryExtractRenderState/submit 及 Model/ModelPart/SpriteGetter 默认路径捕获动画与 atlas UV。每类32对象/128模型/1 MiB frame/256 KiB scratch，block_entity_shadows 默认on，status独立；全64位 BlockPos tie-break。每cascade在 terrain 结束后重新借当前共享 indexbuffer，统一较大请求，pass内不触发 growth。动态失败rollback和删除/开关清空保持有效。
+
+Native26.2床是普通模型，其他block-entity仅native model submit支持；item/text/transparent/custom geometry不支持。自身 material 仍vanilla，人工灯DDA不检测动态对象。B3a实机待验收，后续entity material/light-aware caster volume见PLAN。

@@ -43,4 +43,25 @@ class EntityShadowGeometryTest {
             assertThrows(IllegalArgumentException.class, () -> EntityShadows.buildModel(scratch, animatedCube(), 0, new PoseStack(), 0, 0, -1, null));
         }
     }
+    @Test void blockEntityAtlasSpritesRemapUvWithoutLosingTheAnimatedPose() {
+        var id=net.minecraft.resources.Identifier.fromNamespaceAndPath("voxellight","test");
+        var image=new com.mojang.blaze3d.platform.NativeImage(4,4,false);
+        try(var contents=new net.minecraft.client.renderer.texture.SpriteContents(id,
+                    new net.minecraft.client.resources.metadata.animation.FrameSize(4,4),image);
+            var scratch=new ByteBufferBuilder(4096,DynamicCasterSelection.MODEL_BYTES)) {
+            var sprite=new net.minecraft.client.renderer.texture.TextureAtlasSprite(id,contents,16,16,4,8,0){};
+            var pose=new PoseStack();pose.translate(4,5,6);
+            try(var mesh=DynamicModelBuffer.buildModel(scratch,animatedCube(),2,pose,0,0,-1,sprite)) {
+                assertNotNull(mesh);var data=mesh.vertexBuffer();
+                int stride=DefaultVertexFormat.BLOCK.getVertexSize(),uv=DefaultVertexFormat.BLOCK.getElement("UV0").offset();
+                for(int vertex=0;vertex<mesh.drawState().vertexCount();vertex++) {
+                    int offset=vertex*stride;
+                    assertTrue(data.getFloat(offset)>=6 && data.getFloat(offset)<=7);
+                    assertTrue(data.getFloat(offset+uv)>=sprite.getU0() && data.getFloat(offset+uv)<=sprite.getU1());
+                    assertTrue(data.getFloat(offset+uv+4)>=sprite.getV0() && data.getFloat(offset+uv+4)<=sprite.getV1());
+                }
+            }
+        }
+    }
+
 }

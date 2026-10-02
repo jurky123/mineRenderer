@@ -24,4 +24,12 @@ class DynamicCasterSelectionTest {
         var next = new DynamicCasterSelection<Integer>(); next.consider(2,2,10);
         assertEquals(List.of(2), next.selected());
     }
+    @Test void packedBlockPositionsRetainTheirFullWidthAsStableTieBreakers() {
+        var selection=new DynamicCasterSelection<String>();
+        selection.consider("positive",1L<<40,10);
+        selection.consider("negative",-(1L<<40),10);
+        selection.consider("zero",0,10);
+        assertEquals(List.of("negative","zero","positive"),selection.selected());
+    }
+
 }

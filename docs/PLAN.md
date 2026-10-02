@@ -4,7 +4,7 @@
 
 用户评审针对 `2808397807449f7b7e490907a9f2b57d470d18ae`。采纳材质/光照分离优先，停止向 legacy `shadow.fsh` 堆叠 AO/GI/水/体积效果。0.9.0 shape 遮挡已获用户确认，0.10.0 实体视觉仍待验收；81 个自动测试不代替实机。
 
-B1 corrected material/normal/cutout diagnostics（0.11.2）已获用户确认。**B2 separated terrain lighting（0.12.0）已实现，等待实机验收**：真实材质/法线驱动 sun/moon、hemisphere sky、保留 block-light baseline 的 local light、参考 emission；独立 HDR/tonemap/native fog 在 opaque hook 执行。B3 随后补实体 material、block entity caster、receiver-driven light-aware caster volume 与对应验收。
+B1 corrected material/normal/cutout diagnostics（0.11.2）已获用户确认。**B2 separated terrain lighting（0.12.0/0.12.1）已获用户确认**：真实材质/法线驱动 sun/moon、hemisphere sky、保留 block-light baseline 的 local light、参考 emission；独立 HDR/tonemap/native fog 在 opaque hook 执行。B3a（0.13.0）已实现 block-entity caster 和动态 caster owner，实机验收 pending；B3 后续补实体 material、receiver-driven light-aware caster volume。
 
 | 顺序 | 下一里程碑 | 门槛 |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ B1 corrected material/normal/cutout diagnostics（0.11.2）已获用户确认。
 | F | 可选水/大气/SSR | 原生透明合成与独立 history/资源预算已验证。 |
 | G | GPU Voxel DB / Probe GI | 真实 material/normal/emission 和基本 lighting/temporal 已通过，不使用 legacy 已照明色作为 GI 材质输入。 |
 
-保留 legacy 效果与 profiler 作为可比较 reference。预算调度、dual-angle cache、cutout 动画分类、mesh reuse、clustered lights 等性能改造按实测推进；不声明当前 world-sun cache 已达到原 P1b 收益门槛。B1 已获用户确认；B2 reference implemented，实机验收 pending；B3 未实施。
+保留 legacy 效果与 profiler 作为可比较 reference。预算调度、dual-angle cache、cutout 动画分类、mesh reuse、clustered lights 等性能改造按实测推进；不声明当前 world-sun cache 已达到原 P1b 收益门槛。B1/B2 已获用户确认；B3a block-entity caster implemented，实机验收 pending；B3 material/caster-volume 后续实施。
 
 具体依据：[0.10.0 评审决策](REVIEW-0.10.0.md)。下一阶段输入/格式/owner/验收：[Visual Foundation contract](VISUAL-FOUNDATION.md)。文后原计划和逐版记录保留为历史。
 
@@ -149,3 +149,9 @@ SurfaceToken 单独跟踪 light-only packed light 失效，保留 shadow Geometr
 ## 0.12.1 plant stability follow-up
 
 0.12.0 overall foundation 获用户确认；植物 flicker 单独修复：capture native culling parity，取消 camera-driven foliage normal flip，双面 diffuse/sky 与 emitter-facing local ray offset。保留 8 ULP/采样/预算。实机复测后继续 B3；未借此宣称 temporal 已完成。
+
+## 0.13.0 B3a block-entity caster
+
+进入 geometry coverage 的第一步：DynamicCasterSystem 分离动/静 ownership，EntityShadows/BlockEntityShadows 负责原生对象选择/extract/submit，DynamicModelBuffer 统一限额顶点/sprite转换/rollback/上传。block-entity loaded-only selection 与 native camera visible list 无关，默认独立开关。已有 dynamic depth 共享，不因 animation 失效 terrain cache。完整 64-bit block position tie-break、原生 atlas/animated pose/预算/rollback/loaded-only/index refresh 合约加入测试。
+
+实机验收 chest/shulker/banner/off-camera/removal/reload 等后，B3 下一步为 entity material/normal migration 与 light-aware caster volume；native26.2 BedBlock 是普通模型，已由 terrain 路径处理。当前不宣称 B3 完成。

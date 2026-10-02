@@ -1,6 +1,6 @@
 # Visual Foundation: implementation contract
 
-Status: the user confirmed corrected B1 diagnostics in 0.11.2. B2 terrain reference lighting is implemented in 0.12.0 and awaits in-game acceptance. B3 is not implemented. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
+Status: the user confirmed corrected B1 diagnostics in 0.11.2. The user confirmed B2 terrain reference lighting and the 0.12.1 foliage fix. B3a block-entity casters are implemented in 0.13.0 and await in-game acceptance; entity materials/light-aware caster selection remain ahead. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
 
 ## Objective
 
@@ -101,3 +101,11 @@ Acceptance remains: torch-lit sun-shadowed wall, glowstone under shadow, full/ne
 ## 0.12.1 foliage stability
 
 The user confirmed the overall 0.12.0 foundation effect and reported plant flicker. Capture now matches native terrain backface culling; native plant models provide opposing faces and should not receive additional coplanar backface writes. Cutout diffuse/hemisphere response uses a two-sided convention, and local visibility bias selects the emitter-facing side instead of flipping with camera position. Both changes preserve strict depth validation and native cutout sampling. Plant fix acceptance is pending; ordinary subpixel cutout aliasing is not a claim of temporal stabilization.
+
+## 0.13.0 B3a dynamic caster coverage
+
+DynamicCasterSystem owns the mob and loaded block-entity stream boundaries; DynamicModelBuffer owns shared bounded native model conversion, sprite-coordinate expansion, GPU/CPU vertex memory, renderer checkpoint/rollback and borrowed sequential indices. Both streams render into the existing dynamic cascade depth alongside terrain depth; static cache generations are unchanged. Index growth/refresh happens once for both streams after each terrain cascade, before opening the dynamic pass.
+
+Block-entity selection enumerates only already loaded chunks within the 64-block candidate radius, independent of camera frustum/visible sections. Each stream has separate 32-object/128-model/1-MiB frame limits, 256-KiB scratch and status; packed block positions retain 64 bits for deterministic ties. Native dispatcher extraction and model/model-part submission preserve chest/shulker/banner animation and atlas UVs. Failed object capture rolls back its entire partial stream; toggles/removal clear the dynamic layer next frame. Non-model, blended/custom/item/text submits are not claimed as covered. Native 26.2 beds are ordinary BedBlock terrain models, not block entities.
+
+This is B3a rather than a declaration that B3 is complete: dynamic model materials/normals are still vanilla-rendered and current shadow-only BLOCK conversion remains. B3 material migration must use retained normals in its new stream; receiver-driven light extrusion is also outstanding. In-game acceptance: opening single/double/ender chests, shulker animation, banner wind, off-camera caster, removal/toggle, reload/world/resize, mobs/player alongside block entities, and bounded overflow. Dynamic light visibility remains block-voxel-only.

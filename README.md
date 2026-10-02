@@ -2,7 +2,7 @@
 
 VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
 
-当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。Foundation 尚待实机验收；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla，尚无实体材质迁移、方块实体阴影、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
+当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 增加 block-entity dynamic shadows，尚无实体材质迁移、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
 
 ## 文档
 
@@ -30,7 +30,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 ./gradlew build clientKit
 ```
 
-mod：`build/libs/voxellight-client-26.2-0.12.1.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.12.1.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
+mod：`build/libs/voxellight-client-26.2-0.13.0.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-0.13.0.zip`。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
 
 进入世界后使用 `/voxellight mode color` 检查原画面复制，`/voxellight mode depth` 查看世界深度，`/voxellight mode off` 恢复原画面。`/voxellight status` 查看状态，`/voxellight export` 导出最近最多 14,400 个 pass 样本。仅 Vulkan 执行诊断，OpenGL 保留 vanilla。所有命令均在本地执行，无服务端要求。
 
@@ -79,3 +79,7 @@ mod：`build/libs/voxellight-client-26.2-0.12.1.jar`；安装包：`build/distri
 ## 0.12.0 separated terrain lighting（B2）
 
 `/voxellight mode foundation` 从 unlit material/真实 normal 计算 sun/moon、hemisphere sky、block/local light 和参考 emission，输出 linear HDR，再 tone map 与 native fog。太阳阴影只影响 direct term；unsupported geometry 保留 native，entities/transparency/UI 随后合成。`mode shadow` 是旧版比较，`mode off` 恢复 vanilla。无 SceneColor copy，现有 material/caster 窗口与预算仍有限，实机验收待完成。具体光照模型、显存与测试步骤见 [安装说明](docs/INSTALL.md) 和 [Foundation contract](docs/VISUAL-FOUNDATION.md)。
+
+## 0.13.0 B3a block-entity shadows
+
+新增 chest/shulker/banner 等 native model submit 的动态投影，默认开启；`/voxellight block_entity_shadows off` 可比较。来自已加载 chunk 的独立最近32个选择，不依赖 camera visible list；与 mob 共用已有 dynamic depth，单独1 MiB/128 model budget。`foundation`/`shadow`/`shadow_map` 均复用此层。Native26.2 beds 已为普通模型，仍走 terrain。实机检查与边界见 [安装说明](docs/INSTALL.md)。B3 实体材质迁移与 light-aware caster volume 将随后推进。

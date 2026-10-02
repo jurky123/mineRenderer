@@ -44,6 +44,41 @@ class RenderingContractTest {
         assertEquals(2, checked);
     }
 
+    @Test
+    void shippedBlockEntityCaptureUsesLoadedChunksAndRefreshesSharedIndicesOutsideThePass() throws Exception {
+        try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {
+            var blocks=new ClassNode(Opcodes.ASM9);
+            try(var stream=jar.getInputStream(jar.getEntry("com/voxellight/adapter/BlockEntityShadows.class"))) {
+                new ClassReader(stream).accept(blocks,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+            }
+            boolean loaded=false,enumerated=false,extract=false,submit=false;
+            for(var method:blocks.methods)for(var instruction:method.instructions)if(instruction instanceof MethodInsnNode call) {
+                if(call.name.equals("getChunk")) {
+                    assertEquals(Opcodes.ICONST_0,call.getPrevious().getOpcode(),"Block-entity shadow selection must not load missing chunks");
+                    loaded=true;
+                }
+                if(call.name.equals("getBlockEntities"))enumerated=true;
+                if(call.name.equals("tryExtractRenderState"))extract=true;
+                if(call.owner.endsWith("BlockEntityRenderDispatcher") && call.name.equals("submit"))submit=true;
+            }
+            assertTrue(loaded && enumerated && extract && submit);
+            var renderer=new ClassNode(Opcodes.ASM9);
+            try(var stream=jar.getInputStream(jar.getEntry("com/voxellight/adapter/ShadowRenderer.class"))) {
+                new ClassReader(stream).accept(renderer,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+            }
+            var dynamicPass=renderer.methods.stream().filter(method->method.name.equals("renderEntities")).findFirst().orElseThrow();
+            int sequence=-1,open=-1,index=0;
+            for(var instruction:dynamicPass.instructions) {
+                if(instruction instanceof MethodInsnNode call) {
+                    if(call.owner.endsWith("DynamicCasterSystem") && call.name.equals("prepareIndices"))sequence=index;
+                    if(call.name.equals("createRenderPass"))open=index;
+                }
+                index++;
+            }
+            assertTrue(sequence>=0 && open>sequence,"Refresh the shared native index buffer after terrain, before dynamic depth opens");
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"RenderProbe", "ShadowRenderer", "MaterialCapture", "LightingResolvePass"})
     void packagedDiagnosticDrawSubmitsGeometry(String className) throws Exception {

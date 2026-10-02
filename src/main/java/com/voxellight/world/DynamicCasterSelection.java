@@ -9,12 +9,12 @@ public final class DynamicCasterSelection<T> {
     public static final int MAX_ENTITIES = 32, MAX_MODELS = 128;
     public static final int FRAME_BYTES = 1024 * 1024, MODEL_BYTES = 256 * 1024;
     public static final double RADIUS = 64;
-    public record Candidate<T>(T value, int id, double distanceSquared) { }
+    public record Candidate<T>(T value, long id, double distanceSquared) { }
     private final Comparator<Candidate<T>> order = Comparator.<Candidate<T>>comparingDouble(Candidate::distanceSquared)
-            .thenComparingInt(Candidate::id);
+            .thenComparingLong(Candidate::id);
     private final PriorityQueue<Candidate<T>> nearest = new PriorityQueue<>(MAX_ENTITIES, order.reversed());
     private int candidates;
-    public void consider(T value, int id, double distanceSquared) {
+    public void consider(T value, long id, double distanceSquared) {
         if (!Double.isFinite(distanceSquared) || distanceSquared < 0 || distanceSquared > RADIUS * RADIUS) return;
         candidates++;
         var candidate = new Candidate<>(value, id, distanceSquared);

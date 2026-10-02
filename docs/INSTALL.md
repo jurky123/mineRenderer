@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.12.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，保留有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.13.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.12.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.13.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -234,3 +234,25 @@ MRT emission properties R/G=block/quad strength，B=sky level，A=block level；
 用户确认 0.12.0 foundation 效果正常，但反馈植物 flicker。Material capture 改为与 native CUTOUT_TERRAIN 相同的 backface culling，避免 opposing plant quads 同时覆盖 coplanar depth。Foundation foliage 改为与视角无关的双面 diffuse/sky response；local visibility offset 朝光源侧，不再按相机翻转 normal。8 ULP depth rejection 与 native nearest/RGSS sampling 保持不变，没有扩大容差或新增 history。
 
 替换旧 jar 后 `mode foundation`，在草/花/树叶附近慢转、移动，尤其绕过 plant plane 的侧面；比较 `sun fixed` 与 `sun world`，附近放火把观察彩光。`mode material_coverage` 检查植物是否出现 green/magenta 来回切换。请同时比较 `mode off`：native cutout 边缘仍可能有 subpixel aliasing，本版未做 TAA/temporal，不能宣称消除全部闪烁。固定相机的 flicker、更新触发的 native fallback 需另行定位。
+
+## 0.13.0 B3a animated block-entity shadows
+
+用户已确认 0.12.1 foundation/plant fix。新版默认 block_entity_shadows on。在 Vulkan 世界执行：
+
+```text
+/voxellight mode foundation
+/voxellight sun fixed
+/voxellight block_entity_shadows off
+/voxellight block_entity_shadows on
+/voxellight status
+```
+
+摆放单/双 chest、ender chest、shulker box 和 banner，观察开箱盖动画、shulker 打开、旗帜动画对应阴影；移到相机外但让投影落在镜头内。也可 `mode shadow` 比较 legacy receiver，`shadow_map` 查看合并 dynamic depth。Native 26.2 BedBlock 已非 BlockEntity，床走已有 terrain 模型 caster，不需要此开关。Sign/其他 block-entity 的 model 部件可进入；文字、item/custom geometry、beam/透明 submit 不支持。
+
+DynamicCasterSystem 统一 entity/block-entity depth，DynamicModelBuffer 统一 bounded 模型顶点/sprite UV/原生动画/错误回滚。扫描相机±4 chunk（最多81个），仅 `getChunk(FULL,false)` 的已加载 chunk，球半径64格；非渲染 block entities 不占32个选择槽。按距离/完整64位 packed BlockPos 稳定排序，每类分别最多32对象、128 model attempts、1 MiB frame/GPU vertex buffer、256 KiB model scratch；同用24 MiB dynamic depth，不新增整套 shadow maps。现有 terrain32 MiB/HDR/material/local预算不变。
+
+独立 `entity_shadows` 和 `block_entity_shadows` 控制；关闭/删除/卸载后下一 frame 重建 dynamic layer，不会保留旧图像，也不使 static terrain tiles 因 lid/flag 动画失效。GPU sequential index buffer 在 terrain cascade draw 后、dynamic pass 前统一取当前较大需求，避免两个 stream 互相增长后持有旧 buffer。模型 renderer 失败撤销该对象的 partial draw，记录失败，不关掉地形效果。
+
+status 新增 blockEntityCasters/Models/Skipped/Failures/Overflow、Chunks/CaptureNs/UploadBytes/BufferBytes。没有 GPU 时自动测试不代替 chest/sprite/动画实机验收。依次测开关、破坏/放置、离开相机、F3+T、切维度、resize、第三人称 mob 并存，检查无残影且 entity baseline 不回归。动态模型仍只为 sun/moon shadow caster，本身继续 vanilla shading；人工灯 DDA 仍不遮挡动态对象。超预算可能缺 caster，未实现选入/淘汰 fade。
+
+B3a 是 geometry coverage 的第一步；entity material/normal migration、block-entity material 和 receiver-driven light-aware caster search 仍未完成，不宣称完整 B3 验收。
