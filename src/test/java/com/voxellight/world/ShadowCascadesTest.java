@@ -7,6 +7,20 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ShadowCascadesTest {
+    @Test void uploadedNormalMatricesMatchThePreviousShaderInverseTransposeInEveryCascade() {
+        for(var light:List.of(ShadowLight.fixed(),ShadowLight.world(-1.2f,3,1,0),ShadowLight.world(.7f,3,1,0))) {
+            for(int c=0;c<3;c++) {
+                var matrix=ShadowCascades.anchored(29_999_000.25,65,-29_999_000.5,new ShadowMapCache.Anchor(29_999_000,64,-29_999_000),light,c);
+                var expected=new org.joml.Matrix3f(matrix).invert().transpose();
+                var actual=new org.joml.Matrix3f(ShadowCascades.normalMatrix(matrix));
+                for(var normal:List.of(new Vector3f(1,0,0),new Vector3f(0,1,0),new Vector3f(0,0,1),new Vector3f(.3f,.7f,-.5f))) {
+                    var e=expected.transform(new Vector3f(normal));var a=actual.transform(new Vector3f(normal));
+                    assertEquals(e.x,a.x,1e-4);assertEquals(e.y,a.y,1e-4);assertEquals(e.z,a.z,1e-4);
+                }
+            }
+        }
+    }
+
     @Test void everyRangeCoversItsReceiverSphereEvenAtTheLargestAnchorOffset() {
         var anchor = new ShadowMapCache.Anchor(0, 64, 0);
         for (var light : List.of(ShadowLight.fixed(), ShadowLight.world(-1.2f, 3, 1, 0), ShadowLight.world(0, 3, 1, 0), ShadowLight.world(1.2f, 3, 1, 0))) {

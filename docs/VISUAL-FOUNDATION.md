@@ -1,6 +1,6 @@
 # Visual Foundation: implementation contract
 
-Status: the user confirmed corrected B1 diagnostics in 0.11.2. The user confirmed B2 terrain reference lighting and the 0.12.1 foliage fix. The user accepted B3a block-entity casters in 0.13.0. The user accepted B3b light-aware terrain caster selection in 0.14.0. B3c actual opaque model material capture/lighting is implemented in 0.15.0 and accepted by the user; blended player materials and custom submit paths remain native. The 0.10.0 shadow mode remains the legacy comparison. Actual formats, scope and budgets are recorded in INSTALL.md; the contract below includes later acceptance targets.
+Current implementation and acceptance: [CURRENT.md](CURRENT.md). This document is the material/lighting contract; versioned sections below describe historical implementations.
 
 ## Objective
 
@@ -126,3 +126,11 @@ The late boundary is PreparedFrame.executeSolid TAIL inside world rendering, bef
 GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4f)，包含bob/hurt/nausea；不能使用nominal camera projection替代。world/resource/scene changeRevision、caster geometryRevision、light source/jump、camera cut、frame gap、settings/resize使history失效。Bridge changeRevision仅增加可观测dirty-stream序号，不改变geometry/light-only契约。
 
 四张RGBA16F、32 bytes/pixel、128 MiB额外cap和96-byte UBO；超过cap退回unfiltered foundation。两个MRT render descriptors显式renderArea，不写native depth。CPU admission counters不代表GPU pixel acceptance。native shader binding/阶段编译与CPU reprojection/invalidation/budget检查通过；移动阴影/编辑/plant/model/reload/resize实机验收待用户。下一步在D1验收后做basic AO或后续temporal覆盖，full TAA/motion vectors/GI未完成。
+
+## 0.16.1 material refresh and frame transforms
+
+SurfaceToken仍推进packed light版本，但同一section lifetime内可以retain旧mesh至replacement。新mesh通过current token与resident budget验证后才替换；oversized/等待邻居/stale build不移除旧mesh。资源、世界或entry incarnation不匹配以及离开窗口时立即释放。几何变化期间旧surface仍必须通过现有native depth 8-ULP验证；same-depth材质或light可短暂陈旧，不能承诺瞬时更新。steady16 MiB与1 MiB/section保持，替换临时GPU顶点至多额外1 MiB。
+
+ShadowResolveSettings增加InvProjection和三张LightNormalMatrix（mat4 upper3×3），总560 bytes，所有四个fragment消费者共用反射验证。actual world projection通过现有hook同步CPU inverse，caster矩阵每frame CPU inverse-transpose；不改变native depth、PCF、fog或HDR tone模型。没有实测GPU性能提升。
+
+D1 history key使用geometryChangeRevision，不受纯LIGHT dirty影响；动态阴影上一帧eligible=false会保存negative visibility，因此刚移开dynamic caster也拒绝该history。完整移动动物/开箱/banner/camera/cascade实机验收仍pending，不扩大temporal系统。

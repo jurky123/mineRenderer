@@ -240,6 +240,16 @@ class ShadowPipelineTest {
                         assertEquals(0,Spvc.spvc_resources_get_resource_list_for_type(resources,1,pointer,count));
                         boolean found = false;
                         for (var uniform : SpvcReflectedResource.create(pointer.get(0),(int)count.get(0))) {
+                            if(uniform.nameString().equals("ShadowResolveSettings")) {
+                                long block=Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
+                                assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,block,pointer));
+                                assertEquals(ShadowCascades.RESOLVE_BYTES,pointer.get(0),"All resolve consumers share the expanded CPU transform upload");
+                                var offset=stack.callocInt(1);
+                                assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,5,offset));
+                                assertEquals(304,offset.get(0),"InvProjection follows the unchanged original fields");
+                                assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,6,offset));
+                                assertEquals(368,offset.get(0),"Normal matrix array matches CPU std140 packing");
+                            }
                             String expected = shader.equals("lighting") ? "LightingEnvironment" : shader.equals("temporal_shadow") ? "TemporalSettings" : "Fog";
                             if (!uniform.nameString().equals(expected)) continue;
                             long struct = Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());

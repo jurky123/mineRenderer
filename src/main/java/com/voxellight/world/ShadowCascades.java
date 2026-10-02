@@ -4,7 +4,7 @@ import org.joml.Matrix4f;
 
 /** Overlapping world-distance ranges, independent of view yaw/pitch or camera frustum selection. */
 public final class ShadowCascades {
-    public static final int COUNT = 3, RESOLVE_BYTES = COUNT * 64 + 64 + 3 * 16;
+    public static final int COUNT = 3, RESOLVE_BYTES = COUNT * 64 + 64 + 3 * 16 + 64 + COUNT * 64;
     public static final float FADE_START = 40, RADIUS = 48;
     public record Range(int mapSize, float halfExtent, float blendStart, float blendEnd) { }
     private static final Range[] RANGES = {
@@ -13,6 +13,10 @@ public final class ShadowCascades {
             new Range(1024, 96, 40, 48)
     };
     private ShadowCascades() { }
+    /** Affine orthographic light transform; the upper 3x3 is the inverse-transpose normal transform. */
+    public static Matrix4f normalMatrix(Matrix4f lightMatrix) {
+        return new Matrix4f(lightMatrix).invert().transpose();
+    }
     public static Range range(int index) { return RANGES[index]; }
     public static long mapBytes() {
         long bytes = 0;

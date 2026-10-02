@@ -14,6 +14,18 @@ class WorldSceneBridgeTest {
         return new SectionSnapshot(request, new short[4096], new int[]{0}, new byte[]{0}, new byte[]{0});
     }
 
+    @Test void directionalHistoryIgnoresLightOnlyButInvalidatesForGeometryAndSectionLifetimes() {
+        var scene=new WorldSceneBridge(1);scene.reconcile(List.of(A));
+        long geometry=scene.geometryChangeRevision();var token=scene.surfaceToken(A);
+        scene.markDirty(A,WorldSceneBridge.LIGHT);scene.markRangeDirty(A.x(),A.y(),A.z(),A.x(),A.y(),A.z(),WorldSceneBridge.LIGHT);
+        assertEquals(geometry,scene.geometryChangeRevision());assertTrue(scene.canRetain(token));
+        scene.markDirty(A,WorldSceneBridge.GEOMETRY|WorldSceneBridge.LIGHT);assertTrue(scene.geometryChangeRevision()>geometry);
+        geometry=scene.geometryChangeRevision();scene.unloadChunk(A.x(),A.z());assertTrue(scene.geometryChangeRevision()>geometry);
+        scene.reconcile(List.of(A));assertFalse(scene.canRetain(token));
+        geometry=scene.geometryChangeRevision();scene.reloadResources();assertTrue(scene.geometryChangeRevision()>geometry);
+        geometry=scene.geometryChangeRevision();scene.changeWorld();assertTrue(scene.geometryChangeRevision()>geometry);
+    }
+
     @Test
     void historyRevisionChangesOnEditsUnloadsAndGenerationsButNotRepeatedReconcileOrAcquire() {
         var scene=new WorldSceneBridge(2);
@@ -224,10 +236,12 @@ class WorldSceneBridgeTest {
         scene.markDirty(A,WorldSceneBridge.LIGHT);
         assertTrue(scene.isCurrent(geometry));
         assertFalse(scene.isCurrent(material));
+        assertTrue(scene.canRetain(material));
         var replacement = scene.surfaceToken(A);
         assertTrue(scene.isCurrent(replacement));
         scene.reloadResources();
         assertFalse(scene.isCurrent(replacement));
+        assertFalse(scene.canRetain(replacement));
         scene.changeWorld();
         assertNull(scene.surfaceToken(A));
     }

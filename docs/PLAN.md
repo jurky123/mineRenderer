@@ -2,15 +2,13 @@
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 
-用户评审针对 `2808397807449f7b7e490907a9f2b57d470d18ae`。采纳材质/光照分离优先，停止向 legacy `shadow.fsh` 堆叠 AO/GI/水/体积效果。0.9.0 shape 遮挡已获用户确认，0.10.0 实体视觉仍待验收；81 个自动测试不代替实机。
-
-B1 corrected material/normal/cutout diagnostics（0.11.2）已获用户确认。**B2 separated terrain lighting（0.12.0/0.12.1）已获用户确认**：真实材质/法线驱动 sun/moon、hemisphere sky、保留 block-light baseline 的 local light、参考 emission；独立 HDR/tonemap/native fog 在 opaque hook 执行。B3a（0.13.0）已实现 block-entity caster 和动态 caster owner，实机验收 pending；B3 后续补实体 material、receiver-driven light-aware caster volume。
+当前实现、用户验收与下一任务统一见[CURRENT.md](CURRENT.md)，本文件保留路线和历史实施记录。当前决策是先修0.16.x material refresh与frame transforms，保持D1 scope，之后进入Basic AO；不以temporal细微差异宣称完整验收。
 
 | 顺序 | 下一里程碑 | 门槛 |
 | --- | --- | --- |
 | B1 | Material/GBuffer capture proof（0.11.2 用户确认） | 材质不含 lightmap/AO/fog；geometry normals 与 native depth/cutout 对齐；状态/预算和实机诊断。 |
 | B2 | 分离 opaque lighting | 太阳阴影只作用于 direct；保留声明的 vanilla block-light baseline；HDR/tonemap/fog 一次应用；透明/UI 合成正确。 |
-| B3 | Geometry/caster 完整性 | 实体验收与材质迁移，block entity shadow，沿 receiver-to-light 方向扩展已加载 caster 搜索。 |
+| B3 | Geometry/caster foundation（0.13–0.15 用户确认） | 有界实体/方块实体caster、opaque模型材质、light-aware窗口；unsupported模型仍native。 |
 | D | Temporal + basic AO | camera reprojection、depth/normal rejection，动态无 motion pixels 拒绝 history。 |
 | E | Local lighting polish | 数据驱动光源色、多 source 聚合、明确 falloff 和有界动态光源。 |
 | F | 可选水/大气/SSR | 原生透明合成与独立 history/资源预算已验证。 |
@@ -179,3 +177,9 @@ SurfaceToken 单独跟踪 light-only packed light 失效，保留 shadow Geometr
 GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4f)，包含bob/hurt/nausea；不能使用nominal camera projection替代。world/resource/scene changeRevision、caster geometryRevision、light source/jump、camera cut、frame gap、settings/resize使history失效。Bridge changeRevision仅增加可观测dirty-stream序号，不改变geometry/light-only契约。
 
 四张RGBA16F、32 bytes/pixel、128 MiB额外cap和96-byte UBO；超过cap退回unfiltered foundation。两个MRT render descriptors显式renderArea，不写native depth。CPU admission counters不代表GPU pixel acceptance。native shader binding/阶段编译与CPU reprojection/invalidation/budget检查通过；移动阴影/编辑/plant/model/reload/resize实机验收待用户。下一步在D1验收后做basic AO或后续temporal覆盖，full TAA/motion vectors/GI未完成。
+
+## 0.16.1 review follow-up
+
+不扩展temporal或直接叠AO：先修LIGHT/material coverage闪回与移除fragment matrix inverses。retain-old/build/token-verify/swap使旧surface继续有效，steady16 MiB、每section1 MiB、temporary GPU replacement至多1 MiB；优先replacements，每帧仍最多一次build，oversized token不会反复编译。world/resource/unload/window退出立即退休。LIGHT仍重建packed light，独立dynamic light-data stream后置。
+
+Directional history改用geometryChangeRevision，纯LIGHT dirty不全局reset；torch的实际geometry改变仍reset。其他D1算法/内存cap不扩张。用户目前无法辨认0.16改善，完整ghosting/稳定性验收仍pending。下一视觉功能选择半分辨率Basic AO + bilateral upsample，先不加AO temporal；tone/sky/local polish后续。

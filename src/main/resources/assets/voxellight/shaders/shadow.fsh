@@ -18,6 +18,8 @@ layout(std140) uniform ShadowResolveSettings {
     vec4 LightDirectionAndMask;
     vec4 Coverage;
     vec4 CascadeRanges;
+    mat4 InvProjection;
+    mat4 LightNormalMatrix[3];
 };
 layout(std140) uniform LocalLightSettings {
     vec4 GridOriginAndCount;
@@ -86,14 +88,14 @@ bool visibleToEmitter(vec3 start, vec3 end) {
     return false; // Bounded traversal exhaustion cannot turn into a light leak.
 }
 
-float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, vec3 position, vec3 normal) {
+float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, mat3 normalMatrix, vec3 position, vec3 normal) {
     vec4 clip = matrix * vec4(position, 1.0);
     vec3 projected = clip.xyz / clip.w;
     vec2 shadowUv = projected.xy * 0.5 + 0.5;
     vec2 pixel = 1.0 / vec2(textureSize(map, 0));
     if (projected.z < 0.0 || projected.z > 1.0 || any(lessThan(shadowUv, pixel * 3.0))
         || any(greaterThan(shadowUv, vec2(1.0) - pixel * 3.0))) return 0.0;
-    vec3 planeNormal = transpose(inverse(mat3(matrix))) * normal;
+    vec3 planeNormal = normalMatrix * normal;
     vec2 gradient = abs(planeNormal.z) > 0.000001 ? clamp(-2.0 * planeNormal.xy / planeNormal.z, vec2(-16.0), vec2(16.0)) : vec2(0.0);
     vec2 grid = shadowUv / pixel - 0.5;
     vec2 base = floor(grid);
@@ -125,18 +127,18 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, vec3 posit
 float cascadeOcclusion(float distanceToCamera, vec3 position, vec3 normal) {
     // World-radius partitions: camera yaw/pitch never changes cascade selection.
     if (distanceToCamera < CascadeRanges.y) {
-        float near = shadowOcclusion(ShadowMap, EntityShadowMap, LightMatrix[0], position, normal);
+        float near = shadowOcclusion(ShadowMap, EntityShadowMap, LightMatrix[0], mat3(LightNormalMatrix[0]), position, normal);
         if (distanceToCamera <= CascadeRanges.x) return near;
-        float middle = shadowOcclusion(MiddleShadowMap, MiddleEntityShadowMap, LightMatrix[1], position, normal);
+        float middle = shadowOcclusion(MiddleShadowMap, MiddleEntityShadowMap, LightMatrix[1], mat3(LightNormalMatrix[1]), position, normal);
         return mix(near, middle, smoothstep(CascadeRanges.x, CascadeRanges.y, distanceToCamera));
     }
     if (distanceToCamera < CascadeRanges.w) {
-        float middle = shadowOcclusion(MiddleShadowMap, MiddleEntityShadowMap, LightMatrix[1], position, normal);
+        float middle = shadowOcclusion(MiddleShadowMap, MiddleEntityShadowMap, LightMatrix[1], mat3(LightNormalMatrix[1]), position, normal);
         if (distanceToCamera <= CascadeRanges.z) return middle;
-        float far = shadowOcclusion(FarShadowMap, FarEntityShadowMap, LightMatrix[2], position, normal);
+        float far = shadowOcclusion(FarShadowMap, FarEntityShadowMap, LightMatrix[2], mat3(LightNormalMatrix[2]), position, normal);
         return mix(middle, far, smoothstep(CascadeRanges.z, CascadeRanges.w, distanceToCamera));
     }
-    return shadowOcclusion(FarShadowMap, FarEntityShadowMap, LightMatrix[2], position, normal);
+    return shadowOcclusion(FarShadowMap, FarEntityShadowMap, LightMatrix[2], mat3(LightNormalMatrix[2]), position, normal);
 }
 
 float planeError(float center, float nearDepth, float farDepth) {
@@ -152,7 +154,7 @@ void main() {
         fragColor = LightDirectionAndMask.w > 0.5 ? vec4(1.0) : color;
         return;
     }
-    mat4 inverseProjection = inverse(ProjMat);
+    mat4 inverseProjection = InvProjection;
     vec3 viewPosition = reconstruct(texCoord, depth, inverseProjection);
     vec3 position = (ViewToWorld * vec4(viewPosition, 1.0)).xyz;
     float distanceToCamera = length(position);

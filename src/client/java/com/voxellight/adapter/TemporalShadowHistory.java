@@ -48,7 +48,7 @@ final class TemporalShadowHistory implements AutoCloseable {
         var bridge=VoxelLightClient.scene().bridge();var stats=bridge.stats();
         var frame=new TemporalShadowState.Frame(camera.pos.x(),camera.pos.y(),camera.pos.z(),
                 new Matrix4f(actualProjection).mul(camera.viewRotationMatrix),new Matrix4f(camera.viewRotationMatrix),
-                new TemporalShadowState.Key(stats.worldGeneration(),stats.resourceGeneration(),bridge.changeRevision(),shadows.geometryRevision(),shadows.light().source()),
+                new TemporalShadowState.Key(stats.worldGeneration(),stats.resourceGeneration(),bridge.geometryChangeRevision(),shadows.geometryRevision(),shadows.light().source()),
                 shadows.light().angleRadians(),System.nanoTime());
         var admission=state.admit(frame);
         try(var stack=MemoryStack.stackPush()) {

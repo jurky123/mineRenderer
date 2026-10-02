@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.16.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.16.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.16.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.16.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -24,6 +24,7 @@
 | `/voxellight mode normal` | 用深度和当前 projection 重建表面方向并着色；天空黑色，无新增世界光照。 |
 | `/voxellight mode shadow` | 世界太阳/月亮阴影、月光 fill 与人工灯；自动启用 scene，caster 准备完成后生效。 |
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
+| `/voxellight temporal_shadows on` / `off` | foundation directional visibility history比较，默认on；静止画面可能无差别，非full TAA。 |
 | `/voxellight entity_materials on` / `off` | 默认on；支持的opaque实体模型使用材质/normal分离lighting，off保留native实体颜色；不关闭terrain或实体阴影。 |
 | `/voxellight entity_shadows on` / `off` | 默认 on；开关新增太阳/月亮实体模型阴影，保留地形阴影与原生 blob shadow。 |
 | `/voxellight light_occlusion shapes` / `full` | 默认 shapes；比较人工灯形状遮挡与 full-block 参考。 |
@@ -43,6 +44,8 @@
 CSV 的 CPU 字段只表示该 pass 的命令准备时间，GPU 字段表示 color copy + draw 或 depth/normal draw，shadow 模式则表示颜色复制 + shadow map + resolve，不包含 caster 编译/上传，不是整帧耗时。status 中 lastBuildNs 单独记录最近 caster 编译/上传 CPU 时间。GPU 结果延迟读取，未完成/不支持时留空；导出前让场景继续渲染几帧。模式切换、窗口尺寸变化、世界切换清空样本；先导出再切换。最多保留 14,400 条，导出发生在命令执行时，不在每帧写文件。
 
 OpenGL/未知 backend 或不支持的 scene format 保留原生画面，status 会显示原因。shader/pass 出错时自动关闭并写日志，下一帧恢复原生渲染；可用 mode 命令重试。已有 vanilla spectator/post effects 会继续处理诊断结果。
+
+当前scope和预算汇总见[CURRENT.md](CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.16.1。
 
 ## 实机 smoke checklist
 
@@ -132,7 +135,7 @@ map/geometry 上限和编辑替换上限不变，没有新增 texture/history/GP
 
 本机仅完成 build、CPU 逻辑、最终 jar GLSL→SPIR-V/真实 binding 和 160/560 字节 uniform reflection 验证。没有显卡实机 flicker 修复或帧率验收；请保留截图与导出结果，特别是 thin/cutout 与快速编辑场景。
 
-## 0.8.0：三层阴影与视角突变检查（当前版本）
+## 0.8.0：三层阴影与视角突变检查（历史）
 
 0.7.0 已获用户认可，但仍有某些视角的阴影突变。本次 world-distance 范围扩大至 48 格；三层 map 独立 cache，near 2048²/±32、middle 1024²/±64、far 1024²/±96；12–16、26–32 格重叠 blend，默认 40–48 格淡出。人工灯仍是 80³/近处 125 section、最多 16 灯、receiver 24 格，避免扩大灯 atlas/trace 成本。
 
@@ -237,7 +240,7 @@ MRT emission properties R/G=block/quad strength，B=sky level，A=block level；
 
 替换旧 jar 后 `mode foundation`，在草/花/树叶附近慢转、移动，尤其绕过 plant plane 的侧面；比较 `sun fixed` 与 `sun world`，附近放火把观察彩光。`mode material_coverage` 检查植物是否出现 green/magenta 来回切换。请同时比较 `mode off`：native cutout 边缘仍可能有 subpixel aliasing，本版未做 TAA/temporal，不能宣称消除全部闪烁。固定相机的 flicker、更新触发的 native fallback 需另行定位。
 
-## 0.14.0 B3a animated block-entity shadows
+## 0.13.0 B3a animated block-entity shadows
 
 用户已确认 0.12.1 foundation/plant fix。新版默认 block_entity_shadows on。在 Vulkan 世界执行：
 
@@ -292,3 +295,11 @@ opaque terrain先完成已有foundation。native solid features绘制后，复�
 使用 `/voxellight temporal_shadows off` / `on` 比较。先 `/voxellight mode foundation`，可用 `/voxellight sun fixed` 固定光源；等待 caster 准备完成后沿阴影墙缓慢走动/转视角。目标是降低小幅 PCF/shadow crawl，静止画面可能没有明显差异，不处理植物纹理本身的亚像素 aliasing。检查移动实体、开箱、banner 没有拖影；编辑、teleport、快速转向、F3+T、resize、维度切换应重置 history。
 
 额外四张 RGBA16F texture 共32 bytes/pixel，独立128 MiB cap：1440p约112.5 MiB，4K超限自动保留当前 foundation shadows。另有96-byte settings UBO；不新增 SceneColor copy，不修改 native depth。status 的 temporalSeeds/Reuses/Resets 是 CPU frame admission 数量，不是 GPU 实际接受像素数量。scene/caster/light变化、长帧间隔与 camera cut 会重新seed。实机稳定性仍待验收；full RGB TAA、motion vectors、AO、GI 尚未实现。
+
+## 0.16.1 material refresh stability
+
+这一版不新增AO，画面总体应保持0.16光照。在已有foundation覆盖的洞穴中多次放置/移除火把，检查周围section在light propagation期间不会整片退回vanilla后逐块恢复。`/voxellight mode material_coverage`也可观察保留的coverage；新放/破坏geometry的像素仍遵守native depth匹配，可能暂时unsupported。
+
+status新增materialStale（等待replacement的resident数）、materialReplacements与materialDiscarded。每帧仍只编译一个surface；stale的packed light/material短暂保留，超大/超预算replacement可延后。16 MiB steady geometry外最多1 MiB temporary replacement，world/F3+T/卸载/window退出立即清理旧surface。检查resource reload、移动跨section、快速编辑和维度切换没有旧块残留。
+
+纯LIGHT dirty不再reset directional history，实际torch geometry编辑仍reset；D1支持范围和128 MiB cap不变。CPU上传actual inverse projection与light normal matrices；输出应与此前一致。完整ghosting/cascade边界验证仍需实机，用户对0.16改善目前无明显观察；下一视觉阶段为Basic AO。

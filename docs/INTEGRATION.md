@@ -6,7 +6,7 @@ Minecraft `com.mojang:minecraft:26.2`，Java 25，Fabric Loader `0.19.5`，Fabri
 
 源码通过 `./gradlew genSources` 生成并检查，没有将 Mojang 源码提交到仓库。26.3 的 RenderPearl 包名与 26.2 不同，当前代码统一使用 26.2 Blaze3D。
 
-## 能力与使用位置
+## 初始接入证据（历史；当前见[CURRENT.md](CURRENT.md)）
 
 | 能力 | 26.2 符号/证据 | 当前状态 |
 | --- | --- | --- |
@@ -165,3 +165,9 @@ GameRenderer.renderLevel's LevelRenderer.render invocation scopes the world-only
 GameRendererMixin捕获renderLevel实际ProjectionMatrixBuffer.getBuffer(Matrix4f)，包含bob/hurt/nausea；不能使用nominal camera projection替代。world/resource/scene changeRevision、caster geometryRevision、light source/jump、camera cut、frame gap、settings/resize使history失效。Bridge changeRevision仅增加可观测dirty-stream序号，不改变geometry/light-only契约。
 
 四张RGBA16F、32 bytes/pixel、128 MiB额外cap和96-byte UBO；超过cap退回unfiltered foundation。两个MRT render descriptors显式renderArea，不写native depth。CPU admission counters不代表GPU pixel acceptance。native shader binding/阶段编译与CPU reprojection/invalidation/budget检查通过；移动阴影/编辑/plant/model/reload/resize实机验收待用户。下一步在D1验收后做basic AO或后续temporal覆盖，full TAA/motion vectors/GI未完成。
+
+## 0.16.1 stability integration
+
+现有actualProjection hook同时供ShadowRenderer上传InvProjection，不依赖nominal CameraRenderState projection。共享ShadowResolveSettings从304扩为560 bytes；三层normal matrix为CPU affine inverse-transpose，legacy/foundation PCF使用同一更新后的kernel。lighting/output/temporal/shadow fragment不再调用inverse。
+
+MaterialSurfaceStore具有同一生产prepare路径的可注入extractor，用无GPU buffer double验证原mesh在rebuild期间仍可见、obsolete结果仅关闭自身、verified swap后旧buffer关闭一次、oversized等待、unload/resource/window retirement与cap处replacement admission。增加geometryChangeRevision区别LIGHT-only与shadow-changing dirties。native编译/reflection通过不代表实机画质验收。

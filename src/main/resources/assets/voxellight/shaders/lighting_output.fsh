@@ -9,6 +9,8 @@ layout(std140) uniform ShadowResolveSettings {
     vec4 LightDirectionAndMask;
     vec4 Coverage;
     vec4 CascadeRanges;
+    mat4 InvProjection;
+    mat4 LightNormalMatrix[3];
 };
 layout(std140) uniform Fog {
     vec4 FogColor;
@@ -35,7 +37,7 @@ void main() {
     // Unsupported pixels keep their original native color without a SceneColor copy.
     if (hdr.a < 0.5) discard;
     float depth = texture(SceneDepth, texCoord).r;
-    vec4 view = inverse(ProjMat) * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
+    vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;
     vec3 mapped = max(hdr.rgb, vec3(0.0)) / (vec3(1.0) + max(hdr.rgb, vec3(0.0)));
     vec3 encoded = linearToSrgb(mapped);

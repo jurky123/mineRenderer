@@ -226,6 +226,9 @@ public final class ShadowRenderer implements AutoCloseable {
         }
     }
 
+    private final Matrix4f inverseProjection = new Matrix4f();
+    void captureProjection(Matrix4f projection) { inverseProjection.set(projection).invert(); }
+
     void updateLighting(CommandEncoder encoder, RenderProbe.Mode mode) {
         var minecraft = Minecraft.getInstance();
         var camera = minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState;
@@ -234,20 +237,24 @@ public final class ShadowRenderer implements AutoCloseable {
         dynamic.upload(encoder);
         artificial.upload(encoder, camera.pos.x(), camera.pos.y(), camera.pos.z(), frameLight, dynamic.hasModels());
         var viewToWorld = new Matrix4f(camera.viewRotationMatrix).invert();
+        var matrices = new Matrix4f[ShadowCascades.COUNT];
+        for(int i=0;i<matrices.length;i++) matrices[i]=ShadowCascades.anchored(camera.pos.x(),camera.pos.y(),camera.pos.z(),key,frameLight,i);
         try (var stack = MemoryStack.stackPush()) {
             var data = Std140Builder.onStack(stack, ShadowCascades.RESOLVE_BYTES);
-            for (int i = 0; i < ShadowCascades.COUNT; i++) data.putMat4f(ShadowCascades.anchored(camera.pos.x(), camera.pos.y(), camera.pos.z(), key, frameLight, i));
+            for (int i = 0; i < ShadowCascades.COUNT; i++) data.putMat4f(matrices[i]);
             data.putMat4f(viewToWorld)
                     .putVec4(light.x, light.y, light.z, mode == RenderProbe.Mode.SHADOW_RANGES ? 2 : mode == RenderProbe.Mode.SHADOW_MASK ? 1 : 0)
                     .putVec4(receiverDistance - 8, receiverDistance, frameLight.strength(), worldSun ? 1 : 0)
                     .putVec4(ShadowCascades.range(0).blendStart(), ShadowCascades.range(0).blendEnd(),
                             ShadowCascades.range(1).blendStart(), ShadowCascades.range(1).blendEnd());
+            data.putMat4f(inverseProjection);
+            for (var matrix : matrices) data.putMat4f(ShadowCascades.normalMatrix(matrix));
             encoder.writeToBuffer(resolveSettings.slice(), data.get());
         }
         boolean updateMap = frameLight.strength() > 0 || mode == RenderProbe.Mode.SHADOW_MAP;
         for (var cascade : cascades) {
             if (!updateMap) { cascade.cache.suspend(); clearEntities(encoder, cascade); continue; }
-            var matrix = ShadowCascades.anchored(camera.pos.x(), camera.pos.y(), camera.pos.z(), key, frameLight, cascade.index);
+            var matrix = matrices[cascade.index];
             try (var stack = MemoryStack.stackPush()) {
                 var data = Std140Builder.onStack(stack, SETTINGS_BYTES).putMat4f(matrix).putMat4f(viewToWorld)
                         .putVec4(light.x, light.y, light.z, 0).putVec4(0, 0, 0, 0);

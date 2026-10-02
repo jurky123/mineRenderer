@@ -12,6 +12,8 @@ layout(std140) uniform ShadowResolveSettings {
     vec4 LightDirectionAndMask;
     vec4 Coverage;
     vec4 CascadeRanges;
+    mat4 InvProjection;
+    mat4 LightNormalMatrix[3];
 };
 layout(std140) uniform TemporalSettings {
     mat4 PreviousWorldToClip;
@@ -40,7 +42,7 @@ void main() {
     if(current.a<0.5)return;
     float depth=texture(MaterialDepth,texCoord).r;
     vec3 normal=normalize(texture(MaterialNormal,texCoord).xyz);
-    vec4 view=inverse(ProjMat)*vec4(texCoord*2.0-1.0,depth,1.0);
+    vec4 view=InvProjection*vec4(texCoord*2.0-1.0,depth,1.0);
     vec3 position=(ViewToWorld*vec4(view.xyz/view.w,1.0)).xyz;
     vec4 shadow=texture(CurrentShadow,texCoord);
     float visibility=shadow.r,filtered=visibility;

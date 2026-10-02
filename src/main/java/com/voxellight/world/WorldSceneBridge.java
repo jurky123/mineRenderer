@@ -20,6 +20,7 @@ public final class WorldSceneBridge {
 
     private static final class Entry {
         long version;
+        long residencyVersion;
         long geometryVersion;
         long dirtyOrder;
         int reasons;
@@ -32,6 +33,7 @@ public final class WorldSceneBridge {
     private long worldGeneration = 1;
     private long resourceGeneration = 1;
     private long changeRevision;
+    private long geometryChangeRevision;
     private long sequence;
     private long accepted;
     private long stale;
@@ -54,6 +56,7 @@ public final class WorldSceneBridge {
             if (!keys.contains(entry.getKey())) {
                 unloaded++;
                 changeRevision++;
+                geometryChangeRevision++;
                 return true;
             }
             return false;
@@ -78,6 +81,7 @@ public final class WorldSceneBridge {
         if (entries.remove(key) != null) {
             unloaded++;
             changeRevision++;
+            geometryChangeRevision++;
         }
     }
 
@@ -97,6 +101,7 @@ public final class WorldSceneBridge {
             if (entry.getKey().x() == x && entry.getKey().z() == z) {
                 unloaded++;
                 changeRevision++;
+                geometryChangeRevision++;
                 return true;
             }
             return false;
@@ -148,12 +153,14 @@ public final class WorldSceneBridge {
     public synchronized void changeWorld() {
         worldGeneration++;
         changeRevision++;
+        geometryChangeRevision++;
         entries.clear();
     }
 
     public synchronized void reloadResources() {
         resourceGeneration++;
         changeRevision++;
+        geometryChangeRevision++;
         for (Entry entry : entries.values()) {
             invalidate(entry, RESOURCE);
         }
@@ -194,6 +201,13 @@ public final class WorldSceneBridge {
                 && entry.version == token.version();
     }
 
+    /** An older surface may be drawn until replacement, but never across unload/reload generations. */
+    public synchronized boolean canRetain(SurfaceToken token) {
+        Entry entry = entries.get(token.key());
+        return entry != null && worldGeneration == token.worldGeneration() && resourceGeneration == token.resourceGeneration()
+                && token.version() >= entry.residencyVersion && token.version() <= entry.version;
+    }
+
     /** Atomically capture a geometry token only for a snapshot that is still current. */
     public synchronized long geometryVersion(SectionSnapshot snapshot) {
         Entry entry = entries.get(snapshot.request().key());
@@ -227,8 +241,12 @@ public final class WorldSceneBridge {
 
     public synchronized long changeRevision() { return changeRevision; }
 
+    /** Directional visibility excludes block-light-only changes. */
+    public synchronized long geometryChangeRevision() { return geometryChangeRevision; }
+
     private void invalidate(Entry entry, int reasons) {
         changeRevision++;
+        if ((reasons & (LOAD | GEOMETRY | RESOURCE)) != 0) geometryChangeRevision++;
         if (entry.reasons != 0) {
             coalesced++;
         } else {
@@ -236,6 +254,7 @@ public final class WorldSceneBridge {
         }
         entry.reasons |= reasons;
         entry.version = ++sequence;
+        if ((reasons & LOAD) != 0) entry.residencyVersion = entry.version;
         if ((reasons & (LOAD | GEOMETRY | RESOURCE)) != 0) entry.geometryVersion = entry.version;
         // A dirty section is unavailable to consumers until a current snapshot is ready.
         entry.snapshot = null;
