@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.11.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.11.2。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增有界动态实体模型阴影，尚无方块实体阴影、分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.11.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.11.2.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -201,3 +201,7 @@ map+attachment 从 20 增为 30 MiB；caster GPU uniform 3×160 字节，resolve
 ## 0.11.1 material capture hotfix
 
 修复 MRT capture 缺少 `RenderPassDescriptor.renderArea` 导致所有 material 模式失败并自动回到 OFF。替换旧 jar 后重新选择 `MATERIAL_COVERAGE` 或 `SURFACE_NORMAL`；此错误与 Iris、认证失败无关。新增已打包 descriptor 的全尺寸/窗口尺寸变更回归检查；实机画面仍需验收。
+
+## 0.11.2 material input and cutout fixes
+
+修复未使用 UV2 导致 native Vulkan 压缩 shader input location、Normal 读取错误 attribute。UV2 现在保留 skylight strength 到 emission B，回归检查实际 SPIR-V input location 与完整 vertex format 一致。capture 使用原生 opaque terrain sampler，并匹配 vanilla nearest/RGSS 采样与 cutout alpha；不放宽 depth rejection。ALBEDO 无阴影是预期诊断行为；SURFACE_NORMAL 应显示面方向颜色。植物紫色表示捕获深度不匹配，实机仍需复测。

@@ -120,16 +120,16 @@ public final class RenderProbe {
             materialPointObserved = false;
             return;
         }
-        renderPass(target);
+        renderPass(target, null);
     }
 
-    public void renderMaterialTerrain(RenderTarget target) {
+    public void renderMaterialTerrain(RenderTarget target, com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
         if (!mode.isMaterial()) return;
         materialPointObserved = true;
-        renderPass(target);
+        renderPass(target, terrainSampler);
     }
 
-    private void renderPass(RenderTarget target) {
+    private void renderPass(RenderTarget target, com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
         RenderSystem.assertOnRenderThread();
         var device = RenderSystem.getDevice();
         var info = device.getDeviceInfo();
@@ -210,7 +210,7 @@ public final class RenderProbe {
                 encoder.copyTextureToTexture(target.getColorTexture(), scratch, 0, 0, 0, 0, 0, target.width, target.height);
             }
             if (mode.isMaterial()) {
-                material.render(encoder, target, scratchView, mode);
+                material.render(encoder, target, scratchView, mode, terrainSampler);
             } else if (mode.isShadow()) {
                 shadows.render(encoder, target, scratchView, mode);
             } else try (var pass = encoder.createRenderPass(() -> "VoxelLight diagnostic", target.getColorTextureView(), Optional.empty())) {

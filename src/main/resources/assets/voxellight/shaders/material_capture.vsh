@@ -4,6 +4,7 @@ in vec3 Position;
 in vec4 Color;
 in vec2 UV0;
 in ivec2 UV1;
+in ivec2 UV2;
 in vec4 Normal;
 layout(std140) uniform Globals {
     ivec3 CameraBlockPos;
@@ -25,6 +26,7 @@ layout(location = 0) out vec2 texCoord;
 layout(location = 1) out vec4 unlitTint;
 layout(location = 2) flat out vec3 surfaceNormal;
 layout(location = 3) flat out ivec2 emissionFlags;
+layout(location = 4) out vec2 compatibilityLight;
 void main() {
     vec3 pos = Position + vec3(ChunkPosition - CameraBlockPos) + CameraOffset;
     gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);
@@ -32,4 +34,5 @@ void main() {
     unlitTint = Color;
     surfaceNormal = Normal.xyz;
     emissionFlags = UV1;
+    compatibilityLight = vec2(UV2) / 240.0;
 }

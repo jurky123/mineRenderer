@@ -64,7 +64,7 @@ final class MaterialCapture implements AutoCloseable {
         }
         settings=RenderSystem.getDevice().createBuffer(() -> "VoxelLight material diagnostic settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,SETTINGS_BYTES);
     }
-    void render(CommandEncoder encoder,RenderTarget output,GpuTextureView sceneColor,RenderProbe.Mode mode) {
+    void render(CommandEncoder encoder,RenderTarget output,GpuTextureView sceneColor,RenderProbe.Mode mode,com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
         var minecraft=Minecraft.getInstance();
         var camera=minecraft.gameRenderer.gameRenderState().levelRenderState.cameraRenderState;
         var atlas=minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
@@ -83,7 +83,7 @@ final class MaterialCapture implements AutoCloseable {
         var descriptor=captureDescriptor(views,width,height);
         try(var pass=encoder.createRenderPass(descriptor)) {
             pass.setPipeline(CAPTURE);RenderSystem.bindDefaultUniforms(pass);
-            pass.bindTexture("Sampler0",atlas,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            pass.bindTexture("Sampler0",atlas,terrainSampler);
             if(!submissions.isEmpty())pass.drawMultipleIndexed(submissions,indices,sequence.type(),List.of("ChunkSection"),ubos);
         }
         draws=submissions.size();

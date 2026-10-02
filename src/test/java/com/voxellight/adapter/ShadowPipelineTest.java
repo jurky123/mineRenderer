@@ -101,6 +101,19 @@ class ShadowPipelineTest {
                         if (format != null) format.getElements().forEach(element -> inputs.add(element.name()));
                     }
                     vertex.rebind(inputs, entries);
+                    if (field.equals("CAPTURE")) {
+                        int location = 0;
+                        for (String input : inputs) {
+                            Object reflected = null;
+                            for (Object candidate : vertex.inputs()) {
+                                var name = candidate.getClass().getDeclaredMethod("name"); name.setAccessible(true);
+                                if (input.equals(name.invoke(candidate))) reflected = candidate;
+                            }
+                            assertNotNull(reflected, "Unused format attributes shift native Vulkan bindings: " + input);
+                            var offset = reflected.getClass().getDeclaredMethod("locationOffset"); offset.setAccessible(true);
+                            assertEquals(location++, vertex.spirv().asIntBuffer().get((int)offset.invoke(reflected)));
+                        }
+                    }
                     var outputs = new ArrayList<String>();
                     for (Object output : vertex.outputs()) {
                         var name = output.getClass().getDeclaredMethod("name");
@@ -159,6 +172,20 @@ class ShadowPipelineTest {
                 }
                 assertEquals(0.0,descriptor.depthAttachment.clearValue().orElseThrow());
             }
+        }
+    }
+
+    @Test
+    void materialCutoutSamplingMatchesPinnedNativeTerrain() throws Exception {
+        try (var loader = shippedLoader();
+             var nativeStream = getClass().getResourceAsStream("/assets/minecraft/shaders/core/terrain.fsh");
+             var captureStream = loader.findResource("assets/voxellight/shaders/material_capture.fsh").openStream()) {
+            assertNotNull(nativeStream);
+            var nativeShader = new String(nativeStream.readAllBytes(), StandardCharsets.UTF_8);
+            var captureShader = new String(captureStream.readAllBytes(), StandardCharsets.UTF_8);
+            var sampling = nativeShader.substring(nativeShader.indexOf("vec4 sampleNearest"),nativeShader.indexOf("void main()"));
+            assertTrue(captureShader.contains(sampling), "Alpha coverage must use the native nearest/RGSS sampling functions");
+            assertTrue(captureShader.contains("UseRgss == 1 ? sampleRGSS"));
         }
     }
 
