@@ -8,11 +8,13 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.shaders.ShaderSource;
 import com.mojang.blaze3d.shaders.ShaderType;
+import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.voxellight.debug.PassMetrics;
+import com.voxellight.VoxelLightClient;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,13 +26,21 @@ import java.util.Optional;
 
 /** Version-specific diagnostic pass. Owns no Minecraft device, queue or framebuffer. */
 public final class RenderProbe {
-    public enum Mode { OFF, COLOR, DEPTH }
+    public enum Mode {
+        OFF, COLOR, DEPTH, NORMAL, SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES;
+
+        public boolean isShadow() {
+            return this == SHADOW || this == SHADOW_MASK || this == SHADOW_MAP || this == SHADOW_RANGES;
+        }
+    }
 
     private static final Logger LOGGER = LoggerFactory.getLogger("VoxelLight");
     private static final RenderPipeline COLOR = pipeline("color");
     private static final RenderPipeline DEPTH = pipeline("depth");
-    private static final ShaderSource SHADERS = (id, type) -> readShader(id, type);
+    private static final RenderPipeline NORMAL = pipeline("normal");
+    static final ShaderSource SHADERS = (id, type) -> readShader(id, type);
     private final PassMetrics metrics = new PassMetrics(14_400);
+    private final ShadowRenderer shadows = new ShadowRenderer();
     private Mode mode = Mode.OFF;
     private GpuTexture scratch;
     private GpuTextureView scratchView;
@@ -46,9 +56,38 @@ public final class RenderProbe {
 
     public void setMode(Mode mode) {
         RenderSystem.assertOnRenderThread();
-        reset();
+        if (mode.isShadow() && !VoxelLightClient.scene().isEnabled()) VoxelLightClient.scene().setEnabled(true);
+        if (this.mode == mode) return;
+        if (this.mode.isShadow() && mode.isShadow()) resetTiming();
+        else reset();
         this.mode = mode;
         state = mode == Mode.OFF ? "off" : "waiting for world render";
+    }
+
+    public void setShadowDistance(int blocks) {
+        RenderSystem.assertOnRenderThread();
+        shadows.setShadowDistance(blocks);
+        resetTiming();
+    }
+
+    public void setEntityShadows(boolean value) { RenderSystem.assertOnRenderThread(); shadows.setEntityShadows(value); resetTiming(); }
+    public void setFineShapes(boolean value) { RenderSystem.assertOnRenderThread(); shadows.setFineShapes(value); resetTiming(); }
+    public void setLocalLights(boolean enabled) {
+        RenderSystem.assertOnRenderThread();
+        shadows.setLocalLights(enabled);
+        resetTiming();
+    }
+
+    public void setWorldSun(boolean enabled) {
+        RenderSystem.assertOnRenderThread();
+        shadows.setWorldSun(enabled);
+        resetTiming();
+    }
+
+    public void setShadowCache(boolean enabled) {
+        RenderSystem.assertOnRenderThread();
+        shadows.setCacheEnabled(enabled);
+        resetTiming();
     }
 
     public Mode mode() {
@@ -63,7 +102,8 @@ public final class RenderProbe {
         return "mode=" + mode + ", state=" + state + ", backend=" + backend + ", device=" + deviceName
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
                 + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
-                + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size();
+                + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
+                + (mode.isShadow() ? ", " + shadows.status() : "");
     }
 
     public long scratchBytes() {
@@ -97,12 +137,23 @@ public final class RenderProbe {
 
         frame++;
         try {
-            RenderPipeline pipeline = mode == Mode.COLOR ? COLOR : DEPTH;
+            if (mode.isShadow() && !shadows.prepare()) {
+                releaseScratch();
+                state = "shadow not ready; vanilla rendering retained";
+                return;
+            }
+            RenderPipeline pipeline = switch (mode) {
+                case COLOR -> COLOR;
+                case DEPTH -> DEPTH;
+                case NORMAL -> NORMAL;
+                case SHADOW, SHADOW_MASK, SHADOW_MAP, SHADOW_RANGES -> null;
+                case OFF -> throw new IllegalStateException("Off mode cannot render");
+            };
             // Minecraft owns compilation/cache destruction. Only our shaders are supplied here.
-            if (!device.precompilePipeline(pipeline, SHADERS).isValid()) {
+            if (pipeline != null && !device.precompilePipeline(pipeline, SHADERS).isValid()) {
                 throw new IllegalStateException("Diagnostic shader compilation failed");
             }
-            if (mode == Mode.COLOR) {
+            if (mode == Mode.COLOR || mode.isShadow()) {
                 ensureScratch(target);
             }
             if (!timerAttempted) {
@@ -133,13 +184,18 @@ public final class RenderProbe {
                     disableTimer(e);
                 }
             }
-            if (mode == Mode.COLOR) {
+            if (mode == Mode.COLOR || mode.isShadow()) {
                 encoder.copyTextureToTexture(target.getColorTexture(), scratch, 0, 0, 0, 0, 0, target.width, target.height);
             }
-            try (var pass = encoder.createRenderPass(() -> "VoxelLight diagnostic", target.getColorTextureView(), Optional.empty())) {
+            if (mode.isShadow()) {
+                shadows.render(encoder, target, scratchView, mode);
+            } else try (var pass = encoder.createRenderPass(() -> "VoxelLight diagnostic", target.getColorTextureView(), Optional.empty())) {
                 pass.setPipeline(pipeline);
                 pass.bindTexture("SceneSampler", mode == Mode.COLOR ? scratchView : target.getDepthTextureView(),
                         RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+                if (mode == Mode.NORMAL) {
+                    pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                }
                 // 26.2: vertexCount, instanceCount, firstVertex, firstInstance.
                 pass.draw(3, 1, 0, 0);
             }
@@ -152,7 +208,7 @@ public final class RenderProbe {
             }
             // Leave submission/frame lifecycle to Minecraft's shared encoder.
             metrics.record(frame, mode.name(), target.width, target.height, System.nanoTime() - cpuStart);
-            state = "diagnostic active";
+            state = mode.isShadow() ? "terrain lighting active" : "diagnostic active";
         } catch (RuntimeException e) {
             LOGGER.error("Diagnostic pass disabled after failure", e);
             reset();
@@ -165,6 +221,12 @@ public final class RenderProbe {
     public void reset() {
         RenderSystem.assertOnRenderThread();
         releaseScratch();
+        shadows.close();
+        resetTiming();
+        state = mode == Mode.OFF ? "off" : "waiting for world render";
+    }
+
+    private void resetTiming() {
         if (timer != null) {
             timer.close();
             timer = null;
@@ -172,7 +234,6 @@ public final class RenderProbe {
         timerAttempted = false;
         timing = "not observed";
         metrics.clear();
-        state = mode == Mode.OFF ? "off" : "waiting for world render";
     }
 
     private void ensureScratch(RenderTarget target) {
@@ -206,11 +267,15 @@ public final class RenderProbe {
     }
 
     private static RenderPipeline pipeline(String name) {
+        var bindings = BindGroupLayout.builder().withSampler("SceneSampler");
+        if (name.equals("normal")) {
+            bindings.withUniform("Projection", UniformType.UNIFORM_BUFFER);
+        }
         return RenderPipeline.builder()
                 .withLocation(Identifier.fromNamespaceAndPath("voxellight", "pipeline/" + name))
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight", "probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight", name))
-                .withBindGroupLayout(BindGroupLayout.builder().withSampler("SceneSampler").build())
+                .withBindGroupLayout(bindings.build())
                 .withColorTargetState(ColorTargetState.DEFAULT)
                 .withDepthStencilState(Optional.empty())
                 .withCull(false)

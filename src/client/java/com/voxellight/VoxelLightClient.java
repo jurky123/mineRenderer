@@ -1,8 +1,14 @@
 package com.voxellight;
 
 import net.fabricmc.api.ClientModInitializer;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.voxellight.adapter.RenderProbe;
+import com.voxellight.adapter.ClientScene;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.network.chat.Component;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.LoggerFactory;
@@ -12,17 +18,28 @@ import java.nio.file.Files;
 import java.time.Instant;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
 
 public final class VoxelLightClient implements ClientModInitializer {
     private static final RenderProbe PROBE = new RenderProbe();
+    private static final ClientScene SCENE = new ClientScene();
 
     public static RenderProbe probe() {
         return PROBE;
     }
 
+    public static ClientScene scene() {
+        return SCENE;
+    }
+
     @Override
     public void onInitializeClient() {
-        LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 rendering prototype loaded; diagnostics are off by default");
+        LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 reference lighting prototype loaded; rendering effects are off by default");
+        ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false));
+        ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true));
+        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> SCENE.changeLevel(level));
+        ClientTickEvents.END_CLIENT_TICK.register(SCENE::tick);
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> SCENE.close());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             var command = literal("voxellight")
                     .executes(context -> {
@@ -39,9 +56,11 @@ public final class VoxelLightClient implements ClientModInitializer {
                             Files.createDirectories(directory);
                             var path = directory.resolve("probe-" + Instant.now().toEpochMilli() + ".csv");
                             PROBE.metrics().export(path);
+                            SCENE.export(path.resolveSibling(path.getFileName() + ".scene.csv"));
                             Files.writeString(path.resolveSibling(path.getFileName() + ".txt"),
                                     "Minecraft=26.2\nVoxelLight=" + FabricLoader.getInstance().getModContainer("voxellight")
-                                            .orElseThrow().getMetadata().getVersion().getFriendlyString() + "\n" + PROBE.status() + "\n");
+                                            .orElseThrow().getMetadata().getVersion().getFriendlyString() + "\n" + PROBE.status()
+                                            + "\n" + SCENE.status() + "\n");
                             context.getSource().sendFeedback(Component.literal("VoxelLight: exported " + path.getFileName()
                                     + " to benchmark-results/voxellight"));
                             return 1;
@@ -55,11 +74,77 @@ public final class VoxelLightClient implements ClientModInitializer {
             for (var mode : RenderProbe.Mode.values()) {
                 modeCommand.then(literal(mode.name().toLowerCase(java.util.Locale.ROOT)).executes(context -> {
                     PROBE.setMode(mode);
-                    context.getSource().sendFeedback(Component.literal("VoxelLight: " + mode));
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: " + mode + (mode.isShadow() ? "; preparing nearby shadows" : "")));
                     return 1;
                 }));
             }
-            dispatcher.register(command.then(modeCommand));
+            var sceneCommand = literal("scene")
+                    .executes(context -> {
+                        context.getSource().sendFeedback(Component.literal(SCENE.status()));
+                        return 1;
+                    })
+                    .then(literal("on").executes(context -> {
+                        SCENE.setEnabled(true);
+                        context.getSource().sendFeedback(Component.literal("VoxelLight: scene tracking on"));
+                        return 1;
+                    }))
+                    .then(literal("off").executes(context -> {
+                        SCENE.setEnabled(false);
+                        context.getSource().sendFeedback(Component.literal("VoxelLight: scene tracking off"));
+                        return 1;
+                    }))
+                    .then(literal("inspect").executes(context -> {
+                        context.getSource().sendFeedback(Component.literal(SCENE.inspect(context.getSource().getClient())));
+                        return 1;
+                    }));
+            var cacheCommand = literal("shadow_cache");
+            for (boolean enabled : new boolean[]{true, false}) {
+                cacheCommand.then(literal(enabled ? "on" : "off").executes(context -> {
+                    PROBE.setShadowCache(enabled);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: shadow cache " + (enabled ? "on" : "off (reference redraw)")));
+                    return 1;
+                }));
+            }
+            var sunCommand = literal("sun");
+            for (boolean worldSun : new boolean[]{true, false}) {
+                sunCommand.then(literal(worldSun ? "world" : "fixed").executes(context -> {
+                    PROBE.setWorldSun(worldSun);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: " + (worldSun ? "world sun/moon" : "fixed reference light")));
+                    return 1;
+                }));
+            }
+            var localCommand = literal("local_lights");
+            for (boolean enabled : new boolean[]{true, false}) {
+                localCommand.then(literal(enabled ? "on" : "off").executes(context -> {
+                    PROBE.setLocalLights(enabled);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: artificial lights " + (enabled ? "on" : "off")));
+                    return 1;
+                }));
+            }
+            var entityCommand = literal("entity_shadows");
+            for (boolean enabled : new boolean[]{true, false}) {
+                entityCommand.then(literal(enabled ? "on" : "off").executes(context -> {
+                    PROBE.setEntityShadows(enabled);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: entity shadows " + (enabled ? "on" : "off")));
+                    return 1;
+                }));
+            }
+            var occlusionCommand = literal("light_occlusion");
+            for (boolean fine : new boolean[]{true, false}) {
+                occlusionCommand.then(literal(fine ? "shapes" : "full").executes(context -> {
+                    PROBE.setFineShapes(fine);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: light occlusion " + (fine ? "shapes" : "full")));
+                    return 1;
+                }));
+            }
+            var distanceCommand = literal("shadow_distance")
+                    .then(argument("blocks", IntegerArgumentType.integer(12, 48)).executes(context -> {
+                        int distance = IntegerArgumentType.getInteger(context, "blocks");
+                        PROBE.setShadowDistance(distance);
+                        context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
+                        return 1;
+                    }));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand));
         });
     }
 }

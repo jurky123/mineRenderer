@@ -1,6 +1,14 @@
 # VoxelLight 实施计划
 
-状态：P0a 的 26.2 原型已实现并通过构建/离线测试，实机 smoke 待验证；P0b 和后续阶段尚未通过。按用户要求开发基线改为 Minecraft 26.2，原始 v0.2 保留历史。本计划纳入 [评审意见](REVIEW.md)，实现证据见 [接入记录](INTEGRATION.md)。先证明接入和缓存收益，不提前搭完整视觉管线。
+状态：用户已确认 0.1.2 Vulkan depth，以及 0.2.0 normal、125/125 局部 section、F3+T 和下界切换正常。0.3.0 进入 P1a 的地形参考阴影实验：独立模型 caster、固定太阳、单层非缓存 map、cutout、PCF/bias、近距合成。0.3.0 用户截图已证明 caster map 执行，同时暴露 acne 和全局准备闪灭；0.3.1 后新截图地面改善但侧面仍有条纹，移动时局部消失；0.3.2 改为深度邻域法线平面修正并保留有效 caster 的已确认遮挡，待实机复测；实体/方块实体动态 caster、远距完整覆盖、真正 GBuffer 和完整 benchmark 仍待接入，不宣称完整 P1a 验收通过。按用户要求基线为 Minecraft 26.2。详见 [评审](REVIEW.md)、[接入记录](INTEGRATION.md) 和 [阴影边界](SHADOWS.md)。
+
+0.4.0 推进 P1b 的单层缓存基础：固定 8 格世界 anchor、caster 集版本失效、同质量每帧参考开关、map reuse/update 原因；同时将 map 提升到 2048² 并连续插值 comparison PCF。cutout 每帧重绘保证动画 alpha 当前。P1a 剩余画质/动态层与 P1b 三层 clipmap/分页/动态合成/太阳运动仍未完成；先实机比较当前缓存与参考。
+
+用户认可 0.4.0，并观察编辑刷新。0.5.0 继续 tile 更新基础：64 个逻辑页、实际 caster bounds 的局部失效、邻接合并矩形、重叠 caster 全重绘与页更新计数。已有同质量参考开关；生命周期仍全重置。没有虚拟分页/三层 clipmap/延期预算，编辑 mesh 重建仍可能漏影；需实机比较 tile 边界与增删重叠 caster。
+
+0.5.1 优先修复用户观察的 local refresh：独立 live geometry token、最多 8 section 同帧编辑替换、32 MiB steady/8 MiB staging；特定网络 light rebuild 分类 LIGHT，避免 27 邻居误失效。大组/预算/未加载邻居仍安全暖机，CPU 同步开销待测；新增替换/回退/peak CPU 状态。
+
+用户认可 0.5.1。0.6.0 推进 P1b 变化太阳：native sky sun/moon angles、月相/雨天/近地平线强度策略、source/angle cache key、正午稳定 basis、sun world/fixed 比较开关。cache/reference 同样取整方向；方向变化立即全更新，strength-only 不失效。3 层 clipmap/延期页预算/动态 entity 与完整性能验收仍未完成。
 
 ## 阶段与验收
 
@@ -53,4 +61,38 @@ P0 首次实测后锁定资源表：每个 target 的格式/分辨率/历史/fra
 
 文档阶段检查相对链接、源文档提取和 Git 忽略规则，无可构建代码。实现阶段运行 `./gradlew build` 和相关逻辑测试；render 正确性通过实机 smoke/对比截图验证。客户端交付文件名含游戏和 mod 版本，只包含本 mod 产物。
 
-仓库远程 URL 尚未提供，提交保留在本地。汇总仓库索引后续需登记 mineRenderer；不修改其他仓库或子模块指针。
+已配置 origin 为 `https://github.com/jurky123/mineRenderer.git`。汇总仓库索引后续需登记 mineRenderer；不修改其他仓库或子模块指针。
+
+## 0.7.0 用户要求优先修复 flicker，并推进局部人工光源
+
+用户未接受 0.6.0 的 flicker/月光表现。本次取消渲染方向取整与旋转全局 resnap，加入 anchor 滞回、近轴 normal 稳定、较宽 comparison PCF 和实际冷色 moon fill；实机是否消除报告问题待用户验证。按本次明确要求先交付有界 P2/P3 局部灯子集：最多 16 source、64 spatial representatives/section、80³ full-block opacity atlas、DDA 遮挡、编辑/generation token、选择/fade/overflow 与状态预算。不是完整 GPU Voxel DB、clustered light、细材质遮挡或 GI；3 层 clipmap/页调度/动态 entity 与性能验收仍待完成。下一阶段以用户视觉反馈和导出数据决定先补抗锯齿/细材质/局部灯预算，不默认宣称已经达到各阶段验收。
+
+## 0.8.0 用户批准下一阶段；优先处理某些视角下阴影突变
+
+用户认可 0.7，但怀疑影距导致局部突变。实施 P1b 三层 overlapping local cascades（2048/1024/1024，12..16/26..32 blends、默认 40..48 fade）、343-section scene marker/模型窗口、32 MiB 有界 proximity residency、独立 125-section 人工灯数据。补 two-neighbor depth plane selection 与连续 axis normal stabilization，提供 shadow_distance/ranges/map 三图诊断。缓存/参考保持同样的质量参数。CPU coverage/projection 与大小不同的 tile caches、预算准入/不会来回淘汰、shipped shader/UBO tests 通过；GPU 角度问题是否完全消除仍需用户实机回归。三层 map 不等于完成滚动 clipmap、页调度、动态 caster 或完整 P1b 性能验收。下一步依 export/截图先确认 coverage/normal/alias 根因，再决定细材质/temporal/预算调度；不直接宣称全阶段通过。
+
+## 0.9.0 人工灯形状遮挡与增量上传
+
+用户已确认 0.8.0 的阴影距离控制有效。0.9.0 保留三层方向阴影，在人工灯光线遍历中增加原生 BlockState 缓存 occlusion shape 的 AABB 相交测试。默认 `/voxellight light_occlusion shapes`；`/voxellight light_occlusion full` 恢复此前只检查 full-block 的参考行为，便于同场景比较。
+
+测试：Vulkan 世界运行 `/voxellight mode shadow`，在火把与地面之间放置半砖、楼梯和栅栏，比较 shapes/full；观察开口透光和实体部分遮挡。随后放置/破坏遮挡块、移动跨 section、F3+T、切维度，检查无陈旧遮挡。status 中 shapeRows、shapeFallbacks、shapeOverflows、uploadRegions、voxelUploadBytes、shapeUploadBytes 显示实际资源/上传计数。
+
+800×640 R32_UINT 网格使用 2,048,000 字节，32×1024 RGBA32_FLOAT 形状纹理使用 524,288 字节，总计 2,572,288 字节。最多 1023 种非空形状，每种最多 16 个框；复杂形状退化为包围框，形状表满时保守地当作整块遮挡。状态缓存最多 4096 条；世界/资源重置同时清空网格、形状 ID 和 GPU 资源。
+
+局部编辑只上传受影响 section 的 atlas 区域；一个 section 为 16,384 字节。相同遮挡数据重新捕获不上传网格；超过 64 个合并区域或窗口原点移动时完整上传。形状表只上传新增行，旧 ID 不改写。仍为最多 16 盏灯、80³ 已加载方块窗口、每光线最多 48 次方块遍历，未知区域保守遮挡。
+
+此阶段使用原生遮挡形状，不使用资源包模型或 alpha 贴图；noOcclusion 玻璃/植物不会新增形状阴影，框裁剪到所属方块的 0..1 范围，不表示超出方块的模型部分。没有动态实体灯光/阴影、GI 或物理材质输出。自动测试覆盖形状编码、保守容量回退、编辑/卸载/移动增量上传，以及 Minecraft 原生 GLSL→SPIR-V 和绑定布局；新画质和 GPU 耗时待实机验证。
+
+## 0.10.0 动态实体模型阴影
+
+用户已确认 0.9.0 shapes/full 的人工灯遮挡差异有效。本阶段推进 P1a/P1b 的动态层：为每个 cascade 增加独立 D32 深度层，每帧使用原生实体 renderer 的 interpolated state、模型动画、模型/部件 submit、pose 与 Sampler0 alpha 纹理生成自有 BLOCK 顶点。光照 PCF 每个 tap 使用 terrain/entity 的较近深度；动态实体移动不改变静态 terrain cache token 或 tile validity。实体层为空或关闭时清除已有动态深度；连续为空时复用空层。shadow_map 显示两层合成深度。
+
+默认 entity_shadows on，`/voxellight entity_shadows off` 可同场景比较。优先测试白天平地的牛/猪/僵尸、行走动画、第三人称玩家；用 `/voxellight sun fixed` 暂停天空角度干扰。让实体离开镜头但其阴影仍进入镜头，确认不依赖主相机 frustum。随后移除/杀死实体、开关 entity_shadows、F3+T、切维度和重进世界，确认无旧姿态残影。status 查看 entityModels、entityUploadBytes、entityCaptureNs、entitySkipped、entityFailures、entityOverflow。大量实体测试需记录帧时间与 CSV，构建通过不表示 GPU 性能验收。
+
+最多选择相机 64 格球内最近 32 个已加载、非 invisible/removed/spectator 实体，按距离与 entity ID 排序，选择内存固定 32 条，不请求 chunk。每帧最多尝试 128 个合格 model、总顶点 1 MiB、单模型原生 scratch 最大 256 KiB。几何超限/不支持类型会跳过，失败 renderer 撤销该实体已捕获的全部模型，记录错误且保留地形光照。超限时不保证所有实体投影；目前无选入/淘汰 fade 或动态层 temporal filter。
+
+非混合、QUADS、带 Sampler0 的 native Model/ModelPart 可投影；原生 PlayerModel 使用 translucent skin pipeline，作为特殊情况按 alpha>=0.5 cutout 投影。其他 translucent 模型、粒子、火焰、leash、blob shadow、文本、held/item geometry、custom geometry 与方块实体不进入新层。模组自定义 renderer 的兼容性取决于是否使用此 native model submit 路径。不替换 vanilla entity/blob rendering；人工灯 DDA 仍只检测方块，不新增实体的人工灯遮挡。
+
+三张 dynamic depth（2048²/1024²/1024²）增加 24 MiB，复用既有写禁用 R8 color attachment；总 shadow targets 54 MiB。固定 dynamic GPU vertex buffer 最多 1 MiB，CPU frame pack 1 MiB + scratch<=256 KiB；off mode/reload/world reset 释放自有资源。entity_shadows off 保留已分配资源并清空深度，避免开关重分配。存在动态模型时 PCF 每 tap 最多增加一次深度采样；空层通过统一 flag 跳过动态采样。模型捕获 CPU 时间在 GPU query 之前单列 entityCaptureNs；GPU pass timing 包括动态顶点上传、动态层 draw/clear 和合成。
+
+本阶段没有完成页调度、滚动 clipmap、动态方块实体、完整 frame profiler/GBuffer 或 AO/GI。下一步先实机验证动态层与压力性能，再实现预算页更新或 AO。自动测试验证 nearest admission/overflow、native animated Model→BLOCK 顶点坐标与容量限制、实际 ENTITY pipeline 的 GLSL→SPIR-V 和 Vulkan stage binding。

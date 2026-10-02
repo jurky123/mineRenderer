@@ -3,6 +3,8 @@ package com.voxellight.adapter;
 import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.vulkan.glsl.GlslCompiler;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
@@ -10,6 +12,7 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.VarInsnNode;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -20,10 +23,33 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RenderingContractTest {
     @Test
-    void packagedDiagnosticDrawSubmitsGeometry() throws Exception {
+    void partialRenderAreaDoesNotRescaleTheMinecraftVulkanViewport() throws Exception {
+        var node = new ClassNode(Opcodes.ASM9);
+        new ClassReader("com.mojang.blaze3d.vulkan.VulkanRenderPass").accept(node, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        var constructor = node.methods.stream().filter(method -> method.name.equals("<init>")).findFirst().orElseThrow();
+        int checked = 0;
+        for (var instruction : constructor.instructions) {
+            if (instruction instanceof MethodInsnNode call && call.owner.equals("org/lwjgl/vulkan/VkViewport$Buffer")
+                    && (call.name.equals("width") || call.name.equals("height"))) {
+                var conversion = instruction.getPrevious();
+                assertEquals(Opcodes.I2F, conversion.getOpcode());
+                assertInstanceOf(VarInsnNode.class, conversion.getPrevious());
+                var source = (VarInsnNode)conversion.getPrevious();
+                assertEquals(Opcodes.ILOAD, source.getOpcode());
+                assertEquals(call.name.equals("width") ? 6 : 7, source.var,
+                        "Viewport must use full attachment dimensions, not a tile's RenderArea dimensions");
+                checked++;
+            }
+        }
+        assertEquals(2, checked);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RenderProbe", "ShadowRenderer"})
+    void packagedDiagnosticDrawSubmitsGeometry(String className) throws Exception {
         // Check the shipped call, not a separately constructed test triangle.
         try (var jar = new ZipFile(System.getProperty("voxellight.modJar"));
-             var stream = jar.getInputStream(jar.getEntry("com/voxellight/adapter/RenderProbe.class"))) {
+             var stream = jar.getInputStream(jar.getEntry("com/voxellight/adapter/" + className + ".class"))) {
             var node = new ClassNode(Opcodes.ASM9);
             new ClassReader(stream).accept(node, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
             int draws = 0;
@@ -91,7 +117,7 @@ class RenderingContractTest {
     @Test
     void packagedShadersCompileWithMinecraftVulkanCompiler() throws Exception {
         try (var compiler = new GlslCompiler()) {
-            for (String name : List.of("probe.vsh", "color.fsh", "depth.fsh")) {
+            for (String name : List.of("probe.vsh", "color.fsh", "depth.fsh", "normal.fsh", "shadow_caster.vsh", "shadow_caster.fsh", "shadow.fsh", "shadow_map.fsh")) {
                 try (var stream = getClass().getResourceAsStream("/assets/voxellight/shaders/" + name)) {
                     assertNotNull(stream, name);
                     var module = compiler.createIntermediary(name, new String(stream.readAllBytes(), StandardCharsets.UTF_8),
