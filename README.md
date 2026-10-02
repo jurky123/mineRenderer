@@ -2,7 +2,7 @@
 
 VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
 
-当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 block-entity dynamic shadows 已获用户确认；0.14.0 增加 light-aware terrain caster selection，尚无实体材质迁移、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
+当前是 **Minecraft 26.2 的局部光照 renderer prototype**。0.12.0 新增 `foundation`：以未照明材质、真实 geometry normal 和 emission strength 分离 sun/moon、sky、block/local illumination，输出 HDR 后 tone map/native fog；0.11.2 的 material diagnostics 已获用户确认。既有三层局部 directional tile cache、形状人工灯遮挡与有界动态实体 caster 继续复用，`shadow` 保留旧 LDR 比较路径。具备统一世界脏区、局部快照、backend 检测、非阻塞 GPU timestamp、显存/上传状态与 CSV 导出。用户已确认 0.12.1 foundation 与植物稳定性修复；material 仅有限 terrain coverage，未支持 geometry 继续 vanilla；0.13.0 block-entity dynamic shadows 已获用户确认；0.14.0 light-aware terrain caster selection 已获用户确认；0.15.0 增加实际native opaque模型材质/normal lighting，blended玩家皮肤与custom geometry仍native、虚拟分页/滚动 clipmap、temporal 或 GI。目录/仓库名称为 `mineRenderer`，功能名称为 `VoxelLight`，mod ID 为 `voxellight`，Java 包为 `com.voxellight`。
 
 ## 文档
 
@@ -87,4 +87,11 @@ mod：`build/libs/voxellight-client-26.2-0.13.0.jar`；安装包：`build/distri
 
 ## 0.14.0 B3b light-aware caster selection
 
-默认从48格 receiver 球向 sun/moon 扩展16..48格，优先本地125 sections，只选择已加载地形，scene cap384与terrain32 MiB预算不变。`/voxellight caster_volume cube` / `light` 比较旧窗口；低太阳角度、较远建筑的附近阴影最容易看到差异。scene status显示搜索/已加载候选/限额排除与扩展距离；未加载或预算排除的caster仍可能缺失。完整实机检查见安装说明。下一步仍为B3实体材质迁移，未进入GI。
+默认从48格 receiver 球向 sun/moon 扩展16..48格，优先本地125 sections，只选择已加载地形，scene cap384与terrain32 MiB预算不变。`/voxellight caster_volume cube` / `light` 比较旧窗口；低太阳角度、较远建筑的附近阴影最容易看到差异。scene status显示搜索/已加载候选/限额排除与扩展距离；未加载或预算排除的caster仍可能缺失。完整实机检查见安装说明。实体材质第一步见0.15.0，未进入GI。
+
+
+## 0.15.0 B3c opaque entity material lighting
+
+实际native ModelFeatureRenderer顶点在原render调用中同步捕获ENTITY格式，保留pose、sprite UV、unlit tint、overlay、packed light与normal，不重新提取/运行动画。支持原生solid/cutout模型与普通armor，部分opaque block-entity模型也走同一路径；在solid feature结束后、translucency前使用同帧shadow/local-light数据完成分离HDR lighting。`/voxellight entity_materials off` / `on` 比较仅新增的实体材质光照，terrain与shadow仍启用。
+
+最多128 model attempts/1 MiB frame/256 KiB model scratch，复用现有MRT/HDR，不新增全屏targets。玩家blended skin、eyes/glow、held item/custom submits仍native；armor trim以coverage exclusion保留native像素，glint/transparency随后native绘制。该阶段支持范围与实机验收见INSTALL；temporal/GI尚未开始。

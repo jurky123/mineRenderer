@@ -43,6 +43,9 @@ public final class RenderProbe {
     static final ShaderSource SHADERS = (id, type) -> readShader(id, type);
     private final PassMetrics metrics = new PassMetrics(14_400);
     private final ShadowRenderer shadows = new ShadowRenderer();
+    private final EntityMaterials entityMaterials = new EntityMaterials();
+    private boolean entityCaptureScope, materialFrameReady;
+    private String entityMaterialPass = "off";
     private final MaterialCapture material = new MaterialCapture();
     private final LightingResolvePass lighting = new LightingResolvePass();
     private Mode mode = Mode.OFF;
@@ -74,6 +77,8 @@ public final class RenderProbe {
         shadows.setShadowDistance(blocks);
         resetTiming();
     }
+
+    public void setEntityMaterials(boolean value) { RenderSystem.assertOnRenderThread(); entityMaterials.setEnabled(value); resetTiming(); }
 
     public void setEntityShadows(boolean value) { RenderSystem.assertOnRenderThread(); shadows.setEntityShadows(value); resetTiming(); }
     public void setLightAwareCasters(boolean value) { RenderSystem.assertOnRenderThread(); VoxelLightClient.scene().setLightAware(value); resetTiming(); }
@@ -109,6 +114,7 @@ public final class RenderProbe {
         return "mode=" + mode + ", state=" + state + ", backend=" + backend + ", device=" + deviceName
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
                 + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
+                + (mode.isMaterial() ? entityMaterials.status() + ", entityMaterialPass=" + entityMaterialPass : "")
                 + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
                 + (mode == Mode.FOUNDATION ? ", " + lighting.status() + ", " + material.status() + ", " + shadows.status()
                 : mode.isShadow() ? ", " + shadows.status() : mode.isMaterial() ? ", " + material.status() : "");
@@ -118,7 +124,46 @@ public final class RenderProbe {
         return scratch == null ? 0 : (long) scratch.getWidth(0) * scratch.getHeight(0) * scratch.getFormat().blockSize();
     }
 
+    public void beginEntityMaterialFrame() {
+        entityCaptureScope = mode.isMaterial() && "Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName());
+        materialFrameReady = false;
+        entityMaterialPass = entityCaptureScope ? "solid hook not observed" : "off";
+        entityMaterials.begin();
+    }
+    public com.mojang.blaze3d.vertex.VertexConsumer entityMaterialConsumer(net.minecraft.client.renderer.feature.ModelFeatureRenderer.Submit<?> submit,com.mojang.blaze3d.vertex.VertexConsumer consumer) {
+        return entityCaptureScope ? entityMaterials.consumer(submit,consumer) : consumer;
+    }
+    public void finishEntityMaterial(com.mojang.blaze3d.vertex.VertexConsumer consumer,boolean success) { entityMaterials.finish(consumer,success); }
+    public void renderMaterialEntities(RenderTarget target) {
+        if(!entityCaptureScope || !mode.isMaterial())return;
+        entityMaterialPass = "no eligible models or overlay fallback";
+        if(!materialFrameReady){entityMaterialPass="terrain foundation unavailable";return;}
+        if(!entityMaterials.hasModels())return;
+        frame++;
+        long start=System.nanoTime();
+        try {
+            var encoder=RenderSystem.getDevice().createCommandEncoder();
+            int query=-1;
+            if(timer!=null)try{query=timer.begin(encoder,frame);}catch(RuntimeException e){disableTimer(e);}
+            entityMaterials.render(encoder,material,target.width,target.height);
+            if(mode==Mode.FOUNDATION)lighting.renderCaptured(encoder,target,material,shadows);
+            else {
+                ensureScratch(target);
+                encoder.copyTextureToTexture(target.getColorTexture(),scratch,0,0,0,0,0,target.width,target.height);
+                material.display(encoder,target,scratchView,mode,true);
+            }
+            if(timer!=null)try{timer.end(encoder,query);}catch(RuntimeException e){disableTimer(e);}
+            metrics.record(frame,mode.name()+"_ENTITIES",target.width,target.height,System.nanoTime()-start);
+            entityMaterialPass="resolved opaque models";
+        } catch(RuntimeException error) {
+            LOGGER.error("Entity material pass disabled after failure",error);
+            reset();mode=Mode.OFF;state="failed; vanilla restored on subsequent frames (see log)";
+        }
+    }
+
     public void render(RenderTarget target) {
+        entityCaptureScope=false;
+        entityMaterials.endFrame();
         if (mode.isMaterial()) {
             if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
             materialPointObserved = false;
@@ -242,6 +287,7 @@ public final class RenderProbe {
             }
             // Leave submission/frame lifecycle to Minecraft's shared encoder.
             metrics.record(frame, mode.name(), target.width, target.height, System.nanoTime() - cpuStart);
+            materialFrameReady = mode.isMaterial();
             state = mode == Mode.FOUNDATION ? "separated opaque lighting active" : mode.isShadow() ? "terrain lighting active" : mode.isMaterial() ? "material diagnostic active" : "diagnostic active";
         } catch (RuntimeException e) {
             LOGGER.error("Diagnostic pass disabled after failure", e);
@@ -256,6 +302,9 @@ public final class RenderProbe {
         RenderSystem.assertOnRenderThread();
         releaseScratch();
         shadows.close();
+        entityMaterials.close();
+        entityCaptureScope = materialFrameReady = false;
+        entityMaterialPass="off";
         material.close();
         lighting.close();
         materialPointObserved = false;

@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.14.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.15.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.14.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.15.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -24,6 +24,7 @@
 | `/voxellight mode normal` | 用深度和当前 projection 重建表面方向并着色；天空黑色，无新增世界光照。 |
 | `/voxellight mode shadow` | 世界太阳/月亮阴影、月光 fill 与人工灯；自动启用 scene，caster 准备完成后生效。 |
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
+| `/voxellight entity_materials on` / `off` | 默认on；支持的opaque实体模型使用材质/normal分离lighting，off保留native实体颜色；不关闭terrain或实体阴影。 |
 | `/voxellight entity_shadows on` / `off` | 默认 on；开关新增太阳/月亮实体模型阴影，保留地形阴影与原生 blob shadow。 |
 | `/voxellight light_occlusion shapes` / `full` | 默认 shapes；比较人工灯形状遮挡与 full-block 参考。 |
 | `/voxellight local_lights on` / `off` | 默认 on，独立开关新增人工灯；保留 vanilla lightmap 和 sun/moon。 |
@@ -268,3 +269,18 @@ B3a 是 geometry coverage 的第一步；entity material/normal migration、bloc
 Vulkan 中 `/voxellight mode foundation`、`/voxellight sun world`；在晨昏观察向光源约60–80格的已加载高墙向附近投影，比较 `/voxellight caster_volume cube` 与 `light`，每次等待 caster 暖机。正午/近处小场景可能没有明显差异。测试转动视角、跨 section、编辑远处墙、chunk 卸载、F3+T、切维度、第三人称与 teleport；用 `/voxellight scene` 查看 casterCandidates、casterEligible、casterWindowDeferred、casterExtrusion、casterSelectionNs，以及 shadow 的 geometry budgetDeferred。自动测试通过不能替代这些 GPU 检查。
 
 B3 entity material/normal migration 仍未实施；本版不新增 temporal、GI 或无限距离阴影。
+
+
+## 0.15.0 B3c actual opaque model materials
+
+0.14 light-aware caster selection 已获用户确认。本版继续B3 geometry/material覆盖：world feature准备期间，在native ModelFeatureRenderer的原model.renderToBuffer调用中tee实际顶点，不重新extract实体、不再次setupAnim/render模型。自有ENTITY36字节格式保存真实posed world-space normal、camera-relative vertex、UV、native未照明tint、overlay与packed sky/block brightness；sprite映射同时应用于native/private流。vertex tint不包含native shader的cardinal shading/lightmap/fog，亮度不是emission。
+
+仅准入已知原生ENTITY_SOLID、ENTITY_CUTOUT、ENTITY_CUTOUT_CULL、ARMOR_CUTOUT_NO_CULL的MAIN_TARGET/QUADS模型。通常可看到牛/猪/僵尸及普通armor；经同一原生模型路径的chest/shulker等opaque模型也可支持。玩家的blended skin、透明显隐、glowing eyes/emissive或dissolve shader、手持item/custom geometry、particles、labels/outline、hand/UI不迁移，仍native。支持的实体材质emission strength=0；fullbright packed light不会伪造emission。hurt/white overlay与native ColorModulator属于材质tint，保留；cutout使用原生texture采样和纹理alpha .1阈值，不复用terrain .5/RGSS。
+
+opaque terrain先完成已有foundation。native solid features绘制后，复用同一MRT清零并捕获opaque models；使用native private/main depth最多8 ULP匹配，再用同帧shadow/light environment resolve到复用HDR，tone/fog一次。保持native主depth不写入，不重做shadow prepare/update，不复制SceneColor（foundation）。随后translucent、glint、blob shadow、water、weather、hand/UI按原路径继续；material diagnostics会额外复制当前color以保留未支持实体。opaque armor trim已先native绘制，因此以私有coverage exclusion保留其native像素；若trim mask预算/捕获失败，整帧实体relighting跳过。任意custom coplanar shader不能宣称完全兼容。
+
+只处理native实际提交的可见模型，最多128尝试、1 MiB CPU frame + GPU vertex、256 KiB单模型scratch；并非新32实体选择器。四个settings buffer共64字节；textures/DynamicTransforms是同帧借用，不持有跨frame列表、不接管其生命周期。复用existing24 bytes/pixel MRT+8 bytes/pixel HDR，terrain/material/local-light budgets不变。off/reload/world/resize释放自有buffer；新frame清空旧pose，无motion vector/history。entity_materials off保持terrain/shadow并撤销新实体流，资源可保留至normal reset。
+
+测试Vulkan `/voxellight mode foundation`，观察行走的牛/猪/僵尸进入/离开建筑太阳阴影，再用`entity_materials off/on`比较实体颜色（terrain应保持同一效果）。看夜间/月光、火把照明与hurt tint；第三人称玩家目前仍native。检查普通/染色armor与trim/glint不消失、胸箱开合、cutout缺口、实体重叠/behind terrain、移除/大量模型、F3+T、resize/fullscreen、teleport/维度切换。`mode albedo`/`surface_normal`/`material_coverage`可直接检查支持模型；late coverage在未捕获区域保留之前的terrain诊断和native实体颜色，不整屏改灰。entity emission图黑色是预期。status看entityMaterialPass/models/skipped/failures/uploadBytes/captureNs/overlayFallback；CSV新增 *_ENTITIES pass行，terrain与实体GPU耗时分列。自动CPU/原生GLSL→SPIR-V/绑定/调用合约已验证，GPU实机尚待确认。
+
+这是一版有界opaque model迁移，不表示所有entity material都已完成；blended玩家/模型与custom submit仍是已知缺口。B3本版实机验证之后再考虑temporal稳定性，不进入GI。

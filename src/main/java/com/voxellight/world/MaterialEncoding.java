@@ -2,7 +2,7 @@ package com.voxellight.world;
 
 /** B1 material contract: no lighting, AO or fog in albedo; emission is strength, not radiance. */
 public final class MaterialEncoding {
-    public static final int CUTOUT = 1, TINTED = 2, UNSHADED = 4, ANIMATED = 8;
+    public static final int CUTOUT = 1, TINTED = 2, UNSHADED = 4, ANIMATED = 8, ENTITY = 16;
     public static final int PIXEL_BYTES = 24; // RGBA8 + two RGBA16F targets + private D32.
     public static final long TARGET_LIMIT = 192L * 1024 * 1024;
     public static final long RESIDENT_LIMIT = 16L * 1024 * 1024;

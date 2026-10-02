@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX);
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT)) {
@@ -101,7 +101,7 @@ class ShadowPipelineTest {
                         if (format != null) format.getElements().forEach(element -> inputs.add(element.name()));
                     }
                     vertex.rebind(inputs, entries);
-                    if (field.equals("CAPTURE")) {
+                    if (field.equals("CAPTURE") || field.equals("CULL") || field.equals("NO_CULL")) {
                         int location = 0;
                         for (String input : inputs) {
                             Object reflected = null;
@@ -122,7 +122,7 @@ class ShadowPipelineTest {
                     }
                     fragment.rebind(outputs, entries);
                     assertFalse(entries.isEmpty());
-                    if (field.equals("CAPTURE")) {
+                    if (field.equals("CAPTURE") || field.equals("CULL") || field.equals("NO_CULL")) {
                         var names = new ArrayList<String>();
                         for (Object output : fragment.outputs()) {
                             var name = output.getClass().getDeclaredMethod("name"); name.setAccessible(true);
@@ -131,7 +131,7 @@ class ShadowPipelineTest {
                         assertEquals(List.of("outAlbedo", "outNormal", "outEmission"), names,
                                 "Native output rebinding order must match the actual MRT attachments");
                     }
-                    if (!field.equals("CASTER") && !field.equals("ENTITY") && !field.equals("CAPTURE")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
+                    if (!field.equals("CASTER") && !field.equals("ENTITY") && !field.equals("CAPTURE") && !field.equals("CULL") && !field.equals("NO_CULL")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
                 }
             }
         }
@@ -271,7 +271,7 @@ class ShadowPipelineTest {
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
-        var field = Class.forName("com.voxellight.adapter." + (name.equals("LIGHTING") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
+        var field = Class.forName("com.voxellight.adapter." + (name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);
     }

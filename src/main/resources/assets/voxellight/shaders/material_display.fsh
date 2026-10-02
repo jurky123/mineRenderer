@@ -18,6 +18,8 @@ void main() {
     int depthDifference = abs(int(floatBitsToUint(depth)) - int(floatBitsToUint(materialDepth)));
     bool valid = normal.a > 0.5 && depth > 0.0 && materialDepth > 0.0 && depthDifference <= 8;
     if (Diagnostic.x > 3.5) {
+        // The late entity capture reuses/clears MRT: retain terrain diagnostics outside its geometry.
+        if (Diagnostic.y > 0.5 && materialDepth <= 0.0) { fragColor = scene; return; }
         // Green = supported matching surface. Magenta = captured but depth mismatch. Gray = uncaptured.
         vec3 overlay = valid ? vec3(0.0, 1.0, 0.2) : normal.a > 0.5 ? vec3(1.0, 0.0, 1.0) : vec3(0.3);
         fragColor = depth <= 0.0 ? scene : vec4(mix(scene.rgb, overlay, 0.75), scene.a);

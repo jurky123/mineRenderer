@@ -43,6 +43,9 @@ final class LightingResolvePass implements AutoCloseable {
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuSampler terrainSampler) {
         material.capture(encoder,terrainSampler);
         shadows.updateLighting(encoder,RenderProbe.Mode.FOUNDATION);
+        renderCaptured(encoder,output,material,shadows);
+    }
+    void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
         var sky = Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
         var light = LightingEnvironment.sample(shadows.light(),sky.skybox == DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);
         try (var stack = MemoryStack.stackPush()) {

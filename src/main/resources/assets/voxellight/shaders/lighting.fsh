@@ -161,7 +161,7 @@ void main() {
     int flags = int(round(material.a * 255.0));
     // Cutout foliage receives two-sided diffuse light. Never orient its normal to the camera:
     // crossed models contain opposing quads, and camera-facing flips change lighting at grazing angles.
-    bool foliage = (flags & 1) != 0;
+    bool foliage = (flags & 1) != 0 && (flags & 16) == 0;
     float coverage = 1.0 - smoothstep(Coverage.x, Coverage.y, distanceToCamera);
     float occlusion = coverage > 0.0 && Coverage.z > 0.0 ? cascadeOcclusion(distanceToCamera, position, normal) : 0.0;
     float visibility = 1.0 - occlusion * coverage;

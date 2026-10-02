@@ -180,6 +180,43 @@ class RenderingContractTest {
     }
 
     @Test
+    void nativeSolidFeatureBoundaryPrecedesDepthCopiesAndTransparency() throws Exception {
+        var level=new ClassNode(Opcodes.ASM9);
+        new ClassReader("net.minecraft.client.renderer.LevelRenderer").accept(level,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+        int checked=0;
+        for(var method:level.methods) {
+            int solid=-1,copy=-1,translucent=-1,index=0;
+            for(var instruction:method.instructions) {
+                if(instruction instanceof MethodInsnNode call) {
+                    if(call.name.equals("executeSolid"))solid=index;
+                    if(call.name.equals("copyDepthFrom"))copy=index;
+                    if(call.name.equals("executeTranslucent"))translucent=index;
+                }
+                index++;
+            }
+            if(solid>=0){assertTrue(copy>solid && translucent>copy);checked++;}
+        }
+        assertEquals(1,checked);
+        try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {
+            var probe=new ClassNode(Opcodes.ASM9);
+            try(var stream=jar.getInputStream(jar.getEntry("com/voxellight/adapter/RenderProbe.class"))) {
+                new ClassReader(stream).accept(probe,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+            }
+            var late=probe.methods.stream().filter(m->m.name.equals("renderMaterialEntities")).findFirst().orElseThrow();
+            int capture=-1,resolve=-1,index=0;
+            for(var instruction:late.instructions) {
+                if(instruction instanceof MethodInsnNode call) {
+                    assertFalse(call.owner.endsWith("ShadowRenderer") && (call.name.equals("prepare")||call.name.equals("updateLighting")),"Entity resolve must reuse this frame's terrain/dynamic shadow preparation");
+                    if(call.owner.endsWith("EntityMaterials") && call.name.equals("render"))capture=index;
+                    if(call.name.equals("renderCaptured"))resolve=index;
+                }
+                index++;
+            }
+            assertTrue(capture>=0 && resolve>capture);
+        }
+    }
+
+    @Test
     void packagedShadersCompileWithMinecraftVulkanCompiler() throws Exception {
         try (var compiler = new GlslCompiler()) {
             for (String name : List.of("probe.vsh", "color.fsh", "depth.fsh", "normal.fsh", "shadow_caster.vsh", "shadow_caster.fsh", "shadow.fsh", "shadow_map.fsh")) {

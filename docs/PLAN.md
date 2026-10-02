@@ -162,3 +162,12 @@ SurfaceToken 单独跟踪 light-only packed light 失效，保留 shadow Geometr
 用户已确认0.13 block-entity阴影工作。本阶段先完成caster correctness子项：实际render camera48格receiver球，向当前sun/moon扫掠16..48格；native已加载chunk过滤后最多384sections，本地125优先，terrain32 MiB/staging8 MiB与material/local-light budgets保持不变。提供caster_volume light/cube比较与candidate/eligible/deferred/extrusion/selection计数，shadow准备读取keys前更新volume。自动测试覆盖光源方向/高低角度、真实camera offset/大坐标、local125优先、加载过滤先于cap、section距离独立数值验证及shipped loaded-only/调用顺序合约。
 
 实机验收低角度上游远墙、第三人称/移动/编辑/卸载/F3+T/teleport/维度切换待用户执行；有限volume与budget不能宣称完整coverage。B3下一步仍为entity material/normal migration，然后才temporal与后续visual polish/GI。
+
+
+## 0.15.0 B3c opaque native model material migration
+
+用户已确认0.14 light-aware窗口。本阶段迁移支持的opaque模型材质：tee原生ModelFeatureRenderer一次render调用，ENTITY保留pose/world normal/UV/tint/overlay/native sky-block brightness；独立材质ownership，不使用shadow BLOCK输出。solid features完成后、translucency/depth copy前capture+HDR resolve，复用本帧shadow与既有MRT/HDR，不修改native主depth，foundation不复制SceneColor。ENTITY flag防止cutout动物被当作双面foliage，armor trim exclusion与超限全实体native回退防止擦除native装饰。
+
+128模型尝试/1 MiB frame/256 KiB scratch，settings64 bytes；native vertices始终优先写入，private容量失败不截断vanilla。自动检查actual vertex/UV/normal/overlay/light、sprite parity、private budget/reset/trim fallback、native composition顺序、Mixin调用及实体GLSL→SPIR-V绑定；实机动物动画、armor trim/glint、hurt、block-entity开合、深度遮挡、reload/resize/维度等待用户确认。
+
+本阶段仍不迁移blended玩家skin、held item/custom geometry、特殊emissive/dissolve shader。B3不宣称全实体覆盖；完成当前实机验收后，temporal基础可以开始设计，动态像素无motion时须拒绝history。GI仍后置。

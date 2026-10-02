@@ -152,3 +152,8 @@ B1 的 opaque `ChunkSectionsToRender.renderGroup` TAIL 同时用于 `FOUNDATION`
 EntityShadows 的模型/GPU内存迁到 DynamicModelBuffer；DynamicCasterSystem 协调 mobs 与 BlockEntityShadows，使用同一三 cascade dynamic depth。新选择来自 loaded chunk.getBlockEntities，不依赖 visible section list；原生 tryExtractRenderState/submit 及 Model/ModelPart/SpriteGetter 默认路径捕获动画与 atlas UV。每类32对象/128模型/1 MiB frame/256 KiB scratch，block_entity_shadows 默认on，status独立；全64位 BlockPos tie-break。每cascade在 terrain 结束后重新借当前共享 indexbuffer，统一较大请求，pass内不触发 growth。动态失败rollback和删除/开关清空保持有效。
 
 Native26.2床是普通模型，其他block-entity仅native model submit支持；item/text/transparent/custom geometry不支持。自身 material 仍vanilla，人工灯DDA不检测动态对象。B3a实机待验收，后续entity material/light-aware caster volume见PLAN。
+
+
+## 0.15 opaque model capture boundary
+
+GameRenderer.renderLevel's LevelRenderer.render invocation scopes the world-only capture. ModelFeatureRenderer.prepareModel's single native Model.renderToBuffer call is wrapped to tee ENTITY attributes without a second animation/render invocation; normal consumers continue even on private stream failure. PreparedFrame.executeSolid TAIL resolves supported models after their native depth writes and before LevelRenderer copies depth or executes translucent features. Same-frame PreparedRenderType textures/DynamicTransforms are borrowed, known solid/cutout pipelines only; opaque armor decal masks retain native trim pixels. CPU/native shader/mixin contracts validate the pinned26.2 boundaries; actual GPU replay/depth/overlay/animation correctness still needs in-game acceptance. Full blended entity/player migration is not claimed.

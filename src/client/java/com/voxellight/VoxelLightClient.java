@@ -121,6 +121,14 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var entityMaterialCommand = literal("entity_materials");
+            for (boolean enabled : new boolean[]{true, false}) {
+                entityMaterialCommand.then(literal(enabled ? "on" : "off").executes(context -> {
+                    PROBE.setEntityMaterials(enabled);
+                    context.getSource().sendFeedback(Component.literal("VoxelLight: opaque entity materials " + (enabled ? "on" : "off")));
+                    return 1;
+                }));
+            }
             var entityCommand = literal("entity_shadows");
             for (boolean enabled : new boolean[]{true, false}) {
                 entityCommand.then(literal(enabled ? "on" : "off").executes(context -> {
@@ -160,7 +168,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand));
         });
     }
 }

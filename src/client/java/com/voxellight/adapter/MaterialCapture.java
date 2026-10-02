@@ -66,9 +66,15 @@ final class MaterialCapture implements AutoCloseable {
     }
     void render(CommandEncoder encoder,RenderTarget output,GpuTextureView sceneColor,RenderProbe.Mode mode,com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
         capture(encoder,terrainSampler);
+        display(encoder,output,sceneColor,mode);
+    }
+    void display(CommandEncoder encoder,RenderTarget output,GpuTextureView sceneColor,RenderProbe.Mode mode) {
+        display(encoder,output,sceneColor,mode,false);
+    }
+    void display(CommandEncoder encoder,RenderTarget output,GpuTextureView sceneColor,RenderProbe.Mode mode,boolean entities) {
         int diagnostic=switch(mode){case ALBEDO->0;case SURFACE_NORMAL->1;case EMISSION->2;case MATERIAL_FLAGS->3;case MATERIAL_COVERAGE->4;default->throw new IllegalArgumentException("Not a material mode");};
         try(var stack=MemoryStack.stackPush()) {
-            encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,SETTINGS_BYTES).putVec4(diagnostic,0,0,0).get());
+            encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,SETTINGS_BYTES).putVec4(diagnostic,entities?1:0,0,0).get());
         }
         try(var pass=encoder.createRenderPass(()->"VoxelLight material diagnostic display",output.getColorTextureView(),Optional.empty())) {
             pass.setPipeline(DISPLAY);
