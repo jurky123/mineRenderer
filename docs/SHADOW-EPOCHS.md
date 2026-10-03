@@ -1,3 +1,5 @@
+> **0.26.1:** Epoch blending is disabled by default after the user reported higher FPS with it off. Use `shadow_epochs on` only for comparison. Static foliage caching remains active in either mode. Extra endpoint sampling is a suspected cost; pass timings are needed before choosing a replacement.
+
 # 0.26: moving celestial light with reusable terrain shadows
 
 The previous cache treated every distinct native sun/moon angle as a full-map invalidation. This release retains the128-block coverage, near/middle/far resolutions and current-frame entity/block-entity shadows, but displays two fixed-angle terrain epochs, with a third allocation preparing the following endpoint. The normal world-sun path enables them by default; fixed sun and `shadow_cache off` use the continuous-angle reference.

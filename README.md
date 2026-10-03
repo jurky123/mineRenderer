@@ -4,7 +4,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current client kit: [VoxelLight0.26.0](https://temp.sh/vDwvP/voxellight-client-kit-26.2-0.26.0.zip). Celestial shadow epochs with look-ahead, static foliage caching and a continuous-angle reference toggle;189 tests pass, in-game quality/performance acceptance pending.
+Current client kit: [VoxelLight0.26.1](https://temp.sh/RXTOG/voxellight-client-kit-26.2-0.26.1.zip). Epoch blending defaults off after user-reported FPS regression; static foliage caching remains enabled.189 tests pass.
 
 ## 文档
 

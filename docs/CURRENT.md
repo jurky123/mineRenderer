@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.26.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.26.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -23,6 +23,7 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | 0.25 phase3 — animated water / quality controls | Three moving normal-wave harmonics, bounded phase and modulo64 continuity; waves/reflections/filter toggles and fixed fast/balanced/high sampling budgets. Pending combined in-game test. |
 | 0.25.1 review follow-up | Direct36-byte writer; cached caster admission outside allocation lock; smaller filtered water ripples; optional delayed per-pass profiler. 178 tests passed; actual native shader compilation and direct vanilla/Indigo startup writer checks passed (graphics startup stops at missing DISPLAY); in-game motion and measured performance pending. |
 | 0.26 celestial cache | Two fixed-angle terrain epochs with visibility interpolation,8-page future construction budget and current dynamic shadow reprojection. Static cutout meshes now cache; animated/unknown emitters remain conservative.189 tests pass; native shader contracts and actual startup classification/writer checks pass (graphics stops at missing DISPLAY). In-game quality/performance pending. |
+| 0.26.1 epoch default | User reports higher FPS with epochs disabled. Epoch blending is now opt-in; static cutout caching remains enabled independently. No measured pass-level diagnosis yet. |
 | Next milestone | [Shadow epoch acceptance and A/B profiling](SHADOW-EPOCHS.md). Confirm edits/dynamic shadows, low-sun edge quality and measured costs before HZB/froxel/GI work. |
 
 Current budgets: dual-angle terrain shadows add at most48 MiBD32 (102 MiB total shadow textures); shared resolve transforms1344 bytes. Native material mode borrows visible native terrain geometry, adding8 bytes/vertex (BLOCK stride28→36) and one material MRT raster pass; no duplicate material mesh store. `/voxellight native_material off` selects the old125-section/16 MiB/one-build-per-frame local reference. Native compiler light updates still rebuild native section buffers. Light-aware scene cap384 loaded sections; independent near shadow terrain32 MiB; distant shadows borrow native allocations under a bounded128-block receiver +96-block light extrusion, with pending native compilation reported; local-light reference16 combined sources (one slot reserved while a held source exists). D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).

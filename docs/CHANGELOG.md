@@ -1,3 +1,8 @@
+# 0.26.1
+
+- Default celestial shadow epoch blending off after user-reported FPS regression; preserve static cutout caching and opt-in comparison.
+- Extra endpoint sampling is a suspected bottleneck, pending GPU pass profiling.
+
 # VoxelLight release history
 
 ## 0.26.0 — Celestial terrain epochs / static cutout caching

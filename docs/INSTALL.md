@@ -6,7 +6,7 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.26.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.26.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -430,3 +430,7 @@ Direct terrain vertex writes and cached distant-caster admission reduce avoidabl
 Default world-sun shadows now use two fixed-angle terrain epochs, blending visibility while the sun moves. Future-map initialization uses8 pages/frame; published maps repair edits/camera anchors immediately. Static leaves/plants no longer force per-frame tile refresh; animated and unknown cutouts retain it. Moving entities/block entities still use actual current light direction. One look-ahead set keeps the next endpoint ready; additional shadow textures are capped at48 MiB; blended lighting/volume sampling is more expensive, so FPS improvement must be measured.
 
 Compare `/voxellight shadow_epochs off` and `on` in an unchanged forest/building view with `sun world`. Wait30 seconds; use `profile on` and `export` for each run. Status reports `epochBlend`, `epochRotations`, `nextEpochReady`, `nextEpochUpdatedPages` and static/animated native cutout layers. Check low sun, slow walking, animals, block edits, animated-cutout packs, F3+T, teleport, resize and dimensions. Preserve atmosphere_density0.001 and water_wave_strength0.09. Full checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/SHADOW-EPOCHS.md
+
+### 0.26.1 — Epoch blending opt-in
+
+Epoch blending now defaults off after the user reported better FPS with `/voxellight shadow_epochs off`. Static foliage shadow caching is retained independently. `shadow_epochs on` remains available for A/B profiling; effects still start off. Density0.001 and water strength0.09 are unchanged.

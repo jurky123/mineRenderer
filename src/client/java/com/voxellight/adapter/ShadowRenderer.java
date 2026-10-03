@@ -111,7 +111,8 @@ public final class ShadowRenderer implements AutoCloseable {
     private final DynamicCasterSystem dynamic = new DynamicCasterSystem();
     private final NativeShadowCasters nativeCasters = new NativeShadowCasters();
     private final com.voxellight.world.ShadowEpochs epochs=new com.voxellight.world.ShadowEpochs();
-    private boolean epochEnabled=true, epochActive;
+    // Opt-in: endpoint sampling can cost more than cached shadow-map redraws save.
+    private boolean epochEnabled=false, epochActive;
     private float epochWeight;
     private boolean cacheEnabled = true;
     private boolean worldSun = true;
