@@ -16,6 +16,12 @@ public final class NativeTerrainAttributes {
             .addAttribute("UV1",GpuFormat.RG16_SINT).addAttribute("Normal",GpuFormat.RGBA8_SNORM).build();
     public record Attributes(int tintMetadata,Vector3f normal,int blockEmission) { }
     private static final ThreadLocal<Attributes> CURRENT=new ThreadLocal<>();
+    private static final ThreadLocal<java.util.Iterator<Attributes>> VERTICES=new ThreadLocal<>();
+    public static Attributes nextVertex(){var vertices=VERTICES.get();return vertices==null?current():vertices.hasNext()?vertices.next():null;}
+    public static void withVertices(Attributes[] values,Runnable output){
+        var old=VERTICES.get();VERTICES.set(java.util.Arrays.asList(values).iterator());
+        try{output.run();}finally{if(old==null)VERTICES.remove();else VERTICES.set(old);}
+    }
     private NativeTerrainAttributes() { }
     /** Verify the transformed writer once before graphics startup; catches layout/fast-path mismatch. */
     public static void verifyWriter(){
@@ -47,8 +53,8 @@ public final class NativeTerrainAttributes {
     }
     public static Attributes current(){return CURRENT.get();}
     public static void with(Attributes value,Runnable output){
-        var old=CURRENT.get();CURRENT.set(value);
-        try{output.run();}finally{if(old==null)CURRENT.remove();else CURRENT.set(old);}
+        var old=CURRENT.get();var vertices=VERTICES.get();VERTICES.remove();CURRENT.set(value);
+        try{output.run();}finally{if(old==null)CURRENT.remove();else CURRENT.set(old);if(vertices!=null)VERTICES.set(vertices);}
     }
     public static Attributes attributes(BakedQuad quad,int tint,int emission,boolean forceSolid){
         var info=quad.materialInfo();

@@ -19,7 +19,7 @@ abstract class NativeTerrainBufferMixin implements VertexConsumer {
     @Inject(method="addVertex(FFFIFFIIFFF)V",at=@At("HEAD"),cancellable=true)
     private void voxellight$extendedVertex(float x,float y,float z,int color,float u,float v,int overlay,int light,float nx,float ny,float nz,CallbackInfo ci){
         if(format!=NativeTerrainAttributes.FORMAT)return;
-        var a=NativeTerrainAttributes.current();int packed=a==null?0:a.tintMetadata();
+        var a=NativeTerrainAttributes.nextVertex();int packed=a==null?0:a.tintMetadata();
         addVertex(x,y,z).setColor(color).setUv(u,v).setUv2(light&65535,light>>>16)
                 .setUv1(packed&65535,packed>>>16).setNormal(a==null?nx:a.normal().x,a==null?ny:a.normal().y,a==null?nz:a.normal().z);
         MemoryUtil.memPutByte(vertexPointer+35,(byte)(a==null?0:16+a.blockEmission()));

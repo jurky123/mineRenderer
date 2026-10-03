@@ -39,7 +39,8 @@ class MixinPackagingTest {
                     if (method.visibleAnnotations == null) continue;
                     for (var inject : method.visibleAnnotations) {
                         if (!inject.desc.equals("Lorg/spongepowered/asm/mixin/injection/Inject;")
-                                && !inject.desc.equals("Lcom/llamalad7/mixinextras/injector/wrapoperation/WrapOperation;")) continue;
+                                && !inject.desc.equals("Lcom/llamalad7/mixinextras/injector/wrapoperation/WrapOperation;")
+                                && !inject.desc.equals("Lcom/llamalad7/mixinextras/injector/wrapmethod/WrapMethod;")) continue;
                         @SuppressWarnings("unchecked")
                         var selectors = (List<String>) annotationValue(inject, "method");
                         for (String selector : selectors) {

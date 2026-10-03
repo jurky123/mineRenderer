@@ -36,7 +36,8 @@ public final class VoxelLightClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         com.voxellight.adapter.NativeTerrainAttributes.verifyWriter();
-        LoggerFactory.getLogger("VoxelLight").info("Native terrain material writer verified: 36-byte stride, shared visible geometry");
+        com.voxellight.adapter.IndigoMaterials.verifyWriter();
+        LoggerFactory.getLogger("VoxelLight").info("Native terrain material writer verified: 36-byte stride, vanilla + Indigo emission");
         LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 reference lighting prototype loaded; rendering effects are off by default");
         ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false));
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true));

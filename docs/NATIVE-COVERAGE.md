@@ -34,3 +34,11 @@ This contract is for the pinned26.2 native terrain renderer. Renderer mods that 
 In-game acceptance is pending: compare `native_material on/off`, `material_coverage`, `surface_normal`, `albedo`, `emission` and foundation at16/24/32 chunks. Far supported terrain should be green coverage without the camera-centered32-block style boundary. Check foliage, slopes, biome tint, emissive blocks, water, rapid flight, torch/block edits, F3+T, resize, teleport and dimensions. Record frame-time and native memory/draw counters; no benchmark result exists yet.
 
 Next: accept this coverage proof, then extend light-aware directional caster/cascade range and cache scheduling under independent quality budgets. Single-raster MRT may follow once material attributes and native lifecycle are proven.
+
+## 0.22.1 Fabric route correction
+
+The0.22.0 test covered vanilla compilation/writing, but the user's running Fabric API replaced the tessellation call with Indigo AltModelBlockRenderer. That proxy ignores vanilla BlockQuadOutput, so material validity stayed empty despite valid draw submission.
+
+0.22.1 captures four unlit vertex colors and biome tint plus face geometry normal before Indigo modifies AO/lighting. Metadata is attached to QuadViewImpl, consumed during its actual untransformed `buffer(int,VertexConsumer)` output and cleared when the mutable quad is reused. Emissive strength uses the quad's explicit emissive flag or pre-lighting minimum block-light coordinates (the representation used by Indigo's BakedQuad conversion); block emission remains independent. Per-vertex scopes restore nested state in finally. No shaded color is treated as albedo.
+
+The source remains borrowed native geometry with inline attributes and the same resource/range limits. Startup now checks the actual transformed Indigo quad-buffer path with deliberately mutated native colors, verifies its unlit metadata/marker and checks reuse cleanup. The log has to be followed by material_coverage GPU validation; draw count is not sufficient.

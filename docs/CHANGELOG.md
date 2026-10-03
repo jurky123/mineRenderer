@@ -1,5 +1,12 @@
 # VoxelLight release history
 
+## 0.22.1 — Capture Fabric Indigo terrain materials
+
+- User log showed934 borrowed draws without working terrain lighting. Fabric API redirects SectionCompiler tessellation to AltModelBlockRenderer and ignores the decorated vanilla output. The vanilla-only startup writer check did not cover this route.
+- Capture each Indigo quad’s unlit vertex color/tint, geometry normal, emission and flags before AO/face shading; attach metadata to the quad and consume it during its actual buffer call. Clear reusable quad state and restore nested per-vertex scopes on failure.
+- Startup regression verifies transformed Indigo buffer emission/clear as well as vanilla packing. Tests pin the Fabric redirect and cover pre-lighting attributes and nested scope cleanup.
+- Status reports actual coverage-blend admission and cumulative Indigo material emissions; draw count alone is not a validity claim. Native Vulkan visuals still require in-game retest.
+
 ## 0.22.0 — Native visible terrain material coverage
 
 - Capture real normal, unlit tint, independent block/model emission and flags during the existing native SectionCompiler output; preserve native shaded color, position, UV and light offsets. Inline BLOCK stride28→36 adds8 bytes/vertex even with effects off.

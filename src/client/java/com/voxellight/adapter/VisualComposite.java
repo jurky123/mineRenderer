@@ -23,6 +23,7 @@ final class VisualComposite implements AutoCloseable {
     static final RenderPipeline OUTPUT=outputPipeline();
     private final EmissiveBloom bloom=new EmissiveBloom();
     private final WaterPass water=new WaterPass();
+    private boolean coverageBlendActive;
     private boolean polished=true,bloomEnabled=true,coverageBlend=true,atmosphereEnabled=true,atmosphereActive,waterEnabled=true;
     private float exposureEv=VisualPolish.DEFAULT_EV,atmosphereDensity=Atmosphere.DEFAULT_DENSITY;
     private GpuBuffer visualSettings,atmosphereSettings;
@@ -53,9 +54,10 @@ final class VisualComposite implements AutoCloseable {
     }
     boolean bindWater(RenderPass pass){return water.bind(pass);}
     void endFrame(){water.endFrame();}
-    String status(){return ", look="+(polished?"polished":"reference")+", exposureEV="+exposureEv+", coverageBlend="+(polished && coverageBlend)+bloom.status()+", atmosphere="+(atmosphereActive?"analytic aerial perspective":"off/native")+", atmosphereDensity="+atmosphereDensity+water.status();}
+    String status(){return ", look="+(polished?"polished":"reference")+", exposureEV="+exposureEv+", coverageBlend="+coverageBlendActive+bloom.status()+", atmosphere="+(atmosphereActive?"analytic aerial perspective":"off/native")+", atmosphereDensity="+atmosphereDensity+water.status();}
     @Override public void close(){water.close();bloom.close();if(visualSettings!=null){visualSettings.close();visualSettings=null;}if(atmosphereSettings!=null){atmosphereSettings.close();atmosphereSettings=null;}atmosphereActive=false;}
     private void display(CommandEncoder encoder,RenderTarget output,ShadowRenderer shadows,MaterialCapture material,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao) {
+        coverageBlendActive=polished && coverageBlend && !material.nativeTerrain();
         var mc=Minecraft.getInstance();
         var sky=mc.gameRenderer.gameRenderState().levelRenderState.skyRenderState;
         atmosphereActive=polished && atmosphereEnabled && mc.level!=null && sky.skybox==DimensionType.Skybox.OVERWORLD
@@ -65,7 +67,7 @@ final class VisualComposite implements AutoCloseable {
                     .putVec4(Atmosphere.weatherDensity(atmosphereDensity,sky.rainBrightness),
                             mc.level==null?0:(float)(mc.gameRenderer.mainCamera().position().y-mc.level.getSeaLevel()),atmosphereActive?1:0,Atmosphere.MAX_DISTANCE).get());
             encoder.writeToBuffer(visualSettings.slice(),Std140Builder.onStack(stack,VisualPolish.SETTINGS_BYTES)
-                    .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,polished && coverageBlend && !material.nativeTerrain()?1:0)
+                    .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,coverageBlendActive?1:0)
                     .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,0,0).get());
         }
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);

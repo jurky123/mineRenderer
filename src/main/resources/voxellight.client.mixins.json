@@ -13,7 +13,10 @@
     "PreparedFeatureFrameMixin",
     "NativeTerrainFormatMixin",
     "NativeTerrainBufferMixin",
-    "NativeTerrainCompilerMixin"
+    "NativeTerrainCompilerMixin",
+    "IndigoTerrainMaterialMixin",
+    "IndigoQuadMaterialMixin",
+    "IndigoQuadResetMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.22.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.22.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -15,7 +15,7 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | 0.19 local-light polish | Implemented: exact-ID resource-pack colors and one player held-emissive-block source within16 combined lights. User confirmed working. |
 | 0.20 atmosphere foundation | Implemented analytic height/distance aerial perspective and directional glow; local supported receivers only; user confirmed working and prefers density0.002.0.20.1 adopts that default. |
 | 0.21 Water Foundation | VisualComposite ownership split; native-stream HDR water with Fresnel/absorption/sky reflection/refraction. Screenshot showed blue water grid/dashes;0.21.1 fixes derivative evaluation order and UV rounding. User confirmed seam fix. |
-| 0.22 native material coverage | Implemented native-compile inline attributes and a borrowed visible-terrain material pass. Default foundation/material diagnostics no longer use the local mesh store or 24–32-block fade. Native Vulkan in-game coverage/performance acceptance pending. |
+| 0.22 native material coverage | Implemented native-compile inline attributes and a borrowed visible-terrain material pass. Default foundation/material diagnostics no longer use the local mesh store or 24–32-block fade. 0.22.0 user log exposed Fabric Indigo bypass of the vanilla output callback;0.22.1 captures pre-lighting Indigo quads and transfers metadata at actual buffer emission. In-game acceptance pending. |
 | Next milestone | Validate native coverage, reload/flight and near-field quality; then extend directional shadow/caster range independently. See [native coverage](NATIVE-COVERAGE.md) and [range decision](RANGE.md). |
 
 Current budgets: native material mode borrows visible native terrain geometry, adding8 bytes/vertex (BLOCK stride28→36) and one material MRT raster pass; no duplicate material mesh store. `/voxellight native_material off` selects the old125-section/16 MiB/one-build-per-frame local reference. Native compiler light updates still rebuild native section buffers. Light-aware scene cap384 loaded sections; shadow terrain32 MiB; local-light reference16 combined sources (one slot reserved while a held source exists). D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).

@@ -145,7 +145,7 @@ final class MaterialCapture implements AutoCloseable {
         return descriptor.withDepthAttachment(views[3],OptionalDouble.of(0));
     }
     String status() {
-        return "material=" + state + ", materialSource="+(nativeTerrain?"native":"local reference") + (nativeTerrain?", materialDuplicateGeometryBytes=0, materialNativeExtraBytesPerVertex=8":surfaces.status())
+        return "material=" + state + ", materialSource="+(nativeTerrain?"native":"local reference") + (nativeTerrain?", materialDuplicateGeometryBytes=0, materialNativeExtraBytesPerVertex=8, indigoMaterialEmissionsTotal="+IndigoMaterials.emissions():surfaces.status())
                 + ", materialTargetBytes=" + (targets[0] == null ? 0 : MaterialEncoding.targetBytes(width, height)) + ", materialDraws=" + draws;
     }
     private void releaseTargets() {
