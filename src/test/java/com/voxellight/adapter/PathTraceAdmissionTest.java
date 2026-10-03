@@ -12,6 +12,12 @@ class PathTraceAdmissionTest {
   assertFalse(a.matches(key(2,1,new Matrix4f().rotateY(.01f),1)));
   assertFalse(a.matches(key(3,1,new Matrix4f(),1)));
  }
+ @Test void movementCanReprojectWithoutAccumulatingUnalignedPixels(){
+  var a=key(2,1,new Matrix4f(),1);var b=key(2,2,new Matrix4f().rotateY(.1f),1);
+  assertFalse(a.matches(b));assertTrue(a.canReproject(b));
+  assertFalse(a.canReproject(key(3,2,new Matrix4f(),1)));
+  assertFalse(a.canReproject(key(2,20,new Matrix4f(),1)));
+ }
  @Test void celestialRefreshReseedsAccumulationWithoutRemovingValidSurfaceLighting(){
   var a=key(2,1,new Matrix4f(),1);var b=key(2,1,new Matrix4f(),2);
   assertFalse(a.matches(b));assertTrue(a.surfaceMatches(b));

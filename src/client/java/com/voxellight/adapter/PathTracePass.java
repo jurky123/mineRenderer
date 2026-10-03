@@ -24,7 +24,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
-/** Experimental static-camera hybrid PT. GPU readback is asynchronous; CUDA waits only on the worker. */
+/** Experimental reprojected hybrid PT. GPU readback is asynchronous; CUDA waits only on the worker. */
 final class PathTracePass implements AutoCloseable {
     static final RenderPipeline PT_CAPTURE=pipeline(true),PT_COMPOSITE=pipeline(false);
     private final ExecutorService worker=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"VoxelLight-OptiX");t.setDaemon(true);return t;});
@@ -34,10 +34,9 @@ final class PathTracePass implements AutoCloseable {
     private volatile String state="off";
     private boolean enabled,denoise=true,debug;
     private volatile boolean failed;
-    private long handle,lastSubmit,stableSince;
-    private Key admissionKey;
+    private long handle,lastSubmit;
     private Key workerKey,displayKey;
-    private GpuBuffer uniform;
+    private GpuBuffer uniform,historyUniform;
     private final GpuTexture[] textures=new GpuTexture[3];
     private final GpuTextureView[] views=new GpuTextureView[3];
     private GpuTexture composite;
@@ -47,6 +46,8 @@ final class PathTracePass implements AutoCloseable {
     private ByteBuffer scene;
     record Key(long generation,long scene,double x,double y,double z,Matrix4f clip,int width,int height,int sun,int weather,ShadowLight.Source source){
         boolean matches(Key other){return surfaceMatches(other) && sun==other.sun && weather==other.weather;}
+        boolean canReproject(Key other){return other!=null && generation==other.generation && scene==other.scene && width==other.width && height==other.height && source==other.source
+            && Math.abs(x-other.x)<8 && Math.abs(y-other.y)<8 && Math.abs(z-other.z)<8;}
         boolean surfaceMatches(Key other){return other!=null && generation==other.generation && scene==other.scene && width==other.width && height==other.height && source==other.source
             && Math.abs(x-other.x)<.002 && Math.abs(y-other.y)<.002 && Math.abs(z-other.z)<.002 && clip.equals(other.clip,1.e-5f);}
     }
@@ -69,20 +70,19 @@ final class PathTracePass implements AutoCloseable {
             long hash=stats.worldGeneration()*31+stats.resourceGeneration();hash=hash*31+center.hashCode();
             for(var snapshot:snapshots) {var k=snapshot.request().key();if(Math.abs(k.x()-center.x())<=2&&Math.abs(k.y()-center.y())<=2&&Math.abs(k.z()-center.z())<=2)hash+=PathTraceAdmission.sectionHash(k,snapshot.materialFingerprint());}
             var key=new Key(generation,hash,pos.x(),pos.y(),pos.z(),new Matrix4f(projection).mul(camera.viewRotationMatrix),w,h,(int)Math.floor(shadows.light().angleRadians()/.02),(int)(skyState.rainBrightness*32),shadows.light().source());
-            if(!key.matches(admissionKey)){admissionKey=key;stableSince=System.nanoTime();}
             if(width!=w||height!=h||composite==null||composite.getWidth(0)!=target.width||composite.getHeight(0)!=target.height){releaseTargets();width=w;height=h;displayKey=null;}
             prepare(target,w,h);
             var result=completed.getAndSet(null);
             if(result!=null){
-                try{if(result.key.surfaceMatches(key) && (displayKey==null || !displayKey.surfaceMatches(key) || result.key.matches(displayKey) || result.samples>=8)){
+                try{if(result.key.canReproject(key)){
                     encoder.writeToTexture(textures[0],result.light,0,0,0,0,w,h);encoder.writeToTexture(textures[1],result.positions,0,0,0,0,w,h);encoder.writeToTexture(textures[2],result.normals,0,0,0,0,w,h);
                     displayKey=result.key;samples=result.samples;traceNs=result.nanos;state="diffuse hybrid active; stationary accumulation";
                 }}finally{result.release();}
             }
             try(var stack=MemoryStack.stackPush()){
-                encoder.writeToBuffer(uniform.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(Math.min(1,samples/8f),debug?1:0,0,0).get());
+                encoder.writeToBuffer(uniform.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(1,debug?1:0,0,0).get());
             }
-            if(!busy.get()&&System.nanoTime()-stableSince>250_000_000L&&System.nanoTime()-lastSubmit>100_000_000L&&(!key.matches(displayKey)||samples<4096)){
+            if(!busy.get()&&System.nanoTime()-lastSubmit>100_000_000L&&(!key.matches(displayKey)||samples<4096)){
                 byte[] uuid=gpuUuid();ByteBuffer params=ByteBuffer.allocateDirect(84).order(ByteOrder.nativeOrder());
                 params.putFloat((float)(pos.x()-(center.x()-2)*16)).putFloat((float)(pos.y()-(center.y()-2)*16)).putFloat((float)(pos.z()-(center.z()-2)*16));
                 var light=shadows.light();var direction=light.direction();params.putFloat(direction.x).putFloat(direction.y).putFloat(direction.z);
@@ -93,10 +93,15 @@ final class PathTracePass implements AutoCloseable {
                 var m=camera.viewRotationMatrix;params.putFloat(m.m00()).putFloat(m.m10()).putFloat(m.m20()).putFloat(m.m01()).putFloat(m.m11()).putFloat(m.m21()).putFloat(m.m02()).putFloat(m.m12()).putFloat(m.m22()).flip();
                 submit(encoder,target,material,key,uuid,snapshots,center,params,denoise);lastSubmit=System.nanoTime();
             }
-            if(!key.surfaceMatches(displayKey)){samples=0;state="waiting for stationary camera; raster retained";return hdr;}
+            if(!key.canReproject(displayKey)){samples=0;state="waiting for traced surfaces; raster retained";return hdr;}
+            state=key.matches(displayKey)?"diffuse hybrid active; progressive":"diffuse hybrid active; reprojected";
+            try(var stack=MemoryStack.stackPush()){
+                encoder.writeToBuffer(historyUniform.slice(),Std140Builder.onStack(stack,80).putMat4f(displayKey.clip)
+                    .putVec4((float)(key.x-displayKey.x),(float)(key.y-displayKey.y),(float)(key.z-displayKey.z),0).get());
+            }
             var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
             try(var profile=RenderPassProfile.begin(encoder,"pathtrace_composite");var pass=encoder.createRenderPass(descriptor(compositeView,target.width,target.height,"VoxelLight path traced indirect light"))){
-                pass.setPipeline(PT_COMPOSITE);pass.bindTexture("CurrentHdr",hdr,nearest);pass.bindTexture("PathRadiance",views[0],nearest);pass.bindTexture("PathPosition",views[1],nearest);pass.bindTexture("PathNormal",views[2],nearest);
+                pass.setPipeline(PT_COMPOSITE);pass.setUniform("PathTraceHistory",historyUniform);pass.bindTexture("CurrentHdr",hdr,nearest);pass.bindTexture("PathRadiance",views[0],nearest);pass.bindTexture("PathPosition",views[1],nearest);pass.bindTexture("PathNormal",views[2],nearest);
                 bindMaterial(pass,material,target,nearest);pass.setUniform("PathTraceSettings",uniform);pass.draw(3,1,0,0);
             }
             return compositeView;
@@ -105,6 +110,7 @@ final class PathTracePass implements AutoCloseable {
     private static int linearColor(int c){int r=(int)Math.round(Math.pow(((c>>16)&255)/255.,2.2)*255),g=(int)Math.round(Math.pow(((c>>8)&255)/255.,2.2)*255),b=(int)Math.round(Math.pow((c&255)/255.,2.2)*255);return r<<16|g<<8|b;}
     private void prepare(RenderTarget target,int w,int h){
         var d=RenderSystem.getDevice();if(!d.precompilePipeline(PT_CAPTURE,RenderProbe.SHADERS).isValid()||!d.precompilePipeline(PT_COMPOSITE,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Path trace shader compilation failed");
+        if(historyUniform==null)historyUniform=d.createBuffer(()->"VoxelLight PT reprojection",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,80);
         if(uniform==null)uniform=d.createBuffer(()->"VoxelLight PT settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,144);
         if(textures[0]==null){for(int i=0;i<3;i++){textures[i]=d.createTexture("VoxelLight PT result "+i,GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,w,h,1,1);views[i]=d.createTextureView(textures[i]);}
             composite=d.createTexture("VoxelLight PT HDR composite",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA16_FLOAT,target.width,target.height,1,1);compositeView=d.createTextureView(composite);
@@ -165,10 +171,10 @@ final class PathTracePass implements AutoCloseable {
     private static RenderPassDescriptor descriptor(GpuTextureView v,int w,int h,String label){return RenderPassDescriptor.create(()->label).withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(v,Optional.of(new Vector4f(0)));}
     private static RenderPipeline pipeline(boolean capture){
         var layout=BindGroupLayout.builder().withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialDepth").withSampler("SceneDepth").withUniform("PathTraceSettings",UniformType.UNIFORM_BUFFER);
-        if(!capture)layout.withSampler("CurrentHdr").withSampler("PathRadiance").withSampler("PathPosition").withSampler("PathNormal");
+        if(!capture)layout.withUniform("PathTraceHistory",UniformType.UNIFORM_BUFFER).withSampler("CurrentHdr").withSampler("PathRadiance").withSampler("PathPosition").withSampler("PathNormal");
         var b=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight",capture?"pipeline/pathtrace_capture":"pipeline/pathtrace_composite")).withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight",capture?"pathtrace_capture":"pathtrace_composite")).withBindGroupLayout(layout.build()).withColorTargetState(new ColorTargetState(Optional.empty(),capture?GpuFormat.RGBA32_FLOAT:GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL)).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false);
         if(capture)for(int i=1;i<3;i++)b.withColorTargetState(i,new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL));return b.build();
     }
     private void releaseTargets(){for(int i=0;i<3;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(textures[i]!=null){textures[i].close();textures[i]=null;}}if(compositeView!=null){compositeView.close();compositeView=null;}if(composite!=null){composite.close();composite=null;}}
-    @Override public void close(){generation++;admissionKey=null;displayKey=null;samples=0;releaseTargets();if(uniform!=null){uniform.close();uniform=null;}var result=completed.getAndSet(null);if(result!=null)result.release();worker.execute(()->{if(handle!=0){OptixBridge.destroy(handle);handle=0;}workerKey=null;scene=null;sceneHash=Long.MIN_VALUE;var pendingResult=completed.getAndSet(null);if(pendingResult!=null)pendingResult.release();});}
+    @Override public void close(){generation++;displayKey=null;samples=0;releaseTargets();if(uniform!=null){uniform.close();uniform=null;}if(historyUniform!=null){historyUniform.close();historyUniform=null;}var result=completed.getAndSet(null);if(result!=null)result.release();worker.execute(()->{if(handle!=0){OptixBridge.destroy(handle);handle=0;}workerKey=null;scene=null;sceneHash=Long.MIN_VALUE;var pendingResult=completed.getAndSet(null);if(pendingResult!=null)pendingResult.release();});}
 }

@@ -11,13 +11,13 @@ Use the native-enabled 0.30 kit, Minecraft 26.2, native Vulkan and an NVIDIA GPU
 3. Test a white wall next to a sunlit red/green wall, an overhang beside sunlit ground, and a small room with a broad glowstone source. Compare `/voxellight pathtrace off` and `on` from the same stationary view. Look for indirect light and color bleed in shaded surfaces.
 4. `/voxellight pathtrace_debug on` shows the **indirect contribution only** on supported nearby terrain. Black in open empty space is expected: primary sky lighting is already provided by raster and is not duplicated. Restore `off` afterward.
 5. `/voxellight pathtrace_denoise off` exposes progressive raw samples; `on` uses the actual OptiX HDR denoiser with primary albedo and camera-space normal guides.
-6. Move/rotate, place/break a block, teleport, F3+T, resize, switch dimension, and disable/re-enable. Old camera/world results must not appear over the new view. The first version returns to raster while the camera moves; it is a stationary quality preview.
+6. Move/rotate, place/break a block, teleport, F3+T, resize, switch dimension, and disable/re-enable. Old camera/world results must not appear over the new view. 0.30.2 reprojects valid surfaces during motion; newly exposed surfaces can still fall back until the next batch arrives.
 
 ## What is traced
 
 - Exact raster primary position, normal and linear albedo come from the material GBuffer. Cutout, animated and entity primary pixels are excluded.
 - Up to three cosine-weighted diffuse secondary segments, voxel DDA intersections, secondary emissive hits and sun next-event visibility. Secondary sky illumination is accumulated only after a secondary surface hit.
-- Progressive one-sample batches, at most 10 submissions/second, one capture/trace job in flight and a 4096-sample cap. Camera/projection, scene/world/resource changes, denoising control, and celestial source/angle epochs reset accumulation.
+- Eight-sample reset batches followed by progressive one-sample batches, at most 10 submissions/second, one capture/trace job in flight and a 4096-sample cap. Camera/projection, scene/world/resource changes, denoising control, and celestial source/angle epochs reset accumulation.
 - Secondary terrain is an 80³ proxy of immutable section snapshots. Full opaque blocks and emissive blocks are cubes; secondary albedo uses linearized block map colors, not atlas textures. Thin/partial non-emissive shapes, foliage, dynamic entities and water are not secondary occluders. Missing sections terminate rays rather than behaving as air; exiting the bounded proxy uses approximate sky.
 - Indirect shading fades from 16 to 24 blocks. This limits **experimental GI only**; native material/direct-light coverage stays at Minecraft's visible-scene range. Emissive lighting has no importance sampling yet, so small torches can converge slowly. This is not a replacement for existing direct local lights.
 
@@ -48,3 +48,9 @@ Native CPU checks: `g++ -std=c++17 -O2 native/optix/test_paths.cpp -o /tmp/voxel
 API references: [OptiX denoiser](https://raytracing-docs.nvidia.com/optix9/api/group__optix__host__api__denoiser.html), [CUDA/Vulkan device matching and interop](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/graphics-interop.html). Exportable Vulkan/CUDA memory, OptiX GAS/IAS ray traversal, emissive importance sampling, dynamic secondary geometry and temporal reprojection are subsequent steps, not implemented claims of this version.
 
 0.30.1 stability fix: accumulation uses order-independent local material content, tolerates tiny floating-point camera noise and waits 250 ms for a stationary view. Genuine movement/edits still reject stale results. Sun/weather reseeds keep the last surface-valid image until replacement; an eight-sample ramp reduces initial pop-in. Check that stationary `pathtraceSamples` now increases instead of repeatedly returning zero.
+
+## 0.30.2 — Motion reprojection
+
+The earlier stationary-preview behavior caused GI to drop to zero during movement and an eight-sample strength ramp brightened it after stopping. That behavior is removed. Tracing continues during motion (one job in flight, at most 10 batches/second); each reset batch traces eight samples before denoising. Sample count controls convergence, not brightness.
+
+Composition reprojects current world positions into the captured camera, adds the camera-position delta to the old guides, and rejects offscreen, depth-distance or normal mismatches. Valid previously visible surfaces retain GI while fresh camera batches arrive. Genuine scene/world/resource changes, section-window changes and camera cuts still reject the old buffer; newly exposed or out-of-history surfaces can temporarily have no GI. This is a first motion-reuse implementation, not complete temporal GI or world-space caching. In-game stability/performance pending.

@@ -72,7 +72,8 @@ struct Context {
   check(d.cuCtxSetCurrent(cuda));size_t bytes=(size_t)width*height*16;if(reset){samples=0;check(d.cuMemsetD8Async(sum,0,bytes,stream));}
   check(d.cuMemcpyHtoD(position,pos,bytes));check(d.cuMemcpyHtoD(normal,normals,bytes));check(d.cuMemcpyHtoD(albedo,alb,bytes));check(d.cuMemcpyHtoD(grid,vox,80*80*80*4));check(d.cuMemcpyHtoD(params,settings,21*4));
   int count=width*height;void* args[]={&position,&normal,&albedo,&grid,&params,&sum,&raw,&guide,&count,&samples};
-  check(d.cuLaunchKernel(paths,(count+127)/128,1,1,128,1,1,0,stream,args,nullptr));++samples;
+  int batch=reset?8:1;
+  for(int i=0;i<batch;i++){check(d.cuLaunchKernel(paths,(count+127)/128,1,1,128,1,1,0,stream,args,nullptr));++samples;}
   if(denoise){auto input=image(raw);check(optixDenoiserComputeIntensity(denoiser,stream,&input,intensity,scratch,scratchBytes));
    OptixDenoiserParams dp{};dp.hdrIntensity=intensity;OptixDenoiserGuideLayer guides{};guides.albedo=image(albedo);guides.normal=image(guide);
    OptixDenoiserLayer layer{};layer.input=input;layer.output=image(output);

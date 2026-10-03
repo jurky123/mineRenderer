@@ -1,5 +1,10 @@
 # VoxelLight release history
 
+## 0.30.2 — Reproject indirect lighting during camera motion
+
+- Remove stationary-only scheduling and sample-count brightness ramp. Reproject surface-valid traced lighting through the captured camera, with normal/depth/offscreen rejection; motion no longer clears all GI.
+- Eight samples per reset batch before OptiX denoising; progressive follow-up remains one sample. One job in flight and 10 Hz submission cap retained. New surfaces/window changes can still lose history; in-game acceptance pending.
+
 ## 0.30.1 — Hybrid accumulation stability
 
 - Replace global scene/task-version invalidation with order-independent local material fingerprints. LIGHT-only snapshot replacement and distant caster churn no longer discard GI. Known secondary snapshots remain until replacement.

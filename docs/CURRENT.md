@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.30.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.30.2** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -45,4 +45,6 @@ No full RGB TAA, motion vectors, complete transparent HDR rendering or full-scen
 
 Review decision: preserve the accepted material/lighting architecture; material refresh is confirmed and basic AO is confirmed operational with modest benefit. Lighting/color polish is confirmed working; local-light materials and held source are confirmed working; analytic atmosphere is confirmed working, with preferred density0.001 adopted as the0.23 default. Water, native material coverage and0.23 extended shadows are confirmed;0.24 is user-confirmed working;0.25 was reported working with modest visual benefit; detailed combined acceptance remains pending.0.26 epoch cache/static cutout changes require the new A/B checks. See[local-light scope](LOCAL-LIGHTS.md). See[AO contract](AO.md). See [0.16 review decision](REVIEW-0.16.0.md) and [release history](CHANGELOG.md). This environment has no graphics device/display; automated native shader checks do not replace in-game acceptance.
 
-0.30.1: local material content replaces global/LIGHT task-version admission. Tiny camera noise is tolerated; celestial reseeds retain surface-valid images during warm-up. 205 tests pass. User GPU log confirms native work executes; corrected in-game accumulation/flicker acceptance pending.
+0.30.2: local material content replaces global/LIGHT task-version admission. Tiny camera noise is tolerated; celestial reseeds retain surface-valid images during warm-up. 205 tests pass. User GPU log confirms native work executes; corrected in-game accumulation/flicker acceptance pending.
+
+0.30.2 removes stationary-only rendering and the sample-count intensity ramp. Valid surface lighting is camera-reprojected while motion batches refresh it; resets trace eight samples before denoising. 206 tests pass; in-game motion/flicker and worker cost pending.
