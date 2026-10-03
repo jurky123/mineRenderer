@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.30.6 — Continuous display-time GI transitions
+
+- Reproject and validate two observations in the Vulkan composite, blending over 150 ms rather than swapping GI in one frame. Keep valid older lighting where the incoming batch has no sample; fade in newly observed surfaces.
+- Freeze holds/resume continues the blend. Trace admission waits for transition completion; one-job/10 Hz cap retained. Three additional low-res float4 textures (10.55 MiB maximum), no new full-res target or rays.
+- 212 Java tests including freeze/resume and transition scheduling pass; actual shaders/bindings compile. Freeze is user-confirmed working in 0.30.5; resumed flicker still needed this follow-up. GPU stability/ghosting and cost pending.
+
 ## 0.30.5 — Display lifetime / post-denoiser stability
 
 - Retain surface-valid displayed GI through material revisions; accumulation still invalidates independently. Explicit world/resource resets protect lifetime. Freeze accepts a first valid observation before holding it, instead of freezing an empty image. Add display-valid status.
