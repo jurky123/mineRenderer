@@ -44,7 +44,7 @@ static Driver& driver(){static Driver d;return d;}
 static void check(CUresult r){if(r!=CUDA_SUCCESS)throw std::runtime_error("CUDA error "+std::to_string((int)r));}
 static void check(OptixResult r){if(r!=OPTIX_SUCCESS)throw std::runtime_error("OptiX error "+std::to_string((int)r));}
 struct Context {
- Driver& d;CUdevice device=-1;CUcontext cuda=nullptr;CUstream stream=nullptr;CUmodule module=nullptr;CUfunction paths=nullptr,temporal=nullptr;
+ Driver& d;CUdevice device=-1;CUcontext cuda=nullptr;CUstream stream=nullptr;CUmodule module=nullptr;CUfunction paths=nullptr,temporal=nullptr,bootstrap=nullptr;
  OptixDeviceContext optix=nullptr;OptixDenoiser denoiser=nullptr;int width=0,height=0,samples=0,epoch=0,read=0;
  CUdeviceptr position=0,normal=0,albedo=0,grid=0,params=0,sum=0,raw=0,guide=0,output=0,state=0,scratch=0,intensity=0;
  CUdeviceptr history[2]{},moments[2]{},display[2]{},previousPosition=0,previousNormal=0;
@@ -57,7 +57,7 @@ struct Context {
   for(int i=0;i<count;i++){CUdevice dev;CUuuid id;check(d.cuDeviceGet(&dev,i));check(d.cuDeviceGetUuid(&id,dev));if(!std::memcmp(id.bytes,uuid,16)){device=dev;break;}}
   if(device<0)throw std::runtime_error("No CUDA device matches the Vulkan GPU UUID");
   check(d.cuDevicePrimaryCtxRetain(&cuda,device));check(d.cuCtxSetCurrent(cuda));check(d.cuStreamCreate(&stream,CU_STREAM_NON_BLOCKING));
-  check(d.cuModuleLoadData(&module,ptx));check(d.cuModuleGetFunction(&paths,module,"paths"));check(d.cuModuleGetFunction(&temporal,module,"temporal"));
+  check(d.cuModuleLoadData(&module,ptx));check(d.cuModuleGetFunction(&paths,module,"paths"));check(d.cuModuleGetFunction(&temporal,module,"temporal"));check(d.cuModuleGetFunction(&bootstrap,module,"bootstrap"));
   check(optixInit());OptixDeviceContextOptions co{};check(optixDeviceContextCreate(cuda,&co,&optix));
   OptixDenoiserOptions options{};options.guideAlbedo=1;options.guideNormal=1;options.denoiseAlpha=OPTIX_DENOISER_ALPHA_MODE_COPY;
   check(optixDenoiserCreate(optix,OPTIX_DENOISER_MODEL_KIND_HDR,&options,&denoiser));
@@ -76,6 +76,8 @@ struct Context {
   check(d.cuMemcpyHtoD(position,pos,bytes));check(d.cuMemcpyHtoD(normal,normals,bytes));check(d.cuMemcpyHtoD(albedo,alb,bytes));check(d.cuMemcpyHtoD(grid,vox,80*80*80*4));check(d.cuMemcpyHtoD(params,settings,41*4));
   int count=width*height,batchSample=0;void* args[]={&position,&normal,&albedo,&grid,&params,&sum,&raw,&guide,&count,&batchSample,&samples};
   for(int i=0;i<8;i++){batchSample=i;check(d.cuLaunchKernel(paths,(count+127)/128,1,1,128,1,1,0,stream,args,nullptr));++samples;}
+  void* bootstrapArgs[]={&position,&normal,&albedo,&grid,&params,&sum,&raw,&guide,&previousPosition,&previousNormal,&history[read],&width,&height,&samples};
+  check(d.cuLaunchKernel(bootstrap,(count+127)/128,1,1,128,1,1,0,stream,bootstrapArgs,nullptr));samples+=24;
   int write=1-read;void* historyArgs[]={&raw,&position,&normal,&previousPosition,&previousNormal,&history[read],&moments[read],&history[write],&moments[write],&params,&width,&height};
   check(d.cuLaunchKernel(temporal,(count+127)/128,1,1,128,1,1,0,stream,historyArgs,nullptr));read=write;
 

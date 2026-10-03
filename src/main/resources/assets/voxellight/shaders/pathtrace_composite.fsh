@@ -68,7 +68,8 @@ void main(){
  vec3 light;
  if(hasIncoming && hasOlder)light=mix(older,incoming,BatchTransition.x);
  else if(hasOlder)light=older;
- else light=incoming*(BatchTransition.y>.5?BatchTransition.x:1);
+ // No compatible old surface: use the first estimate at full strength.
+ else light=incoming;
  float fade=1-smoothstep(16,24,length(world));
  result.rgb=PtControls.y>.5?light*fade:result.rgb+light*fade*PtControls.x;
 }

@@ -31,6 +31,16 @@ int main(){
  for(int y=0;y<80;y++)for(int z=0;z<80;z++)for(int x=0;x<80;x++)if(y==12||y==8||x==12||x==8||z==12||z==8)grid[(y*80+z)*80+x]=0x100000ff;
  for(int i=0;i<4;i++)sum[i]=0;
  paths(pos,normal,alb,grid.data(),settings,sum,raw,guide,1,0,0);assert(raw[0]>0&&raw[1]==0&&raw[2]==0);
+ // Bootstrap must improve only new surfaces and normalize all 32 rays correctly.
+ float bootSettings[41]={};bootSettings[9]=bootSettings[10]=bootSettings[11]=1;
+ float bootSum[4]={},bootRaw[4]={},referenceSum[4]={},referenceRaw[4]={};
+ for(int i=0;i<8;i++){paths(pos,normal,alb,grid.data(),bootSettings,bootSum,bootRaw,guide,1,i,i);paths(pos,normal,alb,grid.data(),bootSettings,referenceSum,referenceRaw,guide,1,i,i);}
+ bootstrap(pos,normal,alb,grid.data(),bootSettings,bootSum,bootRaw,guide,nullptr,nullptr,nullptr,1,1,8);
+ for(int i=8;i<32;i++)paths(pos,normal,alb,grid.data(),bootSettings,referenceSum,referenceRaw,guide,1,i,i);
+ assert(bootRaw[0]>0&&std::abs(bootRaw[0]-referenceRaw[0])<1e-6f);
+ bootSettings[21]=bootSettings[26]=bootSettings[31]=.01f;bootSettings[36]=1;bootSettings[40]=1;
+ float confidence[]={0,0,0,8};float before=bootSum[0];
+ bootstrap(pos,normal,alb,grid.data(),bootSettings,bootSum,bootRaw,guide,pos,normal,confidence,1,1,32);assert(bootSum[0]==before);
  // Per-pixel history validates surface guides and blends instead of replacing noisy observations.
  float settingsT[41]={};settingsT[21]=settingsT[26]=settingsT[31]=settingsT[36]=1;settingsT[40]=1;
  float pNow[]={0,0,0,1},nNow[]={0,1,0,1},current[]={.5,.5,.5,1},history[]={.48,.48,.48,8},moments[]={.48,.2304,8,0},next[4]={},nextMom[4]={};

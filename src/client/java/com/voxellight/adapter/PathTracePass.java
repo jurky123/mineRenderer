@@ -99,7 +99,9 @@ final class PathTracePass implements AutoCloseable {
             var key=new Key(generation,hash,(materialRevision*31+stats.worldGeneration())*31+stats.resourceGeneration(),pos.x(),pos.y(),pos.z(),new Matrix4f(projection).mul(camera.viewRotationMatrix),w,h,(int)Math.floor(shadows.light().angleRadians()/.02),(int)(skyState.rainBrightness*32),shadows.light().source());
             if(width!=w||height!=h||composite==null||composite.getWidth(0)!=target.width||composite.getHeight(0)!=target.height){releaseTargets();width=w;height=h;displayKey=null;olderKey=null;transition.reset();}
             prepare(target,w,h);
-            var result=completed.getAndSet(null);
+            // Compute the next observation during the transition, but do not recycle
+            // the older image until the displayed blend is complete.
+            var result=transition.ready(System.nanoTime()) || freeze || displayKey==null?completed.getAndSet(null):null;
             if(result!=null){
                 try{if((!freeze || !key.canDisplay(displayKey)) && result.key.canDisplay(key)){
                     olderKey=displayKey;
@@ -115,7 +117,7 @@ final class PathTracePass implements AutoCloseable {
             try(var stack=MemoryStack.stackPush()){
                 encoder.writeToBuffer(uniform.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(1,debug?1:0,rejectionDebug,key.canDisplay(displayKey)?1:0).get());
             }
-            if((!freeze || !key.canDisplay(displayKey))&&transition.ready(System.nanoTime())&&!busy.get()&&System.nanoTime()-lastSubmit>100_000_000L){
+            if((!freeze || !key.canDisplay(displayKey))&&completed.get()==null&&!busy.get()&&System.nanoTime()-lastSubmit>100_000_000L){
                 byte[] uuid=gpuUuid();ByteBuffer params=ByteBuffer.allocateDirect(164).order(ByteOrder.nativeOrder());
                 params.putFloat((float)(pos.x()-(center.x()-2)*16)).putFloat((float)(pos.y()-(center.y()-2)*16)).putFloat((float)(pos.z()-(center.z()-2)*16));
                 var light=shadows.light();var direction=light.direction();params.putFloat(direction.x).putFloat(direction.y).putFloat(direction.z);

@@ -1,6 +1,6 @@
 # Experimental hybrid diffuse path tracing
 
-Current: **0.30.6**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
+Current: **0.30.7**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
 
 This is a runnable raster-primary prototype, with CUDA voxel traversal and real OptiX 9.1 HDR denoising. It is **not full primary-ray path tracing**, and its traversal does not yet use OptiX acceleration structures / RT cores. Existing Vulkan primary visibility, direct lighting, water and UI remain in place. The traced contribution is added in linear HDR before atmosphere, water-background capture, bloom and tone mapping.
 
@@ -19,7 +19,7 @@ Use the native-enabled 0.30 kit, Minecraft 26.2, native Vulkan and an NVIDIA GPU
 
 - Exact raster primary position, normal and linear albedo come from the material GBuffer. Cutout, animated and entity primary pixels are excluded.
 - Up to three cosine-weighted diffuse secondary segments, voxel DDA intersections, emissive hits after another diffuse surface and sun next-event visibility. Secondary sky illumination is accumulated only after a secondary surface hit.
-- Eight new samples per observation, at most 10 submissions/second, one capture/trace job in flight; new jobs wait for the 150 ms display transition to finish. Persistent per-pixel EMA/confidence/moments replaces global progressive averaging. World/resource, dimensions, actual local material changes and sun/moon source changes invalidate history; camera motion, proxy-origin shifts and sun/weather bins do not globally reset it. No 4096-sample stop.
+- Eight samples for established surfaces, 32 for newly exposed surfaces without validated history, at most 10 submissions/second, one capture/trace job in flight. Compute overlaps the 150 ms display blend; one completed result can wait until image recycling is safe. Persistent per-pixel EMA/confidence/moments replaces global progressive averaging. World/resource, dimensions, actual local material changes and sun/moon source changes invalidate history; camera motion, proxy-origin shifts and sun/weather bins do not globally reset it. No 4096-sample stop.
 - Secondary terrain is an 80³ proxy of immutable section snapshots. Full opaque blocks and emissive blocks are cubes; secondary albedo uses linearized block map colors, not atlas textures. Thin/partial non-emissive shapes, foliage, dynamic entities and water are not secondary occluders. Missing sections terminate rays rather than behaving as air; exiting the bounded proxy uses approximate sky.
 - Indirect shading fades from 16 to 24 blocks. This limits **experimental GI only**; native material/direct-light coverage stays at Minecraft's visible-scene range. Emissive lighting has no importance sampling yet, so small torches can converge slowly. This is not a replacement for existing direct local lights.
 

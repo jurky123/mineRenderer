@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.30.7 — Faster new-view GI acquisition
+
+- User confirms 0.30.6 no flicker on Vulkan. Remove new-only surfaces’ explicit fade from zero; retain continuous blending where old surface history exists.
+- Bootstrap newly exposed surfaces with 32 samples; established surfaces keep eight. Compute the next observation during display blending, deferring replacement until the two-image transition finishes. No additional images.
+- 212 Java tests and native normalization/established-surface regressions pass. First-exposure worker cost can increase; staged latency and stochastic refinement remain. GPU response and stability pending.
+
 ## 0.30.6 — Continuous display-time GI transitions
 
 - Reproject and validate two observations in the Vulkan composite, blending over 150 ms rather than swapping GI in one frame. Keep valid older lighting where the incoming batch has no sample; fade in newly observed surfaces.

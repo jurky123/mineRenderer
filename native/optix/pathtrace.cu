@@ -30,7 +30,7 @@ __device__ int trace(const unsigned* grid,V o,V d,V &p,V &n,unsigned &material){
  return -1;
 }
 __device__ V rgb(unsigned m){return v((m&255)/255.f,((m>>8)&255)/255.f,((m>>16)&255)/255.f);}
-extern "C" __global__ void paths(const float* positions,const float* normals,const float* albedos,const unsigned* grid,const float* settings,float* sum,float* radiance,float* guide,int count,int sample,int seed){
+__device__ void samplePath(const float* positions,const float* normals,const float* albedos,const unsigned* grid,const float* settings,float* sum,float* radiance,float* guide,int count,int sample,int seed){
  int i=blockIdx.x*blockDim.x+threadIdx.x;if(i>=count)return;int j=i*4;
  V n=norm(v(normals[j],normals[j+1],normals[j+2]));
  // OptiX HDR denoiser normal guides are in camera space.
@@ -57,6 +57,31 @@ extern "C" __global__ void paths(const float* positions,const float* normals,con
  // Bounded radiance protects accumulation from pathological emissive proxies.
  sum[j]+=fminf(result.x,20.f);sum[j+1]+=fminf(result.y,20.f);sum[j+2]+=fminf(result.z,20.f);
  radiance[j]=sum[j]/(sample+1);radiance[j+1]=sum[j+1]/(sample+1);radiance[j+2]=sum[j+2]/(sample+1);radiance[j+3]=1;
+}
+
+extern "C" __global__ void paths(const float* positions,const float* normals,const float* albedos,const unsigned* grid,const float* settings,float* sum,float* radiance,float* guide,int count,int sample,int seed){
+ samplePath(positions,normals,albedos,grid,settings,sum,radiance,guide,count,sample,seed);
+}
+
+// Extra rays only for newly exposed surfaces. Established surfaces keep 8 spp.
+extern "C" __global__ void bootstrap(const float* positions,const float* normals,const float* albedos,const unsigned* grid,const float* settings,float* sum,float* radiance,float* guide,const float* oldPosition,const float* oldNormal,const float* oldRadiance,int width,int height,int seed){
+ int i=blockIdx.x*blockDim.x+threadIdx.x;if(i>=width*height || positions[i*4+3]<.5f)return;int j=i*4;
+ bool established=false;
+ if(settings[40]>.5f){
+  V p=add(v(positions[j],positions[j+1],positions[j+2]),v(settings[37],settings[38],settings[39]));const float* m=settings+21;
+  float w=m[3]*p.x+m[7]*p.y+m[11]*p.z+m[15];
+  float u=(m[0]*p.x+m[4]*p.y+m[8]*p.z+m[12])/fmaxf(w,1.e-8f)*.5f+.5f,vv=(m[1]*p.x+m[5]*p.y+m[9]*p.z+m[13])/fmaxf(w,1.e-8f)*.5f+.5f;
+  if(w>0 && u>=0 && vv>=0 && u<1 && vv<1){
+   int bx=(int)floorf(u*width-.5f),by=(int)floorf(vv*height-.5f);V n=v(normals[j],normals[j+1],normals[j+2]);float tolerance=.08f+.003f*sqrtf(dot(p,p));
+   for(int y=0;y<2;y++)for(int x=0;x<2;x++){
+    int xx=bx+x,yy=by+y;if(xx<0||yy<0||xx>=width||yy>=height)continue;int q=(yy*width+xx)*4;
+    V delta=add(v(oldPosition[q],oldPosition[q+1],oldPosition[q+2]),mul(p,-1));
+    if(oldPosition[q+3]>.5f && oldRadiance[q+3]>0 && dot(n,v(oldNormal[q],oldNormal[q+1],oldNormal[q+2]))>.95f && fabsf(dot(n,delta))<tolerance && dot(delta,delta)<2.25f)established=true;
+   }
+  }
+ }
+ if(established)return;
+ for(int sample=8;sample<32;sample++)samplePath(positions,normals,albedos,grid,settings,sum,radiance,guide,width*height,sample,seed+sample-8);
 }
 
 // Persistent per-surface EMA. A batch is an observation, never the display history itself.
