@@ -21,6 +21,7 @@ import java.util.Optional;
 final class LightingResolvePass implements AutoCloseable {
     static final RenderPipeline LIGHTING = lightingPipeline(false);
     static final RenderPipeline LIGHTING_TEMPORAL = lightingPipeline(true);
+    private final PathTracePass pathtrace=new PathTracePass();
     private final VisualComposite composite=new VisualComposite();
     private final AmbientOcclusionPass ao = new AmbientOcclusionPass();
     private final TemporalShadowHistory temporal = new TemporalShadowHistory();
@@ -55,6 +56,7 @@ final class LightingResolvePass implements AutoCloseable {
         if(useTemporal && !RenderSystem.getDevice().precompilePipeline(LIGHTING_TEMPORAL,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Temporal lighting shader compilation failed");
         renderCurrent(encoder,output,material,shadows,useTemporal);
         var result = useTemporal ? temporal.resolve(encoder,hdrView,material,shadows,actualProjection) : hdrView;
+        result=pathtrace.render(encoder,output,material,shadows,result,actualProjection,projectionObserved);
         composite.render(encoder,output,material,shadows,result,environment,ao,true);
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
@@ -77,11 +79,15 @@ final class LightingResolvePass implements AutoCloseable {
     void setQuality(com.voxellight.world.VisualQuality value){composite.setQuality(value);}
     void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.prepareWater(target,shadows,environment,ao);}
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
+    void setPathTrace(boolean enabled){pathtrace.setEnabled(enabled);}
+    void setPathTraceDenoise(boolean enabled){pathtrace.setDenoise(enabled);}
+    void setPathTraceDebug(boolean enabled){pathtrace.setDebug(enabled);}
     void setTemporal(boolean enabled){temporal.setEnabled(enabled);}
     void invalidateHistory(){temporal.invalidate();}
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
         renderCurrent(encoder,output,material,shadows,false);
-        composite.render(encoder,output,material,shadows,hdrView,environment,ao,false);
+        var result=pathtrace.render(encoder,output,material,shadows,hdrView,actualProjection,projectionObserved);
+        composite.render(encoder,output,material,shadows,result,environment,ao,false);
     }
     void renderCurrent(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,boolean history) {
         var sky = Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
@@ -111,8 +117,8 @@ final class LightingResolvePass implements AutoCloseable {
                 .withRenderArea(new RenderPass.RenderArea(0,0,width,height))
                 .withColorAttachment(hdr,Optional.of(new Vector4f(0))).withColorAttachment(shadow,Optional.of(new Vector4f(1,0,0,0)));
     }
-    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + temporal.status() + ao.status() +composite.status(); }
-    @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();projectionObserved=false;}
+    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + temporal.status() + ao.status() +composite.status()+pathtrace.status(); }
+    @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();pathtrace.close();projectionObserved=false;}
     private void releaseBuffers() {
         if (hdrView != null) { hdrView.close(); hdrView=null; }
         if (hdr != null) { hdr.close(); hdr=null; }

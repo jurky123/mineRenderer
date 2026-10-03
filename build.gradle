@@ -45,6 +45,7 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     dependsOn tasks.named('jar')
+    classpath += files(tasks.named('jar').flatMap { it.archiveFile })
     useJUnitPlatform()
     jvmArgs '--enable-native-access=ALL-UNNAMED'
     doFirst {
@@ -69,4 +70,19 @@ tasks.register('clientKit', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
+}
+
+// Optional native build is explicit; the regular Java build remains usable without SDKs.
+jar {
+    from('build/optix-native') { into 'voxellight/native' }
+    doFirst {
+        def manifest=file('build/optix-native/build.json')
+        if (manifest.exists()) {
+            def built=new groovy.json.JsonSlurper().parse(manifest)
+            built.sources.each { name, expected ->
+                def actual=java.security.MessageDigest.getInstance('SHA-256').digest(file(name).bytes).encodeHex().toString()
+                if(actual!=expected)throw new GradleException("Native source changed: ${name}; run tools/build_optix.py before packaging")
+            }
+        } else if(project.hasProperty('nativeKit'))throw new GradleException('Build the native component before -PnativeKit')
+    }
 }

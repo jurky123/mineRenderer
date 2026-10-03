@@ -1,6 +1,6 @@
 # VoxelLight 实施计划
 
-最新优先级：用户确认0.24运行，并要求一次完成3phase后再实机测试。0.25 bundle完成1) bounded HDR water SSR，2) quarter-res bilateral volumetric spatial filtering，3) animated normal waves + fixed quality/comparison controls。默认density0.001不变。交付后按[combined checklist](TEST-0.25.md)统一实机验收；暂不扩展GI或加入未经验证的temporal volume history。
+最新优先级：按用户明确请求，0.30实现实验性 raster-primary path tracing + OptiX HDR denoising。保留raster，先交付 stationary-camera diffuse secondary preview，实机验收后再决定零拷贝interop / OptiX GAS。当前范围和测试以[CURRENT](CURRENT.md)及[PATH-TRACING](PATH-TRACING.md)为准；不宣称完整PT或性能收益。
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 

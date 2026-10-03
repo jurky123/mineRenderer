@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.30.0 — Experimental hybrid diffuse path tracing / OptiX denoising
+
+- Opt-in raster-primary CUDA voxel secondary paths, three diffuse segments, secondary emission/sun/sky, static-camera progressive accumulation and real OptiX 9.1 HDR guide denoising. Indirect-only and raw/denoised comparison commands.
+- Asynchronous low-resolution Vulkan readback, single native worker, UUID-matched device, bounded resources, generation/scene/camera rejection and HDR composite. Native x64 Windows/Linux component packaged; missing driver/component retains raster.
+- Bounded cube/map-color secondary proxy and staged transfer are experimental limitations; no full-primary PT, RT-core traversal, zero-copy interop or FPS improvement claim. 202 Java tests and native CPU traversal/sampling checks pass; NVIDIA in-game test pending.
+
 ## 0.29.0 — Conservative depth pyramid / hierarchical SSR
 
 - Add opt-in water_hzb reflection path: half-resolutionR32 reversed-Z maximum-depth mip chain, odd-tail safe reduction and bounded perspective cell traversal with full-resolution hit validation. Keep linear trace as default/reference.

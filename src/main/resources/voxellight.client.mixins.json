@@ -17,7 +17,8 @@
     "NativeCutoutMeshMixin",
     "IndigoTerrainMaterialMixin",
     "IndigoQuadMaterialMixin",
-    "IndigoQuadResetMixin"
+    "IndigoQuadResetMixin",
+    "GpuDeviceMixin"
   ],
   "injectors": {
     "defaultRequire": 1
