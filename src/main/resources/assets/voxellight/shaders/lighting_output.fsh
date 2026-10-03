@@ -118,7 +118,7 @@ void main() {
         vec4 air=filteredVolume(texCoord,length(position));
         displayed=mapColor(hdr.rgb*air.a+air.rgb,position,texCoord);
     } else displayed=displayColor(hdr.rgb,position,texture(MaterialEmission,texCoord).b,texCoord);
-    float nativeVisibility=texture(MaterialNormal,texCoord).a;
+    float nativeVisibility=texture(MaterialNormal,texCoord).a*3.0;
     if(nativeVisibility>=2.0)displayed=mix(FogColor.rgb,displayed,clamp(nativeVisibility-2.0,0.0,1.0));
     float coverage = ToneBloom.w>.5 ? 1.0-smoothstep(MaterialFade.x,MaterialFade.y,length(position)) : 1.0;
     fragColor = vec4(displayed, coverage);

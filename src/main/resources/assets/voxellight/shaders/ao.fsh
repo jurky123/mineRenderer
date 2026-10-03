@@ -52,7 +52,7 @@ float aoGuideWeight(vec3 center,vec3 normal,vec3 samplePosition,vec3 sampleNorma
 bool aoSurface(ivec2 pixel,out float depth,out vec3 normal) {
     depth=texelFetch(MaterialDepth,pixel,0).r;
     float scene=texelFetch(SceneDepth,pixel,0).r;
-    vec4 geometry=texelFetch(MaterialNormal,pixel,0);
+    vec4 geometry=texelFetch(MaterialNormal,pixel,0) * vec4(2,2,2,3) - vec4(1,1,1,0);
     int flags=int(round(texelFetch(MaterialAlbedo,pixel,0).a*255.0));
     if(depth<=0.0 || scene<=0.0 || geometry.a<.5 || (flags&21)!=0
             || abs(int(floatBitsToUint(depth))-int(floatBitsToUint(scene)))>8)return false;

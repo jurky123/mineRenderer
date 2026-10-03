@@ -6,7 +6,7 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.26.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.27.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -434,3 +434,9 @@ Compare `/voxellight shadow_epochs off` and `on` in an unchanged forest/building
 ### 0.26.1 — Epoch blending opt-in
 
 Epoch blending now defaults off after the user reported better FPS with `/voxellight shadow_epochs off`. Static foliage shadow caching is retained independently. `shadow_epochs on` remains available for A/B profiling; effects still start off. Density0.001 and water strength0.09 are unchanged.
+
+### 0.27.0 — Packed material / temporal opt-in
+
+Normal and emission/light targets now use RGBA8; material storage drops24→16 bytes/pixel. HDR remains floating point. Temporal shadows default off, saving112.5 MiB of optional history at1440p; `temporal_shadows on` restores the comparison. Epochs remain off. Density0.001 and water strength0.09 retained.
+
+Check `surface_normal`, `material_coverage`, `emission`, then `foundation`: negative-facing walls, stairs, leaves, entities, emissive blocks and distant chunk fade. Test torch edits, F3+T, resize and dimensions. Compare temporal off/on from the same static view, enabling `profile on` and exporting each run. Checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/PERFORMANCE-0.27.md

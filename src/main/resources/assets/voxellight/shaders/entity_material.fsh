@@ -27,7 +27,7 @@ void main() {
         base=mix(srgbToLinear(overlay.rgb),base,overlay.a);
     }
     outAlbedo=vec4(linearToSrgb(base),Settings.y/255.0);
-    outNormal=vec4(normalize(gl_FrontFacing?surfaceNormal:-surfaceNormal),1.0-Settings.w);
+    outNormal=vec4(normalize(gl_FrontFacing?surfaceNormal:-surfaceNormal)*0.5+0.5,(1.0-Settings.w)/3.0);
     // Packed brightness is compatibility illumination, never inferred emission.
     outEmission=vec4(0,0,clamp(compatibilityLight.y,0,1),clamp(compatibilityLight.x,0,1));
 }

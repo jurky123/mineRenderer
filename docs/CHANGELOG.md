@@ -1,9 +1,16 @@
-# 0.26.1
+# VoxelLight release history
+
+## 0.27.0 — Packed material buffers / temporal opt-in
+
+- Pack normal and emission/light MRTs as RGBA8_UNORM; material targets drop24→16 bytes/pixel, preserving signed normals, supported-surface markers and native chunk visibility. HDR radiance staysRGBA16F.
+- Temporal shadows now default off; opt-in remains for stability/performance comparison. Epochs remain off; static foliage cache remains active.
+- Native Vulkan shader/binding tests and packing precision checks pass;191 tests. FPS/visual acceptance pending; no GPU available here.
+
+## 0.26.1
 
 - Default celestial shadow epoch blending off after user-reported FPS regression; preserve static cutout caching and opt-in comparison.
 - Extra endpoint sampling is a suspected bottleneck, pending GPU pass profiling.
 
-# VoxelLight release history
 
 ## 0.26.0 — Celestial terrain epochs / static cutout caching
 

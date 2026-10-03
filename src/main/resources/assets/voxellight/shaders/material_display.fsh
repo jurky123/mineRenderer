@@ -13,7 +13,7 @@ void main() {
     vec4 scene = texture(SceneColor, texCoord);
     float depth = texture(SceneDepth, texCoord).r;
     float materialDepth = texture(MaterialDepth, texCoord).r;
-    vec4 normal = texture(MaterialNormal, texCoord);
+    vec4 normal = texture(MaterialNormal, texCoord) * vec4(2,2,2,3) - vec4(1,1,1,0);
     // Reject occluded/unsupported foreground without turning a depth epsilon into light leaking.
     int depthDifference = abs(int(floatBitsToUint(depth)) - int(floatBitsToUint(materialDepth)));
     bool valid = normal.a > 0.5 && depth > 0.0 && materialDepth > 0.0 && depthDifference <= 8;

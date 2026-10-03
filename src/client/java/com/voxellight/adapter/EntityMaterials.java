@@ -126,7 +126,7 @@ final class EntityMaterials implements AutoCloseable {
                         .withUniform("EntityMaterialSettings",UniformType.UNIFORM_BUFFER).withSampler("Sampler0").withSampler("Sampler1").build())
                 .withVertexBinding(0,DefaultVertexFormat.ENTITY).withPrimitiveTopology(PrimitiveTopology.QUADS).withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL,true)).withCull(cull);
         builder.withColorTargetState(0,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
-        builder.withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL));
-        builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL));return builder.build();
+        builder.withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
+        builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));return builder.build();
     }
 }

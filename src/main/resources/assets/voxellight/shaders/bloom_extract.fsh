@@ -19,7 +19,7 @@ void main() {
         ivec2 p=base+ivec2(x,y);
         if(any(greaterThanEqual(p,size)))continue;
         float scene=texelFetch(SceneDepth,p,0).r, surface=texelFetch(MaterialDepth,p,0).r;
-        if(texelFetch(MaterialNormal,p,0).a<.5 || scene<=0.0 || surface<=0.0 || abs(int(floatBitsToUint(scene))-int(floatBitsToUint(surface)))>8)continue;
+        if(texelFetch(MaterialNormal,p,0).a*3.0<.5 || scene<=0.0 || surface<=0.0 || abs(int(floatBitsToUint(scene))-int(floatBitsToUint(surface)))>8)continue;
         vec4 properties=texelFetch(MaterialEmission,p,0);
         emission+=srgbToLinear(texelFetch(MaterialAlbedo,p,0).rgb)*max(properties.r,properties.g)*2.4;
     }

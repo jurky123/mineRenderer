@@ -45,7 +45,7 @@ void main() {
     nextHistory=vec4(-1,0,0,0);
     if(current.a<0.5)return;
     float depth=texture(MaterialDepth,texCoord).r;
-    vec3 normal=normalize(texture(MaterialNormal,texCoord).xyz);
+    vec3 normal=normalize(texture(MaterialNormal,texCoord).xyz*2.0-1.0);
     vec4 view=InvProjection*vec4(texCoord*2.0-1.0,depth,1.0);
     vec3 position=(ViewToWorld*vec4(view.xyz/view.w,1.0)).xyz;
     vec4 shadow=texture(CurrentShadow,texCoord);
@@ -71,7 +71,7 @@ void main() {
                     ivec2 pixel=clamp(center+ivec2(x,y),ivec2(0),size-1);
                     if(texelFetch(CurrentHdr,pixel,0).a<.99)continue;
                     float otherDepth=texelFetch(MaterialDepth,pixel,0).r;
-                    vec3 otherNormal=normalize(texelFetch(MaterialNormal,pixel,0).xyz);
+                    vec3 otherNormal=normalize(texelFetch(MaterialNormal,pixel,0).xyz*2.0-1.0);
                     if(dot(normal,otherNormal)<HistoryParameters.w || abs(otherDepth-depth)>max(.0001,depth*.02))continue;
                     float value=texelFetch(CurrentShadow,pixel,0).r;
                     lower=min(lower,value);upper=max(upper,value);

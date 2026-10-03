@@ -155,8 +155,8 @@ class ShadowPipelineTest {
             assertTrue(capture.isCull());
             assertEquals(3, capture.getColorTargetStates().length);
             assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[0].format());
-            assertEquals(GpuFormat.RGBA16_FLOAT, capture.getColorTargetStates()[1].format());
-            assertEquals(GpuFormat.RGBA16_FLOAT, capture.getColorTargetStates()[2].format());
+            assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[1].format());
+            assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[2].format());
             for (var target : capture.getColorTargetStates()) assertTrue(target.blendFunction().isEmpty());
             assertEquals(CompareOp.GREATER_THAN_OR_EQUAL, capture.getDepthStencilState().depthTest());
             assertTrue(capture.getDepthStencilState().writeDepth());

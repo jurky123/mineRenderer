@@ -114,9 +114,10 @@ void main() {
     // Encoded unlit albedo preserves dark RGBA8 colors. Decode once in the future lighting resolve.
     // Excludes native lightmap, face shading, vertex AO and fog.
     outAlbedo = vec4(linearToSrgb(srgbToLinear(texel.rgb) * srgbToLinear(unlitTint.rgb)), float(flags) / 255.0);
-    outNormal = vec4(normalize(surfaceNormal), 1.0);
+    // XYZ signed normal -> UNORM; alpha retains validity and native fade in [0,3].
+    outNormal = vec4(normalize(surfaceNormal) * 0.5 + 0.5, 1.0 / 3.0);
 #ifdef NATIVE_TERRAIN
-    outNormal.a=2.0+clamp(ChunkVisibility,0.0,1.0);
+    outNormal.a=(2.0+clamp(ChunkVisibility,0.0,1.0))/3.0;
 #endif
     // Material strengths only. This is deliberately not a claim of emissive RGB radiance.
     outEmission = vec4(float(emissionFlags.x) / 15.0, float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));

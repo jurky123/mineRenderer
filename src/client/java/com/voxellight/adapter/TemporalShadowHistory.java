@@ -23,7 +23,7 @@ final class TemporalShadowHistory implements AutoCloseable {
     private final GpuTextureView[] views=new GpuTextureView[4];
     private GpuBuffer settings;
     private int width,height,read;
-    private boolean enabled=true,active;
+    private boolean enabled=false,active;
     private String fallback="waiting";
     boolean prepare(RenderTarget target,boolean projectionObserved) {
         active=false;

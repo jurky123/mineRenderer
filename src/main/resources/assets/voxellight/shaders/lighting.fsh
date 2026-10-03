@@ -280,7 +280,7 @@ void main() {
 #endif
     float depth = texture(SceneDepth, texCoord).r;
     float capturedDepth = texture(MaterialDepth, texCoord).r;
-    vec4 geometryNormal = texture(MaterialNormal, texCoord);
+    vec4 geometryNormal = texture(MaterialNormal, texCoord) * vec4(2,2,2,3) - vec4(1,1,1,0);
     int difference = abs(int(floatBitsToUint(depth)) - int(floatBitsToUint(capturedDepth)));
     if (depth <= 0.0 || capturedDepth <= 0.0 || difference > 8 || geometryNormal.a < 0.5) {
         return;

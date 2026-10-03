@@ -196,3 +196,7 @@ Directional history改用geometryChangeRevision，纯LIGHT dirty不全局reset�
 ## 0.26 review follow-up: reusable world-sun shadows
 
 Implemented dual-angle terrain epochs and static-cutout classification after0.25.1 CPU fixes/profiling. See[SHADOW-EPOCHS.md](SHADOW-EPOCHS.md) and CURRENT for acceptance. This is a bounded cache improvement, not a quality-reference freeze or a measured whole-renderer optimization. Future priority depends on off/on exports: additional resolve sampling trades against reduced map submissions. HZB SSR, froxel visibility, packed history, material single-raster MRT and clustered local lights remain pending; do not increase lights or march steps without evidence.
+
+## 0.27 performance architecture entry
+
+Implemented packed material MRT (16B/pixel) and temporal-shadow opt-in. Validate input precision/coverage and capture pass timings before selecting further raster changes. Directional visibility, HZB, froxel/temporal volume, single-raster material and RTX interop remain future work; full path tracing is not a performance mode.

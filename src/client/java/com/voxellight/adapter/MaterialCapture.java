@@ -63,7 +63,7 @@ final class MaterialCapture implements AutoCloseable {
     }
     private void allocate(int w,int h) {
         releaseTargets(); width=w; height=h;
-        var formats = new GpuFormat[]{GpuFormat.RGBA8_UNORM,GpuFormat.RGBA16_FLOAT,GpuFormat.RGBA16_FLOAT,GpuFormat.D32_FLOAT};
+        var formats = new GpuFormat[]{GpuFormat.RGBA8_UNORM,GpuFormat.RGBA8_UNORM,GpuFormat.RGBA8_UNORM,GpuFormat.D32_FLOAT};
         for (int i=0;i<4;i++) {
             targets[i]=RenderSystem.getDevice().createTexture("VoxelLight material target "+i,GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,formats[i],w,h,1,1);
             views[i]=RenderSystem.getDevice().createTextureView(targets[i]);
@@ -163,8 +163,8 @@ final class MaterialCapture implements AutoCloseable {
                 .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL,true)).withCull(true);
         if(nativeGeometry)builder.withShaderDefine("NATIVE_TERRAIN");
         builder.withColorTargetState(0,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
-        builder.withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL));
-        builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL));
+        builder.withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
+        builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
         return builder.build();
     }
     private static RenderPipeline displayPipeline() {
