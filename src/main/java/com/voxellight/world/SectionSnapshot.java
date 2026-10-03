@@ -16,6 +16,7 @@ public final class SectionSnapshot {
     private final byte[] flags;
     private final byte[] emissions;
     private final long[] fullOccupancy = new long[64];
+    private final long materialFingerprint;
     private final int nonAirCount;
     private final int fullCount;
     private final int emissiveCount;
@@ -30,6 +31,7 @@ public final class SectionSnapshot {
         this.stateIds = stateIds.clone();
         this.flags = flags.clone();
         this.emissions = emissions.clone();
+        long fingerprint=0xcbf29ce484222325L;
         int nonAir = 0;
         int full = 0;
         int emissive = 0;
@@ -38,6 +40,9 @@ public final class SectionSnapshot {
             if (palette >= stateIds.length || Byte.toUnsignedInt(this.emissions[palette]) > 15) {
                 throw new IllegalArgumentException("Invalid section material");
             }
+            fingerprint=(fingerprint ^ stateIds[palette])*0x100000001b3L;
+            fingerprint=(fingerprint ^ Byte.toUnsignedInt(this.flags[palette]))*0x100000001b3L;
+            fingerprint=(fingerprint ^ Byte.toUnsignedInt(this.emissions[palette]))*0x100000001b3L;
             if ((this.flags[palette] & NON_AIR) != 0) nonAir++;
             if ((this.flags[palette] & FULL_OCCLUDER) != 0) {
                 fullOccupancy[i >>> 6] |= 1L << (i & 63);
@@ -45,12 +50,14 @@ public final class SectionSnapshot {
             }
             if (this.emissions[palette] != 0) emissive++;
         }
+        materialFingerprint=fingerprint;
         nonAirCount = nonAir;
         fullCount = full;
         emissiveCount = emissive;
     }
 
     public WorldSceneBridge.Request request() { return request; }
+    public long materialFingerprint(){return materialFingerprint;}
     public int paletteSize() { return stateIds.length; }
     public int nonAirCount() { return nonAirCount; }
     public int fullCount() { return fullCount; }

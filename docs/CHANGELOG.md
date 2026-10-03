@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.30.1 — Hybrid accumulation stability
+
+- Replace global scene/task-version invalidation with order-independent local material fingerprints. LIGHT-only snapshot replacement and distant caster churn no longer discard GI. Known secondary snapshots remain until replacement.
+- Tolerate sub-millimetre camera/float noise; require 250 ms stationary admission before tracing. Genuine movement, local material edits, world/resource changes and resize still reject stale surfaces. Celestial refresh resets accumulation while retaining the last valid surface result until replacement. Eight-sample strength ramp reduces initial noise/pop-in.
+- User log confirms the native worker executes, but 0.30.0 repeatedly returned raster with zero accepted samples. In-game stability verification pending.
+
 ## 0.30.0 — Experimental hybrid diffuse path tracing / OptiX denoising
 
 - Opt-in raster-primary CUDA voxel secondary paths, three diffuse segments, secondary emission/sun/sky, static-camera progressive accumulation and real OptiX 9.1 HDR guide denoising. Indirect-only and raw/denoised comparison commands.
