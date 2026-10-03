@@ -68,6 +68,12 @@ final class LightingResolvePass implements AutoCloseable {
     void setAtmosphereDensity(float density){composite.setAtmosphereDensity(density);}
     void setExposure(float ev){composite.setExposure(ev);}
     void setWater(boolean value){composite.setWater(value);}
+    void setWaterReflections(boolean value){composite.setWaterReflections(value);}
+    void setWaterWaves(boolean value){composite.setWaterWaves(value);}
+    void setWaveStrength(float value){composite.setWaveStrength(value);}
+    void setWaveSpeed(float value){composite.setWaveSpeed(value);}
+    void setVolumeFilter(boolean value){composite.setVolumeFilter(value);}
+    void setQuality(com.voxellight.world.VisualQuality value){composite.setQuality(value);}
     void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.prepareWater(target,shadows,environment,ao);}
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
     void setTemporal(boolean enabled){temporal.setEnabled(enabled);}

@@ -87,6 +87,12 @@ public final class RenderProbe {
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setAtmosphereDensity(float density){RenderSystem.assertOnRenderThread();lighting.setAtmosphereDensity(density);}
     public void setWater(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setWater(enabled);}
+    public void setWaterReflections(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterReflections(value);}
+    public void setWaterWaves(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterWaves(value);}
+    public void setWaveStrength(float value){RenderSystem.assertOnRenderThread();lighting.setWaveStrength(value);}
+    public void setWaveSpeed(float value){RenderSystem.assertOnRenderThread();lighting.setWaveSpeed(value);}
+    public void setVolumeFilter(boolean value){RenderSystem.assertOnRenderThread();lighting.setVolumeFilter(value);}
+    public void setQuality(com.voxellight.world.VisualQuality value){RenderSystem.assertOnRenderThread();lighting.setQuality(value);}
     public void prepareWater(RenderTarget target){if(mode==Mode.FOUNDATION && materialFrameReady)lighting.prepareWater(target,shadows);}
     public boolean bindWater(com.mojang.blaze3d.systems.RenderPass pass){return mode==Mode.FOUNDATION && materialFrameReady && lighting.bindWater(pass);}
     public void setExposure(float ev) {RenderSystem.assertOnRenderThread();lighting.setExposure(ev);}

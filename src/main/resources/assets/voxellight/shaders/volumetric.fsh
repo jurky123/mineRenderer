@@ -10,7 +10,7 @@ uniform sampler2D MiddleEntityShadowMap;
 uniform sampler2D FarEntityShadowMap;
 layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters; };
 layout(std140) uniform LightingEnvironment { vec4 DirectColorStrength; vec4 SkyColorStrength; vec4 HorizonColorLower; };
-layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; }; // active, distance, anisotropy, phase scale
+layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; vec4 VolumeQuality; }; // active, distance, anisotropy, phase scale
 layout(std140) uniform ShadowResolveSettings {
     mat4 LightMatrix[3];mat4 ViewToWorld;vec4 LightDirectionAndMask;vec4 Coverage;vec4 CascadeRanges;
     mat4 InvProjection;mat4 LightNormalMatrix[3];
@@ -56,7 +56,8 @@ void main() {
     if(distance<.001)return;
     vec3 ray=endpoint/distance;
     float reach=min(distance,min(VolumeParameters.y,max(0.0,Coverage.y-8.0)));
-    float ds=reach/16.0, transmission=1.0;
+    int steps=int(VolumeQuality.x);
+    float ds=reach/float(steps), transmission=1.0;
     // Fixed interleaved spatial gradient; no frame-varying noise or unvalidated history.
     float jitter=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))));
     float g=VolumeParameters.z, cosine=clamp(dot(ray,LightDirectionAndMask.xyz),-1.0,1.0);
@@ -64,10 +65,11 @@ void main() {
     float skyAccess=clamp(texture(MaterialEmission,texCoord).b,0.0,1.0);
     vec3 ambient=HorizonColorLower.rgb*(.01+SkyColorStrength.a*1.5)*skyAccess;
     vec3 scattered=vec3(0);
-    for(int i=0;i<16;i++) {
+    for(int i=0;i<32;i++) {
+        if(i>=steps)break;
         vec3 p=ray*((float(i)+jitter)*ds);
         float height=AtmosphereParameters.y+p.y;
-        float tau=min(AtmosphereParameters.x*exp(-clamp(height/48.0,-1.0,4.0))*ds,2.0/16.0);
+        float tau=min(AtmosphereParameters.x*exp(-clamp(height/48.0,-1.0,4.0))*ds,2.0/float(steps));
         float stepTransmission=exp(-tau);
         // Shadow only direct in-scattering; ambient keeps the stated receiver-skylight approximation.
         float direct=Coverage.z>0.0?visibility(p):0.0;

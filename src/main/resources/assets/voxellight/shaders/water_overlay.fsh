@@ -3,6 +3,7 @@ uniform sampler2D WaterHdr;
 uniform sampler2D WaterDepth;
 uniform sampler2D EmissiveBloom;
 in float waterSkyAccess;
+layout(std140) uniform Projection { mat4 ProjMat; };
 layout(std140) uniform WaterSettings {
     vec4 WaterStill;vec4 WaterFlow;vec4 WaterCamera;vec4 WaterParameters;
 };
@@ -29,6 +30,61 @@ bool background(vec2 uv,vec3 surface,out vec3 radiance,out float thickness) {
     if(depth<=0.0 || hdr.a<=0.0 || abs(hdr.a-distanceBack)>max(.04,distanceBack*.002) || distanceBack<=length(surface))return false;
     radiance=hdr.rgb;thickness=clamp(distanceBack-length(surface),0.0,16.0);return true;
 }
+// Reflect only current supported HDR surfaces; offscreen/sky/missing-data rays use sky fallback.
+bool reflectionGuide(vec3 point,out vec2 uv,out float gap) {
+    vec3 view=transpose(mat3(ViewToWorld))*point;
+    vec4 clip=ProjMat*vec4(view,1);
+    if(clip.w<=.001)return false;
+    uv=clip.xy/clip.w*.5+.5;
+    if(any(lessThan(uv,vec2(.002))) || any(greaterThan(uv,vec2(.998))))return false;
+    float depth=texture(WaterDepth,uv).r;
+    if(depth<=0.0)return false;
+    vec3 hit=waterPosition(uv,depth);
+    gap=length(point)-length(hit);
+    return true;
+}
+vec4 screenReflection(vec3 surface,vec3 normal,vec3 direction) {
+    int steps=int(WaterParameters.w);
+    if(steps<=0 || normal.y<.5)return vec4(0);
+    vec3 origin=surface+normal*.08;
+    float previousT=0.0,previousGap=-1e6;
+    bool previousValid=false;
+    for(int i=1;i<=32;i++) {
+        if(i>steps)break;
+        float fraction=float(i)/float(steps);
+        float t=.15+47.85*fraction*fraction;
+        vec2 uv;float gap;
+        if(!reflectionGuide(origin+direction*t,uv,gap))return vec4(0);
+        if(previousValid && previousGap<0.0 && gap>=0.0) {
+            float lo=previousT,hi=t;
+            for(int refine=0;refine<5;refine++) {
+                float middle=(lo+hi)*.5;vec2 refinedUv;float refinedGap;
+                if(!reflectionGuide(origin+direction*middle,refinedUv,refinedGap))return vec4(0);
+                if(refinedGap>=0.0)hi=middle;else lo=middle;
+            }
+            if(!reflectionGuide(origin+direction*hi,uv,gap))return vec4(0);
+            vec4 hdr=texture(WaterHdr,uv);
+            vec3 hit=waterPosition(uv,texture(WaterDepth,uv).r);
+            float distance=length(hit),tolerance=max(.12,distance*.004);
+            if(hdr.a<=0.0 || abs(hdr.a-distance)>max(.04,distance*.002) || gap<0.0 || gap>tolerance)return vec4(0);
+            float border=min(min(uv.x,1.0-uv.x),min(uv.y,1.0-uv.y));
+            float confidence=smoothstep(.005,.08,border)*(1.0-smoothstep(36.0,48.0,hi))
+                *(1.0-smoothstep(tolerance*.5,tolerance,gap));
+            return vec4(hdr.rgb,confidence);
+        }
+        previousValid=true;previousGap=gap;previousT=t;
+    }
+    return vec4(0);
+}
+vec2 waveSlope(vec2 position,float phase) {
+    // Integer spatial harmonics make camera modulo64 crossings continuous.
+    float frequency=.09817477042;
+    float p=dot(position,vec2(2,1))*frequency+phase;
+    float q=dot(position,vec2(-1,3))*frequency-2.0*phase;
+    float r=dot(position,vec2(5,2))*frequency+3.0*phase;
+    return WaterParameters.z*(.65*normalize(vec2(2,1))*cos(p)
+        +.25*normalize(vec2(-1,3))*cos(q)+.1*normalize(vec2(5,2))*cos(r));
+}
 void main() {
     // Derivatives require all quad/helper lanes, including pixels which later use native fallback.
     // Evaluating them after background/sprite rejection created native-blue seams and dashes.
@@ -44,10 +100,12 @@ void main() {
     vec3 viewDirection=normalize(-surface);
     if(dot(normal,viewDirection)<0.0)normal=-normal;
     vec3 absolute=surface+WaterCamera.xyz;
-    float time=GameTime*1200.0*.7853981634;
-    if(abs(normal.y)>.8)normal=normalize(normal+vec3(.055*sin(absolute.x*.1963495408+time),0.0,.045*cos(absolute.z*.3926990817-time)));
+    if(abs(normal.y)>.8) {
+        vec2 slope=waveSlope(absolute.xz,WaterCamera.w);
+        normal=normalize(normal+vec3(slope.x,0,slope.y));
+    }
     vec3 viewNormal=transpose(mat3(ViewToWorld))*normal;
-    vec2 refracted=uv+viewNormal.xy*min(6.0,thickness*2.0)/vec2(textureSize(WaterHdr,0));
+    vec2 refracted=uv+viewNormal.xy*min(10.0,thickness*3.0)/vec2(textureSize(WaterHdr,0));
     vec3 shifted;float shiftedThickness;
     if(all(greaterThanEqual(refracted,vec2(0))) && all(lessThanEqual(refracted,vec2(1))) && background(refracted,surface,shifted,shiftedThickness)) {base=shifted;thickness=shiftedThickness;}
     vec3 transmission=exp(-vec3(.18,.065,.028)*thickness);
@@ -55,6 +113,8 @@ void main() {
     vec3 sky=mix(HorizonColorLower.rgb,SkyColorStrength.rgb,clamp(reflected.y,0.0,1.0))*SkyColorStrength.a*waterSkyAccess;
     float specular=pow(max(dot(reflected,LightDirectionAndMask.xyz),0.0),64.0);
     sky+=DirectColorStrength.rgb*DirectColorStrength.a*specular*waterSkyAccess;
+    vec4 sceneReflection=screenReflection(surface,normal,reflected);
+    sky=mix(sky,sceneReflection.rgb,sceneReflection.a);
     vec3 body=vec3(.015,.09,.12)*(.01+SkyColorStrength.a*waterSkyAccess);
     vec3 transmitted=base*transmission+body*(1.0-transmission);
     float fresnel=.02+.98*pow(1.0-clamp(dot(normal,viewDirection),0.0,1.0),5.0);

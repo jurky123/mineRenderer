@@ -49,3 +49,16 @@ Blue grid/dashes in2026-10-03_11.44.01.png prompted moving surface derivatives b
 ## 0.22 native background coverage
 
 With native material source, water follows the captured visible-terrain HDR background instead of fading at24–32 blocks. Local reference keeps the old fade. Background validation, sky/unsupported occluder fallback and native translucent/underwater restrictions still apply; this does not add geometry waves or SSR.
+
+
+## 0.25 phase1 — HDR scene reflections
+
+Native Fast/Fancy water now traces the reflected world-relative ray against the existing immutable opaque depth. Project with the bound native projection and camera rotation; select16/24/32 samples by quality, with at most48-block reach and5 binary refinements at a negative→positive depth crossing. Accept only a supported HDR texel whose stored radial guide agrees with native depth. Fade confidence near screen edges, the trace limit and uncertain thickness; blend misses to the existing sky reflection. No reflection image, full RGB history, geometry pass or scene-color copy is added.
+
+This is screen-space reflection of current supported opaque surfaces. Offscreen/occluded objects and unsupported HDR surfaces cannot be reflected. Large steps can miss thin objects and changing visibility can still change confidence; there is no SSR temporal history. First-ray missing/sky samples reject the trace conservatively. Compare `water_reflections off/on` next to an on-screen building, moving slowly through grazing viewpoints. Do not infer working scene reflections from the water active status alone.
+
+## 0.25 phase3 — Water animation and quality controls
+
+Replace the two faint GameTime-driven normal components with three directional normal-wave harmonics (default slope strength0.12), using bounded monotonic phase rather than a world-day timer. Integer spatial frequencies repeat over64 blocks, matching camera modulo64 and preserving continuity at positive/negative large world coordinates. Speed changes advance the previous phase before applying the new rate;0 freezes the current phase. GPU views/settings close/reload does not reset these controls or the CPU phase. Animation currently advances with elapsed render time, including paused menus.
+
+`water_waves off` supplies flat geometry normals; `on` restores normal waves. `water_wave_strength 0..0.3` and `water_wave_speed 0..3` expose artistic controls. These deform reflection/refraction/highlight normals, not water vertices or shoreline silhouettes; this is not geometric wave simulation. Defaults are waves/reflections on and quality balanced. Presets change trace/sample budgets only, not density/exposure/world ranges. See[combined checklist](TEST-0.25.md).

@@ -6,7 +6,7 @@ uniform sampler2D EmissiveBloom;
 uniform sampler2D MaterialEmission;
 uniform sampler2D MaterialNormal;
 uniform sampler2D VolumetricScatter;
-layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; };
+layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; vec4 VolumeQuality; };
 layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters; }; // density, camera above sea level, enabled, max distance
 layout(std140) uniform LightingEnvironment { vec4 DirectColorStrength; vec4 SkyColorStrength; vec4 HorizonColorLower; };
 layout(std140) uniform VisualSettings {

@@ -279,6 +279,8 @@ public final class ShadowRenderer implements AutoCloseable {
         pass.setUniform("ShadowResolveSettings", resolveSettings);
     }
 
+    void bindVolumeTransform(RenderPass pass) { pass.setUniform("ShadowResolveSettings", resolveSettings); }
+
     void bindVolumetric(RenderPass pass) {
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         String[] terrain = {"ShadowMap", "MiddleShadowMap", "FarShadowMap"};

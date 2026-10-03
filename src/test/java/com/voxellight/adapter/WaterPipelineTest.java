@@ -77,6 +77,28 @@ class WaterPipelineTest {
             }
         }
     }
+    @Test void waterControlsSurviveResourceCloseWithoutResettingTheWavePhase() throws Exception {
+        try(var loader=loader()) {
+            var type=Class.forName("com.voxellight.adapter.WaterPass",true,loader);
+            var ctor=type.getDeclaredConstructor();ctor.setAccessible(true);var water=ctor.newInstance();
+            for(var option:List.of("setReflections","setWaves")) {
+                var method=type.getDeclaredMethod(option,boolean.class);method.setAccessible(true);method.invoke(water,false);
+            }
+            var strength=type.getDeclaredMethod("setWaveStrength",float.class);strength.setAccessible(true);strength.invoke(water,.2f);
+            var speed=type.getDeclaredMethod("setWaveSpeed",float.class);speed.setAccessible(true);speed.invoke(water,0f);
+            var quality=type.getDeclaredMethod("setQuality",com.voxellight.world.VisualQuality.class);quality.setAccessible(true);quality.invoke(water,com.voxellight.world.VisualQuality.HIGH);
+            var phase=type.getDeclaredField("wavePhase");phase.setAccessible(true);phase.set(water,1.25);
+            type.getMethod("close").invoke(water);
+            for(String field:List.of("reflectionsEnabled","wavesEnabled")) {
+                var value=type.getDeclaredField(field);value.setAccessible(true);assertEquals(false,value.get(water));
+            }
+            var value=type.getDeclaredField("waveStrength");value.setAccessible(true);assertEquals(.2f,value.get(water));
+            value=type.getDeclaredField("waveSpeed");value.setAccessible(true);assertEquals(0f,value.get(water));
+            value=type.getDeclaredField("quality");value.setAccessible(true);assertEquals(com.voxellight.world.VisualQuality.HIGH,value.get(water));
+            assertEquals(1.25,phase.get(water));
+        }
+    }
+
     private static URLClassLoader loader() throws Exception {return new URLClassLoader(new java.net.URL[]{Path.of(System.getProperty("voxellight.modJar")).toUri().toURL()},WaterPipelineTest.class.getClassLoader());}
     private static String read(ClassLoader loader,String name) {
         try(var stream=loader.getResourceAsStream(name)){if(stream==null)throw new IllegalArgumentException("Missing "+name);return new String(stream.readAllBytes(),StandardCharsets.UTF_8);}catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}

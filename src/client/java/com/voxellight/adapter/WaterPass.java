@@ -43,8 +43,23 @@ final class WaterPass implements AutoCloseable {
     private ShadowRenderer shadows;
     private EmissiveBloom bloom;
     private boolean captured,ready,failed;
+    private boolean reflectionsEnabled=true,wavesEnabled=true;
+    private float waveStrength=WaterSurface.DEFAULT_STRENGTH,waveSpeed=WaterSurface.DEFAULT_SPEED;
+    private VisualQuality quality=VisualQuality.BALANCED;
+    private long waveTick=System.nanoTime();
+    private double wavePhase;
     private String state="waiting";
     private int width,height;
+    void setReflections(boolean value){reflectionsEnabled=value;}
+    void setWaves(boolean value){wavesEnabled=value;}
+    void setWaveStrength(float value){waveStrength=WaterSurface.strength(value);}
+    void setWaveSpeed(float value){float speed=WaterSurface.speed(value);advanceWaves();waveSpeed=speed;}
+    private float advanceWaves(){
+        long now=System.nanoTime();
+        wavePhase=(wavePhase+WaterSurface.phase(now-waveTick,waveSpeed))%(Math.PI*2);
+        waveTick=now;return (float)wavePhase;
+    }
+    void setQuality(VisualQuality value){quality=value;}
     private boolean eligible() {
         var mc=Minecraft.getInstance();
         return mc.level!=null && mc.levelRenderer.translucentTarget()==null && mc.gameRenderer.mainCamera().getFluidInCamera()==FogType.NONE
@@ -96,8 +111,8 @@ final class WaterPass implements AutoCloseable {
                 encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,WaterOptics.SETTINGS_BYTES)
                         .putVec4(still.getU0(),still.getV0(),still.getU1(),still.getV1())
                         .putVec4(flow.getU0(),flow.getV0(),flow.getU1(),flow.getV1())
-                        .putVec4((float)(camera.x%64),(float)(camera.y%64),(float)(camera.z%64),0)
-                        .putVec4(24,32,0,0).get());
+                        .putVec4((float)(camera.x%64),(float)(camera.y%64),(float)(camera.z%64),advanceWaves())
+                        .putVec4(24,32,wavesEnabled?waveStrength:0,reflectionsEnabled?quality.reflectionSteps():0).get());
             }
             this.shadows=shadows;this.visual=visual;this.atmosphere=atmosphere;this.environment=environment;this.bloom=bloom;
             ready=true;state="native-stream HDR water active";
@@ -122,7 +137,7 @@ final class WaterPass implements AutoCloseable {
                 .withColorAttachment(target,clear?Optional.of(new Vector4f(0)):Optional.empty());
     }
     void endFrame(){captured=ready=false;}
-    String status(){return ", water="+state+", waterBytes="+(hdr==null?0:WaterOptics.targetBytes(width,height));}
+    String status(){return ", water="+state+", waterBytes="+(hdr==null?0:WaterOptics.targetBytes(width,height))+", waterReflection="+(reflectionsEnabled?"screen-space; "+quality.reflectionSteps()+" steps":"sky only")+", waterWaves="+(wavesEnabled?waveStrength:0)+", waterWaveSpeed="+waveSpeed;}
     private void fail(RuntimeException error){close();failed=true;state="failed; native water retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Water reference disabled; native terrain retained",error);}
     @Override public void close() {
         if(hdrView!=null){hdrView.close();hdrView=null;}if(hdr!=null){hdr.close();hdr=null;}

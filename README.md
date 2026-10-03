@@ -7,6 +7,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 ## 文档
 
 - [Native terrain coverage](docs/NATIVE-COVERAGE.md)：0.22原生几何复用、inline attributes与实机检查。
+- [0.25 three-phase test bundle](docs/TEST-0.25.md)：water SSR、volume spatial filter、animated normal waves/quality presets与统一实机测试。
 - [Shadowed volumetric light](docs/VOLUMETRIC.md)：quarter-resolution sun/moon shafts、HDR medium composition与比较命令。
 - [128-block directional shadows](docs/EXTENDED-SHADOWS.md)：近场detail保留、远场借用native offscreen geometry、预算与验收。
 - [Range and quality plan](docs/RANGE.md)：native material stream、独立效果距离与测量门槛；下一优先任务。

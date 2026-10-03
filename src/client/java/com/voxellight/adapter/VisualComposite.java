@@ -25,6 +25,7 @@ final class VisualComposite implements AutoCloseable {
     private final WaterPass water=new WaterPass();
     private final VolumetricPass volumetric=new VolumetricPass();
     private boolean volumetricEnabled=true;
+    private com.voxellight.world.VisualQuality quality=com.voxellight.world.VisualQuality.BALANCED;
     private boolean coverageBlendActive;
     private boolean polished=true,bloomEnabled=true,coverageBlend=true,atmosphereEnabled=true,atmosphereActive,waterEnabled=true;
     private float exposureEv=VisualPolish.DEFAULT_EV,atmosphereDensity=Atmosphere.DEFAULT_DENSITY;
@@ -47,6 +48,13 @@ final class VisualComposite implements AutoCloseable {
     void setAtmosphereDensity(float value){atmosphereDensity=Atmosphere.density(value);}
     void setExposure(float value){VisualPolish.exposure(value);exposureEv=value;}
     void setWater(boolean value){waterEnabled=value;if(!value)water.close();}
+    void setWaterReflections(boolean value){water.setReflections(value);}
+    void setWaterWaves(boolean value){water.setWaves(value);}
+    void setWaveStrength(float value){water.setWaveStrength(value);}
+    void setWaveSpeed(float value){water.setWaveSpeed(value);}
+    void setVolumeFilter(boolean value){volumetric.setFiltered(value);}
+    void setQuality(com.voxellight.world.VisualQuality value){quality=value;water.setQuality(value);volumetric.setQuality(value);}
+
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao,boolean terrain) {
         if(terrain)bloom.render(encoder,output,material,polished && bloomEnabled);
         water.capture(encoder,output,source,shadows,terrain,polished && waterEnabled && !ao.debug());
@@ -57,7 +65,7 @@ final class VisualComposite implements AutoCloseable {
     }
     boolean bindWater(RenderPass pass){return water.bind(pass);}
     void endFrame(){water.endFrame();}
-    String status(){return ", look="+(polished?"polished":"reference")+", exposureEV="+exposureEv+", coverageBlend="+coverageBlendActive+bloom.status()+", atmosphere="+(atmosphereActive?(volumetric.active()?"shadowed opaque medium; analytic water":"analytic aerial perspective"):"off/native")+", atmosphereDensity="+atmosphereDensity+volumetric.status()+water.status();}
+    String status(){return ", look="+(polished?"polished":"reference")+", quality="+quality.name().toLowerCase(java.util.Locale.ROOT)+", exposureEV="+exposureEv+", coverageBlend="+coverageBlendActive+bloom.status()+", atmosphere="+(atmosphereActive?(volumetric.active()?"shadowed opaque medium; analytic water":"analytic aerial perspective"):"off/native")+", atmosphereDensity="+atmosphereDensity+volumetric.status()+water.status();}
     @Override public void close(){water.close();bloom.close();volumetric.close();if(visualSettings!=null){visualSettings.close();visualSettings=null;}if(atmosphereSettings!=null){atmosphereSettings.close();atmosphereSettings=null;}atmosphereActive=false;}
     private void display(CommandEncoder encoder,RenderTarget output,ShadowRenderer shadows,MaterialCapture material,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao) {
         coverageBlendActive=polished && coverageBlend && !material.nativeTerrain();

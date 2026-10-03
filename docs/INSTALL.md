@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.24.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.25.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.24.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.25.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -29,6 +29,12 @@
 | `/voxellight atmosphere on` / `off` | polished foundation atmosphere总开关；opaque默认shadowed volume，water保留analytic；水下/非主世界native。 |
 | `/voxellight atmosphere_density 0.001` | 默认0.001，允许0..0.08；可用0.003放大比较，0无haze。 |
 | `/voxellight volumetric on` / `off` | Polished Overworld opaque medium：shadowed16-step volume / analytic comparison；density共用atmosphere_density。 |
+| `/voxellight water_reflections on` / `off` | HDR screen-space reflections / sky-only comparison；default on。 |
+| `/voxellight water_waves on` / `off` | animated surface normals / flat-normal comparison；default on，geometry不位移。 |
+| `/voxellight water_wave_strength 0.12` | normal slope0..0.3，default0.12。 |
+| `/voxellight water_wave_speed 1` | speed0..3，default1；0冻结当前phase。 |
+| `/voxellight volumetric_filter on` / `off` | depth-aware quarter-resolution spatial filter；default on，无history。 |
+| `/voxellight quality fast` / `balanced` / `high` | volume/reflection steps8/16、16/24、32/32；default balanced，无auto quality。 |
 | `/voxellight exposure 0.75` | polished默认+0.75EV，允许-2..2，手动曝光，无自动变化。 |
 | `/voxellight bloom on` / `off` | polished默认on；已捕获torch/glowstone等terrain emission的quarter-res glow，非lava/透明/天空bloom或GI。 |
 | `/voxellight coverage_blend on` / `off` | polished默认on；24–32格连续淡回native，避免5³材质窗硬边；off比较原receiver范围。 |
@@ -389,3 +395,24 @@ The first reference uses quarter-resolution16-step shadow marching and depth-gui
 `volumetric`, `volumetricBytes` and `volumetricPasses` appear in status. One quarter-sizeRGBA16F buffer uses about1.76MiB at1440p, with8MiB admission cap. March range is at most96 blocks and inside the configured directional-shadow fade. `/voxellight atmosphere off`, density0, `look reference`, underwater and non-Overworld all disable it.
 
 Check tree/window shafts, cave entrance and enclosed cave, moving entities, slow camera motion, foreground silhouette halos, low sun/night/new moon, rain, shoreline/underwater, F3+T, resize, teleport and dimension changes. Low sample count can show spatial noise/steps; no visual acceptance or FPS claim is made before this test. See[VOLUMETRIC.md](VOLUMETRIC.md).
+
+
+### 0.25.0 — Three-phase test bundle
+
+This release completes three related phases before asking for one combined in-game test: HDR water screen-space reflections; depth-aware spatial volumetric filtering; and animated normal waves with comparison/quality controls. Density remains0.001 and directional shadows remain128 blocks.
+
+Start with:
+
+```text
+/voxellight mode foundation
+/voxellight quality balanced
+/voxellight atmosphere_density 0.001
+```
+
+1. Water next to a visible building/tree: compare `water_reflections off` / `on`; look for an actual reflected scene, edge fades and stable shorelines while turning. Screen-space misses intentionally fade to sky reflection; offscreen objects cannot be reflected.
+2. Stand still looking across a pond: compare `water_waves off` / `on`. Ripples should move in highlights/reflection/refraction; water vertices/shoreline are not displaced. `water_wave_speed 0` freezes the current phase;1 restores movement. Test crossing positive and negative64-block camera-coordinate boundaries.
+3. Low sun through trees/window: compare `volumetric_filter off` / `on`, moving slowly and past foreground fences/leaves. Filtering should reduce spatial grain while rejecting background haze at near-object edges. There is no temporal history.
+4. Compare `quality fast` / `balanced` / `high` at the same viewpoint and record FPS/frame cost. They change only volume/reflection sample budgets; density, exposure, lights, shadow maps and render distance stay fixed. Restore balanced after comparison.
+5. Check F3+T, resize, block edits, moving animals, shoreline/underwater, teleport and Overworld/Nether. Run `status` if an effect is absent or fails. Send a few matching screenshots plus status and your chosen quality preset. GPU/visual results are not measured here.
+
+Full scope/limits and test matrix:[TEST-0.25.md](TEST-0.25.md),[WATER.md](WATER.md),[VOLUMETRIC.md](VOLUMETRIC.md).

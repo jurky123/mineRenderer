@@ -1,5 +1,14 @@
 # VoxelLight release history
 
+## 0.25.0 — Three-phase visual refinement bundle
+
+- User confirmed0.24 and requested three phases before another in-game test; deliver one client kit with three connected milestones.
+- Phase1: HDR water screen-space reflections reuse immutable opaque depth/pre-tone radiance, with bounded48-block trace,5 binary refinements, native projection, radial HDR guide checks and edge/distance/thickness fade to sky. No reflection target or RGB history.
+- Phase2: depth-guided separable5-tap volumetric spatial filtering; one extra quarter-resolutionRGBA16F scratch,8MiB combined target cap, toggleable. Filter transmittance and scattering together, preserving constant fields and rejecting foreground/background depth discontinuities.
+- Phase3: three animated normal-wave harmonics, default strength0.12/speed1, bounded monotonic phase, modulo64 spatial continuity, phase-preserving speed changes. Native water vertices remain unchanged.
+- Add water_reflections, water_waves, water_wave_strength, water_wave_speed, volumetric_filter and quality controls. Fast/balanced/high use8/16,16/24,32/32 volume/reflection steps. Keep density0.001, existing exposure/light/shadow-distance budgets and native fallback.
+- Validate actual native water and filter shader linkage, uniform sizes, sample bounds/medium energy, resize/budget admission, wave continuity and resource-close control preservation. In-game visual/performance acceptance pending.
+
 ## 0.24.0 — Quarter-resolution shadowed volumetric lighting
 
 - User confirmed0.23 working. Keep preferred atmosphere density0.001 and128-block directional shadows.

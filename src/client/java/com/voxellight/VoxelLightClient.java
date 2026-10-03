@@ -153,6 +153,24 @@ public final class VoxelLightClient implements ClientModInitializer {
             for(boolean enabled:new boolean[]{true,false})waterCommand.then(literal(enabled?"on":"off").executes(context->{
                 PROBE.setWater(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: HDR water "+enabled+" (foundation)"));return 1;
             }));
+            var reflectionCommand=literal("water_reflections");
+            var wavesCommand=literal("water_waves");
+            var filterCommand=literal("volumetric_filter");
+            for(boolean enabled:new boolean[]{true,false}) {
+                reflectionCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setWaterReflections(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: water reflections "+enabled));return 1;}));
+                wavesCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setWaterWaves(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: water waves "+enabled));return 1;}));
+                filterCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setVolumeFilter(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: volumetric spatial filter "+enabled));return 1;}));
+            }
+            var waveStrengthCommand=literal("water_wave_strength").then(argument("strength",FloatArgumentType.floatArg(0,.3f)).executes(context->{
+                float value=FloatArgumentType.getFloat(context,"strength");PROBE.setWaveStrength(value);context.getSource().sendFeedback(Component.literal("VoxelLight: water wave strength "+value));return 1;
+            }));
+            var waveSpeedCommand=literal("water_wave_speed").then(argument("speed",FloatArgumentType.floatArg(0,3)).executes(context->{
+                float value=FloatArgumentType.getFloat(context,"speed");PROBE.setWaveSpeed(value);context.getSource().sendFeedback(Component.literal("VoxelLight: water wave speed "+value));return 1;
+            }));
+            var qualityCommand=literal("quality");
+            for(var quality:com.voxellight.world.VisualQuality.values())qualityCommand.then(literal(quality.name().toLowerCase(java.util.Locale.ROOT)).executes(context->{
+                PROBE.setQuality(quality);context.getSource().sendFeedback(Component.literal("VoxelLight: quality "+quality.name().toLowerCase(java.util.Locale.ROOT)+", volumeSteps="+quality.volumeSteps()+", reflectionSteps="+quality.reflectionSteps()));return 1;
+            }));
             var atmosphereCommand=literal("atmosphere");
             for(boolean enabled:new boolean[]{true,false})atmosphereCommand.then(literal(enabled?"on":"off").executes(context->{
                 PROBE.setAtmosphere(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: aerial perspective "+enabled));return 1;
@@ -228,7 +246,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand));
         });
     }
 }
