@@ -1,5 +1,14 @@
 # VoxelLight release history
 
+## 0.23.0 — Extended directional shadows without a larger duplicate cache
+
+- User accepted0.22.1 native material coverage and prefers atmosphere density0.001; adopt that default.
+- Extend directional receivers to128 blocks, with16-block near transition,40–48 middle/far transition and120–128 outer fade. Keep2048/1024/1024 map dimensions and original near projection; coarser distant density.
+- Borrow compiled solid/cutout geometry from all loaded native sections intersecting a conservative receiver/light capsule, including offscreen sections. Keep independent near casters; do not enlarge the384-section scene bridge or32MiB duplicate caster budget.
+- Refresh borrowed allocations every frame under dispatcher lock, preserve index offsets/types and36-byte base-vertex stride; invalidate changed/removed native caster bounds. No native allocation ownership/compilation/upload.
+- Increase projection depth span for farther casters and derive comparison bias from each cascade matrix to retain the accepted world-space bias.
+- Report native section/layer/pending/selection metrics. Uncompiled offscreen casters and large modded model overhangs remain limitations. Automated tests pass; GPU performance and visual acceptance pending.
+
 ## 0.22.1 — Capture Fabric Indigo terrain materials
 
 - User log showed934 borrowed draws without working terrain lighting. Fabric API redirects SectionCompiler tessellation to AltModelBlockRenderer and ignores the decorated vanilla output. The vanilla-only startup writer check did not cover this route.

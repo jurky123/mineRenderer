@@ -169,6 +169,8 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, mat3 norma
     vec2 grid = shadowUv / pixel - 0.5;
     vec2 base = floor(grid);
     vec2 phase = fract(grid);
+    // Keep the accepted ~0.036-block bias despite different cascade depth spans.
+    float depthBias = 0.0357 * length(vec3(matrix[0].z, matrix[1].z, matrix[2].z));
     float blocked = 0.0;
     for (int y = -2; y <= 3; y++) {
         float wy = y == -2 ? 1.0 - phase.y : (y == 3 ? phase.y : 1.0);
@@ -176,17 +178,16 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, mat3 norma
             float wx = x == -2 ? 1.0 - phase.x : (x == 3 ? phase.x : 1.0);
             vec2 sampleUv = (base + vec2(x, y) + 0.5) * pixel;
             float receiverDepth = projected.z + dot(gradient, sampleUv - shadowUv);
-            // All cascades have the same 255-block depth span; this bias is about 0.036 world blocks.
             float casterDepth = texture(map, sampleUv).r;
             if (MoonLight.z > 0.5) {
                 float dynamicDepth = texture(entities, sampleUv).r;
 #ifdef TEMPORAL_SHADOW
                 // Includes animated block entities. Invalidate history wherever a dynamic tap contributes.
-                if (dynamicDepth <= casterDepth && receiverDepth - 0.00014 > dynamicDepth) dynamicAffected = true;
+                if (dynamicDepth <= casterDepth && receiverDepth - depthBias > dynamicDepth) dynamicAffected = true;
 #endif
                 casterDepth = min(casterDepth, dynamicDepth);
             }
-            blocked += (receiverDepth - 0.00014 > casterDepth ? 1.0 : 0.0) * wx * wy;
+            blocked += (receiverDepth - depthBias > casterDepth ? 1.0 : 0.0) * wx * wy;
         }
     }
     vec2 edge = min(shadowUv, vec2(1.0) - shadowUv) / pixel;

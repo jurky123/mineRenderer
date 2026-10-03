@@ -49,7 +49,8 @@ public final class ShadowVolume {
 
     public static Matrix4f lightMatrix(double x, double y, double z, ShadowLight light, float extent, int mapSize) {
         boolean fixed = light.source() == ShadowLight.Source.FIXED || light.source() == ShadowLight.Source.NONE;
-        var matrix = projection(light.direction(), fixed ? new Vector3f(0, 1, 0) : new Vector3f(0, 0, 1), extent, 128, 256);
+        float eyeDistance = extent <= 32 ? 128 : Math.max(128, extent + BorrowedCasterVolume.EXTRUSION + 32);
+        var matrix = projection(light.direction(), fixed ? new Vector3f(0, 1, 0) : new Vector3f(0, 0, 1), extent, eyeDistance, eyeDistance * 2);
         return fixed ? snap(matrix, x, y, z, extent, mapSize) : matrix;
     }
 

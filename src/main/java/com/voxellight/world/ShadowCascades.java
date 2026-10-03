@@ -5,12 +5,12 @@ import org.joml.Matrix4f;
 /** Overlapping world-distance ranges, independent of view yaw/pitch or camera frustum selection. */
 public final class ShadowCascades {
     public static final int COUNT = 3, RESOLVE_BYTES = COUNT * 64 + 64 + 3 * 16 + 64 + COUNT * 64;
-    public static final float FADE_START = 40, RADIUS = 48;
+    public static final float FADE_START = 112, RADIUS = 128;
     public record Range(int mapSize, float halfExtent, float blendStart, float blendEnd) { }
     private static final Range[] RANGES = {
             new Range(2048, 32, 12, 16),
-            new Range(1024, 64, 26, 32),
-            new Range(1024, 96, 40, 48)
+            new Range(1024, 96, 40, 48),
+            new Range(1024, 192, 112, 128)
     };
     private ShadowCascades() { }
     /** Affine orthographic light transform; the upper 3x3 is the inverse-transpose normal transform. */

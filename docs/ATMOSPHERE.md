@@ -10,7 +10,7 @@ The first atmosphere increment adds a bounded analytic participating-medium appr
 /voxellight atmosphere off
 ```
 
-Atmosphere is on by default in polished foundation, disabled by `look reference`. Default density is0.002 per block (user-preferred setting,0.20.1); `/voxellight atmosphere_density 0.03` gives a stronger comparison, with accepted0..0.08 range (0 disables visible haze). Try an outdoor tree line or building10–24 blocks away, look toward the low sun, and compare rain/clear weather. Startup effects are still off until foundation is selected. Status reports the atmosphere admission and density.
+Atmosphere is on by default in polished foundation, disabled by `look reference`. Default density is0.001 per block (updated user preference,0.23.0); `/voxellight atmosphere_density 0.03` gives a stronger comparison, with accepted0..0.08 range (0 disables visible haze). Try an outdoor tree line or building10–24 blocks away, look toward the low sun, and compare rain/clear weather. Startup effects are still off until foundation is selected. Status reports the atmosphere admission and density.
 
 ## Composition and limits
 

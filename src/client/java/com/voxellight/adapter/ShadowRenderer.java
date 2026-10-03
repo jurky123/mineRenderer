@@ -98,6 +98,7 @@ public final class ShadowRenderer implements AutoCloseable {
     private final ShadowAnchor anchor = new ShadowAnchor();
     private final ArtificialLights artificial = new ArtificialLights();
     private final DynamicCasterSystem dynamic = new DynamicCasterSystem();
+    private final NativeShadowCasters nativeCasters = new NativeShadowCasters();
     private boolean cacheEnabled = true;
     private boolean worldSun = true;
     private int receiverDistance = (int)ShadowCascades.RADIUS;
@@ -204,7 +205,8 @@ public final class ShadowRenderer implements AutoCloseable {
                 break;
             }
         }
-        if (expected == 0 || meshes.isEmpty()) {
+        if (nativeCasters.prepare(minecraft, camera, frameLight, receiverDistance, meshes.keySet(), this::invalidate)) geometryRevision++;
+        if (meshes.isEmpty() && nativeCasters.layers().isEmpty()) {
             state = "warming casters " + meshes.size() + "/" + expected + "; vanilla rendering retained";
             return false;
         }
@@ -305,7 +307,8 @@ public final class ShadowRenderer implements AutoCloseable {
     }
 
     private void renderCascade(CommandEncoder encoder, Minecraft minecraft, ShadowMapCache.Anchor key, Cascade cascade) {
-        var update = cascade.cache.plan(key, frameLight, cacheEnabled, meshes.values().stream().map(Mesh::cutoutBounds).filter(java.util.Objects::nonNull).toList());
+        var update = cascade.cache.plan(key, frameLight, cacheEnabled, java.util.stream.Stream.concat(meshes.values().stream().map(Mesh::cutoutBounds).filter(java.util.Objects::nonNull),
+                nativeCasters.layers().stream().filter(NativeShadowCasters.Layer::cutout).map(NativeShadowCasters.Layer::bounds)).toList());
         if (!update.regions().isEmpty()) {
             var atlas = minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
             var infos = new ArrayList<DynamicUniforms.ChunkSectionInfo>();
@@ -326,6 +329,24 @@ public final class ShadowRenderer implements AutoCloseable {
                             (ubos, uploader) -> uploader.upload("ChunkSection", ubos[uboIndex])));
                 }
                 submissions.add(new Submission(footprint, draws));
+            }
+            for (var layer : nativeCasters.layers()) {
+                var footprint = cascade.cache.project(layer.bounds());
+                if (footprint == null) continue;
+                var section = layer.key();
+                int uboIndex = infos.size();
+                infos.add(new DynamicUniforms.ChunkSectionInfo(new Matrix4f(), section.x() * 16, section.y() * 16, section.z() * 16,
+                        layer.cutout() ? 1 : 0, atlas.getWidth(0), atlas.getHeight(0)));
+                var buffers = layer.buffers();
+                var draw = layer.draw();
+                boolean custom = draw.hasCustomIndexBuffer();
+                int firstIndex = custom ? Math.toIntExact(buffers.indexBufferOffset() / draw.indexType().bytes) : 0;
+                int baseVertex = Math.toIntExact(buffers.vertexBufferOffset() / DefaultVertexFormat.BLOCK.getVertexSize());
+                if (!custom) maxIndices = Math.max(maxIndices, draw.indexCount());
+                var borrowed = new RenderPass.Draw<GpuBufferSlice[]>(0, buffers.vertexBuffer(), custom ? buffers.indexBuffer() : null,
+                        custom ? draw.indexType() : null, firstIndex, draw.indexCount(), baseVertex,
+                        (ubos, uploader) -> uploader.upload("ChunkSection", ubos[uboIndex]));
+                submissions.add(new Submission(footprint, List.of(borrowed)));
             }
             var ubos = RenderSystem.getDynamicUniforms().writeChunkSections(infos.toArray(new DynamicUniforms.ChunkSectionInfo[0]));
             var autoIndices = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
@@ -364,6 +385,7 @@ public final class ShadowRenderer implements AutoCloseable {
         }
         return "shadow=" + state + ", casters=" + meshes.size() + "/" + expected + ", casterDraws=" + drawCalls
                 + ", geometryBytes=" + geometryBytes + ", shadowMapBytes=" + (resolveSettings == null ? 0 : ShadowCascades.mapBytes() + 24L * 1024 * 1024)
+                + nativeCasters.status()
                 + ", cascades=3, shadowDistance=" + receiverDistance
                 + ", sun=" + (worldSun ? "world" : "fixed") + ", lightSource=" + frameLight.source()
                 + ", lightAngleDeg=" + (float)Math.toDegrees(frameLight.angleRadians()) + ", lightStrength=" + frameLight.strength()
@@ -377,7 +399,7 @@ public final class ShadowRenderer implements AutoCloseable {
     }
 
     public void setShadowDistance(int blocks) {
-        if (blocks < 12 || blocks > ShadowCascades.RADIUS) throw new IllegalArgumentException("Shadow distance must be 12..48 blocks");
+        if (blocks < 12 || blocks > ShadowCascades.RADIUS) throw new IllegalArgumentException("Shadow distance must be 12..128 blocks");
         receiverDistance = blocks;
     }
     public void setEntityShadows(boolean value) { dynamic.setEntitiesEnabled(value); }
@@ -549,6 +571,7 @@ public final class ShadowRenderer implements AutoCloseable {
         geometryRevision++;
         meshes.values().forEach(Mesh::close);
         meshes.clear();
+        nativeCasters.clear();
         for (var c : cascades) c.close();
         deferred.clear(); budgetEvictions = 0;
         anchor.clear();

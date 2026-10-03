@@ -36,7 +36,7 @@ class ShadowCascadesTest {
                     assertTrue(Math.abs(projected.x) < 1 - guard * 2, "A selected range cannot hit its hard UV boundary");
                     assertTrue(Math.abs(projected.y) < 1 - guard * 2);
                     assertTrue(projected.z > 0 && projected.z < 1, "Range blend must not cross a depth clip plane");
-                    var blocker = matrix.transformProject(new Vector3f(receiver).add(light.direction().mul(8)));
+                    var blocker = matrix.transformProject(new Vector3f(receiver).add(light.direction().mul(BorrowedCasterVolume.EXTRUSION)));
                     assertEquals(projected.x, blocker.x, 0.000001f);
                     assertEquals(projected.y, blocker.y, 0.000001f);
                     assertTrue(blocker.z < projected.z);
@@ -51,7 +51,7 @@ class ShadowCascadesTest {
             var anchor = new ShadowMapCache.Anchor(ShadowVolume.anchor(cx), 64, ShadowVolume.anchor(cz));
             var light = ShadowLight.world(-0.7f, 3, 1, 0);
             // Points at both overlap bands and the previous 24-block cutoff.
-            for (float radius : new float[]{12, 14, 16, 24, 26, 29, 32, 40, 44, 47}) {
+            for (float radius : new float[]{12, 14, 16, 24, 26, 29, 32, 40, 44, 47, 64, 96, 112, 127}) {
                 var original = new Vector3f(0, -2, -radius);
                 for (int yaw = -30; yaw <= 30; yaw += 10) for (int pitch = -20; pitch <= 20; pitch += 10) for (int fov : new int[]{50, 70, 100}) {
                     var view = new Matrix4f().rotationY((float)Math.toRadians(yaw)).rotateX((float)Math.toRadians(pitch));

@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.22.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.23.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.22.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.23.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -40,7 +40,7 @@
 | `/voxellight local_lights on` / `off` | 默认 on，独立开关新增人工灯；保留 vanilla lightmap 和 sun/moon。 |
 | `/voxellight sun world` / `fixed` | 默认 world，跟随当前原生天空角度；fixed 保留旧版固定光源用于比较。切换清空计时样本/缓存，保留 caster。 |
 | `/voxellight shadow_cache on` / `off` | 默认 on，复用有效局部 map；off 为相同画质/投影的每帧重绘参考。切换清空计时样本与缓存计数。 |
-| `/voxellight shadow_distance 48` | 默认 48 格；允许 12..48，只改方向阴影/月光 receiver fade，不改变人工灯范围。 |
+| `/voxellight shadow_distance 128` | 默认128格；允许12..128。方向阴影末尾8格淡出；远场借用已编译native terrain，不扩展local-light窗口。 |
 | `/voxellight mode shadow_ranges` | near 绿/middle 橙/far 蓝，显示世界球面距离 blend 与外圈 fade；用 mode shadow 恢复。 |
 | `/voxellight mode shadow_mask` | 白=无遮挡/范围外，黑=遮挡；手/HUD 保持原样。 |
 | `/voxellight mode shadow_map` | 横向三个 panel 依次为 near/middle/far 普通深度，空区域白色。 |
@@ -366,3 +366,14 @@ status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world r
 ### 0.22.1 Indigo correction
 
 修复Fabric API默认Indigo renderer绕过vanilla BlockQuadOutput导致所有terrain材质marker为0的问题。启动会验证vanilla和实际Indigo quad.buffer两条写入路径。`materialDraws`仅表示提交数，不能证明材质像素有效；用`material_coverage`确认。status新增`indigoMaterialEmissionsTotal`累计计数，`coverageBlend`现在显示实际启用状态，native默认false。安装后重启游戏，再测foundation与material_coverage；视觉/GPU验收仍需实机。
+
+
+### 0.23.0 — Extended directional shadows
+
+User confirmed0.22.1 native terrain coverage. Atmosphere now defaults to the preferred0.001.
+
+Use `/voxellight mode foundation`; compare `/voxellight shadow_distance 48` and `128` on buildings/trees64–120 blocks away. Near-map resolution remains2048 with32-block half-extent. The middle/far maps keep1024 dimensions but cover larger areas, so distant shadows are softer/coarser. Local lights and dynamic caster budgets stay bounded.
+
+`/voxellight status` includes `nativeShadowSections`, `nativeShadowLayers`, `nativeShadowPending`, `nativeShadowDuplicateBytes=0`, and `nativeShadowSelectionNs`. Pending counts non-air sections absent/uncompiled in native storage and missing layer uploads. Far casters come from all available compiled native sections in light space, not the camera-visible list; they do not request native compilation. Newly loaded offscreen sections can be missing until Minecraft compiles them. The independent near caster path is retained.
+
+Check low sun, buildings offscreen, moving/rotating, flying, block edits, chunk unload, F3+T, resize and Nether/Overworld transitions. Compare near detail and watch for clipping/acne at cascade transitions. See[extended-shadow contract](EXTENDED-SHADOWS.md).

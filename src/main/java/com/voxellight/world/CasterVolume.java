@@ -28,7 +28,7 @@ public final class CasterVolume {
         }
         var direction=light.direction();
         float extrusion=Math.clamp((1-Math.abs(direction.y))*80,MIN_EXTRUSION,MAX_EXTRUSION);
-        double radius=ShadowCascades.RADIUS;
+        double radius=48; // Independent near-field bridge; distant casters borrow native geometry.
         // Section centers sit at multiples of 16 relative to the receiver's section center.
         int minX=lower(ox,direction.x*extrusion,radius),maxX=upper(ox,direction.x*extrusion,radius);
         int minY=lower(oy,direction.y*extrusion,radius),maxY=upper(oy,direction.y*extrusion,radius);

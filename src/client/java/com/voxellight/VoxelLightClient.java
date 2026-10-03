@@ -218,7 +218,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                 PROBE.setNativeMaterial(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: material source "+(enabled?"native visible terrain":"local reference")));return 1;
             }));
             var distanceCommand = literal("shadow_distance")
-                    .then(argument("blocks", IntegerArgumentType.integer(12, 48)).executes(context -> {
+                    .then(argument("blocks", IntegerArgumentType.integer(12, 128)).executes(context -> {
                         int distance = IntegerArgumentType.getInteger(context, "blocks");
                         PROBE.setShadowDistance(distance);
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));

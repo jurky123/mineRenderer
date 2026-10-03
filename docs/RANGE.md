@@ -38,3 +38,8 @@ Capture matching images to check real normals, cutout edges, water fallback, dis
 ## Current delivery
 
 0.22 implements the native material-stream proof using inline compile attributes and one extra raster over borrowed native buffers. Material/display/water coverage no longer has the32-block fade for supported native terrain. Shadow/local-light limits remain unchanged. See [implementation and validation](NATIVE-COVERAGE.md). Single-raster MRT and longer shadow coverage remain pending.
+
+
+## 0.23 delivery
+
+0.22.1 native coverage is user-confirmed.0.23 extends directional receiver range to128 blocks without growing the384-section scene bridge or shadow geometry budget. Distant static casters borrow Minecraft’s compiled solid/cutout buffers from light-space section lookup, independently of main-camera visibility. Shadow maps retain2048/1024/1024 dimensions; middle/far coverage increases at reduced texel density. The near map retains its former projection and scale. Uncompiled offscreen sections remain a declared limitation and are reported; no FPS/GPU improvement is claimed. See[details and acceptance](EXTENDED-SHADOWS.md).
