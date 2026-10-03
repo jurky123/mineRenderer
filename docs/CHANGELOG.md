@@ -2,6 +2,11 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.20.1 atmosphere tuning
+
+- Adopt user-preferred atmosphere density0.002 instead of0.018.
+- User confirmed0.20 atmosphere working; existing density command/range retained.
+
 ## 0.20.0 analytic aerial perspective
 
 - Bounded height-density extinction/scattering before tone mapping, rain density and analytic directional glow.

@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.20.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.20.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.20.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.20.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -26,7 +26,7 @@
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
 | `/voxellight look polished` / `reference` | foundation 默认polished；reference恢复0.17光照/Reinhard输出，关闭新增bloom/exposure/距离blend；AO/history保持独立。 |
 | `/voxellight atmosphere on` / `off` | polished foundation默认on；局部高度/距离haze和朝向光源的analytic glow，非shadowed光柱；水下/非主世界native。 |
-| `/voxellight atmosphere_density 0.018` | 默认0.018，允许0..0.08；可用0.03放大比较，0无haze。 |
+| `/voxellight atmosphere_density 0.002` | 默认0.002，允许0..0.08；可用0.03放大比较，0无haze。 |
 | `/voxellight exposure 0.75` | polished默认+0.75EV，允许-2..2，手动曝光，无自动变化。 |
 | `/voxellight bloom on` / `off` | polished默认on；已捕获torch/glowstone等terrain emission的quarter-res glow，非lava/透明/天空bloom或GI。 |
 | `/voxellight coverage_blend on` / `off` | polished默认on；24–32格连续淡回native，避免5³材质窗硬边；off比较原receiver范围。 |
@@ -339,3 +339,7 @@ status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world r
 ## 0.20.0 atmosphere 验收
 
 `mode foundation`后在户外10–24格建筑/树林前比较`atmosphere off/on`，低太阳视角和雨天更明显；默认density0.018，可试0.03。检查封闭洞穴、夜晚/月相、植物/动物、手持灯、underwater/lava、Nether/End、F3+T和resize。`look reference`关闭atmosphere，AO view不变。不是shadowed光柱或water rewrite，局部材质窗之外仍native。见[ATMOSPHERE.md](https://github.com/jurky123/mineRenderer/blob/main/docs/ATMOSPHERE.md)。
+
+## 0.20.1 atmosphere 默认密度
+
+用户已确认0.20 atmosphere运行，偏好density0.002；本版采用该默认值。旧版可用`/voxellight atmosphere_density 0.002`获得同一设置。命令范围和其它效果保持原样。

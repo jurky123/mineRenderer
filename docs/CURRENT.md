@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.20.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.20.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -13,7 +13,7 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | D2 basic terrain AO | Implemented0.17: half-resolution horizon AO, spatial bilateral filter/upsample, ambient-only composition. User confirmed it works, with modest visual benefit; no AO history. |
 | 0.18 lighting/color polish | Implemented: filmic/manual exposure, hemisphere sky palette, emissive terrain bloom, bounded material-distance blend. User confirmed working. |
 | 0.19 local-light polish | Implemented: exact-ID resource-pack colors and one player held-emissive-block source within16 combined lights. User confirmed working. |
-| 0.20 atmosphere foundation | Implemented analytic height/distance aerial perspective and directional glow; local supported receivers only, in-game acceptance pending. |
+| 0.20 atmosphere foundation | Implemented analytic height/distance aerial perspective and directional glow; local supported receivers only; user confirmed working and prefers density0.002.0.20.1 adopts that default. |
 | Next visual milestone | Water surface/composition prototype, then explicitly shadowed low-resolution volumetrics; GI remains deferred. |
 
 Current budgets: material125 sections within5³,16 MiB resident + up to1 MiB replacement staging,1 MiB/section,one material build/frame. Geometry/light attributes still rebuilt together. Light-aware scene cap384 loaded sections; shadow terrain32 MiB; local-light reference16 combined sources (one slot reserved while a held source exists). D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).
@@ -26,4 +26,4 @@ Atmosphere adds16 bytes of settings and no extra image/history. It is an analyti
 
 No full RGB TAA, motion vectors, water rewrite or shadowed volumetrics, GPU voxel DB or GI yet. Performance results are unmeasured. Continuous world-sun and cutout cache invalidation, duplicate meshes, DDA cost, and history compression remain future work; do not increase local-light count or extend temporal scope before evidence warrants it.
 
-Review decision: preserve the accepted material/lighting architecture; material refresh is confirmed and basic AO is confirmed operational with modest benefit. Lighting/color polish is confirmed working; local-light materials and held source are confirmed working; analytic atmosphere is now implemented. See[local-light scope](LOCAL-LIGHTS.md). See[AO contract](AO.md). See [0.16 review decision](REVIEW-0.16.0.md) and [release history](CHANGELOG.md). This environment has no graphics device/display; automated native shader checks do not replace in-game acceptance.
+Review decision: preserve the accepted material/lighting architecture; material refresh is confirmed and basic AO is confirmed operational with modest benefit. Lighting/color polish is confirmed working; local-light materials and held source are confirmed working; analytic atmosphere is confirmed working with user-preferred density0.002. See[local-light scope](LOCAL-LIGHTS.md). See[AO contract](AO.md). See [0.16 review decision](REVIEW-0.16.0.md) and [release history](CHANGELOG.md). This environment has no graphics device/display; automated native shader checks do not replace in-game acceptance.
