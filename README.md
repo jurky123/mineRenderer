@@ -4,9 +4,11 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current client kit: [VoxelLight **0.30.2**](https://temp.sh/TkXpO/voxellight-client-kit-26.2-0.30.2.zip), with optional hybrid diffuse path tracing and real OptiX HDR denoising. Run `/voxellight pathtrace on`, test camera movement, and inspect `/voxellight status`. [Scope and in-game test](docs/PATH-TRACING.md). GPU quality/performance pending.
+Current client kit: [VoxelLight **0.30.3**](https://temp.sh/cWxTU/voxellight-client-kit-26.2-0.30.3.zip), with persistent per-surface indirect-light history before OptiX HDR denoising. Run `/voxellight pathtrace on`, test camera movement, and inspect `/voxellight status`. [Stability fixes and diagnostics](docs/PT-STABILITY.md). GPU motion/ghosting and performance acceptance pending.
 
 ## 文档
+
+- [Hybrid GI stability](docs/PT-STABILITY.md)：persistent EMA/confidence、depth/color/ownership修正与freeze/rejection诊断。
 
 - [Experimental hybrid path tracing](docs/PATH-TRACING.md)：CUDA secondary paths、OptiX去噪、native build与实机验收。
 

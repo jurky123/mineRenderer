@@ -60,7 +60,7 @@ final class LightingResolvePass implements AutoCloseable {
         composite.render(encoder,output,material,shadows,result,environment,ao,true);
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
-    void endFrame(){projectionObserved=false;composite.endFrame();}
+    void endFrame(){pathtrace.endFrame();projectionObserved=false;composite.endFrame();}
     void setAmbientOcclusion(boolean enabled,boolean debug){ao.setEnabled(enabled,debug);}
     void setPolished(boolean value){composite.setPolished(value);temporal.invalidate();}
     void setBloom(boolean value){composite.setBloom(value);}
@@ -81,6 +81,10 @@ final class LightingResolvePass implements AutoCloseable {
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
     void setPathTrace(boolean enabled){pathtrace.setEnabled(enabled);}
     void setPathTraceDenoise(boolean enabled){pathtrace.setDenoise(enabled);}
+    void setPathTraceFreeze(boolean value){pathtrace.setFreeze(value);}
+    void setPathTraceHistory(boolean value){pathtrace.setHistory(value);}
+    void setPathTraceRejection(boolean value){pathtrace.setRejectionDebug(value);}
+    void setPathTraceUploadDelay(boolean value){pathtrace.setUploadDelay(value);}
     void setPathTraceDebug(boolean enabled){pathtrace.setDebug(enabled);}
     void setTemporal(boolean enabled){temporal.setEnabled(enabled);}
     void invalidateHistory(){temporal.invalidate();}

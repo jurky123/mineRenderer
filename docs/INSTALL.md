@@ -1,21 +1,27 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.30.2。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap；新增可选OptiX denoised hybrid diffuse GI preview；默认关闭，功能开关不跨游戏启动保存。
+版本：0.30.3。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap；新增可选OptiX denoised hybrid diffuse GI preview；默认关闭，功能开关不跨游戏启动保存。
+
+稳定性修复与测试：[PT-STABILITY](https://github.com/jurky123/mineRenderer/blob/main/docs/PT-STABILITY.md)。每批固定8个新样本、最多10Hz；不再移动后从全局零样本重新变亮。先测试慢走、转动、跨section、增删块和F3+T；`pathtraceWorkerBatches`是批次数，非全图有效spp。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.30.2.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.30.3.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `/voxellight pathtrace on` / `off` | 实验性CUDA体素diffuse secondary paths + OptiX HDR去噪；on自动进入foundation，需NVIDIA兼容驱动，静止视角累积。 |
+| `/voxellight pathtrace on` / `off` | 实验性CUDA体素diffuse secondary paths + OptiX HDR去噪；on自动进入foundation，需NVIDIA兼容驱动，每像素persistent EMA，移动时重投影。 |
+| `/voxellight pathtrace_freeze on` / `off` | 停止提交和接收新PT结果，保留最后GI并继续重投影；排查批次替换闪烁。 |
+| `/voxellight pathtrace_history on` / `off` | 默认on：每像素confidence/moments + EMA；off比较独立8样本批次，切换清空history。 |
+| `/voxellight pathtrace_rejection on` / `off` | green有效；red无材质；orange深度不符；yellow无history；blue屏外；magenta法线不符；cyan位置/guide拒绝。 |
+| `/voxellight pathtrace_upload_delay on` / `off` | 默认off；最多延迟8帧释放上传源，最多4批，比较上传生命周期。26.2已验证同步复制到owned staging。 |
 | `/voxellight pathtrace_debug on` / `off` | 只看间接光，帮助确认确实产生bounce；开阔空场景可为黑色。 |
-| `/voxellight pathtrace_denoise on` / `off` | 真实OptiX HDR去噪 / 原始progressive样本比较。 |
+| `/voxellight pathtrace_denoise on` / `off` | 真实OptiX HDR去噪 / 未去噪的temporal样本比较。 |
 | `/voxellight` 或 `/voxellight status` | backend、设备/驱动、pass 状态、timestamp、scratch 字节和样本数。 |
 | `/voxellight mode color` | 世界颜色复制并重新绘制；预期视觉上与 off 一致，用于发现翻转、采样或色彩差异。 |
 | `/voxellight mode depth` | 世界 reversed-Z 的对数灰度诊断，非线性距离；天空预期为黑色。透明物体可能不写深度。 |

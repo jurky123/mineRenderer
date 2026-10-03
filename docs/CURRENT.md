@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.30.2** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.30.3** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -29,7 +29,8 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | 0.28 surface shadow sampling | Independent shadow_filter fast/balanced/high budgets4/16/36 taps per cascade; default balanced. Continuous texel-phase weighting, existing world bias, cascades and dynamic blocker union retained.194 tests pass; visual/FPS acceptance pending. |
 | 0.29 HZB water tracing | Half-res R32 max-depth pyramid with conservative odd-tail reductions and hierarchical screen-space reflection traversal. Opt-in water_hzb,16 MiB cap, separate profiler stage;199 tests pass. GPU quality/performance acceptance pending. |
 | 0.30 experimental hybrid PT | Runnable CUDA voxel diffuse secondary paths + real OptiX HDR denoiser, optional stationary-camera preview. Native Windows/Linux binaries bundled; 205 Java tests and native CPU traversal/sampling checks pass. GPU acceptance pending. [Scope/test instructions](PATH-TRACING.md). |
-| Next milestone | Test indirect-only / denoiser A/B on RTX 4060; measure worker/staging cost before extending to temporal interop or OptiX AS traversal. Continue raster profiling separately. |
+| 0.30.3 hybrid GI stability | Persistent per-pixel radiance/confidence/moments with reprojection/clamping before OptiX HDR; eight fresh samples per batch, view-depth validation, linear albedo, emissive ownership, proxy hysteresis and freeze/rejection/upload diagnostics. 209 Java tests and native CPU checks pass; GPU motion/ghosting acceptance pending. |
+| Next milestone | Verify 0.30.3 motion, section crossing, edits, freeze/history/denoiser A/B on RTX 4060 before adding tracer features. OptiX temporal flow/RT-core traversal and rolling clipmaps remain later. |
 
 Current budgets: material targets use16 bytes/pixel (1440p56.25 MiB,4K126.56 MiB), down from24; HDR lighting remains8 bytes/pixel. Temporal shadows and celestial epochs default off. Optional dual-angle terrain shadows add at most48 MiBD32 (102 MiB total shadow textures); shared resolve transforms1344 bytes. Native material mode borrows visible native terrain geometry, adding8 bytes/vertex (BLOCK stride28→36) and one material MRT raster pass; no duplicate material mesh store. `/voxellight native_material off` selects the old125-section/16 MiB/one-build-per-frame local reference. Native compiler light updates still rebuild native section buffers. Light-aware scene cap384 loaded sections; independent near shadow terrain32 MiB; distant shadows borrow native allocations under a bounded128-block receiver +96-block light extrusion, with pending native compilation reported; local-light reference16 combined sources (one slot reserved while a held source exists). When explicitly enabled, D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).
 
@@ -48,3 +49,5 @@ Review decision: preserve the accepted material/lighting architecture; material 
 0.30.2: local material content replaces global/LIGHT task-version admission. Tiny camera noise is tolerated; celestial reseeds retain surface-valid images during warm-up. 205 tests pass. User GPU log confirms native work executes; corrected in-game accumulation/flicker acceptance pending.
 
 0.30.2 removes stationary-only rendering and the sample-count intensity ramp. Valid surface lighting is camera-reprojected while motion batches refresh it; resets trace eight samples before denoising. 206 tests pass; in-game motion/flicker and worker cost pending.
+
+0.30.3 supersedes the 0.30.1/0.30.2 accumulation policy above. The display receives a persistent worker-filtered GI field, not independent reset batches. Native history adds six float4 images (~21.1 MiB maximum); sun/weather bins and proxy-origin shifts no longer invalidate unchanged world surfaces. Actual 26.2 upload staging copies were verified. See [stability contract and diagnostics](PT-STABILITY.md).

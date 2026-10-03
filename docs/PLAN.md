@@ -1,6 +1,6 @@
 # VoxelLight 实施计划
 
-最新优先级：按用户明确请求，0.30实现实验性 raster-primary path tracing + OptiX HDR denoising。保留raster，先交付 stationary-camera diffuse secondary preview，实机验收后再决定零拷贝interop / OptiX GAS。当前范围和测试以[CURRENT](CURRENT.md)及[PATH-TRACING](PATH-TRACING.md)为准；不宣称完整PT或性能收益。
+最新优先级：0.30.3先修 hybrid GI stability：persistent每像素history、reprojection/confidence/moments、深度/色彩/ownership修正、proxy hysteresis与诊断。先实机检查移动、跨section、ghosting和freeze/history A/B，再决定OptiX temporal flow、rolling clipmap、零拷贝interop或RT-core GAS。当前范围以[CURRENT](CURRENT.md)与[PT-STABILITY](PT-STABILITY.md)为准，不宣称完整PT或性能收益。
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 

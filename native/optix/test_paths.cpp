@@ -23,9 +23,20 @@ int main(){
  assert(std::abs(mean/100000-2.f/3)<.005);
  // No primary-sky duplication: a ray into an empty world contributes zero.
  grid.assign(grid.size(),0);float pos[]={10.5,10.5,10.5,1},normal[]={0,1,0,1},alb[]={1,1,1,1},settings[21]={},sum[4]={},raw[4]={},guide[4]={};settings[9]=settings[10]=settings[11]=1;blockDim.x=1;
- paths(pos,normal,alb,grid.data(),settings,sum,raw,guide,1,0);assert(raw[0]==0&&raw[1]==0&&raw[2]==0);
- // An emissive enclosing proxy must produce indirect light, with red color bleed.
+ paths(pos,normal,alb,grid.data(),settings,sum,raw,guide,1,0,0);assert(raw[0]==0&&raw[1]==0&&raw[2]==0);
+ grid.assign(grid.size(),0);grid[(11*80+10)*80+10]=0x100000ff;
+ for(int i=0;i<4;i++)sum[i]=0;
+ paths(pos,normal,alb,grid.data(),settings,sum,raw,guide,1,0,0);assert(raw[0]==0&&raw[1]==0&&raw[2]==0);
+ // First-hit emissive lighting belongs to raster; later emitter hits are indirect.
  for(int y=0;y<80;y++)for(int z=0;z<80;z++)for(int x=0;x<80;x++)if(y==12||y==8||x==12||x==8||z==12||z==8)grid[(y*80+z)*80+x]=0x100000ff;
  for(int i=0;i<4;i++)sum[i]=0;
- paths(pos,normal,alb,grid.data(),settings,sum,raw,guide,1,0);assert(raw[0]>0&&raw[1]==0&&raw[2]==0);
+ paths(pos,normal,alb,grid.data(),settings,sum,raw,guide,1,0,0);assert(raw[0]>0&&raw[1]==0&&raw[2]==0);
+ // Per-pixel history validates surface guides and blends instead of replacing noisy observations.
+ float settingsT[41]={};settingsT[21]=settingsT[26]=settingsT[31]=settingsT[36]=1;settingsT[40]=1;
+ float pNow[]={0,0,0,1},nNow[]={0,1,0,1},current[]={.5,.5,.5,1},history[]={.48,.48,.48,8},moments[]={.48,.2304,8,0},next[4]={},nextMom[4]={};
+ temporal(current,pNow,nNow,pNow,nNow,history,moments,next,nextMom,settingsT,1,1);
+ assert(next[0]>.48&&next[0]<.5&&next[3]==9);
+ float differentNormal[]={0,-1,0,1};temporal(current,pNow,nNow,pNow,differentNormal,history,moments,next,nextMom,settingsT,1,1);assert(next[0]==.5f&&next[3]==1);
+ float moved[]={3,0,0,1};temporal(current,pNow,nNow,moved,nNow,history,moments,next,nextMom,settingsT,1,1);assert(next[0]==.5f&&next[3]==1);
+ settingsT[40]=0;temporal(current,pNow,nNow,pNow,nNow,history,moments,next,nextMom,settingsT,1,1);assert(next[0]==.5f&&next[3]==1);
 }

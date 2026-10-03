@@ -267,12 +267,18 @@ public final class VoxelLightClient implements ClientModInitializer {
             var pathCommand=literal("pathtrace");
             var denoiseCommand=literal("pathtrace_denoise");
             var pathDebugCommand=literal("pathtrace_debug");
+            var freezeCommand=literal("pathtrace_freeze");var historyCommand=literal("pathtrace_history");
+            var rejectionCommand=literal("pathtrace_rejection");var uploadDelayCommand=literal("pathtrace_upload_delay");
             for(boolean value:new boolean[]{true,false}) {
-                pathCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTrace(value);context.getSource().sendFeedback(Component.literal("VoxelLight: experimental diffuse path tracing "+value+"; hold camera still, inspect /voxellight status"));return 1;}));
+                freezeCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceFreeze(value);context.getSource().sendFeedback(Component.literal("VoxelLight: freeze PT observations "+value));return 1;}));
+                historyCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceHistory(value);context.getSource().sendFeedback(Component.literal("VoxelLight: persistent per-surface GI history "+value));return 1;}));
+                rejectionCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceRejection(value);context.getSource().sendFeedback(Component.literal("VoxelLight: PT rejection debug "+value));return 1;}));
+                uploadDelayCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceUploadDelay(value);context.getSource().sendFeedback(Component.literal("VoxelLight: delay upload source release "+value));return 1;}));
+                pathCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTrace(value);context.getSource().sendFeedback(Component.literal("VoxelLight: experimental diffuse path tracing "+value+"; inspect /voxellight status"));return 1;}));
                 denoiseCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceDenoise(value);context.getSource().sendFeedback(Component.literal("VoxelLight: OptiX HDR denoising "+value));return 1;}));
                 pathDebugCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceDebug(value);context.getSource().sendFeedback(Component.literal("VoxelLight: indirect-only view "+value));return 1;}));
             }
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(epochCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand).then(shadowFilterCommand).then(hzbCommand).then(pathCommand).then(denoiseCommand).then(pathDebugCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(epochCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand).then(shadowFilterCommand).then(hzbCommand).then(pathCommand).then(denoiseCommand).then(pathDebugCommand).then(freezeCommand).then(historyCommand).then(rejectionCommand).then(uploadDelayCommand));
         });
     }
 }

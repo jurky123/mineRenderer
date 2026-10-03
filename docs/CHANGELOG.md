@@ -1,5 +1,12 @@
 # VoxelLight release history
 
+## 0.30.3 — Persistent hybrid GI stability
+
+- Replace camera-reset global accumulation with eight-sample observations and persistent per-pixel EMA, confidence and luminance moments. Reproject, reject disocclusions and clamp history before OptiX HDR denoising; sun/weather bins and proxy-origin changes preserve compatible histories.
+- Replace PT 8-ULP depth gates with view-space validation and reconstruct primary positions from native depth. Decode primary/secondary albedo with piecewise sRGB; raster owns first-hit emitter direct light. Add proxy hysteresis and remove global eight-block camera admission.
+- Add freeze, history A/B, colored rejection and bounded delayed-upload diagnostics. Actual Minecraft 26.2 staging-copy lifetime verified. Preserve existing raster defaults/density.
+- 209 Java tests, actual shader contracts, native CPU traversal/history tests, CUDA PTX and Windows/Linux native builds pass. GPU flicker/ghosting and cost remain pending. See [stability notes](PT-STABILITY.md).
+
 ## 0.30.2 — Reproject indirect lighting during camera motion
 
 - Remove stationary-only scheduling and sample-count brightness ramp. Reproject surface-valid traced lighting through the captured camera, with normal/depth/offscreen rejection; motion no longer clears all GI.

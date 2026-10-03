@@ -1,4 +1,6 @@
-# 0.30 — Experimental hybrid diffuse path tracing
+# Experimental hybrid diffuse path tracing
+
+Current: **0.30.3**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
 
 This is a runnable raster-primary prototype, with CUDA voxel traversal and real OptiX 9.1 HDR denoising. It is **not full primary-ray path tracing**, and its traversal does not yet use OptiX acceleration structures / RT cores. Existing Vulkan primary visibility, direct lighting, water and UI remain in place. The traced contribution is added in linear HDR before atmosphere, water-background capture, bloom and tone mapping.
 
@@ -6,18 +8,18 @@ This is a runnable raster-primary prototype, with CUDA voxel traversal and real 
 
 Use the native-enabled 0.30 kit, Minecraft 26.2, native Vulkan and an NVIDIA GPU with an OptiX 9.1-compatible driver. The previously reported RTX 4060 / 591.74 configuration is the intended test machine. No separate CUDA toolkit installation is needed to run this kit.
 
-1. `/voxellight pathtrace on` selects foundation and enables the optional tracer. Wait for scene tracking, then **hold the camera still** for several seconds.
-2. `/voxellight status`: look for `pathtrace=diffuse hybrid active`, `pathtraceDenoise=OptiX HDR`, and increasing `pathtraceSamples`. An explicit `unavailable; raster retained` message means initialization failed; report that message and the log. A successful mod load does not prove OptiX is running.
+1. `/voxellight pathtrace on` selects foundation and enables the optional tracer. Wait for scene tracking, then test both stationary views and slow camera movement.
+2. `/voxellight status`: look for `pathtrace=diffuse hybrid active`, `pathtraceDenoise=OptiX HDR`, and increasing `pathtraceWorkerBatches` and accepted results. An explicit `unavailable; raster retained` message means initialization failed; report that message and the log. A successful mod load does not prove OptiX is running.
 3. Test a white wall next to a sunlit red/green wall, an overhang beside sunlit ground, and a small room with a broad glowstone source. Compare `/voxellight pathtrace off` and `on` from the same stationary view. Look for indirect light and color bleed in shaded surfaces.
 4. `/voxellight pathtrace_debug on` shows the **indirect contribution only** on supported nearby terrain. Black in open empty space is expected: primary sky lighting is already provided by raster and is not duplicated. Restore `off` afterward.
-5. `/voxellight pathtrace_denoise off` exposes progressive raw samples; `on` uses the actual OptiX HDR denoiser with primary albedo and camera-space normal guides.
-6. Move/rotate, place/break a block, teleport, F3+T, resize, switch dimension, and disable/re-enable. Old camera/world results must not appear over the new view. 0.30.2 reprojects valid surfaces during motion; newly exposed surfaces can still fall back until the next batch arrives.
+5. `/voxellight pathtrace_denoise off` exposes temporally filtered raw samples; `on` uses the actual OptiX HDR denoiser with primary albedo and camera-space normal guides.
+6. Move/rotate, place/break a block, teleport, F3+T, resize, switch dimension, and disable/re-enable. Old camera/world results must not appear over the new view. 0.30.3 accumulates per-surface history before denoising and reprojects valid surfaces during motion; newly exposed surfaces can still fall back until the next batch arrives.
 
 ## What is traced
 
 - Exact raster primary position, normal and linear albedo come from the material GBuffer. Cutout, animated and entity primary pixels are excluded.
-- Up to three cosine-weighted diffuse secondary segments, voxel DDA intersections, secondary emissive hits and sun next-event visibility. Secondary sky illumination is accumulated only after a secondary surface hit.
-- Eight-sample reset batches followed by progressive one-sample batches, at most 10 submissions/second, one capture/trace job in flight and a 4096-sample cap. Camera/projection, scene/world/resource changes, denoising control, and celestial source/angle epochs reset accumulation.
+- Up to three cosine-weighted diffuse secondary segments, voxel DDA intersections, emissive hits after another diffuse surface and sun next-event visibility. Secondary sky illumination is accumulated only after a secondary surface hit.
+- Eight new samples per observation, at most 10 submissions/second, one capture/trace job in flight. Persistent per-pixel EMA/confidence/moments replaces global progressive averaging. World/resource, dimensions, actual local material changes and sun/moon source changes invalidate history; camera motion, proxy-origin shifts and sun/weather bins do not globally reset it. No 4096-sample stop.
 - Secondary terrain is an 80³ proxy of immutable section snapshots. Full opaque blocks and emissive blocks are cubes; secondary albedo uses linearized block map colors, not atlas textures. Thin/partial non-emissive shapes, foliage, dynamic entities and water are not secondary occluders. Missing sections terminate rays rather than behaving as air; exiting the bounded proxy uses approximate sky.
 - Indirect shading fades from 16 to 24 blocks. This limits **experimental GI only**; native material/direct-light coverage stays at Minecraft's visible-scene range. Emissive lighting has no importance sampling yet, so small torches can converge slowly. This is not a replacement for existing direct local lights.
 
@@ -27,7 +29,7 @@ CUDA selects the device whose UUID exactly matches the active Vulkan physical de
 
 The first bridge deliberately uses staging: three asynchronous Vulkan float4 guide readbacks, one worker-side CUDA batch, OptiX denoising, then a Vulkan upload. There are no CUDA waits or blocking GPU readbacks on the render thread. Secondary-scene encoding also runs on the worker from owned immutable snapshots, cached by scene key; it does not query the live world. Block map colors are read from immutable registered states with an empty block getter. Known snapshots remain until the scene bridge replaces them; local material fingerprints ignore LIGHT/task revisions and snapshot palette order.
 
-Capture resolution is at most 640×360 and at most quarter width/height of the main frame. At that maximum, each float4 image is 3.52 MiB. There are three capture images/readbacks, three resident radiance/guide images, owned CPU staging, a 1.95 MiB voxel proxy, and one full-resolution RGBA16F composite (28.1 MiB at 1440p). Native images add about 24.6 MiB, plus OptiX state/scratch capped at 192 MiB. Resources are released/reset on disable, world/resource reset and resize; submitted readbacks retain their resources until completion. Results carry generation/camera/scene keys before upload. Normal/depth-guided upsampling avoids spreading low-resolution bounce light across unrelated surfaces.
+Capture resolution is at most 640×360 and at most quarter width/height of the main frame. At that maximum, each float4 image is 3.52 MiB. There are three capture images/readbacks, three resident radiance/guide images, owned CPU staging, a 1.95 MiB voxel proxy, and one full-resolution RGBA16F composite (28.1 MiB at 1440p). Native images including persistent history add about 45.7 MiB, plus OptiX state/scratch capped at 192 MiB. Resources are released/reset on disable, world/resource reset and resize; submitted readbacks retain their resources until completion. Results carry generation/camera/scene keys before upload. Normal/depth-guided upsampling avoids spreading low-resolution bounce light across unrelated surfaces.
 
 This staging prototype is **not a performance mode**. No GPU quality, convergence, denoiser or FPS result has been measured on the build host, which has no NVIDIA GPU. Native shader compilation, CPU traversal/sampling, JNI loading/failure, actual Vulkan shader/binding tests and packaging are checked. In-game acceptance is pending.
 

@@ -100,6 +100,10 @@ public final class RenderProbe {
     public void setShadowFilter(com.voxellight.world.ShadowFilter value){RenderSystem.assertOnRenderThread();shadows.setFilter(value);lighting.invalidateHistory();resetTiming();}
     public void setPathTrace(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTrace(value);if(value)setMode(Mode.FOUNDATION);}
     public void setPathTraceDenoise(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceDenoise(value);}
+    public void setPathTraceFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceFreeze(value);}
+    public void setPathTraceHistory(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceHistory(value);}
+    public void setPathTraceRejection(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceRejection(value);}
+    public void setPathTraceUploadDelay(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceUploadDelay(value);}
     public void setPathTraceDebug(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceDebug(value);}
     public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
 
