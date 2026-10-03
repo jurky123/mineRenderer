@@ -14,7 +14,10 @@ layout(std140) uniform ShadowResolveSettings {
     mat4 InvProjection;mat4 LightNormalMatrix[3];
 };
 // VOXELLIGHT_VISUAL_FUNCTIONS
-bool waterSprite(vec2 uv,vec4 bounds){return all(greaterThanEqual(uv,bounds.xy)) && all(lessThanEqual(uv,bounds.zw));}
+bool waterSprite(vec2 uv,vec4 bounds){
+    // Interpolated UV may round just outside an atlas edge shared by fluid quads.
+    return all(greaterThanEqual(uv,bounds.xy-vec2(1e-6))) && all(lessThanEqual(uv,bounds.zw+vec2(1e-6)));
+}
 vec3 waterPosition(vec2 uv,float depth) {
     vec4 view=InvProjection*vec4(uv*2.0-1.0,depth,1.0);
     return (ViewToWorld*vec4(view.xyz/view.w,1.0)).xyz;
@@ -27,13 +30,16 @@ bool background(vec2 uv,vec3 surface,out vec3 radiance,out float thickness) {
     radiance=hdr.rgb;thickness=clamp(distanceBack-length(surface),0.0,16.0);return true;
 }
 void main() {
+    // Derivatives require all quad/helper lanes, including pixels which later use native fallback.
+    // Evaluating them after background/sprite rejection created native-blue seams and dashes.
+    vec2 uv=gl_FragCoord.xy/vec2(textureSize(WaterHdr,0));
+    vec3 surface=waterPosition(uv,gl_FragCoord.z);
+    vec3 crossed=cross(dFdx(surface),dFdy(surface));
     voxellightNativeMain();
     if(!waterSprite(texCoord0,WaterStill) && !waterSprite(texCoord0,WaterFlow))return;
-    vec2 uv=gl_FragCoord.xy/vec2(textureSize(WaterHdr,0));
-    vec3 surface=waterPosition(uv,gl_FragCoord.z),base;float thickness;
+    vec3 base;float thickness;
     if(!background(uv,surface,base,thickness))return;
-    vec3 crossed=cross(dFdx(surface),dFdy(surface));
-    if(dot(crossed,crossed)<1e-12 || length(surface)<.001)return;
+    if(dot(crossed,crossed)<=0.0 || any(isnan(crossed)) || any(isinf(crossed)) || length(surface)<.001)return;
     vec3 normal=normalize(crossed);
     vec3 viewDirection=normalize(-surface);
     if(dot(normal,viewDirection)<0.0)normal=-normal;

@@ -2,6 +2,12 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.21.1 water seam fix
+
+- Screenshot2026-10-03_11.44.01.png exposed blue grid/dash artifacts.
+- Evaluate water surface derivatives before native alpha discard and divergent sprite/background fallback; replace absolute screen-scale normal cutoff with finite/zero validation.
+- Bound UV-edge rounding tolerance; retain depth/background guards. Runtime screenshot retest pending.
+
 ## 0.21.0 Water Foundation
 
 - Split opaque lighting/history from VisualComposite atmosphere/bloom/display ownership.

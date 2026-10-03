@@ -55,6 +55,17 @@ class WaterPipelineTest {
             }
         }
     }
+    @Test void surfaceDerivativesPrecedeNativeDiscardAndPerPixelFallback() throws Exception {
+        try(var loader=loader()) {
+            String shader=read(loader,"assets/voxellight/shaders/water_overlay.fsh");
+            String main=shader.substring(shader.indexOf("void main()"));
+            int derivative=main.indexOf("dFdx(surface)");
+            assertTrue(derivative>=0);
+            assertTrue(derivative<main.indexOf("voxellightNativeMain();"),"Native alpha test may discard helper lanes");
+            assertTrue(derivative<main.indexOf("if(!background("),"Per-pixel rejection must not make derivatives divergent");
+            assertTrue(derivative<main.indexOf("if(!waterSprite("));
+        }
+    }
     @Test void backgroundStoreExplicitlyClearsTerrainButLoadsForEntityMerges() throws Exception {
         try(var loader=loader()) {
             var method=Class.forName("com.voxellight.adapter.WaterPass",true,loader).getDeclaredMethod("storeDescriptor",com.mojang.blaze3d.textures.GpuTextureView.class,int.class,int.class,boolean.class);method.setAccessible(true);

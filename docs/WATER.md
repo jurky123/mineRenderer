@@ -41,3 +41,7 @@ Automated checks cover Fresnel/absorption, memory bounds, radial-guide rejection
 Compare a shallow pool, a sloped flowing stream, side faces, deep/sky-facing water, grazing angles, camera motion, stone/sand bottoms, glass next to water, and supported/unsupported entities in front of the bottom. Check hand/HUD, underwater/lava, rain/night, Fast/Fancy/Fabulous fallback, resize/fullscreen, F3+T, teleport, dimension change, wateroff/on and world exit. If a shader/resource pack fails, inspect the native-fallback reason and log; off/on can retry after fixing it.
 
 Do not immediately add SSR/caustics. First accept this HDR/native-stream seam. Next is explicitly shadowed low-resolution volumetric integration with its own volume/depth filtering budget. GI and the previously recorded major cache/mesh/DDA optimizations remain deferred.
+
+## 0.21.1 screenshot follow-up
+
+Blue grid/dashes in2026-10-03_11.44.01.png prompted moving surface derivatives before native fragment discard and divergent fallback. Neighboring quad/helper lanes must all evaluate the derivatives. Normal rejection now checks zero/nonfinite cross products rather than a fixed screen-scale cutoff, and atlas identification allows1e-6 normalized UV rounding tolerance. Existing HDR/depth guide guards remain; please retest the same shoreline and camera motion.
