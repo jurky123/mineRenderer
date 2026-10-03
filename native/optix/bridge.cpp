@@ -47,7 +47,7 @@ struct Context {
  Driver& d;CUdevice device=-1;CUcontext cuda=nullptr;CUstream stream=nullptr;CUmodule module=nullptr;CUfunction paths=nullptr,temporal=nullptr;
  OptixDeviceContext optix=nullptr;OptixDenoiser denoiser=nullptr;int width=0,height=0,samples=0,epoch=0,read=0;
  CUdeviceptr position=0,normal=0,albedo=0,grid=0,params=0,sum=0,raw=0,guide=0,output=0,state=0,scratch=0,intensity=0;
- CUdeviceptr history[2]{},moments[2]{},previousPosition=0,previousNormal=0;
+ CUdeviceptr history[2]{},moments[2]{},display[2]{},previousPosition=0,previousNormal=0;
  size_t stateBytes=0,scratchBytes=0;std::vector<CUdeviceptr> allocations;
  Context():d(driver()){}
  CUdeviceptr alloc(size_t bytes){CUdeviceptr p;check(d.cuMemAlloc(&p,bytes));allocations.push_back(p);return p;}
@@ -62,7 +62,7 @@ struct Context {
   OptixDenoiserOptions options{};options.guideAlbedo=1;options.guideNormal=1;options.denoiseAlpha=OPTIX_DENOISER_ALPHA_MODE_COPY;
   check(optixDenoiserCreate(optix,OPTIX_DENOISER_MODEL_KIND_HDR,&options,&denoiser));
   size_t bytes=(size_t)w*h*16;position=alloc(bytes);normal=alloc(bytes);albedo=alloc(bytes);sum=alloc(bytes);raw=alloc(bytes);guide=alloc(bytes);output=alloc(bytes);
-  for(int i=0;i<2;i++){history[i]=alloc(bytes);moments[i]=alloc(bytes);}previousPosition=alloc(bytes);previousNormal=alloc(bytes);
+  for(int i=0;i<2;i++){history[i]=alloc(bytes);moments[i]=alloc(bytes);display[i]=alloc(bytes);}previousPosition=alloc(bytes);previousNormal=alloc(bytes);
   grid=alloc(80*80*80*4);params=alloc(41*4);intensity=alloc(4);
   OptixDenoiserSizes sizes{};check(optixDenoiserComputeMemoryResources(denoiser,w,h,&sizes));stateBytes=sizes.stateSizeInBytes;scratchBytes=sizes.withoutOverlapScratchSizeInBytes;
   if(scratchBytes<sizes.computeIntensitySizeInBytes)scratchBytes=sizes.computeIntensitySizeInBytes;
@@ -78,13 +78,18 @@ struct Context {
   for(int i=0;i<8;i++){batchSample=i;check(d.cuLaunchKernel(paths,(count+127)/128,1,1,128,1,1,0,stream,args,nullptr));++samples;}
   int write=1-read;void* historyArgs[]={&raw,&position,&normal,&previousPosition,&previousNormal,&history[read],&moments[read],&history[write],&moments[write],&params,&width,&height};
   check(d.cuLaunchKernel(temporal,(count+127)/128,1,1,128,1,1,0,stream,historyArgs,nullptr));read=write;
-  check(d.cuMemcpyDtoDAsync(previousPosition,position,bytes,stream));check(d.cuMemcpyDtoDAsync(previousNormal,normal,bytes,stream));
+
   if(denoise){auto input=image(history[read]);check(optixDenoiserComputeIntensity(denoiser,stream,&input,intensity,scratch,scratchBytes));
    OptixDenoiserParams dp{};dp.hdrIntensity=intensity;OptixDenoiserGuideLayer guides{};guides.albedo=image(albedo);guides.normal=image(guide);
    OptixDenoiserLayer layer{};layer.input=input;layer.output=image(output);
    check(optixDenoiserInvoke(denoiser,stream,&dp,state,stateBytes,&guides,&layer,1,0,0,scratch,scratchBytes));
+   // Spatial OptiX output can change abruptly even when its input is accumulated.
+   // Stabilize the actual displayed field using the previous capture guides.
+   int previous=1-read;void* displayArgs[]={&output,&position,&normal,&previousPosition,&previousNormal,&display[previous],&moments[previous],&display[read],&raw,&params,&width,&height};
+   check(d.cuLaunchKernel(temporal,(count+127)/128,1,1,128,1,1,0,stream,displayArgs,nullptr));
   }
-  check(d.cuStreamSynchronize(stream));check(d.cuMemcpyDtoH(result,denoise?output:history[read],bytes));return ++epoch;
+  check(d.cuMemcpyDtoDAsync(previousPosition,position,bytes,stream));check(d.cuMemcpyDtoDAsync(previousNormal,normal,bytes,stream));
+  check(d.cuStreamSynchronize(stream));check(d.cuMemcpyDtoH(result,denoise?display[read]:history[read],bytes));return ++epoch;
  }
  ~Context(){if(!cuda)return;d.cuCtxSetCurrent(cuda);if(stream)d.cuStreamSynchronize(stream);if(denoiser)optixDenoiserDestroy(denoiser);if(optix)optixDeviceContextDestroy(optix);for(auto p:allocations)d.cuMemFree(p);if(module)d.cuModuleUnload(module);if(stream)d.cuStreamDestroy(stream);d.cuDevicePrimaryCtxRelease(device);}
 };

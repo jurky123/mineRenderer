@@ -1,6 +1,6 @@
 # Experimental hybrid diffuse path tracing
 
-Current: **0.30.4**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
+Current: **0.30.5**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
 
 This is a runnable raster-primary prototype, with CUDA voxel traversal and real OptiX 9.1 HDR denoising. It is **not full primary-ray path tracing**, and its traversal does not yet use OptiX acceleration structures / RT cores. Existing Vulkan primary visibility, direct lighting, water and UI remain in place. The traced contribution is added in linear HDR before atmosphere, water-background capture, bloom and tone mapping.
 
@@ -29,7 +29,7 @@ CUDA selects the device whose UUID exactly matches the active Vulkan physical de
 
 The first bridge deliberately uses staging: three asynchronous Vulkan float4 guide readbacks, one worker-side CUDA batch, OptiX denoising, then a Vulkan upload. There are no CUDA waits or blocking GPU readbacks on the render thread. Secondary-scene encoding also runs on the worker from owned immutable snapshots, cached by scene key; it does not query the live world. Block map colors are read from immutable registered states with an empty block getter. Known snapshots remain until the scene bridge replaces them; local material fingerprints ignore LIGHT/task revisions and snapshot palette order.
 
-Capture resolution is at most 640×360 and at most quarter width/height of the main frame. At that maximum, each float4 image is 3.52 MiB. There are three capture images/readbacks, three resident radiance/guide images, owned CPU staging, a 1.95 MiB voxel proxy, and one full-resolution RGBA16F composite (28.1 MiB at 1440p). Native images including persistent history add about 45.7 MiB, plus OptiX state/scratch capped at 192 MiB. Resources are released/reset on disable, world/resource reset and resize; submitted readbacks retain their resources until completion. Results carry generation/camera/scene keys before upload. Normal/depth-guided upsampling avoids spreading low-resolution bounce light across unrelated surfaces.
+Capture resolution is at most 640×360 and at most quarter width/height of the main frame. At that maximum, each float4 image is 3.52 MiB. There are three capture images/readbacks, three resident radiance/guide images, owned CPU staging, a 1.95 MiB voxel proxy, and one full-resolution RGBA16F composite (28.1 MiB at 1440p). Native images including input and denoised-output history add about 52.7 MiB, plus OptiX state/scratch capped at 192 MiB. Resources are released/reset on disable, world/resource reset and resize; submitted readbacks retain their resources until completion. Results carry generation/camera/scene keys before upload. Normal/depth-guided upsampling avoids spreading low-resolution bounce light across unrelated surfaces.
 
 This staging prototype is **not a performance mode**. No GPU quality, convergence, denoiser or FPS result has been measured on the build host, which has no NVIDIA GPU. Native shader compilation, CPU traversal/sampling, JNI loading/failure, actual Vulkan shader/binding tests and packaging are checked. In-game acceptance is pending.
 

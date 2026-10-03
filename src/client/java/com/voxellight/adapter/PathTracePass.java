@@ -37,6 +37,7 @@ final class PathTracePass implements AutoCloseable {
     private final PathTraceWindow window=new PathTraceWindow();
     private final Map<SectionKey,Long> materialVersions=new HashMap<>();
     private long materialRevision,frameNumber;
+    private long worldGeneration=Long.MIN_VALUE,resourceGeneration=Long.MIN_VALUE;
     private record Retired(long frame,Result result){}
     private final ArrayDeque<Retired> retired=new ArrayDeque<>();
     void endFrame(){frameNumber++;while(!retired.isEmpty()&&retired.peek().frame<=frameNumber)retired.remove().result.release();}
@@ -58,6 +59,7 @@ final class PathTracePass implements AutoCloseable {
     private ByteBuffer scene;
     record Key(long generation,long scene,long history,double x,double y,double z,Matrix4f clip,int width,int height,int sun,int weather,ShadowLight.Source source){
         boolean matches(Key other){return surfaceMatches(other) && sun==other.sun && weather==other.weather;}
+        boolean canDisplay(Key other){return other!=null && generation==other.generation && width==other.width && height==other.height;}
         boolean canReproject(Key other){return other!=null && generation==other.generation && history==other.history && width==other.width && height==other.height && source==other.source;}
         boolean surfaceMatches(Key other){return other!=null && generation==other.generation && scene==other.scene && width==other.width && height==other.height && source==other.source
             && Math.abs(x-other.x)<.002 && Math.abs(y-other.y)<.002 && Math.abs(z-other.z)<.002 && clip.equals(other.clip,1.e-5f);}
@@ -68,15 +70,17 @@ final class PathTracePass implements AutoCloseable {
     void setEnabled(boolean value){enabled=value;failed=false;close();state=value?"waiting for traced surfaces":"off";}
     void setDenoise(boolean value){denoise=value;generation++;displayKey=null;failed=false;}
     void setDebug(boolean value){debug=value;}
-    String status(){return ", pathtrace="+state+", pathtraceDenoise="+(denoise?"OptiX HDR":"raw")+", pathtraceWorkerBatches="+samples+", pathtraceHistory="+temporalHistory+", pathtraceFrozen="+freeze+", pathtraceAccepted="+accepted+", pathtraceRejected="+rejected+", pathtraceSize="+width+"x"+height+", pathtraceWorkerNs="+traceNs;}
+    String status(){return ", pathtrace="+state+", pathtraceDenoise="+(denoise?"OptiX HDR":"raw")+", pathtraceWorkerBatches="+samples+", pathtraceHistory="+temporalHistory+", pathtraceFrozen="+freeze+", pathtraceDisplayValid="+(displayKey!=null)+", pathtraceAccepted="+accepted+", pathtraceRejected="+rejected+", pathtraceSize="+width+"x"+height+", pathtraceWorkerNs="+traceNs;}
     GpuTextureView render(CommandEncoder encoder,RenderTarget target,MaterialCapture material,ShadowRenderer shadows,GpuTextureView hdr,Matrix4f projection,boolean observed){
         if(!enabled||failed||!observed)return hdr;
         try{
             int scale=Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360));int w=(target.width+scale-1)/scale,h=(target.height+scale-1)/scale;
             var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;
             var skyState=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
-            var pos=camera.pos;var center=window.admit(pos.x(),pos.y(),pos.z());
+            var pos=camera.pos;
             var bridge=VoxelLightClient.scene().bridge();var stats=bridge.stats();var snapshots=bridge.snapshots();
+            if(worldGeneration!=stats.worldGeneration() || resourceGeneration!=stats.resourceGeneration()){close();worldGeneration=stats.worldGeneration();resourceGeneration=stats.resourceGeneration();}
+            var center=window.admit(pos.x(),pos.y(),pos.z());
             // Only local material content affects secondary rays. LIGHT revisions and distant caster churn do not.
             long hash=stats.worldGeneration()*31+stats.resourceGeneration();hash=hash*31+center.hashCode();
             for(var snapshot:snapshots) {var k=snapshot.request().key();if(Math.abs(k.x()-center.x())<=2&&Math.abs(k.y()-center.y())<=2&&Math.abs(k.z()-center.z())<=2){
@@ -92,7 +96,7 @@ final class PathTracePass implements AutoCloseable {
             prepare(target,w,h);
             var result=completed.getAndSet(null);
             if(result!=null){
-                try{if(!freeze && result.key.canReproject(key)){
+                try{if((!freeze || !key.canDisplay(displayKey)) && result.key.canDisplay(key)){
                     encoder.writeToTexture(textures[0],result.light,0,0,0,0,w,h);encoder.writeToTexture(textures[1],result.positions,0,0,0,0,w,h);encoder.writeToTexture(textures[2],result.normals,0,0,0,0,w,h);
                     accepted++;displayKey=result.key;samples=result.samples;traceNs=result.nanos;state="diffuse hybrid active; per-surface EMA";
                 }else rejected++;}finally{
@@ -101,9 +105,9 @@ final class PathTracePass implements AutoCloseable {
                 }
             }
             try(var stack=MemoryStack.stackPush()){
-                encoder.writeToBuffer(uniform.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(1,debug?1:0,rejectionDebug,key.canReproject(displayKey)?1:0).get());
+                encoder.writeToBuffer(uniform.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(1,debug?1:0,rejectionDebug,key.canDisplay(displayKey)?1:0).get());
             }
-            if(!freeze&&!busy.get()&&System.nanoTime()-lastSubmit>100_000_000L){
+            if((!freeze || !key.canDisplay(displayKey))&&!busy.get()&&System.nanoTime()-lastSubmit>100_000_000L){
                 byte[] uuid=gpuUuid();ByteBuffer params=ByteBuffer.allocateDirect(164).order(ByteOrder.nativeOrder());
                 params.putFloat((float)(pos.x()-(center.x()-2)*16)).putFloat((float)(pos.y()-(center.y()-2)*16)).putFloat((float)(pos.z()-(center.z()-2)*16));
                 var light=shadows.light();var direction=light.direction();params.putFloat(direction.x).putFloat(direction.y).putFloat(direction.z);
@@ -115,8 +119,8 @@ final class PathTracePass implements AutoCloseable {
                 for(int i=0;i<20;i++)params.putFloat(0);params.flip();
                 submit(encoder,target,material,key,uuid,snapshots,center,params,denoise);lastSubmit=System.nanoTime();
             }
-            if(!key.canReproject(displayKey)){state="waiting for traced surfaces; raster retained";if(rejectionDebug==0)return hdr;}
-            state=freeze?"frozen observation; raster/reprojection active":key.matches(displayKey)?"diffuse hybrid active; per-surface EMA":"diffuse hybrid active; reprojected EMA";
+            if(!key.canDisplay(displayKey)){state=freeze?"freeze pending first valid observation":"waiting for traced surfaces; raster retained";if(rejectionDebug==0)return hdr;}
+            if(key.canDisplay(displayKey))state=freeze?"frozen valid observation; raster/reprojection active":key.matches(displayKey)?"diffuse hybrid active; per-surface EMA":"diffuse hybrid active; reprojected EMA";
             try(var stack=MemoryStack.stackPush()){
                 encoder.writeToBuffer(historyUniform.slice(),Std140Builder.onStack(stack,80).putMat4f(displayKey==null?key.clip:displayKey.clip)
                     .putVec4((float)(key.x-(displayKey==null?key.x:displayKey.x)),(float)(key.y-(displayKey==null?key.y:displayKey.y)),(float)(key.z-(displayKey==null?key.z:displayKey.z)),0).get());

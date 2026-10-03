@@ -27,6 +27,12 @@ class PathTraceAdmissionTest {
   var b=new PathTracePass.Key(1,2,5,16,2,3,new Matrix4f(),640,338,2,1,ShadowLight.Source.SUN);
   assertTrue(a.canReproject(b));assertFalse(a.matches(b));
  }
+ @Test void materialRefreshDoesNotBlankDisplayedObservation(){
+  var a=key(2,1,new Matrix4f(),1);var b=key(3,1,new Matrix4f(),1);
+  assertFalse(a.canReproject(b));assertTrue(a.canDisplay(b));
+  var worldReset=new PathTracePass.Key(2,2,2,1,2,3,new Matrix4f(),640,338,1,0,ShadowLight.Source.SUN);
+  assertFalse(a.canDisplay(worldReset));assertFalse(a.canDisplay(null));
+ }
  @Test void proxyCenterHasHysteresisAcrossSectionBoundaries(){
   var window=new PathTraceWindow();assertEquals(new SectionKey(0,0,0),window.admit(15.9,8,8));
   assertEquals(new SectionKey(0,0,0),window.admit(16.1,8,8));

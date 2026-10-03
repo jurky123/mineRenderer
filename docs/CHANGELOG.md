@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.30.5 — Display lifetime / post-denoiser stability
+
+- Retain surface-valid displayed GI through material revisions; accumulation still invalidates independently. Explicit world/resource resets protect lifetime. Freeze accepts a first valid observation before holding it, instead of freezing an empty image. Add display-valid status.
+- Guide-validate and temporally blend the actual OptiX HDR output before upload; spatial denoiser changes are now filtered too. Two low-res float4 images (~7.0 MiB maximum), no new rays or full-res targets.
+- 210 Java tests and Windows/Linux native builds pass. GPU freeze, residual flicker and ghosting acceptance pending.
+
 ## 0.30.4 — Residual motion flicker
 
 - Gather compatible projected history instead of choosing a single nearest texel; retain grazing-angle coplanar history without radial-distance rejection. Keep plane/normal/proximity checks and add sparse-surface composite fallback.
