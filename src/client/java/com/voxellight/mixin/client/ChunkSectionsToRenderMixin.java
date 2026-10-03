@@ -17,7 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ChunkSectionsToRender.class)
 abstract class ChunkSectionsToRenderMixin {
     @com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method="renderGroup")
-    private void voxellight$profileTranslucent(ChunkSectionLayerGroup group,GpuSampler sampler,Operation<Void> original) {
+    private void voxellight$renderTerrain(ChunkSectionLayerGroup group,GpuSampler sampler,Operation<Void> original) {
+        if(group==ChunkSectionLayerGroup.OPAQUE && VoxelLightClient.probe().renderNativeOpaque((ChunkSectionsToRender)(Object)this,group.outputTarget(),sampler)){VoxelLightClient.probe().renderMaterialTerrain(group.outputTarget(),sampler,(ChunkSectionsToRender)(Object)this);return;}
         if(group!=ChunkSectionLayerGroup.TRANSLUCENT){original.call(group,sampler);return;}
         try(var profile=com.voxellight.adapter.RenderPassProfile.begin(com.mojang.blaze3d.systems.RenderSystem.getDevice().createCommandEncoder(),"native_translucent_including_water")) {
             original.call(group,sampler);

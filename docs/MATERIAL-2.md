@@ -18,7 +18,7 @@ Existing geometry normals, depth, material light channels and 36-byte terrain ve
 
 The 256×256 RGBA8 lookup contains smoothness, reflectance/metal identifier, porosity/SSS byte and material AO. Two atlas-aligned RGBA8 textures contain material IDs/emission and tangent normals. Atlas dimensions are capped at 2048 per axis; high-resolution packs lose map detail at that cap. Unique parameter tuples are deduplicated; excess tuples beyond 65,536 fall back to neutral material ID 0, with overflow reported. Atlas resources are rebuilt on world/resource reset and released with material capture.
 
-Material targets now cost 20 B/pixel: 70.31 MiB at 1440p, 158.20 MiB at 4K, capped at 192 MiB. Atlas storage is at most 32.25 MiB. HDR lighting remains 8 B/pixel, with the combined 256 MiB admission cap. Native terrain vertex size and GI/shadow sample budgets do not grow. Terrain still uses an additional material raster pass; single-raster MRT is a later milestone.
+Material targets now cost 20 B/pixel: 70.31 MiB at 1440p, 158.20 MiB at 4K, capped at 192 MiB. Atlas storage is at most 32.25 MiB. HDR lighting remains 8 B/pixel, with the combined 256 MiB admission cap. Native terrain vertex size and GI/shadow sample budgets do not grow. In0.31.1, [single-raster MRT](SINGLE-RASTER.md) is default; the additional material raster remains the comparison path.
 
 Profiles are exact texture IDs in `assets/voxellight/pbr_materials.json`, for example:
 
@@ -43,4 +43,4 @@ GGX uses Schlick Fresnel and Smith visibility with a minimum alpha .045 to bound
 
 For the same stationary scene, collect `/voxellight profile on`, PBR off/on intervals and `/voxellight export`. Compare material and lighting pass p50/p95, plus `materialTargetBytes`, `pbrAtlasBytes` and `pbrAtlasBuildNs`. Reload construction is a setup cost, not recurring frame work. No GPU measurements are available on the build host, so no FPS gain is claimed.
 
-Next: accept the material contract and appearance, then investigate single-raster native MRT. Sky/cloud shadows, shared temporal/motion infrastructure, underwater caustics, solid-surface SSR/RT reflections and RTX zero-copy/AS remain separate future milestones. Do not expand GI samples, local-light count or shadow epochs for this material release.
+User confirmed0.31.0 working. 0.31.1 implements single-raster native MRT; GPU appearance/FPS comparisons remain pending. Sky/cloud shadows, shared temporal/motion infrastructure, underwater caustics, solid-surface SSR/RT reflections and RTX zero-copy/AS remain separate future milestones. Do not expand GI samples, local-light count or shadow epochs for this material release.

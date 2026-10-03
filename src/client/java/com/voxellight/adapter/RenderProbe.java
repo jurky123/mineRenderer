@@ -202,7 +202,7 @@ public final class RenderProbe {
         RenderPassProfile.nextFrame();
         entityCaptureScope=false;
         entityMaterials.endFrame();
-        lighting.endFrame();
+        lighting.endFrame();material.endFrame();
         if (mode.isMaterial()) {
             if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
             materialPointObserved = false;
@@ -211,6 +211,16 @@ public final class RenderProbe {
         renderPass(target, null);
     }
 
+    public void setSingleRaster(boolean value){RenderSystem.assertOnRenderThread();material.setSingleRaster(value);}
+    public boolean renderNativeOpaque(net.minecraft.client.renderer.chunk.ChunkSectionsToRender terrain,RenderTarget target,com.mojang.blaze3d.textures.GpuSampler sampler){
+        if(!mode.isMaterial() || !material.singleRaster() || !"Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()) || net.minecraft.client.Minecraft.getInstance().wireframe)return false;
+        if(target.width<=0 || target.height<=0 || target.getColorTexture()==null || target.getDepthTextureView()==null || target.getColorTexture().getFormat()!=GpuFormat.RGBA8_UNORM)return false;
+        try{
+            if(!material.prepare(target))return false;
+            if(!NativeMaterialPass.available()){material.setSingleRaster(false);return false;}
+            material.capturedNative(NativeMaterialPass.render(terrain,target,sampler,material));return true;
+        }catch(RuntimeException error){LOGGER.error("Single-raster material capture failed; reference terrain retained",error);material.setSingleRaster(false);return false;}
+    }
     public void setNativeMaterial(boolean value){material.setNativeTerrain(value);lighting.invalidateHistory();materialFrameReady=false;}
     public void renderMaterialTerrain(RenderTarget target, com.mojang.blaze3d.textures.GpuSampler terrainSampler,net.minecraft.client.renderer.chunk.ChunkSectionsToRender terrain) {
         if(!mode.isMaterial())return;
@@ -219,7 +229,7 @@ public final class RenderProbe {
     }
     private net.minecraft.client.renderer.chunk.ChunkSectionsToRender currentTerrain;
     public void renderMaterialTerrain(RenderTarget target, com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
-        if (!mode.isMaterial()) return;
+        if (!mode.isMaterial() || (materialPointObserved && material.nativeCaptured())) return;
         materialPointObserved = true;
         renderPass(target, terrainSampler);
     }

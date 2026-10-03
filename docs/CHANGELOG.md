@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.31.1 — Single-raster native materials
+
+- User confirmed0.31.0 working. Draw native opaque terrain once into native color/depth and all four material targets; share texture filtering, native alpha cutoff and retain native fog/color fallback. Copy native depth for existing consumers.
+- Add `single_raster` on/off comparison, default on for eligible native Vulkan material modes. Preserve reference/local/wireframe paths; disable on integration failure. No new images, GI samples or larger vertices.
+- 219 tests pass including actual native solid/cutout shaders, five ordered MRT outputs, native color/depth load and resized descriptors. GPU visuals and FPS pending.
+
 ## 0.31.0 — Material 2.0
 
 - Add packed material ID/LUT and shading normal, vanilla texture profiles, GGX sun/moon and selected-lamp highlights, approximate sky specular and receiver-gated rain wetness. Geometry normal and GI tracing/history policies remain unchanged; composite suppresses diffuse GI on conductors and preserves material debug views.
