@@ -32,10 +32,23 @@ void main(){
   ivec2 q=clamp(base+ivec2(x,y),ivec2(0),size-1);vec4 guide=texelFetch(PathPosition,q,0);vec3 normal=texelFetch(PathNormal,q,0).xyz;
   vec3 delta=guide.xyz-previousWorld;float plane=abs(dot(normal,delta));float tolerance=.12+.005*length(world);
   if(guide.w>.5 && dot(normal,normalize(n.xyz))<=.9)normalRejected=true;
-  float weight=guide.w>.5 && dot(normal,normalize(n.xyz))>.9 && plane<tolerance && length(delta)<2.0 && abs(length(guide.xyz)-length(previousWorld))<.25+.02*length(previousWorld) ? exp(-plane*plane/(tolerance*tolerance)) : 0;
+  float weight=guide.w>.5 && dot(normal,normalize(n.xyz))>.9 && plane<tolerance && length(delta)<2.0 ? exp(-plane*plane/(tolerance*tolerance)) : 0;
   vec2 b=1-abs(uv-vec2(base+ivec2(x,y)));weight*=max(b.x,0)*max(b.y,0);
   light+=texelFetch(PathRadiance,q,0).rgb*weight;total+=weight;
  }
- if(total>0){if(PtControls.z>.5){result=vec4(0,1,0,1);return;}light/=total;float fade=1-smoothstep(16,24,length(world));result.rgb=PtControls.y>.5?light*fade:result.rgb+light*fade*PtControls.x;}
+ // A sparse low-res footprint can contain only invalid pixels even though a
+ // compatible surface is immediately beside it. Use a bounded same-plane
+ // gather before dropping the contribution completely; never cross normals.
+ if(total<1e-5){
+  for(int y=-1;y<=2;y++)for(int x=-1;x<=2;x++){
+   ivec2 q=base+ivec2(x,y);if(any(lessThan(q,ivec2(0))) || any(greaterThanEqual(q,size)))continue;
+   vec4 guide=texelFetch(PathPosition,q,0);vec3 normal=texelFetch(PathNormal,q,0).xyz;
+   vec3 delta=guide.xyz-previousWorld;float plane=abs(dot(normal,delta));float tolerance=.12+.005*length(world);
+   if(guide.w<=.5 || dot(normal,normalize(n.xyz))<=.9 || plane>=tolerance || length(delta)>=2.0)continue;
+   float weight=exp(-dot(uv-vec2(q),uv-vec2(q)))*exp(-plane*plane/(tolerance*tolerance));
+   light+=texelFetch(PathRadiance,q,0).rgb*weight;total+=weight;
+  }
+ }
+ if(total>1e-5){if(PtControls.z>.5){result=vec4(0,1,0,1);return;}light/=total;float fade=1-smoothstep(16,24,length(world));result.rgb=PtControls.y>.5?light*fade:result.rgb+light*fade*PtControls.x;}
  else reject(normalRejected?vec3(1,0,1):vec3(0,1,1));
 }

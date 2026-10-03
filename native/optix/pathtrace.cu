@@ -70,12 +70,25 @@ extern "C" __global__ void temporal(const float* current,const float* positions,
   float u=(m[0]*p.x+m[4]*p.y+m[8]*p.z+m[12])/fmaxf(w,1.e-8f)*.5f+.5f;
   float vv=(m[1]*p.x+m[5]*p.y+m[9]*p.z+m[13])/fmaxf(w,1.e-8f)*.5f+.5f;
   if(w>0 && u>=0 && vv>=0 && u<1 && vv<1){
-   int q=((int)(vv*height)*width+(int)(u*width))*4;
-   V op=v(oldPosition[q],oldPosition[q+1],oldPosition[q+2]),n=v(normals[j],normals[j+1],normals[j+2]),on=v(oldNormal[q],oldNormal[q+1],oldNormal[q+2]);
-   V delta=add(op,mul(p,-1));float distance=sqrtf(dot(p,p)),plane=fabsf(dot(n,delta));
-   if(oldPosition[q+3]>.5f && dot(n,on)>.95f && plane<.08f+.003f*distance && fabsf(sqrtf(dot(op,op))-distance)<.2f+.015f*distance && dot(delta,delta)<2.25f){
-    history=v(oldRadiance[q],oldRadiance[q+1],oldRadiance[q+2]);count=fminf(oldRadiance[q+3],32.f);oldMean=oldMoments[q];oldSecond=oldMoments[q+1];
+   // Gather the projected footprint: choosing one nearest texel made valid
+   // history alternate with background/other faces at low-resolution edges.
+   float fx=u*width-.5f,fy=vv*height-.5f;int bx=(int)floorf(fx),by=(int)floorf(fy);
+   float weightSum=0,confidence=0;V accumulated=v(0,0,0);
+   V n=v(normals[j],normals[j+1],normals[j+2]);float distance=sqrtf(dot(p,p));
+   for(int yy=0;yy<2;yy++)for(int xx=0;xx<2;xx++){
+    int x=bx+xx,y=by+yy;if(x<0||y<0||x>=width||y>=height)continue;int q=(y*width+x)*4;
+    V op=v(oldPosition[q],oldPosition[q+1],oldPosition[q+2]),on=v(oldNormal[q],oldNormal[q+1],oldNormal[q+2]);
+    V delta=add(op,mul(p,-1));float plane=fabsf(dot(n,delta)),tolerance=.08f+.003f*distance;
+    // Tangential displacement on the same plane is expected during camera motion.
+    // Radial distance was rejecting those surfaces at grazing angles.
+    if(oldPosition[q+3]>.5f && oldRadiance[q+3]>0 && dot(n,on)>.95f && plane<tolerance && dot(delta,delta)<2.25f){
+     float weight=fmaxf(0,1-fabsf(fx-x))*fmaxf(0,1-fabsf(fy-y));
+     accumulated=add(accumulated,mul(v(oldRadiance[q],oldRadiance[q+1],oldRadiance[q+2]),weight));
+     confidence+=fminf(oldRadiance[q+3],32.f)*weight;oldMean+=oldMoments[q]*weight;oldSecond+=oldMoments[q+1]*weight;weightSum+=weight;
+    }
    }
+   if(weightSum>1.e-6f){history=mul(accumulated,1/weightSum);count=confidence/weightSum;oldMean/=weightSum;oldSecond/=weightSum;}
+
   }
  }
  // Neighborhood bounds expanded by variance prevent retaining a stale firefly indefinitely.
@@ -83,10 +96,13 @@ extern "C" __global__ void temporal(const float* current,const float* positions,
   V low=c,high=c;int x=i%width,y=i/width;
   for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){
    int xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=width||yy>=height)continue;int q=(yy*width+xx)*4;
-   if(positions[q+3]<.5f || dot(v(normals[j],normals[j+1],normals[j+2]),v(normals[q],normals[q+1],normals[q+2]))<.95f)continue;
+   if(positions[q+3]<.5f || dot(v(normals[j],normals[j+1],normals[j+2]),v(normals[q],normals[q+1],normals[q+2]))<.95f || fabsf(dot(v(normals[j],normals[j+1],normals[j+2]),v(positions[q]-positions[j],positions[q+1]-positions[j+1],positions[q+2]-positions[j+2])))>.12f)continue;
    low.x=fminf(low.x,current[q]);low.y=fminf(low.y,current[q+1]);low.z=fminf(low.z,current[q+2]);high.x=fmaxf(high.x,current[q]);high.y=fmaxf(high.y,current[q+1]);high.z=fmaxf(high.z,current[q+2]);
   }
-  float sigma=sqrtf(fmaxf(oldSecond-oldMean*oldMean,0.f)),margin=.03f+2*sigma;
+  // Include observation innovation: a single noisy 8-spp batch must not
+  // squeeze a converged history down to its near-zero neighborhood bounds.
+  float innovation=l-oldMean;
+  float sigma=sqrtf(fmaxf(oldSecond-oldMean*oldMean,innovation*innovation)),margin=.03f+2*sigma;
   history.x=fminf(fmaxf(history.x,low.x-margin),high.x+margin);history.y=fminf(fmaxf(history.y,low.y-margin),high.y+margin);history.z=fminf(fmaxf(history.z,low.z-margin),high.z+margin);
  }
  float alpha=count>0?fmaxf(.125f,1/(count+1)):1;

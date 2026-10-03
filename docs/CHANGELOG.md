@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.30.4 — Residual motion flicker
+
+- Gather compatible projected history instead of choosing a single nearest texel; retain grazing-angle coplanar history without radial-distance rejection. Keep plane/normal/proximity checks and add sparse-surface composite fallback.
+- Include observation innovation in variance clamping, preventing one noisy dark batch from erasing stable GI. Reject different-plane neighbors. No additional GPU images or rays.
+- 209 Java tests and expanded native CPU checks pass, including grazing surfaces, sparse valid neighbors and dark batch retention. User reports 0.30.3 reduced flicker frequency; 0.30.4 GPU motion/ghosting checks pending.
+
 ## 0.30.3 — Persistent hybrid GI stability
 
 - Replace camera-reset global accumulation with eight-sample observations and persistent per-pixel EMA, confidence and luminance moments. Reproject, reject disocclusions and clamp history before OptiX HDR denoising; sun/weather bins and proxy-origin changes preserve compatible histories.

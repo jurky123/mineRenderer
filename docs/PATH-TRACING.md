@@ -1,6 +1,6 @@
 # Experimental hybrid diffuse path tracing
 
-Current: **0.30.3**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
+Current: **0.30.4**. [Persistent history, fixes, diagnostics and motion tests](PT-STABILITY.md).
 
 This is a runnable raster-primary prototype, with CUDA voxel traversal and real OptiX 9.1 HDR denoising. It is **not full primary-ray path tracing**, and its traversal does not yet use OptiX acceleration structures / RT cores. Existing Vulkan primary visibility, direct lighting, water and UI remain in place. The traced contribution is added in linear HDR before atmosphere, water-background capture, bloom and tone mapping.
 

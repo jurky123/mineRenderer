@@ -38,5 +38,14 @@ int main(){
  assert(next[0]>.48&&next[0]<.5&&next[3]==9);
  float differentNormal[]={0,-1,0,1};temporal(current,pNow,nNow,pNow,differentNormal,history,moments,next,nextMom,settingsT,1,1);assert(next[0]==.5f&&next[3]==1);
  float moved[]={3,0,0,1};temporal(current,pNow,nNow,moved,nNow,history,moments,next,nextMom,settingsT,1,1);assert(next[0]==.5f&&next[3]==1);
+ float darkCurrent[]={0,0,0,1};
+ temporal(darkCurrent,pNow,nNow,pNow,nNow,history,moments,next,nextMom,settingsT,1,1);assert(next[0]>.4f); // One noisy dark batch must not clamp stable GI to black.
+ // A grazing same-plane offset changes radial distance but remains the same surface.
+ float grazingNow[]={1,0,0,1},grazingOld[]={1.5,0,0,1};settingsT[21]=.25f;
+ temporal(current,grazingNow,nNow,grazingOld,nNow,history,moments,next,nextMom,settingsT,1,1);assert(next[3]==9);
+ // Projected footprint straddles an invalid texel and a valid coplanar one.
+ float twoPos[]={0,0,0,1,0,0,0,1},twoNorm[]={0,1,0,1,0,1,0,1},twoCurrent[]={.5,.5,.5,1,.5,.5,.5,1};
+ float twoOldPos[]={0,0,0,0,0,0,0,1},twoHistory[]={0,0,0,0,.48,.48,.48,8},twoMom[]={0,0,0,0,.48,.2304,8,0},twoNext[8]={},twoNextMom[8]={};
+ temporal(twoCurrent,twoPos,twoNorm,twoOldPos,twoNorm,twoHistory,twoMom,twoNext,twoNextMom,settingsT,2,1);assert(twoNext[3]==9&&twoNext[0]<.5f);
  settingsT[40]=0;temporal(current,pNow,nNow,pNow,nNow,history,moments,next,nextMom,settingsT,1,1);assert(next[0]==.5f&&next[3]==1);
 }
