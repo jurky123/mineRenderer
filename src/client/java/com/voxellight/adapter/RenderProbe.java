@@ -87,6 +87,7 @@ public final class RenderProbe {
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setAtmosphereDensity(float density){RenderSystem.assertOnRenderThread();lighting.setAtmosphereDensity(density);}
     public void setWater(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setWater(enabled);}
+    public void setWaterHzb(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterHzb(value);}
     public void setWaterReflections(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterReflections(value);}
     public void setWaterWaves(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterWaves(value);}
     public void setWaveStrength(float value){RenderSystem.assertOnRenderThread();lighting.setWaveStrength(value);}

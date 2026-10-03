@@ -48,6 +48,7 @@ final class VisualComposite implements AutoCloseable {
     void setAtmosphereDensity(float value){atmosphereDensity=Atmosphere.density(value);}
     void setExposure(float value){VisualPolish.exposure(value);exposureEv=value;}
     void setWater(boolean value){waterEnabled=value;if(!value)water.close();}
+    void setWaterHzb(boolean value){water.setHzb(value);}
     void setWaterReflections(boolean value){water.setReflections(value);}
     void setWaterWaves(boolean value){water.setWaves(value);}
     void setWaveStrength(float value){water.setWaveStrength(value);}

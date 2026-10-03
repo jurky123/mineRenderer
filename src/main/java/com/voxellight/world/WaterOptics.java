@@ -2,7 +2,7 @@ package com.voxellight.world;
 
 /** Reference water optics and one HDR-background + one immutable depth-image budget. */
 public final class WaterOptics {
-    public static final int SETTINGS_BYTES=64;
+    public static final int SETTINGS_BYTES=80;
     public static final long TARGET_LIMIT=96L*1024*1024;
     private WaterOptics() { }
     public static long targetBytes(int width,int height){if(width<=0 || height<=0)throw new IllegalArgumentException("Invalid water size");return Math.multiplyExact((long)width*height,12);}

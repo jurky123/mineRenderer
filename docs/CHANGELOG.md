@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.29.0 — Conservative depth pyramid / hierarchical SSR
+
+- Add opt-in water_hzb reflection path: half-resolutionR32 reversed-Z maximum-depth mip chain, odd-tail safe reduction and bounded perspective cell traversal with full-resolution hit validation. Keep linear trace as default/reference.
+-16 MiB pyramid cap; added water_hzb profiler stage and status bytes/visit budgets. Release on disabled/resize/world/resource paths; preserve control and linear fallback on failure.
+-199 tests pass including actual Vulkan shader/binding/UBO contracts, odd-sized thin-occluder coverage, traversal math and resource control checks. No in-game FPS or quality measurements yet.
+
 ## 0.28.0 — Surface shadow filter budgets
 
 - Default surface PCF now16 taps per cascade; independent shadow_filter fast/balanced/high gives4/16/36 taps. High preserves the existing5-texel filter; reduced budgets use narrower footprints.

@@ -1,11 +1,12 @@
 // Appended to the active native terrain fragment shader after renaming its main.
 uniform sampler2D WaterHdr;
 uniform sampler2D WaterDepth;
+uniform sampler2D WaterHzb;
 uniform sampler2D EmissiveBloom;
 in float waterSkyAccess;
 layout(std140) uniform Projection { mat4 ProjMat; };
 layout(std140) uniform WaterSettings {
-    vec4 WaterStill;vec4 WaterFlow;vec4 WaterCamera;vec4 WaterParameters;
+    vec4 WaterStill;vec4 WaterFlow;vec4 WaterCamera;vec4 WaterParameters;vec4 WaterTrace;
 };
 layout(std140) uniform VisualSettings {vec4 ToneBloom;vec4 MaterialFade;};
 layout(std140) uniform AtmosphereSettings {vec4 AtmosphereParameters;};
@@ -47,7 +48,7 @@ bool reflectionGuide(vec3 point,out vec2 uv,out float gap) {
     gap=length(point)-length(hit);
     return true;
 }
-vec4 screenReflection(vec3 surface,vec3 normal,vec3 direction) {
+vec4 linearReflection(vec3 surface,vec3 normal,vec3 direction) {
     int steps=int(WaterParameters.w);
     if(steps<=0 || normal.y<.5)return vec4(0);
     vec3 origin=surface+normal*.08;
@@ -79,6 +80,70 @@ vec4 screenReflection(vec3 surface,vec3 normal,vec3 direction) {
         previousValid=true;previousGap=gap;previousT=t;
     }
     return vec4(0);
+}
+// Solve the ray's projected crossing of a screen-cell boundary (perspective, not linear UV).
+float boundaryTime(float originAxis,float rayAxis,float originW,float rayW,float uv,float current) {
+    float ndc=uv*2.0-1.0,denominator=rayAxis-ndc*rayW;
+    if(abs(denominator)<1e-9)return 48.0;
+    float crossing=(ndc*originW-originAxis)/denominator;
+    return crossing>current?min(crossing,48.0):48.0;
+}
+vec4 hzbReflection(vec3 surface,vec3 normal,vec3 direction) {
+    if(WaterParameters.w<=0.0 || normal.y<.5)return vec4(0);
+    vec3 origin=surface+normal*.08;
+    mat3 rotation=transpose(mat3(ViewToWorld));
+    vec4 start=ProjMat*vec4(rotation*origin,1),ray=ProjMat*vec4(rotation*direction,0);
+    vec2 screenDirection=ray.xy*start.w-start.xy*ray.w;
+    ivec2 fullSize=textureSize(WaterDepth,0);
+    int top=min(5,int(WaterTrace.y)),level=top;
+    float t=.15;
+    for(int visit=0;visit<128;visit++) {
+        if(visit>=int(WaterTrace.z) || t>=48.0)break;
+        vec4 point=start+ray*t;
+        if(point.w<=.001)return vec4(0);
+        vec3 projected=point.xyz/point.w;
+        vec2 uv=projected.xy*.5+.5;
+        if(projected.z<0.0 || projected.z>1.0 || any(lessThan(uv,vec2(.002))) || any(greaterThan(uv,vec2(.998))))return vec4(0);
+        ivec2 size=level<0?fullSize:textureSize(WaterHzb,level);
+        int span=1<<(level+1); // level0 covers2x2 full-resolution pixels
+        ivec2 cell=clamp(ivec2(uv*vec2(fullSize)+sign(screenDirection)*1e-5)/span,ivec2(0),size-1);
+        ivec2 lower=cell*span,upper=(cell+1)*span;
+        // Odd-sized mip tails merge into the last cell; use its actual screen footprint.
+        if(cell.x==size.x-1)upper.x=fullSize.x;
+        if(cell.y==size.y-1)upper.y=fullSize.y;
+        vec2 border=vec2(screenDirection.x>0.0?upper.x:lower.x,screenDirection.y>0.0?upper.y:lower.y)/vec2(fullSize);
+        float end=min(boundaryTime(start.x,ray.x,start.w,ray.w,border.x,t),boundaryTime(start.y,ray.y,start.w,ray.w,border.y,t));
+        vec4 endpoint=start+ray*end;
+        if(endpoint.w<=.001) { if(level>=0){level--;continue;}return vec4(0); }
+        float endDepth=endpoint.z/endpoint.w;
+        float nearest=level<0?texelFetch(WaterDepth,cell,0).r:texelFetch(WaterHzb,cell,level).r;
+        // Reversed-Z: skip only when the whole ray segment is in front of every surface.
+        if(nearest>0.0 && min(projected.z,endDepth)<=nearest+1e-7) {
+            if(level>=0){level--;continue;}
+            float denominator=ray.z-nearest*ray.w;
+            if(abs(denominator)>1e-9 && projected.z>=nearest-1e-7 && endDepth<=nearest+1e-7) {
+                float hitT=(nearest*start.w-start.z)/denominator;
+                if(hitT>=t-1e-5 && hitT<=end+1e-5) {
+                    vec2 hitUv;float gap;
+                    if(!reflectionGuide(origin+direction*hitT,hitUv,gap))return vec4(0);
+                    vec4 hdr=texture(WaterHdr,hitUv);
+                    vec3 hit=waterPosition(hitUv,texture(WaterDepth,hitUv).r);
+                    float distance=length(hit),tolerance=max(.12,distance*.004);
+                    if(hdr.a<=0.0 || abs(hdr.a-distance)>max(.04,distance*.002) || abs(gap)>tolerance)return vec4(0);
+                    float borderFade=min(min(hitUv.x,1.0-hitUv.x),min(hitUv.y,1.0-hitUv.y));
+                    float confidence=smoothstep(.005,.08,borderFade)*(1.0-smoothstep(36.0,48.0,hitT))
+                        *(1.0-smoothstep(tolerance*.5,tolerance,abs(gap)));
+                    return vec4(hdr.rgb,confidence);
+                }
+            }
+        }
+        t=end+max(1e-5,end*1e-6);
+        level=min(level+1,top);
+    }
+    return vec4(0); // Bounded/offscreen/unsupported hit falls back to sky.
+}
+vec4 screenReflection(vec3 surface,vec3 normal,vec3 direction) {
+    return WaterTrace.x>.5?hzbReflection(surface,normal,direction):linearReflection(surface,normal,direction);
 }
 vec2 waveSlope(vec2 position,float phase) {
     // Periodic, wind-biased ripples with independent harmonics; suppress unresolved wavelengths.

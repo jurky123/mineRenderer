@@ -36,7 +36,7 @@ class WaterPipelineTest {
                 var outputs=new ArrayList<String>();for(Object item:vs.outputs()){var name=item.getClass().getDeclaredMethod("name");name.setAccessible(true);outputs.add((String)name.invoke(item));}
                 assertTrue(outputs.contains("waterSkyAccess"));fs.rebind(outputs,entries);
                 var samplers=new HashSet<String>();for(Object item:fs.samplers()){var name=item.getClass().getDeclaredMethod("name");name.setAccessible(true);samplers.add((String)name.invoke(item));}
-                assertTrue(samplers.containsAll(List.of("Sampler0","WaterHdr","WaterDepth","EmissiveBloom")));
+                assertTrue(samplers.containsAll(List.of("Sampler0","WaterHdr","WaterDepth","WaterHzb","EmissiveBloom")));
                 assertFalse(samplers.contains("SceneColor"));
                 try(var stack=MemoryStack.stackPush()) {
                     var pointer=stack.callocPointer(1);assertEquals(0,Spvc.spvc_context_create(pointer));long context=pointer.get(0);
@@ -82,7 +82,7 @@ class WaterPipelineTest {
         try(var loader=loader()) {
             var type=Class.forName("com.voxellight.adapter.WaterPass",true,loader);
             var ctor=type.getDeclaredConstructor();ctor.setAccessible(true);var water=ctor.newInstance();
-            for(var option:List.of("setReflections","setWaves")) {
+            for(var option:List.of("setReflections","setWaves","setHzb")) {
                 var method=type.getDeclaredMethod(option,boolean.class);method.setAccessible(true);method.invoke(water,false);
             }
             var strength=type.getDeclaredMethod("setWaveStrength",float.class);strength.setAccessible(true);strength.invoke(water,.2f);
@@ -90,13 +90,30 @@ class WaterPipelineTest {
             var quality=type.getDeclaredMethod("setQuality",com.voxellight.world.VisualQuality.class);quality.setAccessible(true);quality.invoke(water,com.voxellight.world.VisualQuality.HIGH);
             var phase=type.getDeclaredField("wavePhase");phase.setAccessible(true);phase.set(water,1.25);
             type.getMethod("close").invoke(water);
-            for(String field:List.of("reflectionsEnabled","wavesEnabled")) {
+            for(String field:List.of("reflectionsEnabled","wavesEnabled","hzbEnabled")) {
                 var value=type.getDeclaredField(field);value.setAccessible(true);assertEquals(false,value.get(water));
             }
             var value=type.getDeclaredField("waveStrength");value.setAccessible(true);assertEquals(.2f,value.get(water));
             value=type.getDeclaredField("waveSpeed");value.setAccessible(true);assertEquals(0f,value.get(water));
             value=type.getDeclaredField("quality");value.setAccessible(true);assertEquals(com.voxellight.world.VisualQuality.HIGH,value.get(water));
             assertEquals(1.25,phase.get(water));
+        }
+    }
+
+    @Test void pyramidPassHasExplicitMipAreaAndWaterHzbOptionSurvivesReload() throws Exception {
+        try(var loader=loader()) {
+            var type=Class.forName("com.voxellight.adapter.DepthPyramid",true,loader);
+            var descriptor=type.getDeclaredMethod("descriptor",com.mojang.blaze3d.textures.GpuTextureView.class,int.class,int.class);descriptor.setAccessible(true);
+            for(int[] size:new int[][]{{427,240},{213,120},{1,1}}) {
+                var pass=(com.mojang.blaze3d.systems.RenderPassDescriptor)descriptor.invoke(null,null,size[0],size[1]);
+                assertEquals(new com.mojang.blaze3d.systems.RenderPass.RenderArea(0,0,size[0],size[1]),pass.renderArea);
+                assertNull(pass.depthAttachment);assertEquals(1,pass.colorAttachments.size());
+            }
+            type=Class.forName("com.voxellight.adapter.WaterPass",true,loader);
+            var constructor=type.getDeclaredConstructor();constructor.setAccessible(true);var water=constructor.newInstance();
+            var method=type.getDeclaredMethod("setHzb",boolean.class);method.setAccessible(true);method.invoke(water,true);
+            type.getMethod("close").invoke(water);
+            var option=type.getDeclaredField("hzbEnabled");option.setAccessible(true);assertEquals(true,option.get(water));
         }
     }
 

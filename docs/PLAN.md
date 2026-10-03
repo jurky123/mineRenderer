@@ -204,3 +204,7 @@ Implemented packed material MRT (16B/pixel) and temporal-shadow opt-in. Validate
 ## 0.28 surface shadow sampling budgets
 
 Implemented4/16/36-tap continuous PCF and balanced default, preserving high reference. User-reported temporal-off gain15 FPS reinforces opt-in history. Compare filter appearance/pass timings before committing to screen-space visibility or HZB infrastructure.
+
+## 0.29 HZB infrastructure and water consumer
+
+Implemented optional conservative max-depth pyramid and hierarchical water SSR, with profiler stage and linear reference. Default promotion requires total-cost and image comparison. Remaining review work: compact directional visibility, volumetric/froxel sampling, single-raster material capture, clustered lights and a separate RTX capability/interop POC.

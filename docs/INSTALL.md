@@ -6,7 +6,7 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.28.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.29.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -446,3 +446,9 @@ Check `surface_normal`, `material_coverage`, `emission`, then `foundation`: nega
 `/voxellight shadow_filter balanced` is the new default,16 taps per cascade. `high` restores the previous36-tap surface filter; `fast` uses4. Lower budgets have sharper edges and can reveal more distant aliasing. World bias,128-block range and dynamic shadow union are unchanged; volume/reflection steps are controlled separately by quality. Temporal and epochs remain off.
 
 Compare balanced/high at identical camera/time near a building and in a forest. Check low sun, stairs, leaves, moving animals, cascade seams and slow walking. Use profile on and export each comparison. Status reports shadowFilter/shadowFilterTaps. Full checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/SHADOW-FILTERS.md
+
+### 0.29.0 — HZB reflection comparison
+
+Use `/voxellight water_hzb on` to enable the new hierarchical screen-space trace; `off` restores linear tracing (default). Requires water_reflections on. The half-resolutionR32 depth pyramid adds4.69 MiB at1440p/10.55 MiB at4K, bounded by16 MiB. Quality fast/balanced/high chooses64/96/128 hierarchy visits.
+
+Compare the same shoreline/building/ocean view on/off, especially grazing water, thin pillars/trees and screen edges. Check FPS and export profile on runs for both: the new water_hzb stage is pyramid overhead; native translucent includes SSR and other translucent work. Test odd-sized windows, F3+T, underwater and dimensions. Temporal/epochs remain off, density0.001 and waves0.09 unchanged. Checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/HZB.md

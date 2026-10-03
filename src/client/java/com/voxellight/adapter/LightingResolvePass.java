@@ -68,6 +68,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setAtmosphereDensity(float density){composite.setAtmosphereDensity(density);}
     void setExposure(float ev){composite.setExposure(ev);}
     void setWater(boolean value){composite.setWater(value);}
+    void setWaterHzb(boolean value){composite.setWaterHzb(value);}
     void setWaterReflections(boolean value){composite.setWaterReflections(value);}
     void setWaterWaves(boolean value){composite.setWaterWaves(value);}
     void setWaveStrength(float value){composite.setWaveStrength(value);}
