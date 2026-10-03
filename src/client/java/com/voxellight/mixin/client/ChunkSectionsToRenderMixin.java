@@ -27,6 +27,6 @@ abstract class ChunkSectionsToRenderMixin {
     // Terrain diagnostics resolve before entities, translucency, weather, particles and hand/UI.
     @Inject(method = "renderGroup(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayerGroup;Lcom/mojang/blaze3d/textures/GpuSampler;)V", at = @At("TAIL"))
     private void voxellight$afterOpaqueTerrain(ChunkSectionLayerGroup group, GpuSampler sampler, CallbackInfo ci) {
-        if (group == ChunkSectionLayerGroup.OPAQUE) VoxelLightClient.probe().renderMaterialTerrain(group.outputTarget(), sampler);
+        if (group == ChunkSectionLayerGroup.OPAQUE) VoxelLightClient.probe().renderMaterialTerrain(group.outputTarget(), sampler,(ChunkSectionsToRender)(Object)this);
     }
 }

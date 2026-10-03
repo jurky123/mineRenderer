@@ -45,3 +45,7 @@ Do not immediately add SSR/caustics. First accept this HDR/native-stream seam. N
 ## 0.21.1 screenshot follow-up
 
 Blue grid/dashes in2026-10-03_11.44.01.png prompted moving surface derivatives before native fragment discard and divergent fallback. Neighboring quad/helper lanes must all evaluate the derivatives. Normal rejection now checks zero/nonfinite cross products rather than a fixed screen-scale cutoff, and atlas identification allows1e-6 normalized UV rounding tolerance. Existing HDR/depth guide guards remain; please retest the same shoreline and camera motion.
+
+## 0.22 native background coverage
+
+With native material source, water follows the captured visible-terrain HDR background instead of fading at24–32 blocks. Local reference keeps the old fade. Background validation, sky/unsupported occluder fallback and native translucent/underwater restrictions still apply; this does not add geometry waves or SSR.

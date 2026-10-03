@@ -35,6 +35,8 @@ public final class VoxelLightClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        com.voxellight.adapter.NativeTerrainAttributes.verifyWriter();
+        LoggerFactory.getLogger("VoxelLight").info("Native terrain material writer verified: 36-byte stride, shared visible geometry");
         LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 reference lighting prototype loaded; rendering effects are off by default");
         ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false));
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true));
@@ -210,6 +212,10 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var nativeMaterialCommand=literal("native_material");
+            for(boolean enabled:new boolean[]{true,false})nativeMaterialCommand.then(literal(enabled?"on":"off").executes(context->{
+                PROBE.setNativeMaterial(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: material source "+(enabled?"native visible terrain":"local reference")));return 1;
+            }));
             var distanceCommand = literal("shadow_distance")
                     .then(argument("blocks", IntegerArgumentType.integer(12, 48)).executes(context -> {
                         int distance = IntegerArgumentType.getInteger(context, "blocks");
@@ -217,7 +223,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(waterCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(waterCommand).then(nativeMaterialCommand));
         });
     }
 }

@@ -10,7 +10,10 @@
     "ShaderManagerMixin",
     "ChunkSectionsToRenderMixin",
     "ModelFeatureRendererMixin",
-    "PreparedFeatureFrameMixin"
+    "PreparedFeatureFrameMixin",
+    "NativeTerrainFormatMixin",
+    "NativeTerrainBufferMixin",
+    "NativeTerrainCompilerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

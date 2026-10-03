@@ -59,7 +59,7 @@ void main() {
     vec3 transmitted=base*transmission+body*(1.0-transmission);
     float fresnel=.02+.98*pow(1.0-clamp(dot(normal,viewDirection),0.0,1.0),5.0);
     vec3 radiance=mix(transmitted,sky,fresnel);
-    float coverage=(1.0-smoothstep(WaterParameters.x,WaterParameters.y,length(surface)))*clamp(ChunkVisibility,0.0,1.0);
+    float coverage=(ToneBloom.w>.5?1.0-smoothstep(WaterParameters.x,WaterParameters.y,length(surface)):1.0)*clamp(ChunkVisibility,0.0,1.0);
     // Fully admitted water replaces the native fragment with a transmitted HDR background, tone mapped once.
     fragColor=mix(fragColor,vec4(displayColor(radiance,surface,waterSkyAccess,uv),1.0),coverage);
 }

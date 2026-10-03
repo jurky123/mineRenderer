@@ -81,6 +81,22 @@ class MixinPackagingTest {
         }
     }
 
+    @Test
+    void nativeFormatFirstBuilderHookTargetsOnlyBlockLayout() throws Exception {
+        var target=new ClassNode(Opcodes.ASM9);
+        new ClassReader("com/mojang/blaze3d/vertex/DefaultVertexFormat").accept(target,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+        var initializer=target.methods.stream().filter(m->m.name.equals("<clinit>")).findFirst().orElseThrow();
+        for(var instruction:initializer.instructions){
+            if(instruction instanceof MethodInsnNode call && call.owner.equals("com/mojang/blaze3d/vertex/VertexFormat$Builder") && call.name.equals("build")){
+                var next=instruction.getNext();while(next!=null && next.getOpcode()<0)next=next.getNext();
+                var assignment=assertInstanceOf(org.objectweb.asm.tree.FieldInsnNode.class,next);
+                assertEquals(Opcodes.PUTSTATIC,assignment.getOpcode());assertEquals("BLOCK",assignment.name);
+                return;
+            }
+        }
+        fail("Missing BLOCK format builder");
+    }
+
     private static Object annotationValue(AnnotationNode annotation, String key) {
         for (int i = 0; i < annotation.values.size(); i += 2) {
             if (annotation.values.get(i).equals(key)) return annotation.values.get(i + 1);

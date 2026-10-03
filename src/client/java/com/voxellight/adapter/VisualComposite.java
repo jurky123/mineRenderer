@@ -65,7 +65,7 @@ final class VisualComposite implements AutoCloseable {
                     .putVec4(Atmosphere.weatherDensity(atmosphereDensity,sky.rainBrightness),
                             mc.level==null?0:(float)(mc.gameRenderer.mainCamera().position().y-mc.level.getSeaLevel()),atmosphereActive?1:0,Atmosphere.MAX_DISTANCE).get());
             encoder.writeToBuffer(visualSettings.slice(),Std140Builder.onStack(stack,VisualPolish.SETTINGS_BYTES)
-                    .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,polished && coverageBlend?1:0)
+                    .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,polished && coverageBlend && !material.nativeTerrain()?1:0)
                     .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,0,0).get());
         }
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
@@ -77,6 +77,7 @@ final class VisualComposite implements AutoCloseable {
             pass.setUniform("AtmosphereSettings",atmosphereSettings);
             pass.setUniform("LightingEnvironment",environment);
             pass.bindTexture("MaterialEmission",material.view(2),nearest);
+            pass.bindTexture("MaterialNormal",material.view(1),nearest);
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindTransform(pass);
             pass.setUniform("Fog",RenderSystem.getShaderFog());
@@ -88,7 +89,7 @@ final class VisualComposite implements AutoCloseable {
         return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/lighting_output"))
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting_output"))
-                .withBindGroupLayout(BindGroupLayout.builder().withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
+                .withBindGroupLayout(BindGroupLayout.builder().withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withSampler("MaterialNormal").withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("Fog",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())

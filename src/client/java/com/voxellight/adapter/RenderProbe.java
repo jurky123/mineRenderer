@@ -187,6 +187,13 @@ public final class RenderProbe {
         renderPass(target, null);
     }
 
+    public void setNativeMaterial(boolean value){material.setNativeTerrain(value);lighting.invalidateHistory();materialFrameReady=false;}
+    public void renderMaterialTerrain(RenderTarget target, com.mojang.blaze3d.textures.GpuSampler terrainSampler,net.minecraft.client.renderer.chunk.ChunkSectionsToRender terrain) {
+        if(!mode.isMaterial())return;
+        currentTerrain=terrain;
+        try{renderMaterialTerrain(target,terrainSampler);}finally{currentTerrain=null;material.setNativeSubmissions(null);}
+    }
+    private net.minecraft.client.renderer.chunk.ChunkSectionsToRender currentTerrain;
     public void renderMaterialTerrain(RenderTarget target, com.mojang.blaze3d.textures.GpuSampler terrainSampler) {
         if (!mode.isMaterial()) return;
         materialPointObserved = true;
@@ -276,6 +283,7 @@ public final class RenderProbe {
             if (mode == Mode.COLOR || mode.isShadow() || (mode.isMaterial() && mode != Mode.FOUNDATION)) {
                 encoder.copyTextureToTexture(target.getColorTexture(), scratch, 0, 0, 0, 0, 0, target.width, target.height);
             }
+            material.setNativeSubmissions(currentTerrain);
             if (mode == Mode.FOUNDATION) {
                 releaseScratch();
                 lighting.render(encoder,target,material,shadows,terrainSampler);

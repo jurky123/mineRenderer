@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.21.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.22.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.21.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.22.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -354,3 +354,11 @@ status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world r
 ## 0.21.1 water seams 复测
 
 修复截图中blue grid/dashes：fluid normal derivatives在native alpha discard和每pixel fallback之前计算，取消依赖屏幕尺度的normal cutoff，允许UV边界rounding。请在同一水岸位置比较water off/on、缓慢移动和远近视角，检查blue seams是否消失。HDR背景缺失仍native，不是扩大coverage。
+
+## 0.22 Native Material Coverage
+
+默认native material source。进入世界后 `/voxellight mode foundation`；用 `/voxellight mode material_coverage` 检查远山/建筑/植物是否green，`surface_normal`检查斜面法线。不再按32 blocks切换整片画面回vanilla；材质范围跟随原生可见terrain。天空/透明/unsupported raw emitters仍native。
+
+`/voxellight native_material off`恢复局部material reference；`on`恢复native，不需要扩大section窗口。该开关只切换material capture，不撤销启动时的native BLOCK扩展：36-byte stride，额外8 bytes/vertex。仅验证原生26.2 terrain布局；替换编译器/硬编码28-byte布局的mod尚未验证。阴影仍最多48 blocks，local shadowed lights保持近场；不是所有效果距离已解锁。
+
+验收：16/24/32 chunks的terrain coverage、快速飞行、torch/block edit、F3+T、resize、维度切换，并记录FPS/frame-time。支持的water底面需有有效HDR与depth匹配；Fabulous/水下保留native。此环境仅可验证shader/CPU及启动至无DISPLAY的GLFW边界，不能代替Vulkan实机验收。

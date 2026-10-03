@@ -108,12 +108,16 @@ vec4 sampleRGSS(sampler2D source, vec2 uv, vec2 pixelSize) {
 void main() {
     vec4 texel = UseRgss == 1 ? sampleRGSS(Sampler0, texCoord, 1.0 / vec2(TextureSize))
             : sampleNearest(Sampler0, texCoord, 1.0 / vec2(TextureSize));
+    if(emissionFlags.x<0)discard; // native raw/unsupported emitters have no material marker
     int flags = emissionFlags.y >> 4;
     if ((flags & 1) != 0 && texel.a * unlitTint.a < 0.5) discard;
     // Encoded unlit albedo preserves dark RGBA8 colors. Decode once in the future lighting resolve.
     // Excludes native lightmap, face shading, vertex AO and fog.
     outAlbedo = vec4(linearToSrgb(srgbToLinear(texel.rgb) * srgbToLinear(unlitTint.rgb)), float(flags) / 255.0);
     outNormal = vec4(normalize(surfaceNormal), 1.0);
+#ifdef NATIVE_TERRAIN
+    outNormal.a=2.0+clamp(ChunkVisibility,0.0,1.0);
+#endif
     // Material strengths only. This is deliberately not a claim of emissive RGB radiance.
     outEmission = vec4(float(emissionFlags.x) / 15.0, float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));
 }

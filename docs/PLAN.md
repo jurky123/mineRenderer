@@ -1,6 +1,6 @@
 # VoxelLight 实施计划
 
-最新优先级：用户确认0.21.1水面接缝修复，但指出局部覆盖半径过小。先推进[native material stream与分级距离方案](RANGE.md)，再做volumetrics。128 blocks为首个验证目标，不是已实现范围；不直接放大duplicate mesh窗口。
+最新优先级：用户确认0.21.1水面接缝修复，但指出局部覆盖半径过小。0.22已实现[native material stream](NATIVE-COVERAGE.md)借用原生draw+inline attributes，native material覆盖跟随visible terrain，实机pending；shadow范围仍48 blocks。先验收与扩展独立shadow/caster预算，再做volumetrics；不放大duplicate material mesh窗口。
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 

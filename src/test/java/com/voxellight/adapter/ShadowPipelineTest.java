@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX,pipeline.getShaderDefines());
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT,pipeline.getShaderDefines())) {
@@ -101,7 +101,7 @@ class ShadowPipelineTest {
                         if (format != null) format.getElements().forEach(element -> inputs.add(element.name()));
                     }
                     vertex.rebind(inputs, entries);
-                    if (field.equals("CAPTURE") || field.equals("CULL") || field.equals("NO_CULL")) {
+                    if (field.equals("CAPTURE") || field.equals("NATIVE_CAPTURE") || field.equals("CULL") || field.equals("NO_CULL")) {
                         int location = 0;
                         for (String input : inputs) {
                             Object reflected = null;
@@ -122,7 +122,7 @@ class ShadowPipelineTest {
                     }
                     fragment.rebind(outputs, entries);
                     assertFalse(entries.isEmpty());
-                    if (field.equals("CAPTURE") || field.equals("CULL") || field.equals("NO_CULL")) {
+                    if (field.equals("CAPTURE") || field.equals("NATIVE_CAPTURE") || field.equals("CULL") || field.equals("NO_CULL")) {
                         var names = new ArrayList<String>();
                         for (Object output : fragment.outputs()) {
                             var name = output.getClass().getDeclaredMethod("name"); name.setAccessible(true);
@@ -140,7 +140,7 @@ class ShadowPipelineTest {
                         }
                         assertEquals(field.equals("TEMPORAL") ? List.of("resolvedHdr","nextHistory") : List.of("fragColor","shadowTemporalInput"),names);
                     }
-                    if (!field.equals("CASTER") && !field.equals("ENTITY") && !field.equals("CAPTURE") && !field.equals("CULL") && !field.equals("NO_CULL")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
+                    if (!field.equals("CASTER") && !field.equals("ENTITY") && !field.equals("CAPTURE") && !field.equals("NATIVE_CAPTURE") && !field.equals("CULL") && !field.equals("NO_CULL")) assertNull(pipeline.getDepthStencilState(), "Resolve must not write the world/hand depth");
                 }
             }
         }
@@ -358,7 +358,7 @@ class ShadowPipelineTest {
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
-        var field = Class.forName("com.voxellight.adapter." + (name.equals("OUTPUT") ? "VisualComposite" : name.equals("WATER_STORE") ? "WaterPass" : name.startsWith("BLOOM_") ? "EmissiveBloom" : name.equals("AO") || name.equals("AO_FILTER") ? "AmbientOcclusionPass" : name.equals("TEMPORAL") ? "TemporalShadowHistory" : name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("LIGHTING_TEMPORAL") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
+        var field = Class.forName("com.voxellight.adapter." + (name.equals("OUTPUT") ? "VisualComposite" : name.equals("WATER_STORE") ? "WaterPass" : name.startsWith("BLOOM_") ? "EmissiveBloom" : name.equals("AO") || name.equals("AO_FILTER") ? "AmbientOcclusionPass" : name.equals("TEMPORAL") ? "TemporalShadowHistory" : name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("LIGHTING_TEMPORAL") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("NATIVE_CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);
     }

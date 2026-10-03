@@ -37,4 +37,4 @@ Capture matching images to check real normals, cutout edges, water fallback, dis
 
 ## Current delivery
 
-0.21.1 runtime limits remain unchanged. No expanded-range release is claimed by this design change. Next implementation is the native material-stream proof, ahead of new water/volumetric effects.
+0.22 implements the native material-stream proof using inline compile attributes and one extra raster over borrowed native buffers. Material/display/water coverage no longer has the32-block fade for supported native terrain. Shadow/local-light limits remain unchanged. See [implementation and validation](NATIVE-COVERAGE.md). Single-raster MRT and longer shadow coverage remain pending.

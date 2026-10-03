@@ -1,5 +1,13 @@
 # VoxelLight release history
 
+## 0.22.0 — Native visible terrain material coverage
+
+- Capture real normal, unlit tint, independent block/model emission and flags during the existing native SectionCompiler output; preserve native shaded color, position, UV and light offsets. Inline BLOCK stride28→36 adds8 bytes/vertex even with effects off.
+- Borrow native visible solid/cutout draw lists and section transforms for an extra MRT pass; no material re-tessellation, duplicate material GPU meshes, scene-window admission or one-build/frame warm-up on the native path. Native light updates still rebuild native geometry.
+- Disable the32-block full-lighting/water fade for the native source; retain raw-emitter/depth/medium fallback, native chunk visibility and independent near-field shadow/local-light limits. `/voxellight native_material off` retains the old local comparison path.
+- Single-raster native MRT and longer shadow coverage remain future work; no FPS improvement claim. Automated shaders, packing and pinned mixin selectors are checked; native writer/startup and in-game validation are recorded in NATIVE-COVERAGE.
+
+
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
 ## 0.21.1 water seam fix

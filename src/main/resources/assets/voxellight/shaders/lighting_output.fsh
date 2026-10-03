@@ -4,6 +4,7 @@ uniform sampler2D LightingHdr;
 uniform sampler2D SceneDepth;
 uniform sampler2D EmissiveBloom;
 uniform sampler2D MaterialEmission;
+uniform sampler2D MaterialNormal;
 layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters; }; // density, camera above sea level, enabled, max distance
 layout(std140) uniform LightingEnvironment { vec4 DirectColorStrength; vec4 SkyColorStrength; vec4 HorizonColorLower; };
 layout(std140) uniform VisualSettings {
@@ -82,6 +83,8 @@ void main() {
     vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;
     vec3 displayed=displayColor(hdr.rgb,position,texture(MaterialEmission,texCoord).b,texCoord);
+    float nativeVisibility=texture(MaterialNormal,texCoord).a;
+    if(nativeVisibility>=2.0)displayed=mix(FogColor.rgb,displayed,clamp(nativeVisibility-2.0,0.0,1.0));
     float coverage = ToneBloom.w>.5 ? 1.0-smoothstep(MaterialFade.x,MaterialFade.y,length(position)) : 1.0;
     fragColor = vec4(displayed, coverage);
 }
