@@ -20,10 +20,12 @@ class PassMetricsTest {
         assertEquals(2, metrics.snapshot().size());
         assertEquals(2, metrics.snapshot().getFirst().frame());
         assertEquals(200L, metrics.snapshot().getFirst().gpuNanos());
+        assertEquals(2,metrics.newestGpuSample().frame());
         assertNull(metrics.snapshot().getLast().gpuNanos());
         metrics.clear();
         metrics.completeGpu(3, 300);
         assertTrue(metrics.snapshot().isEmpty());
+        assertNull(metrics.newestGpuSample());
     }
 
     @Test

@@ -19,6 +19,7 @@ layout(std140) uniform ShadowResolveSettings {
     vec4 EpochBlend; // x visibility blend; y surface PCF radius; w enables fixed-angle terrain epochs.
 
 };
+// VOXELLIGHT_ENVIRONMENT_FUNCTIONS
 // VOXELLIGHT_VISUAL_FUNCTIONS
 bool waterSprite(vec2 uv,vec4 bounds){
     // Interpolated UV may round just outside an atlas edge shared by fluid quads.
@@ -161,13 +162,21 @@ vec2 waveSlope(vec2 position,float phase) {
     }
     return WaterParameters.z*slope;
 }
+vec2 rainSlope(vec2 position) {
+    vec2 cell=floor(position*1.3), local=fract(position*1.3)-.5;
+    float phase=fract(CloudOriginTime.w*4.0+envHash(cell));
+    float radius=length(local), ring=radius-phase*.65;
+    float footprint=max(length(dFdx(position)),length(dFdy(position)));
+    float amplitude=exp(-ring*ring*220.0)*(1.0-phase)*(1.0-smoothstep(.1,.7,footprint));
+    return radius>.001?local/radius*amplitude*.045*WeatherControls.w*UnderwaterControls.z:vec2(0);
+}
 void main() {
     // Derivatives require all quad/helper lanes, including pixels which later use native fallback.
     // Evaluating them after background/sprite rejection created native-blue seams and dashes.
     vec2 uv=gl_FragCoord.xy/vec2(textureSize(WaterHdr,0));
     vec3 surface=waterPosition(uv,gl_FragCoord.z);
     vec3 crossed=cross(dFdx(surface),dFdy(surface));
-    vec2 slope=waveSlope(surface.xz+WaterCamera.xz,WaterCamera.w);
+    vec2 slope=waveSlope(surface.xz+WaterCamera.xz,WaterCamera.w)+rainSlope(surface.xz+CloudOriginTime.xy);
     voxellightNativeMain();
     if(!waterSprite(texCoord0,WaterStill) && !waterSprite(texCoord0,WaterFlow))return;
     vec3 base;float thickness;
@@ -186,6 +195,7 @@ void main() {
     vec3 transmission=exp(-vec3(.18,.065,.028)*thickness);
     vec3 reflected=reflect(-viewDirection,normal);
     vec3 sky=mix(HorizonColorLower.rgb,SkyColorStrength.rgb,clamp(reflected.y,0.0,1.0))*SkyColorStrength.a*waterSkyAccess;
+    if(WeatherControls.x>.5){sky=environmentSky(reflected,SkyColorStrength.rgb,HorizonColorLower.rgb,SkyColorStrength.a)*waterSkyAccess;vec4 reflectedCloud=environmentCloud(reflected,vec3(0),DirectColorStrength.rgb,DirectColorStrength.a,SkyColorStrength.rgb);sky=mix(sky,reflectedCloud.rgb,reflectedCloud.a*waterSkyAccess);}
     float specular=pow(max(dot(reflected,LightDirectionAndMask.xyz),0.0),64.0);
     sky+=DirectColorStrength.rgb*DirectColorStrength.a*specular*waterSkyAccess;
     vec4 sceneReflection=screenReflection(surface,normal,reflected);
@@ -194,6 +204,8 @@ void main() {
     vec3 transmitted=base*transmission+body*(1.0-transmission);
     float fresnel=.02+.98*pow(1.0-clamp(dot(normal,viewDirection),0.0,1.0),5.0);
     vec3 radiance=mix(transmitted,sky,fresnel);
+    float foam=(1.0-smoothstep(.05,.65,thickness))*smoothstep(.38,.68,envNoise((surface.xz+CloudOriginTime.xy)*3.0+CloudOriginTime.w)) * clamp(normal.y,0.0,1.0);
+    radiance=mix(radiance,vec3(.62,.73,.76)*(.1+SkyColorStrength.a),foam*.55);
     float coverage=(ToneBloom.w>.5?1.0-smoothstep(WaterParameters.x,WaterParameters.y,length(surface)):1.0)*clamp(ChunkVisibility,0.0,1.0);
     // Fully admitted water replaces the native fragment with a transmitted HDR background, tone mapped once.
     fragColor=mix(fragColor,vec4(displayColor(radiance,surface,waterSkyAccess,uv),1.0),coverage);

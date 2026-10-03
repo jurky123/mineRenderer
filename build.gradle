@@ -58,6 +58,12 @@ sourceSets.test.compileClasspath += sourceSets.client.compileClasspath
 sourceSets.test.runtimeClasspath += sourceSets.client.runtimeClasspath
 
 processResources {
+    inputs.file('src/main/resources/assets/voxellight/shaders/environment.glsl')
+    inputs.file('src/main/resources/assets/voxellight/shaders/motion.glsl')
+    inputs.file('src/main/resources/assets/voxellight/shaders/motion_reuse.glsl')
+    filesMatching('assets/voxellight/shaders/*.fsh') {
+        filter { line -> line == '// VOXELLIGHT_ENVIRONMENT_FUNCTIONS' ? file('src/main/resources/assets/voxellight/shaders/environment.glsl').text : line == '// VOXELLIGHT_MOTION_FUNCTIONS' ? file('src/main/resources/assets/voxellight/shaders/motion.glsl').text : line == '// VOXELLIGHT_MOTION_REUSE' ? file('src/main/resources/assets/voxellight/shaders/motion_reuse.glsl').text : line }
+    }
     inputs.property 'version', project.version
     filesMatching('fabric.mod.json') {
         expand version: project.version

@@ -82,10 +82,11 @@ float visibility(vec3 p) {
     }
     return epochVisible(FarShadowMap,FarNextShadowMap,FarEntityShadowMap,2,p);
 }
+// VOXELLIGHT_ENVIRONMENT_FUNCTIONS
 void main() {
     fragColor=vec4(0,0,0,1);
     float depth=texture(SceneDepth,texCoord).r;
-    if(depth<=0.0 || VolumeParameters.x<.5 || AtmosphereParameters.x<=0.0)return;
+    if(depth<=0.0 || VolumeParameters.x<.5 || (AtmosphereParameters.x<=0.0 && UnderwaterControls.x<.5))return;
     vec4 v=InvProjection*vec4(texCoord*2.0-1.0,depth,1.0);
     if(abs(v.w)<1e-7)return;
     vec3 endpoint=(ViewToWorld*vec4(v.xyz/v.w,1)).xyz;
@@ -96,23 +97,23 @@ void main() {
     int steps=int(VolumeQuality.x);
     float ds=reach/float(steps), transmission=1.0;
     // Fixed interleaved spatial gradient; no frame-varying noise or unvalidated history.
-    float jitter=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))));
+    float jitter=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715)))+VolumeQuality.z*.61803398875);
     float g=VolumeParameters.z, cosine=clamp(dot(ray,LightDirectionAndMask.xyz),-1.0,1.0);
     float phase=VolumeParameters.w*(1.0-g*g)/pow(1.0+g*g-2.0*g*cosine,1.5);
     float skyAccess=clamp(texture(MaterialEmission,texCoord).b,0.0,1.0);
-    vec3 ambient=HorizonColorLower.rgb*(.01+SkyColorStrength.a*1.5)*skyAccess;
+    vec3 ambient=UnderwaterControls.x>.5?vec3(0):HorizonColorLower.rgb*(.01+SkyColorStrength.a*1.5)*skyAccess;
     vec3 scattered=vec3(0);
     for(int i=0;i<32;i++) {
         if(i>=steps)break;
         vec3 p=ray*((float(i)+jitter)*ds);
         float height=AtmosphereParameters.y+p.y;
-        float tau=min(AtmosphereParameters.x*exp(-clamp(height/48.0,-1.0,4.0))*ds,2.0/float(steps));
+        float tau=min((UnderwaterControls.x>.5?.045:AtmosphereParameters.x*exp(-clamp(height/48.0,-1.0,4.0)))*ds,2.0/float(steps));
         float stepTransmission=exp(-tau);
         // Shadow only direct in-scattering; ambient keeps the stated receiver-skylight approximation.
-        float direct=Coverage.z>0.0?visibility(p):0.0;
-        vec3 source=ambient+DirectColorStrength.rgb*DirectColorStrength.a*phase*direct;
+        float direct=Coverage.z>0.0?visibility(p)*cloudVisibility(p,LightDirectionAndMask.xyz):0.0;
+        vec3 source=ambient+DirectColorStrength.rgb*DirectColorStrength.a*phase*direct*(UnderwaterControls.x>.5?vec3(.16,.50,.65):vec3(1));
         scattered+=transmission*(1.0-stepTransmission)*source;
         transmission*=stepTransmission;
     }
-    fragColor=vec4(scattered,transmission);
+    fragColor=vec4(scattered,UnderwaterControls.x>.5?1.0:transmission);
 }

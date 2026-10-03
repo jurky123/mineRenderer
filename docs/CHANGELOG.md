@@ -1,5 +1,14 @@
 # VoxelLight release history
 
+## 0.35.0 — Raster visual review bundle
+
+- User confirmed PBR and single-raster MRT. Bundle the subsequent review milestones: procedural HDR Overworld sky/sun/moon/stars/weather, cheap world-space clouds and directional cloud shadows.
+- Share compact half-res static camera velocity/depth/normal guides between opt-in opaque HDR TAA and quarter-res volume history. Temporal volume uses4/6/8 jittered steps with guide rejection/clamp; keep8/16/32 current-frame comparison. Dynamic/animated surfaces do not enter history.
+- Add colored underwater absorption/scattering/shadowed shafts, native borrowed water depth mask for caustics, shallow-depth foam and filtered rain ripple slopes.
+- Half-res solid PBR HZB SSR replaces the admitted sky-specular fraction; bilateral upscale and shared HZB allocation with opt-in water path. Misses/rough/unsupported materials preserve fallback; no extra local lights/PT samples.
+- Optional GPU world-region budget controller with hysteresis/manual ceiling, separate world-region exports and performance/balanced/quality presets. TAA/adaptive/shadow epochs remain off by default. Existing CUDA GI/OptiX HDR denoiser preserved; no new RT-core/interop/full PT claim.
+- 221 tests pass, including actual shaders/bindings, motion MRT order and adaptive hysteresis. GPU appearance/stability/FPS acceptance pending. [Review checklist and limits](REVIEW-COMPLETION.md).
+
 ## 0.31.1 — Single-raster native materials
 
 - User confirmed0.31.0 working. Draw native opaque terrain once into native color/depth and all four material targets; share texture filtering, native alpha cutoff and retain native fog/color fallback. Copy native depth for existing consumers.

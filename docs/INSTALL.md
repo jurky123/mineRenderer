@@ -1,6 +1,6 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.31.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap；新增可选OptiX denoised hybrid diffuse GI preview；默认关闭，功能开关不跨游戏启动保存。
+版本：0.35.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap；新增可选OptiX denoised hybrid diffuse GI preview；默认关闭，功能开关不跨游戏启动保存。
 
 稳定性修复与测试：[PT-STABILITY](https://github.com/jurky123/mineRenderer/blob/main/docs/PT-STABILITY.md)。已积累表面每批8样本，新显露且无有效history表面首批32样本；最多10Hz，计算可与150ms显示过渡重叠；不再移动后从全局零样本重新变亮。先测试慢走、转动、跨section、增删块和F3+T；`pathtraceWorkerBatches`是批次数，非全图有效spp。
 
@@ -8,13 +8,28 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.31.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.35.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
+
+## 0.35.0 review bundle
+
+Sky/cloud/weather、shared motion/optional opaque TAA、4/6/8-step temporal volume、underwater/caustics/rain ripples/foam 与half-res solid HZB reflections。[联合测试与预算](https://github.com/jurky123/mineRenderer/blob/main/docs/REVIEW-COMPLETION.md)。NVIDIA backend仍为CUDA diffuse GI + OptiX HDR去噪；没有RT-core traversal、zero-copy、offscreen RT reflection或Full PT。
+
+先 `/voxellight preset balanced`，density继续0.001；天空/日落、雨天、水底和金属/冰是主要比较场景。TAA默认off，adaptive默认off；不宣称未经实测的FPS提升。
 
 ## 命令
 
 | 命令 | 作用 |
 | --- | --- |
+| `/voxellight preset performance` / `balanced` / `quality` | performance保留PBR/简化水，关闭volume/solid SSR/bloom/TAA/PT；balanced开启当前raster效果、关闭TAA/PT；quality开启opaque TAA与已有optional diffuse GI，不是Full PT。 |
+| `/voxellight sky` / `clouds` / `cloud_shadows` `on` / `off` | HDR Overworld sky、cheap world-space cloud layer、directional cloud visibility；遵循视频clouds off。 |
+| `/voxellight underwater` / `caustics` / `rain_ripples` `on` / `off` | 有效receiver的水下absorption/scattering、water mask gated caustics和雨纹。 |
+| `/voxellight volumetric_temporal on` / `off` | 默认on：共享surface/motion rejection + 4/6/8 jittered steps；off恢复current-frame 8/16/32。 |
+| `/voxellight taa on` / `off` | 默认off：reference opaque HDR TAA；不含entity/animated history、transparent water、sky、particles或UI，4K超过budget自动保持current。 |
+| `/voxellight material_reflections on` / `off` | 默认on：half-res solid PBR HDR HZB reflections，bilateral delta composite；miss保持sky approximation，不是RT reflections。 |
+| `/voxellight adaptive_quality on` / `off` | 默认off：delayed GPU world-region budget，30次超预算降/120次低预算升，不超过手动quality上限；只调sample/cadence预算。 |
+| `/voxellight gpu_world_target <4–50>` | GPU world-region target milliseconds，默认16.67；不是完整frame/FPS保证。 |
+
 | `/voxellight pathtrace on` / `off` | 实验性CUDA体素diffuse secondary paths + OptiX HDR去噪；on自动进入foundation，需NVIDIA兼容驱动，每像素persistent EMA，移动时重投影。 |
 | `/voxellight pathtrace_freeze on` / `off` | 等待首个有效GI后停止提交/替换；保留最后GI并继续重投影。保持当前GI过渡权重，恢复后连续过渡；屏外新表面没有冻结GI。 |
 | `/voxellight pathtrace_history on` / `off` | 默认on：每像素confidence/moments + EMA；off比较独立8样本批次，切换清空history。 |
@@ -468,6 +483,6 @@ Compare the same shoreline/building/ocean view on/off, especially grazing water,
 
 PBR默认在polished foundation开启；启动仍off。放置stone、wood、iron、gold、copper和ice，对比`/voxellight pbr off`与`on`，移动观察太阳高光。`/voxellight wetness on|off`比较雨天露天地面。`/voxellight pbr_debug roughness|metal|normal|off`检查材质。静态LabPBR `_n`/`_s`资源包随F3+T重新加载；animated maps、POM、SSS和实体PBR尚未实现。详细预算、材质包配置与实机检查：[Material 2.0](MATERIAL-2.md)。GI仍会在新视角获得后继续细化。
 
-## 0.31.1 Single-raster MRT
+## 0.35.0 Single-raster MRT
 
 在foundation模式对比`/voxellight single_raster off`与`on`。默认on；status应显示`materialRaster=single`。检查plants、远处chunk fade、PBR材质、opaque entity、水、F3+T、resize与维度切换。画面应基本一致；profiler中on为`native_material_single`，没有额外`material_native`地形pass。`off`恢复0.31.0的两次terrain raster。实测FPS尚未知；新pass包含native terrain工作，不能只比较旧material pass单项计时。详见仓库docs/SINGLE-RASTER.md。

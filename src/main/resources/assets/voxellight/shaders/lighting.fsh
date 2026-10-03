@@ -6,6 +6,7 @@ uniform sampler2D MaterialNormal;
 uniform sampler2D MaterialEmission;
 uniform sampler2D MaterialDepth;
 uniform sampler2D SceneDepth;
+uniform sampler2D WaterSurfaceDepth;
 uniform sampler2D ShadowMap;
 uniform sampler2D MiddleShadowMap;
 uniform sampler2D FarShadowMap;
@@ -304,6 +305,7 @@ vec3 ggx(vec3 n,vec3 v,vec3 l,vec3 f0,float alpha) {
     float gl=2.0*nl/(nl+sqrt(a2+(1.0-a2)*nl*nl));
     return fresnel(f0,max(dot(v,h),0.0))*d*gv*gl/(4.0*nv*max(nl,.001))*nl*3.14159265;
 }
+// VOXELLIGHT_ENVIRONMENT_FUNCTIONS
 void main() {
     fragColor = vec4(0.0);
 #ifdef TEMPORAL_SHADOW
@@ -353,7 +355,7 @@ void main() {
     bool foliage = (flags & 1) != 0 && (flags & 16) == 0;
     float coverage = 1.0 - smoothstep(Coverage.x, Coverage.y, distanceToCamera);
     float occlusion = coverage > 0.0 && Coverage.z > 0.0 ? cascadeOcclusion(distanceToCamera, position, normal) : 0.0;
-    float visibility = 1.0 - occlusion * coverage;
+    float visibility = (1.0 - occlusion * coverage)*cloudVisibility(position,LightDirectionAndMask.xyz);
     float skyAccess = clamp(properties.b, 0.0, 1.0);
     float skyFacing = (foliage ? abs(normal.y) : normal.y) * 0.5 + 0.5;
     vec3 sky = mix(HorizonColorLower.rgb, SkyColorStrength.rgb, max(normal.y, 0.0))
@@ -397,6 +399,15 @@ void main() {
     vec3 environmentSpecular=usePbr?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*fresnel(f0,max(dot(shadingNormal,viewDirection),0.0))*mix(1.0,.45,alpha)*ao:vec3(0);
     vec3 directContribution=albedo*diffuseWeight*direct+sunSpecular;
     vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*visibility+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
+    float waterDepth=texture(WaterSurfaceDepth,texCoord).r;
+    vec3 waterPosition=waterDepth>0.0?(ViewToWorld*vec4(reconstruct(texCoord,waterDepth,InvProjection),1)).xyz:vec3(0);
+    bool belowWater=(waterDepth>depth&&waterPosition.y>position.y+.02)||UnderwaterControls.x>.5;
+    float waterTop=UnderwaterControls.x>.5?UnderwaterControls.w-CloudOriginTime.z:waterPosition.y;
+    if(belowWater && UnderwaterControls.y>.5 && position.y<waterTop && normal.y>.0) {
+        float depthBelow=waterTop-position.y;
+        float caustic=causticPattern(position)*exp(-depthBelow*.18)*max(normal.y,0.0)*skyAccess;
+        radiance+=albedo*DirectColorStrength.rgb*DirectColorStrength.a*visibility*caustic*.7;
+    }
     fragColor = vec4(radiance, 1.0);
 #ifdef TEMPORAL_SHADOW
     shadowTemporalInput = vec4(visibility, directContribution);

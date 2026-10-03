@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize a VoxelLight *.passes.csv export; timings are passes, never whole frames."""
+"""Summarize a VoxelLight *.passes.csv export; timings are passes/world render regions, never total frames."""
 import csv
 import math
 import statistics

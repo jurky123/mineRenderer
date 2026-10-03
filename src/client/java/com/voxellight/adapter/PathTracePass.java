@@ -51,7 +51,8 @@ final class PathTracePass implements AutoCloseable {
     void setUploadDelay(boolean value){delayUpload=value;}
     void setRejectionDebug(boolean value){rejectionDebug=value?1:0;}
     private volatile boolean failed;
-    private long handle,lastSubmit;
+    private long handle,lastSubmit,submitInterval=100_000_000L;
+    void setQuality(com.voxellight.world.VisualQuality value){submitInterval=value==com.voxellight.world.VisualQuality.FAST?200_000_000L:100_000_000L;}
     private Key workerKey,displayKey;
     private GpuBuffer uniform,historyUniform;
     private final GpuTexture[] textures=new GpuTexture[6];
@@ -117,7 +118,7 @@ final class PathTracePass implements AutoCloseable {
             try(var stack=MemoryStack.stackPush()){
                 encoder.writeToBuffer(uniform.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(1,debug?1:0,rejectionDebug,key.canDisplay(displayKey)?1:0).get());
             }
-            if((!freeze || !key.canDisplay(displayKey))&&completed.get()==null&&!busy.get()&&System.nanoTime()-lastSubmit>100_000_000L){
+            if((!freeze || !key.canDisplay(displayKey))&&completed.get()==null&&!busy.get()&&System.nanoTime()-lastSubmit>submitInterval){
                 byte[] uuid=gpuUuid();ByteBuffer params=ByteBuffer.allocateDirect(164).order(ByteOrder.nativeOrder());
                 params.putFloat((float)(pos.x()-(center.x()-2)*16)).putFloat((float)(pos.y()-(center.y()-2)*16)).putFloat((float)(pos.z()-(center.z()-2)*16));
                 var light=shadows.light();var direction=light.direction();params.putFloat(direction.x).putFloat(direction.y).putFloat(direction.z);

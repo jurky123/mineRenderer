@@ -11,6 +11,8 @@ public final class PassMetrics {
     public record Sample(long frame, String mode, int width, int height, long cpuNanos, Long gpuNanos) { }
 
     private final int capacity;
+    private Sample newestGpu;
+    public Sample newestGpuSample(){return newestGpu;}
     private final LinkedHashMap<Long, Sample> samples = new LinkedHashMap<>();
 
     public PassMetrics(int capacity) {
@@ -31,8 +33,11 @@ public final class PassMetrics {
         if (gpuNanos < 0) {
             return;
         }
-        samples.computeIfPresent(frame, (key, sample) -> new Sample(sample.frame(), sample.mode(),
-                sample.width(), sample.height(), sample.cpuNanos(), gpuNanos));
+        samples.computeIfPresent(frame, (key, sample) -> {
+            var completed=new Sample(sample.frame(),sample.mode(),sample.width(),sample.height(),sample.cpuNanos(),gpuNanos);
+            if(newestGpu==null||completed.frame()>newestGpu.frame())newestGpu=completed;
+            return completed;
+        });
     }
 
     public int size(){return samples.size();}
@@ -42,7 +47,7 @@ public final class PassMetrics {
     }
 
     public void clear() {
-        samples.clear();
+        samples.clear();newestGpu=null;
     }
 
     public void export(Path path) throws IOException {

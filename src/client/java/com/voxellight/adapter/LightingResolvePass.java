@@ -21,6 +21,12 @@ import java.util.Optional;
 final class LightingResolvePass implements AutoCloseable {
     static final RenderPipeline LIGHTING = lightingPipeline(false);
     static final RenderPipeline LIGHTING_TEMPORAL = lightingPipeline(true);
+    private final WaterSurfaceCapture waterMask=new WaterSurfaceCapture();
+    private final SurfaceEffects surfaces=new SurfaceEffects();
+    private final MotionFrame motion=new MotionFrame();
+    private final EnvironmentPass weather=new EnvironmentPass();
+    boolean replacesClouds(){return weather.replacesClouds();}
+    void setEnvironment(String option,boolean value){switch(option){case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final PathTracePass pathtrace=new PathTracePass();
     private final VisualComposite composite=new VisualComposite();
     private final AmbientOcclusionPass ao = new AmbientOcclusionPass();
@@ -55,6 +61,8 @@ final class LightingResolvePass implements AutoCloseable {
     }
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuSampler terrainSampler) {
         material.capture(encoder,terrainSampler);
+        if(composite.polished()&&!ao.debug()&&pbrDebug==0&&(composite.needsMotion()||surfaces.needsMotion()))motion.prepare(encoder,output,material,actualProjection,projectionObserved);else motion.close();
+        waterMask.render(encoder,output,material,composite.polished()&&weather.caustics()&&!ao.debug());
         shadows.updateLighting(encoder,RenderProbe.Mode.FOUNDATION);
         ao.render(encoder,output,material,shadows);
         boolean useTemporal = temporal.prepare(output,projectionObserved);
@@ -62,10 +70,11 @@ final class LightingResolvePass implements AutoCloseable {
         renderCurrent(encoder,output,material,shadows,useTemporal);
         var result = useTemporal ? temporal.resolve(encoder,hdrView,material,shadows,actualProjection) : hdrView;
         result=pathtrace.render(encoder,output,material,shadows,result,actualProjection,projectionObserved,pbrSettings);
-        composite.render(encoder,output,material,shadows,result,environment,ao,true);
+        if(composite.polished()&&!ao.debug()&&pbrDebug==0)result=surfaces.render(encoder,output,material,shadows,result,environment,pbrSettings,weather,motion);
+        composite.render(encoder,output,material,shadows,result,environment,ao,true,weather,motion);
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
-    void endFrame(){pathtrace.endFrame();projectionObserved=false;composite.endFrame();}
+    void endFrame(){pathtrace.endFrame();motion.endFrame();weather.endFrame();projectionObserved=false;composite.endFrame();}
     void setAmbientOcclusion(boolean enabled,boolean debug){ao.setEnabled(enabled,debug);}
     void setPolished(boolean value){composite.setPolished(value);temporal.invalidate();}
     void setBloom(boolean value){composite.setBloom(value);}
@@ -80,9 +89,13 @@ final class LightingResolvePass implements AutoCloseable {
     void setWaterWaves(boolean value){composite.setWaterWaves(value);}
     void setWaveStrength(float value){composite.setWaveStrength(value);}
     void setWaveSpeed(float value){composite.setWaveSpeed(value);}
+    void setMaterialReflections(boolean value){surfaces.setReflections(value);}
+    void setColorTaa(boolean value){surfaces.setTaa(value);}
+    void jitterProjection(Matrix4f matrix,RenderTarget target){if(composite.polished()&&!ao.debug()&&pbrDebug==0)surfaces.jitter(matrix,target);}
+    void setVolumeTemporal(boolean value){composite.setVolumeTemporal(value);}
     void setVolumeFilter(boolean value){composite.setVolumeFilter(value);}
-    void setQuality(com.voxellight.world.VisualQuality value){composite.setQuality(value);}
-    void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.prepareWater(target,shadows,environment,ao);}
+    void setQuality(com.voxellight.world.VisualQuality value){composite.setQuality(value);surfaces.setQuality(value);pathtrace.setQuality(value);}
+    void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
     void setPathTrace(boolean enabled){pathtrace.setEnabled(enabled);}
     void setPathTraceDenoise(boolean enabled){pathtrace.setDenoise(enabled);}
@@ -96,9 +109,10 @@ final class LightingResolvePass implements AutoCloseable {
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
         renderCurrent(encoder,output,material,shadows,false);
         var result=pathtrace.render(encoder,output,material,shadows,hdrView,actualProjection,projectionObserved,pbrSettings);
-        composite.render(encoder,output,material,shadows,result,environment,ao,false);
+        composite.render(encoder,output,material,shadows,result,environment,ao,false,weather,motion);
     }
     void renderCurrent(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,boolean history) {
+        weather.prepare(encoder,composite.polished()&&!ao.debug());
         var sky = Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
         var light = composite.polished() ? LightingEnvironment.polished(shadows.light(),sky.skybox == DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness)
                 : LightingEnvironment.sample(shadows.light(),sky.skybox == DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);
@@ -121,7 +135,7 @@ final class LightingResolvePass implements AutoCloseable {
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindLighting(pass);
             ao.bind(pass);
-            pass.setUniform("LightingEnvironment",environment);
+            pass.setUniform("LightingEnvironment",environment);weather.bind(pass);waterMask.bind(pass);
             pass.draw(3,1,0,0);
         }
     }
@@ -130,8 +144,8 @@ final class LightingResolvePass implements AutoCloseable {
                 .withRenderArea(new RenderPass.RenderArea(0,0,width,height))
                 .withColorAttachment(hdr,Optional.of(new Vector4f(0))).withColorAttachment(shadow,Optional.of(new Vector4f(1,0,0,0)));
     }
-    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + ", pbr="+pbrEnabled+", wetness="+wetnessEnabled+", pbrDebug="+pbrDebug + temporal.status() + ao.status() +composite.status()+pathtrace.status(); }
-    @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();pathtrace.close();projectionObserved=false;}
+    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + ", pbr="+pbrEnabled+", wetness="+wetnessEnabled+", pbrDebug="+pbrDebug + temporal.status() + ao.status() +composite.status()+weather.status()+motion.status()+surfaces.status()+waterMask.status()+pathtrace.status(); }
+    @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();motion.close();surfaces.close();waterMask.close();weather.close();pathtrace.close();projectionObserved=false;}
     private void releaseBuffers() {
         if (hdrView != null) { hdrView.close(); hdrView=null; }
         if (hdr != null) { hdr.close(); hdr=null; }
@@ -146,9 +160,9 @@ final class LightingResolvePass implements AutoCloseable {
                         .withSampler("MaterialPbr").withSampler("MaterialTable").withUniform("PbrSettings",UniformType.UNIFORM_BUFFER).withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
                         .withSampler("ShadowMap").withSampler("MiddleShadowMap").withSampler("FarShadowMap").withSampler("NextShadowMap").withSampler("MiddleNextShadowMap").withSampler("FarNextShadowMap")
                         .withSampler("EntityShadowMap").withSampler("MiddleEntityShadowMap").withSampler("FarEntityShadowMap")
-                        .withSampler("VoxelOpacity").withSampler("ShapeBounds").withSampler("AmbientVisibility")
+                        .withSampler("WaterSurfaceDepth").withSampler("VoxelOpacity").withSampler("ShapeBounds").withSampler("AmbientVisibility")
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
-                        .withUniform("LocalLightSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())
+                        .withUniform("LocalLightSettings",UniformType.UNIFORM_BUFFER).withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())
                 .withColorTargetState(new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL))
                 .withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false);
         if(history)builder.withShaderDefine("TEMPORAL_SHADOW").withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL));

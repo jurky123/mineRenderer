@@ -40,6 +40,7 @@ final class VisualComposite implements AutoCloseable {
         return true;
     }
     boolean polished(){return polished;}
+    boolean needsMotion(){return polished&&volumetricEnabled&&volumetric.needsMotion();}
     void setPolished(boolean value){polished=value;}
     void setBloom(boolean value){bloomEnabled=value;}
     void setCoverageBlend(boolean value){coverageBlend=value;}
@@ -53,22 +54,24 @@ final class VisualComposite implements AutoCloseable {
     void setWaterWaves(boolean value){water.setWaves(value);}
     void setWaveStrength(float value){water.setWaveStrength(value);}
     void setWaveSpeed(float value){water.setWaveSpeed(value);}
+    void setVolumeTemporal(boolean value){volumetric.setTemporal(value);}
     void setVolumeFilter(boolean value){volumetric.setFiltered(value);}
     void setQuality(com.voxellight.world.VisualQuality value){quality=value;water.setQuality(value);volumetric.setQuality(value);}
 
-    void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao,boolean terrain) {
+    void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao,boolean terrain,EnvironmentPass weather,MotionFrame motion) {
         if(terrain)bloom.render(encoder,output,material,polished && bloomEnabled);
         water.capture(encoder,output,source,shadows,terrain,polished && waterEnabled && !ao.debug());
-        display(encoder,output,shadows,material,source,environment,ao);
+        display(encoder,output,shadows,material,source,environment,ao,weather,motion,terrain);
     }
-    void prepareWater(RenderTarget target,ShadowRenderer shadows,GpuBuffer environment,AmbientOcclusionPass ao) {
-        water.prepareTranslucent(target,shadows,visualSettings,atmosphereSettings,environment,bloom,polished && waterEnabled && !ao.debug());
+    void prepareWater(RenderTarget target,ShadowRenderer shadows,GpuBuffer environment,AmbientOcclusionPass ao,EnvironmentPass weather) {
+        water.prepareTranslucent(target,shadows,visualSettings,atmosphereSettings,environment,weather.settings(),bloom,polished && waterEnabled && !ao.debug());
     }
+    void usePyramid(DepthPyramid shared){water.usePyramid(shared);}
     boolean bindWater(RenderPass pass){return water.bind(pass);}
     void endFrame(){water.endFrame();}
     String status(){return ", look="+(polished?"polished":"reference")+", quality="+quality.name().toLowerCase(java.util.Locale.ROOT)+", exposureEV="+exposureEv+", coverageBlend="+coverageBlendActive+bloom.status()+", atmosphere="+(atmosphereActive?(volumetric.active()?"shadowed opaque medium; analytic water":"analytic aerial perspective"):"off/native")+", atmosphereDensity="+atmosphereDensity+volumetric.status()+water.status();}
     @Override public void close(){water.close();bloom.close();volumetric.close();if(visualSettings!=null){visualSettings.close();visualSettings=null;}if(atmosphereSettings!=null){atmosphereSettings.close();atmosphereSettings=null;}atmosphereActive=false;}
-    private void display(CommandEncoder encoder,RenderTarget output,ShadowRenderer shadows,MaterialCapture material,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao) {
+    private void display(CommandEncoder encoder,RenderTarget output,ShadowRenderer shadows,MaterialCapture material,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao,EnvironmentPass weather,MotionFrame motion,boolean terrain) {
         coverageBlendActive=polished && coverageBlend && !material.nativeTerrain();
         var mc=Minecraft.getInstance();
         var sky=mc.gameRenderer.gameRenderState().levelRenderState.skyRenderState;
@@ -82,7 +85,7 @@ final class VisualComposite implements AutoCloseable {
                     .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,coverageBlendActive?1:0)
                     .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,0,0).get());
         }
-        volumetric.render(encoder,output,material,shadows,atmosphereSettings,environment,atmosphereActive && volumetricEnabled && atmosphereDensity>0 && !ao.debug());
+        if(terrain)volumetric.render(encoder,output,material,shadows,atmosphereSettings,environment,weather,motion,(atmosphereActive && atmosphereDensity>0 || weather.submerged()) && volumetricEnabled && !ao.debug());
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         try (var profile = RenderPassProfile.begin(encoder,"tone_composite"); var pass = encoder.createRenderPass(() -> "VoxelLight tone mapping and native fog",output.getColorTextureView(),Optional.empty())) {
             pass.setPipeline(OUTPUT);
@@ -91,14 +94,14 @@ final class VisualComposite implements AutoCloseable {
             volumetric.bind(pass);
             pass.setUniform("VisualSettings",visualSettings);
             pass.setUniform("AtmosphereSettings",atmosphereSettings);
-            pass.setUniform("LightingEnvironment",environment);
+            pass.setUniform("LightingEnvironment",environment);weather.bind(pass);
             pass.bindTexture("MaterialEmission",material.view(2),nearest);
             pass.bindTexture("MaterialNormal",material.view(1),nearest);
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindTransform(pass);
             pass.setUniform("Fog",RenderSystem.getShaderFog());
             ao.bindSettings(pass);
-            pass.draw(3,1,0,0);
+            pass.draw(3,1,0,0);weather.composed();
         }
     }
     private static RenderPipeline outputPipeline() {
@@ -106,7 +109,7 @@ final class VisualComposite implements AutoCloseable {
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting_output"))
                 .withBindGroupLayout(BindGroupLayout.builder().withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withSampler("MaterialNormal").withSampler("VolumetricScatter").withUniform("VolumetricSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
-                        .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
+                        .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("Fog",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())
                 .withColorTargetState(new ColorTargetState(Optional.of(BlendFunction.ENTITY_OUTLINE_BLIT),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL)).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false).build();

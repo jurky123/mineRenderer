@@ -54,6 +54,7 @@ public final class RenderProbe {
     private GpuPassTimer timer;
     private boolean timerAttempted;
     private long frame;
+    private final AdaptiveBudget adaptive=new AdaptiveBudget();
     private String backend = "not observed";
     private String deviceName = "not observed";
     private String driver = "not observed";
@@ -92,8 +93,18 @@ public final class RenderProbe {
     public void setWaterWaves(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterWaves(value);}
     public void setWaveStrength(float value){RenderSystem.assertOnRenderThread();lighting.setWaveStrength(value);}
     public void setWaveSpeed(float value){RenderSystem.assertOnRenderThread();lighting.setWaveSpeed(value);}
+    public void setVolumeTemporal(boolean value){RenderSystem.assertOnRenderThread();lighting.setVolumeTemporal(value);}
+    public void setMaterialReflections(boolean value){RenderSystem.assertOnRenderThread();lighting.setMaterialReflections(value);}
+    public void setColorTaa(boolean value){RenderSystem.assertOnRenderThread();lighting.setColorTaa(value);}
+    public void jitterWorldProjection(org.joml.Matrix4f matrix){if(mode==Mode.FOUNDATION&&"Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()))lighting.jitterProjection(matrix,net.minecraft.client.Minecraft.getInstance().gameRenderer.mainRenderTarget());}
+    public void setWorldProfiling(boolean value){adaptive.measured(value);}
+    public void setAdaptiveQuality(boolean enabled){adaptive.enabled(enabled);}
+    public void setGpuWorldTarget(float value){adaptive.target(value);}
+    public void beginWorldBudget(){if("Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()))adaptive.begin(mode.name());}
+    public void endWorldBudget(RenderTarget target){lighting.setQuality(adaptive.end(target.width,target.height));}
+    public void exportWorldBudget(java.nio.file.Path path)throws java.io.IOException{adaptive.export(path);}
     public void setVolumeFilter(boolean value){RenderSystem.assertOnRenderThread();lighting.setVolumeFilter(value);}
-    public void setQuality(com.voxellight.world.VisualQuality value){RenderSystem.assertOnRenderThread();lighting.setQuality(value);}
+    public void setQuality(com.voxellight.world.VisualQuality value){RenderSystem.assertOnRenderThread();adaptive.ceiling(value);lighting.setQuality(value);}
     public void prepareWater(RenderTarget target){if(mode==Mode.FOUNDATION && materialFrameReady)lighting.prepareWater(target,shadows);}
     public boolean bindWater(com.mojang.blaze3d.systems.RenderPass pass){return mode==Mode.FOUNDATION && materialFrameReady && lighting.bindWater(pass);}
     public void setExposure(float ev) {RenderSystem.assertOnRenderThread();lighting.setExposure(ev);}
@@ -153,7 +164,7 @@ public final class RenderProbe {
                 + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
                 + (mode.isMaterial() ? entityMaterials.status() + ", entityMaterialPass=" + entityMaterialPass : "")
                 + RenderPassProfile.status() + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
-                + (mode == Mode.FOUNDATION ? ", " + lighting.status() + ", " + material.status() + ", " + shadows.status()
+                + (mode == Mode.FOUNDATION ? ", " + lighting.status()+adaptive.status() + ", " + material.status() + ", " + shadows.status()
                 : mode.isShadow() ? ", " + shadows.status() : mode.isMaterial() ? ", " + material.status() : "");
     }
 
@@ -211,6 +222,8 @@ public final class RenderProbe {
         renderPass(target, null);
     }
 
+    public boolean replacesClouds(){return mode==Mode.FOUNDATION&&lighting.replacesClouds();}
+    public void setEnvironment(String option,boolean value){RenderSystem.assertOnRenderThread();lighting.setEnvironment(option,value);}
     public void setSingleRaster(boolean value){RenderSystem.assertOnRenderThread();material.setSingleRaster(value);}
     public boolean renderNativeOpaque(net.minecraft.client.renderer.chunk.ChunkSectionsToRender terrain,RenderTarget target,com.mojang.blaze3d.textures.GpuSampler sampler){
         if(!mode.isMaterial() || !material.singleRaster() || !"Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()) || net.minecraft.client.Minecraft.getInstance().wireframe)return false;
@@ -365,6 +378,7 @@ public final class RenderProbe {
         material.close();
         lighting.close();
         materialPointObserved = false;
+        adaptive.close();
         resetTiming();
         state = mode == Mode.OFF ? "off" : "waiting for world render";
     }
@@ -435,7 +449,9 @@ public final class RenderProbe {
             if (stream == null) {
                 throw new IllegalArgumentException("Missing shader: " + path);
             }
-            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            String source=new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            if(source.contains("// VOXELLIGHT_ENVIRONMENT_FUNCTIONS")){try(var include=RenderProbe.class.getResourceAsStream("/assets/voxellight/shaders/environment.glsl")){source=source.replace("// VOXELLIGHT_ENVIRONMENT_FUNCTIONS",new String(include.readAllBytes(),StandardCharsets.UTF_8));}}
+            return source;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

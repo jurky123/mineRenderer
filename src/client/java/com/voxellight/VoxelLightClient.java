@@ -55,10 +55,10 @@ public final class VoxelLightClient implements ClientModInitializer {
                         return 1;
                     }))
                     .then(literal("profile").then(literal("on").executes(context -> {
-                        com.voxellight.adapter.RenderPassProfile.setEnabled(true);
+                        com.voxellight.adapter.RenderPassProfile.setEnabled(true);PROBE.setWorldProfiling(true);
                         context.getSource().sendFeedback(Component.literal("VoxelLight: per-pass profiling on; export after the comparison"));return 1;
                     })).then(literal("off").executes(context -> {
-                        com.voxellight.adapter.RenderPassProfile.setEnabled(false);
+                        com.voxellight.adapter.RenderPassProfile.setEnabled(false);PROBE.setWorldProfiling(false);
                         context.getSource().sendFeedback(Component.literal("VoxelLight: per-pass profiling off"));return 1;
                     })))
                     .then(literal("export").executes(context -> {
@@ -67,6 +67,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                             Files.createDirectories(directory);
                             var path = directory.resolve("probe-" + Instant.now().toEpochMilli() + ".csv");
                             PROBE.metrics().export(path);
+                            PROBE.exportWorldBudget(path.resolveSibling(path.getFileName()+".world.csv"));
                             com.voxellight.adapter.RenderPassProfile.export(path.resolveSibling(path.getFileName()+".passes.csv"));
                             SCENE.export(path.resolveSibling(path.getFileName() + ".scene.csv"));
                             Files.writeString(path.resolveSibling(path.getFileName() + ".txt"),
@@ -165,6 +166,11 @@ public final class VoxelLightClient implements ClientModInitializer {
             for(boolean enabled:new boolean[]{true,false})waterCommand.then(literal(enabled?"on":"off").executes(context->{
                 PROBE.setWater(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: HDR water "+enabled+" (foundation)"));return 1;
             }));
+            for(String preset:new String[]{"performance","balanced","quality"})command.then(literal("preset").then(literal(preset).executes(context->{PROBE.setMode(RenderProbe.Mode.FOUNDATION);PROBE.setPbr(true);PROBE.setQuality(preset.equals("performance")?com.voxellight.world.VisualQuality.FAST:preset.equals("quality")?com.voxellight.world.VisualQuality.HIGH:com.voxellight.world.VisualQuality.BALANCED);PROBE.setVolumetric(!preset.equals("performance"));PROBE.setMaterialReflections(!preset.equals("performance"));PROBE.setColorTaa(preset.equals("quality"));PROBE.setBloom(!preset.equals("performance"));PROBE.setPathTrace(preset.equals("quality"));context.getSource().sendFeedback(Component.literal("VoxelLight: "+preset+" preset; quality retains optional NVIDIA diffuse GI, not full PT"));return 1;})));
+            for(String name:new String[]{"volumetric_temporal","taa","material_reflections","adaptive_quality"}){
+                var effectCommand=literal(name);for(boolean enabled:new boolean[]{true,false})effectCommand.then(literal(enabled?"on":"off").executes(context->{switch(name){case "volumetric_temporal"->PROBE.setVolumeTemporal(enabled);case "adaptive_quality"->PROBE.setAdaptiveQuality(enabled);case "taa"->PROBE.setColorTaa(enabled);case "material_reflections"->PROBE.setMaterialReflections(enabled);}context.getSource().sendFeedback(Component.literal("VoxelLight: "+name+" "+enabled));return 1;}));command.then(effectCommand);
+            }
+            command.then(literal("gpu_world_target").then(argument("milliseconds",FloatArgumentType.floatArg(4,50)).executes(context->{float value=FloatArgumentType.getFloat(context,"milliseconds");PROBE.setGpuWorldTarget(value);context.getSource().sendFeedback(Component.literal("VoxelLight: measured GPU world region target "+value+" ms"));return 1;})));
             var reflectionCommand=literal("water_reflections");
             var wavesCommand=literal("water_waves");
             var filterCommand=literal("volumetric_filter");
@@ -252,6 +258,9 @@ public final class VoxelLightClient implements ClientModInitializer {
                     context.getSource().sendFeedback(Component.literal("VoxelLight: light occlusion " + (fine ? "shapes" : "full")));
                     return 1;
                 }));
+            }
+            for(String option:new String[]{"sky","clouds","cloud_shadows","underwater","caustics","rain_ripples"}){
+                var effect=literal(option);for(boolean enabled:new boolean[]{true,false})effect.then(literal(enabled?"on":"off").executes(context->{PROBE.setEnvironment(option,enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: "+option+" "+enabled));return 1;}));command.then(effect);
             }
             var singleRasterCommand=literal("single_raster");
             for(boolean enabled:new boolean[]{true,false})singleRasterCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setSingleRaster(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: single terrain raster "+enabled));return 1;}));

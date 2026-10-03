@@ -27,7 +27,7 @@ final class WaterPass implements AutoCloseable {
             .withShaderDefine("ALPHA_CUTOUT",.1f)
             .withBindGroupLayout(BindGroupLayout.builder().withSampler("WaterHdr").withSampler("WaterDepth").withSampler("WaterHzb").withSampler("EmissiveBloom")
                     .withUniform("WaterSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
-                    .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
+                    .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                     .withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER).build())
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT)).build();
     static final RenderPipeline WATER_STORE=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/water_store"))
@@ -37,11 +37,13 @@ final class WaterPass implements AutoCloseable {
                     .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER).build())
             .withColorTargetState(new ColorTargetState(Optional.empty(),GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL))
             .withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false).build();
-    private final DepthPyramid hzb=new DepthPyramid();
+    private final DepthPyramid ownedHzb=new DepthPyramid();
+    private DepthPyramid hzb=ownedHzb;
+    void usePyramid(DepthPyramid shared){var next=shared==null?ownedHzb:shared;if(next!=hzb){ownedHzb.close();hzb=next;}}
     private boolean hzbEnabled;
     private GpuTexture hdr,depth;
     private GpuTextureView hdrView,depthView;
-    private GpuBuffer settings,visual,atmosphere,environment;
+    private GpuBuffer settings,visual,atmosphere,environment,weather;
     private ShadowRenderer shadows;
     private EmissiveBloom bloom;
     private boolean captured,ready,failed;
@@ -52,8 +54,9 @@ final class WaterPass implements AutoCloseable {
     private double wavePhase;
     private String state="waiting";
     private int width,height;
-    void setReflections(boolean value){reflectionsEnabled=value;if(!value)hzb.close();}
-    void setHzb(boolean value){hzbEnabled=value;hzb.close();}
+    private boolean hzbActive(){return hzbEnabled&&reflectionsEnabled&&hzb.ready();}
+    void setReflections(boolean value){reflectionsEnabled=value;if(!value)ownedHzb.close();}
+    void setHzb(boolean value){hzbEnabled=value;ownedHzb.close();}
     void setWaves(boolean value){wavesEnabled=value;}
     void setWaveStrength(float value){waveStrength=WaterSurface.strength(value);}
     void setWaveSpeed(float value){float speed=WaterSurface.speed(value);advanceWaves();waveSpeed=speed;}
@@ -95,7 +98,7 @@ final class WaterPass implements AutoCloseable {
             captured=true;state="HDR captured; waiting for translucent terrain";
         } catch(RuntimeException e){fail(e);}
     }
-    void prepareTranslucent(RenderTarget target,ShadowRenderer shadows,GpuBuffer visual,GpuBuffer atmosphere,GpuBuffer environment,EmissiveBloom bloom,boolean enabled) {
+    void prepareTranslucent(RenderTarget target,ShadowRenderer shadows,GpuBuffer visual,GpuBuffer atmosphere,GpuBuffer environment,GpuBuffer weather,EmissiveBloom bloom,boolean enabled) {
         ready=false;
         if(!enabled || !captured || failed || !eligible())return;
         var mc=Minecraft.getInstance();
@@ -105,7 +108,7 @@ final class WaterPass implements AutoCloseable {
             if(!RenderSystem.getDevice().precompilePipeline(WATER,WaterPass::shaderSource).isValid())throw new IllegalStateException("Native water shader failed");
             var encoder=RenderSystem.getDevice().createCommandEncoder();
             encoder.copyTextureToTexture(target.getDepthTexture(),depth,0,0,0,0,0,width,height);
-            if(hzbEnabled && reflectionsEnabled)hzb.build(encoder,depthView,width,height);else hzb.close();
+            if(hzbEnabled && reflectionsEnabled)hzb.build(encoder,depthView,width,height);else ownedHzb.close();
             var atlas=(TextureAtlas)mc.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
             var still=atlas.getSprite(Identifier.withDefaultNamespace("block/water_still"));
             var flow=atlas.getSprite(Identifier.withDefaultNamespace("block/water_flow"));
@@ -117,9 +120,9 @@ final class WaterPass implements AutoCloseable {
                         .putVec4(flow.getU0(),flow.getV0(),flow.getU1(),flow.getV1())
                         .putVec4((float)(camera.x%64),(float)(camera.y%64),(float)(camera.z%64),advanceWaves())
                         .putVec4(24,32,wavesEnabled?waveStrength:0,reflectionsEnabled?quality.reflectionSteps():0)
-                        .putVec4(hzb.ready()?1:0,hzb.levels()-1,quality.reflectionSteps()*4,0).get());
+                        .putVec4(hzbActive()?1:0,hzbActive()?hzb.levels()-1:0,quality.reflectionSteps()*4,0).get());
             }
-            this.shadows=shadows;this.visual=visual;this.atmosphere=atmosphere;this.environment=environment;this.bloom=bloom;
+            this.shadows=shadows;this.visual=visual;this.atmosphere=atmosphere;this.environment=environment;this.weather=weather;this.bloom=bloom;
             ready=true;state="native-stream HDR water active";
         } catch(RuntimeException e){fail(e);}
     }
@@ -127,9 +130,9 @@ final class WaterPass implements AutoCloseable {
         if(!ready)return false;
         pass.setPipeline(WATER);
         var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        pass.bindTexture("WaterHzb",hzb.ready()?hzb.view():depthView,nearest);
+        pass.bindTexture("WaterHzb",hzbActive()?hzb.view():depthView,nearest);
         pass.bindTexture("WaterHdr",hdrView,nearest);pass.bindTexture("WaterDepth",depthView,nearest);bloom.bind(pass);
-        pass.setUniform("WaterSettings",settings);pass.setUniform("VisualSettings",visual);pass.setUniform("AtmosphereSettings",atmosphere);pass.setUniform("LightingEnvironment",environment);
+        pass.setUniform("WaterSettings",settings);pass.setUniform("VisualSettings",visual);pass.setUniform("AtmosphereSettings",atmosphere);pass.setUniform("LightingEnvironment",environment);pass.setUniform("EnvironmentSettings",weather);
         shadows.bindTransform(pass);return true;
     }
     static String shaderSource(Identifier id,ShaderType type) {
@@ -143,10 +146,10 @@ final class WaterPass implements AutoCloseable {
                 .withColorAttachment(target,clear?Optional.of(new Vector4f(0)):Optional.empty());
     }
     void endFrame(){captured=ready=false;}
-    String status(){return ", waterHzb="+(hzb.ready()?"active":hzbEnabled?"waiting/fallback":"off")+", waterHzbBytes="+hzb.bytes()+ ", water="+state+", waterBytes="+(hdr==null?0:WaterOptics.targetBytes(width,height))+", waterReflection="+(reflectionsEnabled?(hzb.ready()?"hierarchical; "+quality.reflectionSteps()*4+" visits":"linear; "+quality.reflectionSteps()+" steps"):"sky only")+", waterWaves="+(wavesEnabled?waveStrength:0)+", waterWaveSpeed="+waveSpeed;}
+    String status(){return ", waterHzb="+(hzbActive()?"active":hzbEnabled?"waiting/fallback":"off")+", waterHzbBytes="+(hzb==ownedHzb?hzb.bytes():0)+", waterHzbShared="+(hzb!=ownedHzb)+ ", water="+state+", waterBytes="+(hdr==null?0:WaterOptics.targetBytes(width,height))+", waterReflection="+(reflectionsEnabled?(hzbActive()?"hierarchical; "+quality.reflectionSteps()*4+" visits":"linear; "+quality.reflectionSteps()+" steps"):"sky only")+", waterWaves="+(wavesEnabled?waveStrength:0)+", waterWaveSpeed="+waveSpeed;}
     private void fail(RuntimeException error){close();failed=true;state="failed; native water retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Water reference disabled; native terrain retained",error);}
     @Override public void close() {
-        hzb.close();
+        ownedHzb.close();
         if(hdrView!=null){hdrView.close();hdrView=null;}if(hdr!=null){hdr.close();hdr=null;}
         if(depthView!=null){depthView.close();depthView=null;}if(depth!=null){depth.close();depth=null;}
         if(settings!=null){settings.close();settings=null;}width=height=0;captured=ready=failed=false;

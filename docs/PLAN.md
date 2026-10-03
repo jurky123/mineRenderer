@@ -1,6 +1,6 @@
 # VoxelLight 实施计划
 
-Current 0.31.1 milestone: [single-raster native MRT](SINGLE-RASTER.md) implemented after user acceptance of PBR; compare visual correctness/FPS, then sky/cloud/weather. Earlier 0.31 scope: [Material 2.0](MATERIAL-2.md), packed material ID/LUT, GGX, basic static LabPBR and rain wetness. Accept the material contract before single-raster MRT; then sky/clouds, shared temporal infrastructure, underwater and reflections. PT feature expansion stays frozen; new-view refinement remains observable. Earlier roadmap sections below are historical.
+Current 0.35.0 milestone: [raster review bundle](REVIEW-COMPLETION.md) implements the main visual sequence after accepted PBR/single-raster MRT: sky/cloud/weather, shared compact motion/optional opaque TAA, temporal volume, underwater/caustics/ripples/foam, material HZB SSR and optional adaptive world-region budget. Joint GPU appearance/performance acceptance is pending. Later NVIDIA RT reflection, external-memory/semaphore interop, incremental RT-core scene and Cinematic PT remain a separate track; current diffuse GI policy stays frozen. Earlier roadmap sections below are historical.
 
 最新优先级：0.30.3先修 hybrid GI stability：persistent每像素history、reprojection/confidence/moments、深度/色彩/ownership修正、proxy hysteresis与诊断。先实机检查移动、跨section、ghosting和freeze/history A/B，再决定OptiX temporal flow、rolling clipmap、零拷贝interop或RT-core GAS。当前范围以[CURRENT](CURRENT.md)与[PT-STABILITY](PT-STABILITY.md)为准，不宣称完整PT或性能收益。
 

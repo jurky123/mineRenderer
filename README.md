@@ -4,9 +4,11 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current client kit: [VoxelLight **0.31.1**](https://temp.sh/dClPk/voxellight-client-kit-26.2-0.31.1.zip), single-raster native material capture after confirmed PBR. 219 tests and native kit build pass; GPU appearance/FPS acceptance pending. [Comparison commands](docs/SINGLE-RASTER.md).
+Current client kit: [VoxelLight **0.35.0**](https://temp.sh/cNVVe/voxellight-client-kit-26.2-0.35.0.zip), raster review bundle after accepted PBR/single-raster MRT: sky/cloud/weather, shared motion/optional opaque TAA, temporal volume, underwater/caustics/foam/rain ripples and solid HZB reflections. Build/shader tests pass; joint GPU appearance/FPS acceptance pending. [Scope, budgets and test checklist](docs/REVIEW-COMPLETION.md).
 
 ## 文档
+
+- [Review raster completion / joint checks](docs/REVIEW-COMPLETION.md)：0.35 visual bundle、shared temporal、water/reflections、adaptive预算与future RTX边界。
 
 - [Single-raster native MRT](docs/SINGLE-RASTER.md)：一次terrain raster、shared filtering、reference开关与FPS对比。
 
