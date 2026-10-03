@@ -297,6 +297,11 @@ class ShadowPipelineTest {
                                 assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,6,offset));
                                 assertEquals(368,offset.get(0),"Normal matrix array matches CPU std140 packing");
                             }
+                            if(uniform.nameString().equals("AtmosphereSettings") || uniform.nameString().equals("LightingEnvironment")) {
+                                long block=Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
+                                assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,block,pointer));
+                                assertEquals(uniform.nameString().equals("AtmosphereSettings") ? com.voxellight.world.Atmosphere.SETTINGS_BYTES : com.voxellight.world.LightingEnvironment.SETTINGS_BYTES,pointer.get(0));
+                            }
                             if(uniform.nameString().equals("VisualSettings")) {
                                 long block=Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());
                                 assertEquals(0,Spvc.spvc_compiler_get_declared_struct_size(reflection,block,pointer));

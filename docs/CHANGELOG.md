@@ -2,6 +2,13 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.20.0 analytic aerial perspective
+
+- Bounded height-density extinction/scattering before tone mapping, rain density and analytic directional glow.
+- Overworld dry-camera polished foundation only; native medium fog, unsupported/transparent/sky rendering retained.
+- `atmosphere on|off`, `atmosphere_density 0..0.08`;16-byte settings, no added target/history/geometry.
+- Not shadowed volumetric shafts.0.19 confirmed working;0.20 in-game acceptance pending.
+
 ## 0.19.0 local-light materials and held source
 
 - Replace registry-name color heuristics with bounded exact-ID resource-pack JSON; transactional malformed-file fallback and resource-generation reload.
