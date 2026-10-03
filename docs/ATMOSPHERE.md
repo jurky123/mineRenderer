@@ -27,3 +27,8 @@ Admission requires polished foundation, overworld skybox and camera medium FogTy
 Automated checks compare horizontal optical depth to Beer-Lambert, quadrature to a dense height integral, density/weather/altitude bounds, forward-lobe direction, shader/producer uniform sizes and native GLSL→SPIR-V bindings. No GPU/display is available on the build host; in-game acceptance remains pending.
 
 Check outdoor depth layering and low-sun forward glow, a fully enclosed cave, night/full/new moon, rain, first/third person held lights, plants/animals, native water and lava immersion, Nether/End, resize, F3+T and world exit. Use density0 and atmosphereoff to isolate any color/composition regression. After acceptance, the next substantial pass can target water surface inputs/composition, followed by explicitly shadowed quarter-resolution volume scattering; GI remains deferred.
+
+
+## 0.24 opaque volume override
+
+The analytic description above remains the comparison path and the water display path. With polished Overworld foundation +atmosphere +volumetric enabled and density>0, supported opaque HDR pixels instead use quarter-resolution shadow-marched in-scattering/transmittance. The two paths are not layered. `volumetric off` restores analytic rendering. See[scope and verification](VOLUMETRIC.md).

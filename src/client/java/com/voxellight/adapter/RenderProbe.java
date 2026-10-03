@@ -84,6 +84,7 @@ public final class RenderProbe {
     public void setBloom(boolean value) {RenderSystem.assertOnRenderThread();lighting.setBloom(value);}
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
+    public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setAtmosphereDensity(float density){RenderSystem.assertOnRenderThread();lighting.setAtmosphereDensity(density);}
     public void setWater(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setWater(enabled);}
     public void prepareWater(RenderTarget target){if(mode==Mode.FOUNDATION && materialFrameReady)lighting.prepareWater(target,shadows);}

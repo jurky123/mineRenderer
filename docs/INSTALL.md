@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.23.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.24.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.23.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.24.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -26,8 +26,9 @@
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
 | `/voxellight look polished` / `reference` | foundation 默认polished；reference恢复0.17光照/Reinhard输出，关闭新增bloom/exposure/距离blend；AO/history保持独立。 |
 | `/voxellight water on` / `off` | polished foundation默认on；近处有HDR背景的Fast/Fancy水面：Fresnel/absorption/sky reflection/refraction；水下/Fabulous/缺背景native。 |
-| `/voxellight atmosphere on` / `off` | polished foundation默认on；局部高度/距离haze和朝向光源的analytic glow，非shadowed光柱；水下/非主世界native。 |
-| `/voxellight atmosphere_density 0.002` | 默认0.002，允许0..0.08；可用0.03放大比较，0无haze。 |
+| `/voxellight atmosphere on` / `off` | polished foundation atmosphere总开关；opaque默认shadowed volume，water保留analytic；水下/非主世界native。 |
+| `/voxellight atmosphere_density 0.001` | 默认0.001，允许0..0.08；可用0.003放大比较，0无haze。 |
+| `/voxellight volumetric on` / `off` | Polished Overworld opaque medium：shadowed16-step volume / analytic comparison；density共用atmosphere_density。 |
 | `/voxellight exposure 0.75` | polished默认+0.75EV，允许-2..2，手动曝光，无自动变化。 |
 | `/voxellight bloom on` / `off` | polished默认on；已捕获torch/glowstone等terrain emission的quarter-res glow，非lava/透明/天空bloom或GI。 |
 | `/voxellight coverage_blend on` / `off` | polished默认on；24–32格连续淡回native，避免5³材质窗硬边；off比较原receiver范围。 |
@@ -377,3 +378,14 @@ Use `/voxellight mode foundation`; compare `/voxellight shadow_distance 48` and 
 `/voxellight status` includes `nativeShadowSections`, `nativeShadowLayers`, `nativeShadowPending`, `nativeShadowDuplicateBytes=0`, and `nativeShadowSelectionNs`. Pending counts non-air sections absent/uncompiled in native storage and missing layer uploads. Far casters come from all available compiled native sections in light space, not the camera-visible list; they do not request native compilation. Newly loaded offscreen sections can be missing until Minecraft compiles them. The independent near caster path is retained.
 
 Check low sun, buildings offscreen, moving/rotating, flying, block edits, chunk unload, F3+T, resize and Nether/Overworld transitions. Compare near detail and watch for clipping/acne at cascade transitions. See[extended-shadow contract](EXTENDED-SHADOWS.md).
+
+
+### 0.24.0 — Shadowed volumetric light
+
+Enable `/voxellight mode foundation`. Shadowed opaque atmosphere is enabled in polished Overworld rendering. Preferred density remains0.001. Compare `/voxellight volumetric off` (0.23 analytic haze) and `/voxellight volumetric on`. For a stronger temporary demonstration, try `/voxellight atmosphere_density 0.003`, then restore0.001. Look through trees or a window toward a low sun, with terrain behind the air path.
+
+The first reference uses quarter-resolution16-step shadow marching and depth-guided upsampling; no frame-varying noise or volumetric history. Sun/moon terrain and dynamic shadow maps block direct scattering. The current HDR radiance is attenuated and mixed with scattered light before bloom/exposure/tone/native fog; analytic haze is replaced on admitted opaque pixels. Sky/unsupported surfaces are not overwritten; water keeps its analytic atmosphere path.
+
+`volumetric`, `volumetricBytes` and `volumetricPasses` appear in status. One quarter-sizeRGBA16F buffer uses about1.76MiB at1440p, with8MiB admission cap. March range is at most96 blocks and inside the configured directional-shadow fade. `/voxellight atmosphere off`, density0, `look reference`, underwater and non-Overworld all disable it.
+
+Check tree/window shafts, cave entrance and enclosed cave, moving entities, slow camera motion, foreground silhouette halos, low sun/night/new moon, rain, shoreline/underwater, F3+T, resize, teleport and dimension changes. Low sample count can show spatial noise/steps; no visual acceptance or FPS claim is made before this test. See[VOLUMETRIC.md](VOLUMETRIC.md).

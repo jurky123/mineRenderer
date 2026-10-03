@@ -5,6 +5,8 @@ uniform sampler2D SceneDepth;
 uniform sampler2D EmissiveBloom;
 uniform sampler2D MaterialEmission;
 uniform sampler2D MaterialNormal;
+uniform sampler2D VolumetricScatter;
+layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; };
 layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters; }; // density, camera above sea level, enabled, max distance
 layout(std140) uniform LightingEnvironment { vec4 DirectColorStrength; vec4 SkyColorStrength; vec4 HorizonColorLower; };
 layout(std140) uniform VisualSettings {
@@ -36,6 +38,29 @@ layout(std140) uniform AoSettings {
 };
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
+// These functions stay outside the shared water display function block.
+float volumeGuideDistance(vec2 uv) {
+    float depth=texture(SceneDepth,uv).r;
+    if(depth<=0.0)return 1e6;
+    vec4 p=InvProjection*vec4(uv*2.0-1.0,depth,1.0);
+    return abs(p.w)>1e-7?length(p.xyz/p.w):1e6;
+}
+vec4 filteredVolume(vec2 uv,float receiverDistance) {
+    ivec2 size=textureSize(VolumetricScatter,0);
+    vec2 grid=uv*vec2(size)-.5, phase=fract(grid);
+    ivec2 base=ivec2(floor(grid));
+    vec4 sum=vec4(0);float weight=0.0;
+    for(int y=0;y<2;y++)for(int x=0;x<2;x++) {
+        ivec2 pixel=clamp(base+ivec2(x,y),ivec2(0),size-1);
+        vec2 sampleUv=(vec2(pixel)+.5)/vec2(size);
+        float guide=volumeGuideDistance(sampleUv);
+        float w=(x==0?1.0-phase.x:phase.x)*(y==0?1.0-phase.y:phase.y)
+            *exp(-abs(receiverDistance-guide)/max(.5,receiverDistance*.025));
+        sum+=texelFetch(VolumetricScatter,pixel,0)*w;weight+=w;
+    }
+    // Reject silhouette-crossing samples instead of spreading fog over foreground geometry.
+    return weight>1e-5?sum/weight:vec4(0,0,0,1);
+}
 vec3 linearToSrgb(vec3 c) {
     return mix(1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055,
         c * 12.92, lessThanEqual(c, vec3(0.0031308)));
@@ -63,8 +88,7 @@ vec3 aerialPerspective(vec3 radiance,vec3 position,float skyAccess) {
         +DirectColorStrength.rgb*DirectColorStrength.a*phase*.35;
     return mix(radiance,scattered,haze);
 }
-vec3 displayColor(vec3 inputRadiance,vec3 position,float skyAccess,vec2 uv) {
-    vec3 radiance = aerialPerspective(max(inputRadiance,vec3(0.0)),position,skyAccess);
+vec3 mapColor(vec3 radiance,vec3 position,vec2 uv) {
     radiance = max(radiance + texture(EmissiveBloom,uv).rgb * ToneBloom.z,vec3(0.0)) * ToneBloom.x;
     vec3 mapped = ToneBloom.y>.5 ? clamp(filmicCurve(radiance)/filmicCurve(vec3(6.0)),0.0,1.0)
         : radiance/(vec3(1.0)+radiance);
@@ -74,6 +98,9 @@ vec3 displayColor(vec3 inputRadiance,vec3 position,float skyAccess,vec2 uv) {
     // Native FogColor and main RGBA8 contain display-encoded color. Apply fog once, after tone mapping.
     return mix(encoded,FogColor.rgb,fog*FogColor.a);
 }
+vec3 displayColor(vec3 inputRadiance,vec3 position,float skyAccess,vec2 uv) {
+    return mapColor(aerialPerspective(max(inputRadiance,vec3(0)),position,skyAccess),position,uv);
+}
 void main() {
     vec4 hdr = texture(LightingHdr, texCoord);
     // Unsupported pixels keep their original native color without a SceneColor copy.
@@ -82,7 +109,11 @@ void main() {
     float depth = texture(SceneDepth, texCoord).r;
     vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;
-    vec3 displayed=displayColor(hdr.rgb,position,texture(MaterialEmission,texCoord).b,texCoord);
+    vec3 displayed;
+    if(VolumeParameters.x>.5) {
+        vec4 air=filteredVolume(texCoord,length(position));
+        displayed=mapColor(hdr.rgb*air.a+air.rgb,position,texCoord);
+    } else displayed=displayColor(hdr.rgb,position,texture(MaterialEmission,texCoord).b,texCoord);
     float nativeVisibility=texture(MaterialNormal,texCoord).a;
     if(nativeVisibility>=2.0)displayed=mix(FogColor.rgb,displayed,clamp(nativeVisibility-2.0,0.0,1.0));
     float coverage = ToneBloom.w>.5 ? 1.0-smoothstep(MaterialFade.x,MaterialFade.y,length(position)) : 1.0;

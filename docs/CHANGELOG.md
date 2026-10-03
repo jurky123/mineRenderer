@@ -1,5 +1,13 @@
 # VoxelLight release history
 
+## 0.24.0 — Quarter-resolution shadowed volumetric lighting
+
+- User confirmed0.23 working. Keep preferred atmosphere density0.001 and128-block directional shadows.
+- Add a16-step current-frame air-path integrator with fixed spatial jitter, height density, forward scattering, and blended terrain/dynamic cascade visibility. No volumetric history or moving-frame noise.
+- One quarter-resolutionRGBA16F stores HDR in-scattering and transmittance;8MiB cap, neutral fallback, resize/reload cleanup and status counters. Full-resolution composition uses depth-guided2×2 upscale to reject silhouette-crossing fog.
+- Replace analytic haze on supported opaque HDR pixels, before bloom/exposure/tone mapping and native fog; preserve the existing analytic water path and native sky/unsupported/underwater/non-Overworld behavior.
+- `/voxellight volumetric on|off` compares shadowed medium to the previous analytic path. Ambient sky occlusion and uncompiled-caster coverage remain stated approximations; GPU/visual acceptance pending.
+
 ## 0.23.0 — Extended directional shadows without a larger duplicate cache
 
 - User accepted0.22.1 native material coverage and prefers atmosphere density0.001; adopt that default.

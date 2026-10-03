@@ -157,6 +157,10 @@ public final class VoxelLightClient implements ClientModInitializer {
             for(boolean enabled:new boolean[]{true,false})atmosphereCommand.then(literal(enabled?"on":"off").executes(context->{
                 PROBE.setAtmosphere(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: aerial perspective "+enabled));return 1;
             }));
+            var volumetricCommand=literal("volumetric");
+            for(boolean enabled:new boolean[]{true,false})volumetricCommand.then(literal(enabled?"on":"off").executes(context->{
+                PROBE.setVolumetric(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: shadowed volumetric "+enabled));return 1;
+            }));
             var densityCommand=literal("atmosphere_density").then(argument("density",FloatArgumentType.floatArg(0,.08f)).executes(context->{
                 float density=FloatArgumentType.getFloat(context,"density");PROBE.setAtmosphereDensity(density);
                 context.getSource().sendFeedback(Component.literal("VoxelLight: atmosphere density "+density));return 1;
@@ -224,7 +228,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(waterCommand).then(nativeMaterialCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand));
         });
     }
 }

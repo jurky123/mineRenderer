@@ -23,6 +23,8 @@ final class VisualComposite implements AutoCloseable {
     static final RenderPipeline OUTPUT=outputPipeline();
     private final EmissiveBloom bloom=new EmissiveBloom();
     private final WaterPass water=new WaterPass();
+    private final VolumetricPass volumetric=new VolumetricPass();
+    private boolean volumetricEnabled=true;
     private boolean coverageBlendActive;
     private boolean polished=true,bloomEnabled=true,coverageBlend=true,atmosphereEnabled=true,atmosphereActive,waterEnabled=true;
     private float exposureEv=VisualPolish.DEFAULT_EV,atmosphereDensity=Atmosphere.DEFAULT_DENSITY;
@@ -41,6 +43,7 @@ final class VisualComposite implements AutoCloseable {
     void setBloom(boolean value){bloomEnabled=value;}
     void setCoverageBlend(boolean value){coverageBlend=value;}
     void setAtmosphere(boolean value){atmosphereEnabled=value;}
+    void setVolumetric(boolean value){volumetricEnabled=value;}
     void setAtmosphereDensity(float value){atmosphereDensity=Atmosphere.density(value);}
     void setExposure(float value){VisualPolish.exposure(value);exposureEv=value;}
     void setWater(boolean value){waterEnabled=value;if(!value)water.close();}
@@ -54,8 +57,8 @@ final class VisualComposite implements AutoCloseable {
     }
     boolean bindWater(RenderPass pass){return water.bind(pass);}
     void endFrame(){water.endFrame();}
-    String status(){return ", look="+(polished?"polished":"reference")+", exposureEV="+exposureEv+", coverageBlend="+coverageBlendActive+bloom.status()+", atmosphere="+(atmosphereActive?"analytic aerial perspective":"off/native")+", atmosphereDensity="+atmosphereDensity+water.status();}
-    @Override public void close(){water.close();bloom.close();if(visualSettings!=null){visualSettings.close();visualSettings=null;}if(atmosphereSettings!=null){atmosphereSettings.close();atmosphereSettings=null;}atmosphereActive=false;}
+    String status(){return ", look="+(polished?"polished":"reference")+", exposureEV="+exposureEv+", coverageBlend="+coverageBlendActive+bloom.status()+", atmosphere="+(atmosphereActive?(volumetric.active()?"shadowed opaque medium; analytic water":"analytic aerial perspective"):"off/native")+", atmosphereDensity="+atmosphereDensity+volumetric.status()+water.status();}
+    @Override public void close(){water.close();bloom.close();volumetric.close();if(visualSettings!=null){visualSettings.close();visualSettings=null;}if(atmosphereSettings!=null){atmosphereSettings.close();atmosphereSettings=null;}atmosphereActive=false;}
     private void display(CommandEncoder encoder,RenderTarget output,ShadowRenderer shadows,MaterialCapture material,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao) {
         coverageBlendActive=polished && coverageBlend && !material.nativeTerrain();
         var mc=Minecraft.getInstance();
@@ -70,11 +73,13 @@ final class VisualComposite implements AutoCloseable {
                     .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,coverageBlendActive?1:0)
                     .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,0,0).get());
         }
+        volumetric.render(encoder,output,material,shadows,atmosphereSettings,environment,atmosphereActive && volumetricEnabled && atmosphereDensity>0 && !ao.debug());
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         try (var pass = encoder.createRenderPass(() -> "VoxelLight tone mapping and native fog",output.getColorTextureView(),Optional.empty())) {
             pass.setPipeline(OUTPUT);
             pass.bindTexture("LightingHdr",source,nearest);
             bloom.bind(pass);
+            volumetric.bind(pass);
             pass.setUniform("VisualSettings",visualSettings);
             pass.setUniform("AtmosphereSettings",atmosphereSettings);
             pass.setUniform("LightingEnvironment",environment);
@@ -91,7 +96,7 @@ final class VisualComposite implements AutoCloseable {
         return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/lighting_output"))
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting_output"))
-                .withBindGroupLayout(BindGroupLayout.builder().withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withSampler("MaterialNormal").withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
+                .withBindGroupLayout(BindGroupLayout.builder().withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withSampler("MaterialNormal").withSampler("VolumetricScatter").withUniform("VolumetricSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("Fog",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())

@@ -1,6 +1,6 @@
 # VoxelLight 实施计划
 
-最新优先级：用户确认0.22.1 native material coverage。0.23实现128-block receiver与native compiled offscreen caster借用，保留独立近场缓存与shadow map内存预算，默认atmosphere density0.001。先验收[extended shadows](EXTENDED-SHADOWS.md)，再做quarter-res shadowed volumetrics；不扩大duplicate material/scene窗口。
+最新优先级：用户确认0.23扩展shadow运行。0.24实现quarter-resolution shadowed volumetric：16-step terrain/dynamic shadow marching、depth-guided upscale、HDR composition，无volume temporal history。density0.001保留。先实机验收[VOLUMETRIC](VOLUMETRIC.md)的shafts/noise/edges、透明水面边界与CPU/GPU预算，再决定SSR/refinement或GI。
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 
