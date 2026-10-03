@@ -5,6 +5,9 @@ uniform sampler2D MaterialEmission;
 uniform sampler2D ShadowMap;
 uniform sampler2D MiddleShadowMap;
 uniform sampler2D FarShadowMap;
+uniform sampler2D NextShadowMap;
+uniform sampler2D MiddleNextShadowMap;
+uniform sampler2D FarNextShadowMap;
 uniform sampler2D EntityShadowMap;
 uniform sampler2D MiddleEntityShadowMap;
 uniform sampler2D FarEntityShadowMap;
@@ -14,6 +17,10 @@ layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; vec4 VolumeQu
 layout(std140) uniform ShadowResolveSettings {
     mat4 LightMatrix[3];mat4 ViewToWorld;vec4 LightDirectionAndMask;vec4 Coverage;vec4 CascadeRanges;
     mat4 InvProjection;mat4 LightNormalMatrix[3];
+    mat4 TerrainLightMatrix[3];mat4 TerrainNormalMatrix[3];
+    mat4 NextLightMatrix[3];mat4 NextNormalMatrix[3];
+    vec4 EpochBlend; // Visibility interpolation weight; w enables fixed-angle terrain epochs.
+
 };
 layout(location=0) in vec2 texCoord;
 layout(location=0) out vec4 fragColor;
@@ -31,19 +38,49 @@ float visible(sampler2D terrain,sampler2D dynamicMap,mat4 matrix,vec3 position) 
     }
     return visibility;
 }
+float mapVisible(sampler2D terrain,sampler2D dynamicMap,int cascade,mat4 matrix,mat3 normalMatrix,vec3 position) {
+    vec3 p=(matrix*vec4(position,1)).xyz;
+    vec2 uv=p.xy*.5+.5, pixel=1.0/vec2(textureSize(terrain,0));
+    // Unknown shadow coverage does not manufacture shafts through missing map coverage.
+    if(p.z<=0.0 || p.z>=1.0 || any(lessThan(uv,pixel)) || any(greaterThan(uv,vec2(1)-pixel)))return 0.0;
+    float bias=.0357*length(vec3(matrix[0].z,matrix[1].z,matrix[2].z));
+    vec3 dynamicCenter=(LightMatrix[cascade]*vec4(position,1)).xyz;
+    mat3 toDynamic=mat3(LightMatrix[cascade])*transpose(normalMatrix);
+    float dynamicBias=.0357*length(vec3(LightMatrix[cascade][0].z,LightMatrix[cascade][1].z,LightMatrix[cascade][2].z));
+    float visibility=0.0;
+    for(int y=0;y<2;y++)for(int x=0;x<2;x++) {
+        vec2 tap=uv+(vec2(x,y)-.5)*pixel;
+        float blocker=texture(terrain,tap).r;
+        bool dynamicBlocked=false;
+        if(EpochBlend.z>.5) {
+            vec3 dynamicPoint=dynamicCenter+toDynamic*vec3((tap-uv)*2.0,0);
+            vec2 dynamicUv=dynamicPoint.xy*.5+.5;
+            if(dynamicPoint.z>=0.0 && dynamicPoint.z<=1.0 && all(greaterThanEqual(dynamicUv,vec2(0))) && all(lessThanEqual(dynamicUv,vec2(1))))
+                dynamicBlocked=dynamicPoint.z-dynamicBias>texture(dynamicMap,dynamicUv).r;
+        }
+        visibility+=p.z-bias<=blocker && !dynamicBlocked?.25:0.0;
+    }
+    return visibility;
+}
+float epochVisible(sampler2D first,sampler2D next,sampler2D dynamicMap,int cascade,vec3 p) {
+    if(EpochBlend.w<.5)return visible(first,dynamicMap,LightMatrix[cascade],p);
+    float terrain=mapVisible(first,dynamicMap,cascade,TerrainLightMatrix[cascade],mat3(TerrainNormalMatrix[cascade]),p);
+    if(EpochBlend.x>0.0)terrain=mix(terrain,mapVisible(next,dynamicMap,cascade,NextLightMatrix[cascade],mat3(NextNormalMatrix[cascade]),p),EpochBlend.x);
+    return terrain;
+}
 float visibility(vec3 p) {
     float d=length(p);
     if(d<CascadeRanges.y) {
-        float near=visible(ShadowMap,EntityShadowMap,LightMatrix[0],p);
+        float near=epochVisible(ShadowMap,NextShadowMap,EntityShadowMap,0,p);
         if(d<=CascadeRanges.x)return near;
-        return mix(near,visible(MiddleShadowMap,MiddleEntityShadowMap,LightMatrix[1],p),smoothstep(CascadeRanges.x,CascadeRanges.y,d));
+        return mix(near,epochVisible(MiddleShadowMap,MiddleNextShadowMap,MiddleEntityShadowMap,1,p),smoothstep(CascadeRanges.x,CascadeRanges.y,d));
     }
     if(d<CascadeRanges.w) {
-        float middle=visible(MiddleShadowMap,MiddleEntityShadowMap,LightMatrix[1],p);
+        float middle=epochVisible(MiddleShadowMap,MiddleNextShadowMap,MiddleEntityShadowMap,1,p);
         if(d<=CascadeRanges.z)return middle;
-        return mix(middle,visible(FarShadowMap,FarEntityShadowMap,LightMatrix[2],p),smoothstep(CascadeRanges.z,CascadeRanges.w,d));
+        return mix(middle,epochVisible(FarShadowMap,FarNextShadowMap,FarEntityShadowMap,2,p),smoothstep(CascadeRanges.z,CascadeRanges.w,d));
     }
-    return visible(FarShadowMap,FarEntityShadowMap,LightMatrix[2],p);
+    return epochVisible(FarShadowMap,FarNextShadowMap,FarEntityShadowMap,2,p);
 }
 void main() {
     fragColor=vec4(0,0,0,1);

@@ -123,7 +123,7 @@ final class LightingResolvePass implements AutoCloseable {
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting"))
                 .withBindGroupLayout(BindGroupLayout.builder().withSampler("SceneDepth")
                         .withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
-                        .withSampler("ShadowMap").withSampler("MiddleShadowMap").withSampler("FarShadowMap")
+                        .withSampler("ShadowMap").withSampler("MiddleShadowMap").withSampler("FarShadowMap").withSampler("NextShadowMap").withSampler("MiddleNextShadowMap").withSampler("FarNextShadowMap")
                         .withSampler("EntityShadowMap").withSampler("MiddleEntityShadowMap").withSampler("FarEntityShadowMap")
                         .withSampler("VoxelOpacity").withSampler("ShapeBounds").withSampler("AmbientVisibility")
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)

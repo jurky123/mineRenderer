@@ -6,6 +6,9 @@ uniform sampler2D SceneDepth;
 uniform sampler2D ShadowMap;
 uniform sampler2D MiddleShadowMap;
 uniform sampler2D FarShadowMap;
+uniform sampler2D NextShadowMap;
+uniform sampler2D MiddleNextShadowMap;
+uniform sampler2D FarNextShadowMap;
 uniform sampler2D EntityShadowMap;
 uniform sampler2D MiddleEntityShadowMap;
 uniform sampler2D FarEntityShadowMap;
@@ -20,6 +23,10 @@ layout(std140) uniform ShadowResolveSettings {
     vec4 CascadeRanges;
     mat4 InvProjection;
     mat4 LightNormalMatrix[3];
+    mat4 TerrainLightMatrix[3];mat4 TerrainNormalMatrix[3];
+    mat4 NextLightMatrix[3];mat4 NextNormalMatrix[3];
+    vec4 EpochBlend; // Visibility interpolation weight; w enables fixed-angle terrain epochs.
+
 };
 layout(std140) uniform LocalLightSettings {
     vec4 GridOriginAndCount;
@@ -125,21 +132,71 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, mat3 norma
     return blocked / 25.0 * smoothstep(3.0, 8.0, min(edge.x, edge.y));
 }
 
+float epochMapOcclusion(sampler2D map, sampler2D entities, int cascade, mat4 matrix, mat3 normalMatrix, vec3 position, vec3 normal) {
+    vec4 clip = matrix * vec4(position, 1.0);
+    vec3 projected = clip.xyz / clip.w;
+    vec2 shadowUv = projected.xy * 0.5 + 0.5;
+    vec2 pixel = 1.0 / vec2(textureSize(map, 0));
+    if (projected.z < 0.0 || projected.z > 1.0 || any(lessThan(shadowUv, pixel * 3.0))
+        || any(greaterThan(shadowUv, vec2(1.0) - pixel * 3.0))) return 0.0;
+    vec3 planeNormal = normalMatrix * normal;
+    vec2 gradient = abs(planeNormal.z) > 0.000001 ? clamp(-2.0 * planeNormal.xy / planeNormal.z, vec2(-16.0), vec2(16.0)) : vec2(0.0);
+    vec2 grid = shadowUv / pixel - 0.5;
+    vec2 base = floor(grid);
+    vec2 phase = fract(grid);
+    // Keep the accepted ~0.036-block bias despite different cascade depth spans.
+    float depthBias = 0.0357 * length(vec3(matrix[0].z, matrix[1].z, matrix[2].z));
+    vec3 dynamicCenter=(LightMatrix[cascade]*vec4(position,1)).xyz;
+    // Inverse-transpose normal transform also supplies inverse light-space offsets.
+    mat3 toDynamic=mat3(LightMatrix[cascade])*transpose(normalMatrix);
+    float dynamicBias=.0357*length(vec3(LightMatrix[cascade][0].z,LightMatrix[cascade][1].z,LightMatrix[cascade][2].z));
+    float blocked = 0.0;
+    for (int y = -2; y <= 3; y++) {
+        float wy = y == -2 ? 1.0 - phase.y : (y == 3 ? phase.y : 1.0);
+        for (int x = -2; x <= 3; x++) {
+            float wx = x == -2 ? 1.0 - phase.x : (x == 3 ? phase.x : 1.0);
+            vec2 sampleUv = (base + vec2(x, y) + 0.5) * pixel;
+            float receiverDepth = projected.z + dot(gradient, sampleUv - shadowUv);
+            float casterDepth = texture(map, sampleUv).r;
+            bool dynamicBlocked=false;
+            if(MoonLight.z>.5) {
+                vec3 samplePoint=dynamicCenter+toDynamic*vec3((sampleUv-shadowUv)*2.0,receiverDepth-projected.z);
+                vec2 dynamicUv=samplePoint.xy*.5+.5;
+                if(samplePoint.z>=0.0 && samplePoint.z<=1.0 && all(greaterThanEqual(dynamicUv,vec2(0))) && all(lessThanEqual(dynamicUv,vec2(1))))
+                    dynamicBlocked=samplePoint.z-dynamicBias>texture(entities,dynamicUv).r;
+#ifdef TEMPORAL_SHADOW
+                if(dynamicBlocked)dynamicAffected=true;
+#endif
+            }
+            blocked += (receiverDepth-depthBias>casterDepth || dynamicBlocked ? 1.0 : 0.0) * wx * wy;
+        }
+    }
+    vec2 edge = min(shadowUv, vec2(1.0) - shadowUv) / pixel;
+    return blocked / 25.0 * smoothstep(3.0, 8.0, min(edge.x, edge.y));
+}
+
+float epochOcclusion(sampler2D first,sampler2D next,sampler2D entities,int cascade,vec3 position,vec3 normal) {
+    if(EpochBlend.w<.5)return shadowOcclusion(first,entities,LightMatrix[cascade],mat3(LightNormalMatrix[cascade]),position,normal);
+    float terrain=epochMapOcclusion(first,entities,cascade,TerrainLightMatrix[cascade],mat3(TerrainNormalMatrix[cascade]),position,normal);
+    if(EpochBlend.x>0.0)terrain=mix(terrain,epochMapOcclusion(next,entities,cascade,NextLightMatrix[cascade],mat3(NextNormalMatrix[cascade]),position,normal),EpochBlend.x);
+    return terrain;
+}
+
 float cascadeOcclusion(float distanceToCamera, vec3 position, vec3 normal) {
     // World-radius partitions: camera yaw/pitch never changes cascade selection.
     if (distanceToCamera < CascadeRanges.y) {
-        float near = shadowOcclusion(ShadowMap, EntityShadowMap, LightMatrix[0], mat3(LightNormalMatrix[0]), position, normal);
+        float near = epochOcclusion(ShadowMap, NextShadowMap, EntityShadowMap, 0, position, normal);
         if (distanceToCamera <= CascadeRanges.x) return near;
-        float middle = shadowOcclusion(MiddleShadowMap, MiddleEntityShadowMap, LightMatrix[1], mat3(LightNormalMatrix[1]), position, normal);
+        float middle = epochOcclusion(MiddleShadowMap, MiddleNextShadowMap, MiddleEntityShadowMap, 1, position, normal);
         return mix(near, middle, smoothstep(CascadeRanges.x, CascadeRanges.y, distanceToCamera));
     }
     if (distanceToCamera < CascadeRanges.w) {
-        float middle = shadowOcclusion(MiddleShadowMap, MiddleEntityShadowMap, LightMatrix[1], mat3(LightNormalMatrix[1]), position, normal);
+        float middle = epochOcclusion(MiddleShadowMap, MiddleNextShadowMap, MiddleEntityShadowMap, 1, position, normal);
         if (distanceToCamera <= CascadeRanges.z) return middle;
-        float far = shadowOcclusion(FarShadowMap, FarEntityShadowMap, LightMatrix[2], mat3(LightNormalMatrix[2]), position, normal);
+        float far = epochOcclusion(FarShadowMap, FarNextShadowMap, FarEntityShadowMap, 2, position, normal);
         return mix(middle, far, smoothstep(CascadeRanges.z, CascadeRanges.w, distanceToCamera));
     }
-    return shadowOcclusion(FarShadowMap, FarEntityShadowMap, LightMatrix[2], mat3(LightNormalMatrix[2]), position, normal);
+    return epochOcclusion(FarShadowMap, FarNextShadowMap, FarEntityShadowMap, 2, position, normal);
 }
 
 float planeError(float center, float nearDepth, float farDepth) {

@@ -4,7 +4,7 @@ import org.joml.Matrix4f;
 
 /** Overlapping world-distance ranges, independent of view yaw/pitch or camera frustum selection. */
 public final class ShadowCascades {
-    public static final int COUNT = 3, RESOLVE_BYTES = COUNT * 64 + 64 + 3 * 16 + 64 + COUNT * 64;
+    public static final int COUNT = 3, RESOLVE_BYTES = COUNT * 64 + 64 + 3 * 16 + 64 + COUNT * 64 + 4 * COUNT * 64 + 16;
     public static final float FADE_START = 112, RADIUS = 128;
     public record Range(int mapSize, float halfExtent, float blendStart, float blendEnd) { }
     private static final Range[] RANGES = {

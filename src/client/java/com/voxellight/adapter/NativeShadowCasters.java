@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 /** Frame-local borrowed allocations from all compiled sections in light space, never camera visibility.
  * Does not compile, upload, close or persist native GPU allocations across prepares. */
 final class NativeShadowCasters {
-    record Layer(SectionKey key, CasterBounds bounds, boolean cutout,
+    record Layer(SectionKey key, CasterBounds bounds, boolean cutout, boolean animated,
                  SectionMesh.SectionDraw draw, SectionRenderDispatcher.RenderSectionBufferSlice buffers) { }
     private record State(SectionMesh mesh, int layers) { }
     private static final ChunkSectionLayer[] OPAQUE = {ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT};
@@ -98,7 +98,7 @@ final class NativeShadowCasters {
                             if (draw == null || draw.indexCount() == 0) continue;
                             var buffers = dispatcher.getRenderSectionSlice(mesh, layer);
                             if (buffers == null || draw.hasCustomIndexBuffer() && buffers.indexBuffer() == null) { pending++; continue; }
-                            layers.add(new Layer(key, bounds(key), layer == ChunkSectionLayer.CUTOUT, draw, buffers));
+                            layers.add(new Layer(key, bounds(key), layer == ChunkSectionLayer.CUTOUT, layer == ChunkSectionLayer.CUTOUT && (!(mesh instanceof NativeCutoutInfo info) || info.voxellight$animatedCutout()), draw, buffers));
                             ready |= layer == ChunkSectionLayer.SOLID ? 1 : 2;
                         }
                         if (ready != 0) { current.put(key, new State(mesh, ready)); sections++; }
@@ -124,6 +124,7 @@ final class NativeShadowCasters {
     }
     List<Layer> layers() { return layers; }
     String status() { return ", nativeShadowSections=" + sections + ", nativeShadowPending=" + pending
+            + ", nativeAnimatedCutoutLayers="+layers.stream().filter(Layer::animated).count()+", nativeStaticCutoutLayers="+layers.stream().filter(layer->layer.cutout() && !layer.animated()).count()
             + ", nativeShadowLayers=" + layers.size() + ", nativeShadowDuplicateBytes=0, nativeShadowSelectionNs=" + selectionNs + ", nativeShadowBorrowNs=" + borrowNs + ", nativeShadowSelectionRebuilds=" + selectionRebuilds + ", nativeShadowSelectionReuses=" + selectionReuses; }
     void clear() { candidates.clear(); selectedLevel=selectedView=null; selectedCamera=null; selectedDirection=null; admissionAge=0; previous = Map.of(); layers.clear(); sections = pending = 0; }
 }

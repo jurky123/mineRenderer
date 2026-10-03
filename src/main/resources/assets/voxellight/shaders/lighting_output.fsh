@@ -22,6 +22,10 @@ layout(std140) uniform ShadowResolveSettings {
     vec4 CascadeRanges;
     mat4 InvProjection;
     mat4 LightNormalMatrix[3];
+    mat4 TerrainLightMatrix[3];mat4 TerrainNormalMatrix[3];
+    mat4 NextLightMatrix[3];mat4 NextNormalMatrix[3];
+    vec4 EpochBlend; // Visibility interpolation weight; w enables fixed-angle terrain epochs.
+
 };
 layout(std140) uniform Fog {
     vec4 FogColor;

@@ -6,6 +6,10 @@ layout(std140) uniform VolumeFilterSettings { vec4 FilterDirection; };
 layout(std140) uniform ShadowResolveSettings {
     mat4 LightMatrix[3];mat4 ViewToWorld;vec4 LightDirectionAndMask;vec4 Coverage;vec4 CascadeRanges;
     mat4 InvProjection;mat4 LightNormalMatrix[3];
+    mat4 TerrainLightMatrix[3];mat4 TerrainNormalMatrix[3];
+    mat4 NextLightMatrix[3];mat4 NextNormalMatrix[3];
+    vec4 EpochBlend; // Visibility interpolation weight; w enables fixed-angle terrain epochs.
+
 };
 layout(location=0) in vec2 texCoord;
 layout(location=0) out vec4 fragColor;

@@ -312,6 +312,10 @@ class ShadowPipelineTest {
                                 assertEquals(304,offset.get(0),"InvProjection follows the unchanged original fields");
                                 assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,6,offset));
                                 assertEquals(368,offset.get(0),"Normal matrix array matches CPU std140 packing");
+                                for(int member=7;member<=11;member++) {
+                                    assertEquals(0,Spvc.spvc_compiler_type_struct_member_offset(reflection,block,member,offset));
+                                    assertEquals(560+(member-7)*192,offset.get(0),"Epoch matrices and blend controls must match CPU packing");
+                                }
                             }
                             if(uniform.nameString().equals("AtmosphereSettings") || uniform.nameString().equals("LightingEnvironment")) {
                                 long block=Spvc.spvc_compiler_get_type_handle(reflection,uniform.base_type_id());

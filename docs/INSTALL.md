@@ -6,7 +6,7 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.25.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.26.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -423,3 +423,10 @@ Full scope/limits and test matrix:[TEST-0.25.md](TEST-0.25.md),[WATER.md](WATER.
 Water uses smaller filtered ripples; default strength0.09, geometry/shoreline still flat. Keep atmosphere_density0.001. Compare `/voxellight water_waves off/on`, `water_wave_strength 0.09` or0.15, and `water_wave_speed 0/1`. Test grazing/distant water, F3+T, resize and new-chunk flight.
 
 Direct terrain vertex writes and cached distant-caster admission reduce avoidable CPU work; actual speedup remains unmeasured. `/voxellight profile on`, wait20–30 seconds, `/voxellight export`, then `profile off`. Send `.passes.csv`, `.txt` status and FPS/resolution. Export each view before mode changes/reload clear samples. Per-pass timings include all cascades, material, AO, lighting, temporal, bloom, volume/filter, tone, water background and native translucent rendering; missing GPU values mean pending/unavailable, not zero. Full checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/TEST-0.25.1.md
+
+
+### 0.26.0 — Smooth world-sun terrain cache / static foliage
+
+Default world-sun shadows now use two fixed-angle terrain epochs, blending visibility while the sun moves. Future-map initialization uses8 pages/frame; published maps repair edits/camera anchors immediately. Static leaves/plants no longer force per-frame tile refresh; animated and unknown cutouts retain it. Moving entities/block entities still use actual current light direction. One look-ahead set keeps the next endpoint ready; additional shadow textures are capped at48 MiB; blended lighting/volume sampling is more expensive, so FPS improvement must be measured.
+
+Compare `/voxellight shadow_epochs off` and `on` in an unchanged forest/building view with `sun world`. Wait30 seconds; use `profile on` and `export` for each run. Status reports `epochBlend`, `epochRotations`, `nextEpochReady`, `nextEpochUpdatedPages` and static/animated native cutout layers. Check low sun, slow walking, animals, block edits, animated-cutout packs, F3+T, teleport, resize and dimensions. Preserve atmosphere_density0.001 and water_wave_strength0.09. Full checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/SHADOW-EPOCHS.md

@@ -4,11 +4,12 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current client kit: [VoxelLight0.25.1](https://temp.sh/nlHJF/voxellight-client-kit-26.2-0.25.1.zip). Water motion / CPU hotspot fixes and optional per-pass profiling; in-game visual/performance acceptance pending.
+Current client kit: [VoxelLight0.26.0](https://temp.sh/vDwvP/voxellight-client-kit-26.2-0.26.0.zip). Celestial shadow epochs with look-ahead, static foliage caching and a continuous-angle reference toggle;189 tests pass, in-game quality/performance acceptance pending.
 
 ## 文档
 
 - [Native terrain coverage](docs/NATIVE-COVERAGE.md)：0.22原生几何复用、inline attributes与实机检查。
+- [Smooth celestial shadow cache](docs/SHADOW-EPOCHS.md)：0.26双角度terrain epoch、static foliage cache、reference比较与性能验收。
 - [0.25.1 review fixes / benchmark](docs/TEST-0.25.1.md)：natural ripple follow-up、fast vertex writer、cached caster admission与per-pass profiling。
 - [0.25 three-phase test bundle](docs/TEST-0.25.md)：water SSR、volume spatial filter、animated normal waves/quality presets与统一实机测试。
 - [Shadowed volumetric light](docs/VOLUMETRIC.md)：quarter-resolution sun/moon shafts、HDR medium composition与比较命令。

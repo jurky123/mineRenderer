@@ -94,4 +94,27 @@ class ShadowCascadesTest {
         }
         assertEquals(30L * 1024 * 1024, ShadowCascades.mapBytes(), "Three maps must keep the published resource bound");
     }
+    @org.junit.jupiter.api.Test void epochPcfOffsetsMapToTheCurrentDynamicProjection() {
+        var first=new ShadowLight(ShadowLight.Source.SUN,0,.45f,.9);
+        var current=new ShadowLight(ShadowLight.Source.SUN,0,.45f,.9+ShadowEpochs.STEP*.4);
+        for(int cascade=0;cascade<3;cascade++) {
+            var a=ShadowCascades.matrix(0,64,0,first,cascade);
+            var d=ShadowCascades.matrix(0,64,0,current,cascade);
+            var inverse=new org.joml.Matrix3f(ShadowCascades.normalMatrix(a)).transpose();
+            var transfer=new org.joml.Matrix3f(d).mul(inverse);
+            var world=new org.joml.Vector3f(3,65,4);
+            var projectedA=a.transformProject(new org.joml.Vector3f(world));
+            var center=d.transformProject(new org.joml.Vector3f(world));
+            var normal=new org.joml.Vector3f(.2f,1,.3f).normalize();
+            var plane=new org.joml.Matrix3f(ShadowCascades.normalMatrix(a)).transform(new org.joml.Vector3f(normal));
+            for(float x:new float[]{-.005f,0,.005f})for(float y:new float[]{-.005f,0,.005f}) {
+                var offset=new org.joml.Vector3f(x,y,-(plane.x*x+plane.y*y)/plane.z);
+                var worldOffset=inverse.transform(new org.joml.Vector3f(offset));
+                assertEquals(0,normal.dot(worldOffset),.0001,"Corresponding dynamic sample must remain on the receiver plane");
+                var expected=d.transformProject(new org.joml.Vector3f(world).add(worldOffset));
+                var actual=new org.joml.Vector3f(center).add(transfer.transform(new org.joml.Vector3f(offset)));
+                assertEquals(expected.x,actual.x,.00001);assertEquals(expected.y,actual.y,.00001);assertEquals(expected.z,actual.z,.00001);
+            }
+        }
+    }
 }

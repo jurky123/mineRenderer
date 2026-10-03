@@ -191,3 +191,8 @@ Directional history改用geometryChangeRevision，纯LIGHT dirty不全局reset�
 先实现GTAO-inspired normalized horizon slice reference，非完整XeGTAO移植。half-res native-depth validated material normal/opaque inputs、5×5 spatial bilateral和full-res四guide upsample。ambient/sky与未shadowed的block-fill乘AO，sun/moon、selected direct lights和emission不乘AO。纹理与shadow history仍独立current，不引入AO temporal或geometry窗口扩张。
 
 控制`ao on/off/view`、32 MiB target cap、neutral fallback、odd-size guide matching与lifecycle由AmbientOcclusionPass管理。native binding/UBO/descriptor和数学数值积分验证通过；墙角/楼梯/树根/洞穴、halo/FOV/reload/resize/维度实机检查pending。验收后进入tone/sky polish；性能和GI仍后置。
+
+
+## 0.26 review follow-up: reusable world-sun shadows
+
+Implemented dual-angle terrain epochs and static-cutout classification after0.25.1 CPU fixes/profiling. See[SHADOW-EPOCHS.md](SHADOW-EPOCHS.md) and CURRENT for acceptance. This is a bounded cache improvement, not a quality-reference freeze or a measured whole-renderer optimization. Future priority depends on off/on exports: additional resolve sampling trades against reduced map submissions. HZB SSR, froxel visibility, packed history, material single-raster MRT and clustered local lights remain pending; do not increase lights or march steps without evidence.

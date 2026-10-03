@@ -27,6 +27,7 @@ public final class ShadowMapCache {
         grid = mapSize / TILE_SIZE; tileCount = grid * grid;
     }
     public int tileCount() { return tileCount; }
+    public boolean hasPending(){return !dirty.isEmpty();}
 
     private final BitSet dirty = new BitSet();
     private Anchor anchor;
@@ -45,6 +46,11 @@ public final class ShadowMapCache {
     }
 
     public Update plan(Anchor current, ShadowLight currentLight, boolean enabled, Collection<CasterBounds> cutouts) {
+        return plan(current,currentLight,enabled,cutouts,tileCount);
+    }
+
+    public Update plan(Anchor current, ShadowLight currentLight, boolean enabled, Collection<CasterBounds> cutouts, int pageBudget) {
+        if(pageBudget<0)throw new IllegalArgumentException("Negative shadow page budget");
         String cause = dirty.isEmpty() ? "valid tiles reused" : "casters changed";
         if (!enabled) { dirty.set(0, tileCount); cause = "reference redraw"; }
         else if (anchor == null) { dirty.set(0, tileCount); cause = "uninitialized"; }
@@ -55,7 +61,9 @@ public final class ShadowMapCache {
         int beforeAnimation = dirty.cardinality();
         for (var bounds : cutouts) mark(project(bounds));
         if (dirty.cardinality() > beforeAnimation) cause = beforeAnimation == 0 ? "cutout animation safety" : cause + "; cutout animation safety";
-        return new Update(regions(), dirty.cardinality(), cause);
+        var selected=new BitSet();
+        for(int index=dirty.nextSetBit(0), count=0;index>=0 && count<pageBudget;index=dirty.nextSetBit(index+1),count++)selected.set(index);
+        return new Update(regions(selected), selected.cardinality(), cause);
     }
 
     /** Four-texel raster/filter precision guard. Subtract world coordinates in double before float projection. */
@@ -86,9 +94,9 @@ public final class ShadowMapCache {
     }
 
     /** Merge horizontal runs vertically; bounded by 64 tiles and never includes clean tiles. */
-    private List<Rect> regions() {
+    private List<Rect> regions(BitSet selected) {
         var result = new ArrayList<Rect>();
-        var remaining = (BitSet)dirty.clone();
+        var remaining = (BitSet)selected.clone();
         for (int index = remaining.nextSetBit(0); index >= 0; index = remaining.nextSetBit(0)) {
             int x = index % grid, y = index / grid, width = 1, height = 1;
             while (x + width < grid && remaining.get(index + width)) width++;
@@ -124,6 +132,7 @@ public final class ShadowMapCache {
     public int updatedPages() { return updatedPages; }
     public int regionCount() { return regionCount; }
     public String reason() { return reason; }
+    public void resetValidity(){anchor=null;dirty.clear();reason="uninitialized";updatedPages=regionCount=0;}
     public void clear() {
         anchor = null; light = ShadowLight.fixed(); dirty.clear(); renders = 0; reuses = 0; pageUpdates = 0; pageReuses = 0;
         updatedPages = 0; regionCount = 0; reason = "uninitialized";

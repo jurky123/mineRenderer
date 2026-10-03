@@ -133,6 +133,27 @@ class ShadowMapCacheTest {
         assertEquals(count, update.pages());
     }
 
+    @Test void progressiveBudgetDoesNotPublishUnrenderedTiles() {
+        var budgeted=new ShadowMapCache(0);
+        var light=new ShadowLight(ShadowLight.Source.SUN,0,.45f,.7);
+        int total=0;
+        for(int frame=0;frame<16;frame++) {
+            var update=budgeted.plan(initial,light,true,List.of(),4);
+            assertEquals(4,update.pages());
+            int area=update.regions().stream().mapToInt(rect->rect.width()*rect.height()/256/256).sum();
+            assertEquals(4,area);
+            // Planning again before recording cannot discard scheduled tiles.
+            assertEquals(update.regions(),budgeted.plan(initial,light,true,List.of(),4).regions());
+            update.regions().forEach(budgeted::rendered);total+=update.pages();
+            assertEquals(frame<15,budgeted.hasPending());
+        }
+        assertEquals(64,total);assertEquals(0,budgeted.plan(initial,light,true,List.of(),4).pages());
+        budgeted.invalidate(local);
+        var edit=budgeted.plan(initial,light,true,List.of());
+        assertTrue(edit.pages()>0);edit.regions().forEach(budgeted::rendered);assertFalse(budgeted.hasPending());
+        budgeted.resetValidity();assertEquals(64,budgeted.plan(initial,light,true,List.of()).pages());
+    }
+
     private record Blocker(CasterBounds bounds, float depth) { }
     private float reference(List<Blocker> casters, int x, int y) {
         float depth = 1;

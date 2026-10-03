@@ -117,6 +117,8 @@ public final class RenderProbe {
         resetTiming();
     }
 
+    public void setShadowEpochs(boolean enabled){RenderSystem.assertOnRenderThread();shadows.setEpochs(enabled);resetTiming();}
+
     public void setShadowCache(boolean enabled) {
         RenderSystem.assertOnRenderThread();
         shadows.setCacheEnabled(enabled);

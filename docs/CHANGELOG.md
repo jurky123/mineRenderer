@@ -1,5 +1,10 @@
 # VoxelLight release history
 
+## 0.26.0 — Celestial terrain epochs / static cutout caching
+
+Two fixed-angle terrain maps per cascade, visibility interpolation, recycled endpoint allocations with a third look-ahead set and8-page future initialization. Both published epochs repair edits/anchor changes; current-frame dynamic shadow taps are reprojected and combined before PCF. Static/animated classification comes from existing CPU vertex metadata, owned by each compiled native mesh; raw/unknown emitters remain conservative. ExtraD32 textures at most48 MiB, resolve UBO1344 bytes, reference toggle `shadow_epochs off`. Native shader/math/mixin checks pass; visual quality/FPS unmeasured. Density0.001 and water ripples0.09 preserved. See[acceptance](SHADOW-EPOCHS.md).
+
+
 ## 0.25.1 — Water motion / CPU hotspot / baseline follow-up
 
 Direct36-byte BLOCK writer preserves vanilla reservation and packing; spatial native-shadow admission outside dispatcher lock with cached conservative candidates and fresh per-frame allocation borrowing. Smaller six-band filtered water normals, default strength0.09. Optional `/voxellight profile on/off`, exported per-pass CPU/GPU samples and summary utility. Density0.001 retained. No claim of measured speedup, displaced water, resolved continuous-sun cache or new GI. See TEST-0.25.1.md.

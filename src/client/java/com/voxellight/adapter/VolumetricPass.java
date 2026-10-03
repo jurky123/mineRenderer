@@ -136,7 +136,7 @@ final class VolumetricPass implements AutoCloseable {
                 .withUniform("ShadowResolveSettings", UniformType.UNIFORM_BUFFER)
                 .withUniform("AtmosphereSettings", UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment", UniformType.UNIFORM_BUFFER)
                 .withUniform("VolumetricSettings", UniformType.UNIFORM_BUFFER);
-        for (var name : new String[]{"ShadowMap", "MiddleShadowMap", "FarShadowMap", "EntityShadowMap", "MiddleEntityShadowMap", "FarEntityShadowMap"}) layout.withSampler(name);
+        for (var name : new String[]{"ShadowMap", "MiddleShadowMap", "FarShadowMap", "EntityShadowMap", "MiddleEntityShadowMap", "FarEntityShadowMap", "NextShadowMap", "MiddleNextShadowMap", "FarNextShadowMap"}) layout.withSampler(name);
         return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight", "pipeline/volumetric"))
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight", "probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight", "volumetric"))

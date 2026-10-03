@@ -40,6 +40,17 @@ public final class NativeTerrainAttributes {
                         || data.getShort(24)!=160 || data.getShort(26)!=240 || data.get(32)>=0 || data.get(33)<=0 || data.get(35)!=30 || data.getFloat(4)!=2)
                     throw new IllegalStateException("Native material terrain writer/layout mismatch");
             }
+            var staticBuilder=new BufferBuilder(memory,PrimitiveTopology.QUADS,DefaultVertexFormat.BLOCK);
+            with(new Attributes(0x10ffffff,new Vector3f(0,1,0),0),()->{
+                for(int i=0;i<4;i++)staticBuilder.addVertex(i,0,0,-1,0,0,0,0,0,1,0);
+            });
+            try(var mesh=staticBuilder.build()) {
+                var result=new net.minecraft.client.renderer.chunk.SectionCompiler.Results();
+                result.renderedLayers.put(net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT,mesh);
+                var compiled=new net.minecraft.client.renderer.chunk.CompiledSectionMesh(null,result);
+                if(!(compiled instanceof NativeCutoutInfo info) || info.voxellight$animatedCutout())
+                    throw new IllegalStateException("Native static cutout classification mixin did not apply");
+            }
             // Raw native emitters must be valid native geometry without claiming material metadata.
             var raw=new BufferBuilder(memory,PrimitiveTopology.QUADS,DefaultVertexFormat.BLOCK);
             for(int i=0;i<4;i++){var vertex=raw.addVertex(i,0,0).setColor(-1).setUv(0,0).setUv2(0,0);if(i%2==0)vertex.setNormal(0,1,0);}
@@ -48,7 +59,8 @@ public final class NativeTerrainAttributes {
             }
         }
         // Force version-specific compiler transformation while startup can report a clear failure.
-        try{Class.forName("net.minecraft.client.renderer.chunk.SectionCompiler");}
+        try{Class.forName("net.minecraft.client.renderer.chunk.SectionCompiler");
+            Class.forName("net.minecraft.client.renderer.chunk.CompiledSectionMesh");}
         catch(ClassNotFoundException e){throw new IllegalStateException(e);}
     }
     public static Attributes current(){return CURRENT.get();}
