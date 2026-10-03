@@ -1,0 +1,488 @@
+{
+  "minecraft:block/iron_block": {
+    "roughness": 0.35,
+    "f0": 0.04,
+    "metal": 230,
+    "porosity": 0
+  },
+  "minecraft:block/gold_block": {
+    "roughness": 0.25,
+    "f0": 0.04,
+    "metal": 231,
+    "porosity": 0
+  },
+  "minecraft:block/copper_block": {
+    "roughness": 0.4,
+    "f0": 0.04,
+    "metal": 234,
+    "porosity": 0
+  },
+  "minecraft:block/cut_copper": {
+    "roughness": 0.4,
+    "f0": 0.04,
+    "metal": 234,
+    "porosity": 0
+  },
+  "minecraft:block/chiseled_copper": {
+    "roughness": 0.4,
+    "f0": 0.04,
+    "metal": 234,
+    "porosity": 0
+  },
+  "minecraft:block/exposed_copper": {
+    "roughness": 0.4,
+    "f0": 0.04,
+    "metal": 234,
+    "porosity": 0
+  },
+  "minecraft:block/exposed_cut_copper": {
+    "roughness": 0.4,
+    "f0": 0.04,
+    "metal": 234,
+    "porosity": 0
+  },
+  "minecraft:block/diamond_block": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/emerald_block": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/quartz_block_top": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/quartz_block_side": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/polished_granite": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/polished_diorite": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/polished_andesite": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/polished_deepslate": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/smooth_stone": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/smooth_stone_slab_top": {
+    "roughness": 0.32,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.15
+  },
+  "minecraft:block/ice": {
+    "roughness": 0.08,
+    "f0": 0.02,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/packed_ice": {
+    "roughness": 0.08,
+    "f0": 0.02,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/blue_ice": {
+    "roughness": 0.08,
+    "f0": 0.02,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/sand": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 1
+  },
+  "minecraft:block/red_sand": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 1
+  },
+  "minecraft:block/stone": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/cobblestone": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/deepslate": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/granite": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/diorite": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/andesite": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/stone_bricks": {
+    "roughness": 0.85,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.6
+  },
+  "minecraft:block/oak_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/oak_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/oak_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/spruce_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/spruce_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/spruce_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/birch_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/birch_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/birch_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/jungle_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/jungle_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/jungle_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/acacia_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/acacia_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/acacia_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/dark_oak_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/dark_oak_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/dark_oak_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/mangrove_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/mangrove_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/mangrove_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/cherry_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/cherry_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/cherry_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/pale_oak_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/pale_oak_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/pale_oak_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/bamboo_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/bamboo_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/bamboo_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/crimson_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/crimson_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/crimson_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/warped_planks": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/warped_log": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/warped_log_top": {
+    "roughness": 0.65,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.1875
+  },
+  "minecraft:block/white_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/orange_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/magenta_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/light_blue_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/yellow_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/lime_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/pink_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/gray_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/light_gray_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/cyan_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/purple_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/blue_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/brown_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/green_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/red_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  },
+  "minecraft:block/black_wool": {
+    "roughness": 0.95,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0.59375
+  }
+}

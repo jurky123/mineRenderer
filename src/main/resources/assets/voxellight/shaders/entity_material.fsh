@@ -11,6 +11,7 @@ layout(location=4) in vec2 compatibilityLight;
 layout(location=0) out vec4 outAlbedo;
 layout(location=1) out vec4 outNormal;
 layout(location=2) out vec4 outEmission;
+layout(location=3) out vec4 outMaterialPbr;
 vec3 srgbToLinear(vec3 c) {
     return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,lessThanEqual(c,vec3(0.04045)));
 }
@@ -30,4 +31,5 @@ void main() {
     outNormal=vec4(normalize(gl_FrontFacing?surfaceNormal:-surfaceNormal)*0.5+0.5,(1.0-Settings.w)/3.0);
     // Packed brightness is compatibility illumination, never inferred emission.
     outEmission=vec4(0,0,clamp(compatibilityLight.y,0,1),clamp(compatibilityLight.x,0,1));
+    outMaterialPbr=vec4(0); // Neutral ID; entity BRDF remains compatibility diffuse.
 }

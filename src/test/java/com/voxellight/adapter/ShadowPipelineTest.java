@@ -128,7 +128,7 @@ class ShadowPipelineTest {
                             var name = output.getClass().getDeclaredMethod("name"); name.setAccessible(true);
                             names.add((String)name.invoke(output));
                         }
-                        assertEquals(List.of("outAlbedo", "outNormal", "outEmission"), names,
+                        assertEquals(List.of("outAlbedo", "outNormal", "outEmission", "outMaterialPbr"), names,
                                 "Native output rebinding order must match the actual MRT attachments");
                     }
                     if (field.equals("LIGHTING_TEMPORAL") || field.equals("TEMPORAL")) {
@@ -147,13 +147,13 @@ class ShadowPipelineTest {
     }
 
     @Test
-    void materialMrtHasThreeExplicitTargetsAndUsesNormalsAndReversedDepth() throws Exception {
+    void materialMrtHasFourExplicitTargetsAndUsesNormalsAndReversedDepth() throws Exception {
         try (var loader = shippedLoader()) {
             var capture = pipeline(loader, "CAPTURE");
             assertEquals(net.minecraft.client.renderer.RenderPipelines.CUTOUT_TERRAIN.isCull(),capture.isCull(),
                     "Native foliage contains opposing quads; capture must not draw extra coplanar backfaces");
             assertTrue(capture.isCull());
-            assertEquals(3, capture.getColorTargetStates().length);
+            assertEquals(4, capture.getColorTargetStates().length);
             assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[0].format());
             assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[1].format());
             assertEquals(GpuFormat.RGBA8_UNORM, capture.getColorTargetStates()[2].format());
@@ -220,11 +220,11 @@ class ShadowPipelineTest {
                     .getDeclaredMethod("captureDescriptor", com.mojang.blaze3d.textures.GpuTextureView[].class, int.class, int.class);
             factory.setAccessible(true);
             // Descriptor construction is CPU-only; GPU views are not dereferenced here.
-            var views = new com.mojang.blaze3d.textures.GpuTextureView[4];
+            var views = new com.mojang.blaze3d.textures.GpuTextureView[5];
             for (int[] size : new int[][]{{1920,1080},{853,479},{2560,1440}}) {
                 var descriptor = (com.mojang.blaze3d.systems.RenderPassDescriptor) factory.invoke(null,views,size[0],size[1]);
                 assertEquals(new com.mojang.blaze3d.systems.RenderPass.RenderArea(0,0,size[0],size[1]),descriptor.renderArea);
-                assertEquals(3,descriptor.colorAttachments.size());
+                assertEquals(4,descriptor.colorAttachments.size());
                 for (var attachment : descriptor.colorAttachments) {
                     assertEquals(new org.joml.Vector4f(0,0,0,0),attachment.clearValue().orElseThrow());
                 }

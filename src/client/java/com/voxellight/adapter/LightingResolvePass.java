@@ -30,7 +30,11 @@ final class LightingResolvePass implements AutoCloseable {
 
     private GpuTexture hdr;
     private GpuTextureView hdrView;
-    private GpuBuffer environment;
+    private GpuBuffer environment,pbrSettings;
+    private boolean pbrEnabled=true,wetnessEnabled=true;private int pbrDebug;
+    void setPbr(boolean value){pbrEnabled=value;temporal.invalidate();}
+    void setWetness(boolean value){wetnessEnabled=value;}
+    void setPbrDebug(int value){pbrDebug=value;}
 
     boolean prepare(RenderTarget target) {
         if (LightingEnvironment.targetBytes(target.width,target.height) > LightingEnvironment.TARGET_LIMIT
@@ -44,6 +48,7 @@ final class LightingResolvePass implements AutoCloseable {
             hdr = device.createTexture("VoxelLight linear HDR lighting",GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING,
                     GpuFormat.RGBA16_FLOAT,target.width,target.height,1,1);
             hdrView = device.createTextureView(hdr);
+            pbrSettings=device.createBuffer(() -> "VoxelLight PBR settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,16);
             environment = device.createBuffer(() -> "VoxelLight lighting environment",GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST,LightingEnvironment.SETTINGS_BYTES);
         }
         return true;
@@ -56,7 +61,7 @@ final class LightingResolvePass implements AutoCloseable {
         if(useTemporal && !RenderSystem.getDevice().precompilePipeline(LIGHTING_TEMPORAL,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Temporal lighting shader compilation failed");
         renderCurrent(encoder,output,material,shadows,useTemporal);
         var result = useTemporal ? temporal.resolve(encoder,hdrView,material,shadows,actualProjection) : hdrView;
-        result=pathtrace.render(encoder,output,material,shadows,result,actualProjection,projectionObserved);
+        result=pathtrace.render(encoder,output,material,shadows,result,actualProjection,projectionObserved,pbrSettings);
         composite.render(encoder,output,material,shadows,result,environment,ao,true);
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
@@ -90,7 +95,7 @@ final class LightingResolvePass implements AutoCloseable {
     void invalidateHistory(){temporal.invalidate();}
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
         renderCurrent(encoder,output,material,shadows,false);
-        var result=pathtrace.render(encoder,output,material,shadows,hdrView,actualProjection,projectionObserved);
+        var result=pathtrace.render(encoder,output,material,shadows,hdrView,actualProjection,projectionObserved,pbrSettings);
         composite.render(encoder,output,material,shadows,result,environment,ao,false);
     }
     void renderCurrent(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,boolean history) {
@@ -98,6 +103,7 @@ final class LightingResolvePass implements AutoCloseable {
         var light = composite.polished() ? LightingEnvironment.polished(shadows.light(),sky.skybox == DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness)
                 : LightingEnvironment.sample(shadows.light(),sky.skybox == DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);
         try (var stack = MemoryStack.stackPush()) {
+            encoder.writeToBuffer(pbrSettings.slice(),Std140Builder.onStack(stack,16).putVec4(pbrEnabled&&composite.polished()?1:0,wetnessEnabled&&sky.skybox==DimensionType.Skybox.OVERWORLD?1-sky.rainBrightness:0,pbrDebug,0).get());
             encoder.writeToBuffer(environment.slice(),Std140Builder.onStack(stack,LightingEnvironment.SETTINGS_BYTES)
                     .putVec4(light.directR(),light.directG(),light.directB(),light.directStrength())
                     .putVec4(light.skyR(),light.skyG(),light.skyB(),light.skyStrength())
@@ -109,6 +115,9 @@ final class LightingResolvePass implements AutoCloseable {
             pass.setPipeline(history ? LIGHTING_TEMPORAL : LIGHTING);
             String[] names = {"MaterialAlbedo","MaterialNormal","MaterialEmission","MaterialDepth"};
             for (int i=0;i<names.length;i++) pass.bindTexture(names[i],material.view(i),nearest);
+            pass.bindTexture("MaterialPbr",material.view(4),nearest);
+            pass.bindTexture("MaterialTable",material.materialTable(),nearest);
+            pass.setUniform("PbrSettings",pbrSettings);
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindLighting(pass);
             ao.bind(pass);
@@ -121,11 +130,12 @@ final class LightingResolvePass implements AutoCloseable {
                 .withRenderArea(new RenderPass.RenderArea(0,0,width,height))
                 .withColorAttachment(hdr,Optional.of(new Vector4f(0))).withColorAttachment(shadow,Optional.of(new Vector4f(1,0,0,0)));
     }
-    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + temporal.status() + ao.status() +composite.status()+pathtrace.status(); }
+    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + ", pbr="+pbrEnabled+", wetness="+wetnessEnabled+", pbrDebug="+pbrDebug + temporal.status() + ao.status() +composite.status()+pathtrace.status(); }
     @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();pathtrace.close();projectionObserved=false;}
     private void releaseBuffers() {
         if (hdrView != null) { hdrView.close(); hdrView=null; }
         if (hdr != null) { hdr.close(); hdr=null; }
+        if(pbrSettings!=null){pbrSettings.close();pbrSettings=null;}
         if (environment != null) { environment.close(); environment=null; }
     }
     private static RenderPipeline lightingPipeline(boolean history) {
@@ -133,7 +143,7 @@ final class LightingResolvePass implements AutoCloseable {
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting"))
                 .withBindGroupLayout(BindGroupLayout.builder().withSampler("SceneDepth")
-                        .withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
+                        .withSampler("MaterialPbr").withSampler("MaterialTable").withUniform("PbrSettings",UniformType.UNIFORM_BUFFER).withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
                         .withSampler("ShadowMap").withSampler("MiddleShadowMap").withSampler("FarShadowMap").withSampler("NextShadowMap").withSampler("MiddleNextShadowMap").withSampler("FarNextShadowMap")
                         .withSampler("EntityShadowMap").withSampler("MiddleEntityShadowMap").withSampler("FarEntityShadowMap")
                         .withSampler("VoxelOpacity").withSampler("ShapeBounds").withSampler("AmbientVisibility")

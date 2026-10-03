@@ -34,9 +34,10 @@ final class MaterialCapture implements AutoCloseable {
     void setNativeTerrain(boolean value){nativeTerrain=value;surfaces.close();nativeSubmissions=null;}
     boolean nativeTerrain(){return nativeTerrain;}
     void setNativeSubmissions(net.minecraft.client.renderer.chunk.ChunkSectionsToRender value){nativeSubmissions=value;}
+    private final PbrAtlas pbr = new PbrAtlas();
     private final MaterialSurfaceStore surfaces = new MaterialSurfaceStore();
-    private final GpuTexture[] targets = new GpuTexture[4];
-    private final GpuTextureView[] views = new GpuTextureView[4];
+    private final GpuTexture[] targets = new GpuTexture[5];
+    private final GpuTextureView[] views = new GpuTextureView[5];
     private GpuBuffer settings;
     private long world, resources;
     private int width, height, draws;
@@ -58,13 +59,14 @@ final class MaterialCapture implements AutoCloseable {
         if(!nativeTerrain)surfaces.prepare(minecraft, bridge, center);
         draws = 0;
         if (targets[0] == null || width != target.width || height != target.height) allocate(target.width, target.height);
+        pbr.prepare();
         state = nativeTerrain?"native visible terrain; borrowed geometry":"local reference material capture";
         return true;
     }
     private void allocate(int w,int h) {
         releaseTargets(); width=w; height=h;
-        var formats = new GpuFormat[]{GpuFormat.RGBA8_UNORM,GpuFormat.RGBA8_UNORM,GpuFormat.RGBA8_UNORM,GpuFormat.D32_FLOAT};
-        for (int i=0;i<4;i++) {
+        var formats = new GpuFormat[]{GpuFormat.RGBA8_UNORM,GpuFormat.RGBA8_UNORM,GpuFormat.RGBA8_UNORM,GpuFormat.D32_FLOAT,GpuFormat.RGBA8_UNORM};
+        for (int i=0;i<5;i++) {
             targets[i]=RenderSystem.getDevice().createTexture("VoxelLight material target "+i,GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,formats[i],w,h,1,1);
             views[i]=RenderSystem.getDevice().createTextureView(targets[i]);
         }
@@ -110,7 +112,7 @@ final class MaterialCapture implements AutoCloseable {
         var descriptor=captureDescriptor(views,width,height);
         try (var profile = RenderPassProfile.begin(encoder,"material_local"); var pass = encoder.createRenderPass(descriptor)) {
             pass.setPipeline(CAPTURE);RenderSystem.bindDefaultUniforms(pass);
-            pass.bindTexture("Sampler0",atlas,terrainSampler);
+            pass.bindTexture("Sampler0",atlas,terrainSampler);bindPbr(pass);
             if(!submissions.isEmpty())pass.drawMultipleIndexed(submissions,indices,sequence.type(),List.of("ChunkSection"),ubos);
         }
         draws=submissions.size();
@@ -124,7 +126,7 @@ final class MaterialCapture implements AutoCloseable {
         try (var profile = RenderPassProfile.begin(encoder,"material_native"); var pass = encoder.createRenderPass(captureDescriptor(views,width,height))){
             pass.setPipeline(NATIVE_CAPTURE);RenderSystem.bindDefaultUniforms(pass);
             if(terrain==null)return;
-            pass.bindTexture("Sampler0",terrain.textureView(),sampler);
+            pass.bindTexture("Sampler0",terrain.textureView(),sampler);bindPbr(pass);
             for(var layer:net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup.OPAQUE.layers()){
                 var groups=terrain.drawGroupsPerLayer().get(layer);if(groups==null)continue;
                 for(var list:groups.values())if(!list.isEmpty()){
@@ -135,6 +137,8 @@ final class MaterialCapture implements AutoCloseable {
         }
     }
 
+    private void bindPbr(RenderPass pass){var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);pass.bindTexture("PbrIdsAtlas",pbr.view(0),sampler);pass.bindTexture("PbrNormalAtlas",pbr.view(1),sampler);}
+    GpuTextureView materialTable(){return pbr.view(2);}
     GpuTextureView view(int index) { return views[index]; }
 
     static RenderPassDescriptor captureDescriptor(GpuTextureView[] views,int width,int height) {
@@ -142,29 +146,31 @@ final class MaterialCapture implements AutoCloseable {
         var descriptor=RenderPassDescriptor.create(()->"VoxelLight material MRT capture")
                 .withRenderArea(new RenderPass.RenderArea(0,0,width,height));
         for(int i=0;i<3;i++)descriptor.withColorAttachment(views[i],Optional.of(new Vector4f(0,0,0,0)));
+        descriptor.withColorAttachment(views[4],Optional.of(new Vector4f(0)));
         return descriptor.withDepthAttachment(views[3],OptionalDouble.of(0));
     }
     String status() {
         return "material=" + state + ", materialSource="+(nativeTerrain?"native":"local reference") + (nativeTerrain?", materialDuplicateGeometryBytes=0, materialNativeExtraBytesPerVertex=8, indigoMaterialEmissionsTotal="+IndigoMaterials.emissions():surfaces.status())
-                + ", materialTargetBytes=" + (targets[0] == null ? 0 : MaterialEncoding.targetBytes(width, height)) + ", materialDraws=" + draws;
+                + ", materialTargetBytes=" + (targets[0] == null ? 0 : MaterialEncoding.targetBytes(width, height)) + ", materialDraws=" + draws + pbr.status();
     }
     private void releaseTargets() {
-        for(int i=0;i<4;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(targets[i]!=null){targets[i].close();targets[i]=null;}}
+        for(int i=0;i<5;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(targets[i]!=null){targets[i].close();targets[i]=null;}}
         if(settings!=null){settings.close();settings=null;} width=height=0;
     }
-    @Override public void close(){surfaces.close();releaseTargets();world=resources=0;draws=0;state="waiting";}
+    @Override public void close(){pbr.close();surfaces.close();releaseTargets();world=resources=0;draws=0;state="waiting";}
     private static RenderPipeline capturePipeline() {return capturePipeline(false);}
     private static RenderPipeline capturePipeline(boolean nativeGeometry) {
         var builder=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight",nativeGeometry?"pipeline/native_material_capture":"pipeline/material_capture"))
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight",nativeGeometry?"native_material_capture":"material_capture")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","material_capture"))
                 .withBindGroupLayout(BindGroupLayout.builder().withUniform("Globals",UniformType.UNIFORM_BUFFER).withUniform("Projection",UniformType.UNIFORM_BUFFER)
-                        .withUniform("ChunkSection",UniformType.UNIFORM_BUFFER).withSampler("Sampler0").build())
+                        .withUniform("ChunkSection",UniformType.UNIFORM_BUFFER).withSampler("Sampler0").withSampler("PbrIdsAtlas").withSampler("PbrNormalAtlas").build())
                 .withVertexBinding(0,nativeGeometry?NativeTerrainAttributes.FORMAT:DefaultVertexFormat.ENTITY).withPrimitiveTopology(PrimitiveTopology.QUADS)
                 .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL,true)).withCull(true);
         if(nativeGeometry)builder.withShaderDefine("NATIVE_TERRAIN");
         builder.withColorTargetState(0,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
         builder.withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
         builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
+        builder.withColorTargetState(3,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
         return builder.build();
     }
     private static RenderPipeline displayPipeline() {

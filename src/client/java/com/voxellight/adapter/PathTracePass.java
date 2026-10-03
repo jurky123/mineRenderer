@@ -76,7 +76,7 @@ final class PathTracePass implements AutoCloseable {
     void setDenoise(boolean value){denoise=value;generation++;displayKey=null;olderKey=null;transition.reset();failed=false;}
     void setDebug(boolean value){debug=value;}
     String status(){return ", pathtrace="+state+", pathtraceDenoise="+(denoise?"OptiX HDR":"raw")+", pathtraceWorkerBatches="+samples+", pathtraceHistory="+temporalHistory+", pathtraceFrozen="+freeze+", pathtraceDisplayValid="+(displayKey!=null)+", pathtraceAccepted="+accepted+", pathtraceRejected="+rejected+", pathtraceSize="+width+"x"+height+", pathtraceWorkerNs="+traceNs+", pathtraceBatchBlend="+transition.blend(System.nanoTime())+", pathtraceHistoryResets="+historyResets.get()+", pathtraceHistoryResetReason="+historyResetReason;}
-    GpuTextureView render(CommandEncoder encoder,RenderTarget target,MaterialCapture material,ShadowRenderer shadows,GpuTextureView hdr,Matrix4f projection,boolean observed){
+    GpuTextureView render(CommandEncoder encoder,RenderTarget target,MaterialCapture material,ShadowRenderer shadows,GpuTextureView hdr,Matrix4f projection,boolean observed,GpuBuffer pbrSettings){
         if(!enabled||failed||!observed)return hdr;
         try{
             int scale=Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360));int w=(target.width+scale-1)/scale,h=(target.height+scale-1)/scale;
@@ -140,7 +140,7 @@ final class PathTracePass implements AutoCloseable {
             }
             var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
             try(var profile=RenderPassProfile.begin(encoder,"pathtrace_composite");var pass=encoder.createRenderPass(descriptor(compositeView,target.width,target.height,"VoxelLight path traced indirect light"))){
-                pass.setPipeline(PT_COMPOSITE);pass.setUniform("PathTraceHistory",historyUniform);pass.bindTexture("CurrentHdr",hdr,nearest);pass.bindTexture("PathRadiance",views[displaySlot],nearest);pass.bindTexture("PathPosition",views[displaySlot+1],nearest);pass.bindTexture("PathNormal",views[displaySlot+2],nearest);
+                pass.setPipeline(PT_COMPOSITE);pass.setUniform("PbrSettings",pbrSettings);pass.bindTexture("MaterialPbr",material.view(4),nearest);pass.bindTexture("MaterialTable",material.materialTable(),nearest);pass.setUniform("PathTraceHistory",historyUniform);pass.bindTexture("CurrentHdr",hdr,nearest);pass.bindTexture("PathRadiance",views[displaySlot],nearest);pass.bindTexture("PathPosition",views[displaySlot+1],nearest);pass.bindTexture("PathNormal",views[displaySlot+2],nearest);
                 int older=olderKey==null?displaySlot:3-displaySlot;
                 pass.bindTexture("OlderRadiance",views[older],nearest);pass.bindTexture("OlderPosition",views[older+1],nearest);pass.bindTexture("OlderNormal",views[older+2],nearest);
                 bindMaterial(pass,material,target,nearest);pass.setUniform("PathTraceSettings",uniform);pass.draw(3,1,0,0);
@@ -218,7 +218,7 @@ final class PathTracePass implements AutoCloseable {
     private static RenderPassDescriptor descriptor(GpuTextureView v,int w,int h,String label){return RenderPassDescriptor.create(()->label).withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(v,Optional.of(new Vector4f(0)));}
     private static RenderPipeline pipeline(boolean capture){
         var layout=BindGroupLayout.builder().withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialDepth").withSampler("SceneDepth").withUniform("PathTraceSettings",UniformType.UNIFORM_BUFFER);
-        if(!capture)layout.withUniform("PathTraceHistory",UniformType.UNIFORM_BUFFER).withSampler("CurrentHdr").withSampler("PathRadiance").withSampler("PathPosition").withSampler("PathNormal").withSampler("OlderRadiance").withSampler("OlderPosition").withSampler("OlderNormal");
+        if(!capture)layout.withSampler("MaterialPbr").withSampler("MaterialTable").withUniform("PbrSettings",UniformType.UNIFORM_BUFFER).withUniform("PathTraceHistory",UniformType.UNIFORM_BUFFER).withSampler("CurrentHdr").withSampler("PathRadiance").withSampler("PathPosition").withSampler("PathNormal").withSampler("OlderRadiance").withSampler("OlderPosition").withSampler("OlderNormal");
         var b=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight",capture?"pipeline/pathtrace_capture":"pipeline/pathtrace_composite")).withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight",capture?"pathtrace_capture":"pathtrace_composite")).withBindGroupLayout(layout.build()).withColorTargetState(new ColorTargetState(Optional.empty(),capture?GpuFormat.RGBA32_FLOAT:GpuFormat.RGBA16_FLOAT,ColorTargetState.WRITE_ALL)).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false);
         if(capture)for(int i=1;i<3;i++)b.withColorTargetState(i,new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL));return b.build();
     }

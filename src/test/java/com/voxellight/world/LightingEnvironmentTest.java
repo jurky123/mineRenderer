@@ -26,7 +26,7 @@ class LightingEnvironmentTest {
         assertTrue(nether.skyStrength() < clear.skyStrength());
     }
     @Test void combinedBudgetAccountsForMaterialAndHdrBeforeAllocation() {
-        assertEquals(2560L*1440*24,LightingEnvironment.targetBytes(2560,1440));
+        assertEquals(2560L*1440*28,LightingEnvironment.targetBytes(2560,1440));
         assertTrue(LightingEnvironment.targetBytes(3840,2160) <= LightingEnvironment.TARGET_LIMIT);
         assertTrue(LightingEnvironment.targetBytes(7680,4320) > LightingEnvironment.TARGET_LIMIT);
         assertThrows(IllegalArgumentException.class,()->LightingEnvironment.targetBytes(0,100));

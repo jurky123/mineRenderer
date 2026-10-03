@@ -1,6 +1,8 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
 uniform sampler2D Sampler0;
+uniform sampler2D PbrIdsAtlas;
+uniform sampler2D PbrNormalAtlas;
 layout(std140) uniform Globals {
     ivec3 CameraBlockPos;
     vec3 CameraOffset;
@@ -23,9 +25,11 @@ layout(location = 1) in vec4 unlitTint;
 layout(location = 2) flat in vec3 surfaceNormal;
 layout(location = 3) flat in ivec2 emissionFlags;
 layout(location = 4) in vec2 compatibilityLight;
+layout(location=5) in vec3 materialPosition;
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outEmission;
+layout(location=3) out vec4 outMaterialPbr;
 vec3 srgbToLinear(vec3 c) {
     return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, lessThanEqual(c, vec3(0.04045)));
 }
@@ -105,7 +109,30 @@ vec4 sampleRGSS(sampler2D source, vec2 uv, vec2 pixelSize) {
 }
 
 
+vec2 octEncode(vec3 n) {
+    n/=abs(n.x)+abs(n.y)+abs(n.z);
+    vec2 xy=n.xy;
+    if(n.z<0.0)xy=(1.0-abs(xy.yx))*mix(vec2(-1),vec2(1),greaterThanEqual(xy,vec2(0)));
+    return xy*.5+.5;
+}
 void main() {
+    // Derivatives are evaluated before alpha/marker discard, including neighboring helper lanes.
+    vec3 dx=dFdx(materialPosition),dy=dFdy(materialPosition);
+    vec2 ux=dFdx(texCoord),uy=dFdy(texCoord);
+    float determinant=ux.x*uy.y-ux.y*uy.x;
+    vec3 n=normalize(surfaceNormal),shadingNormal=n;
+    vec2 mapXY=texture(PbrNormalAtlas,texCoord).rg*2.0-1.0;
+    if(abs(determinant)>1e-12) {
+        vec3 t=(dx*uy.y-dy*ux.y)/determinant;
+        vec3 b=(dy*ux.x-dx*uy.x)/determinant;
+        t-=n*dot(t,n);b-=n*dot(b,n);
+        if(dot(t,t)>1e-10 && dot(b,b)>1e-10) {
+            // Atlas V points down; this directly supplies LabPBR's DirectX Y-minus basis.
+            vec3 tangentNormal=vec3(mapXY,sqrt(max(0.0,1.0-dot(mapXY,mapXY))));
+            shadingNormal=normalize(normalize(t)*tangentNormal.x+normalize(b)*tangentNormal.y+n*tangentNormal.z);
+        }
+    }
+    vec4 pbrId=texture(PbrIdsAtlas,texCoord);
     vec4 texel = UseRgss == 1 ? sampleRGSS(Sampler0, texCoord, 1.0 / vec2(TextureSize))
             : sampleNearest(Sampler0, texCoord, 1.0 / vec2(TextureSize));
     if(emissionFlags.x<0)discard; // native raw/unsupported emitters have no material marker
@@ -120,5 +147,6 @@ void main() {
     outNormal.a=(2.0+clamp(ChunkVisibility,0.0,1.0))/3.0;
 #endif
     // Material strengths only. This is deliberately not a claim of emissive RGB radiance.
-    outEmission = vec4(float(emissionFlags.x) / 15.0, float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));
+    outEmission = vec4(max(float(emissionFlags.x) / 15.0,pbrId.b*255.0/254.0), float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));
+    outMaterialPbr=vec4(pbrId.rg,octEncode(shadingNormal));
 }

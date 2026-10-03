@@ -1,6 +1,9 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
 uniform sampler2D CurrentHdr;
+uniform sampler2D MaterialPbr;
+uniform sampler2D MaterialTable;
+layout(std140) uniform PbrSettings { vec4 PbrControls; };
 uniform sampler2D PathRadiance;
 uniform sampler2D PathPosition;
 uniform sampler2D PathNormal;
@@ -50,6 +53,7 @@ bool lookup(sampler2D radiance,sampler2D positions,sampler2D normals,mat4 clip,v
 }
 void main(){
  result=texture(CurrentHdr,texCoord);
+ if(PbrControls.z>.5)return;
  float d=texture(MaterialDepth,texCoord).r,scene=texture(SceneDepth,texCoord).r;
  vec4 n=texture(MaterialNormal,texCoord)*vec4(2,2,2,3)-vec4(1,1,1,0);
  int flags=int(round(texture(MaterialAlbedo,texCoord).a*255));
@@ -70,6 +74,8 @@ void main(){
  else if(hasOlder)light=older;
  // No compatible old surface: use the first estimate at full strength.
  else light=incoming;
+ // The existing worker supplies diffuse GI only. Conductors need a later specular tracer.
+ if(PbrControls.x>.5){ivec2 id=ivec2(round(texture(MaterialPbr,texCoord).rg*255.0));vec4 profile=texelFetch(MaterialTable,id,0);light*=profile.g*255.0>=229.5?0.0:1.0-profile.g;}
  float fade=1-smoothstep(16,24,length(world));
  result.rgb=PtControls.y>.5?light*fade:result.rgb+light*fade*PtControls.x;
 }

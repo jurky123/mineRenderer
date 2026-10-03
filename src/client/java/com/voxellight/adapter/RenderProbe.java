@@ -98,6 +98,9 @@ public final class RenderProbe {
     public boolean bindWater(com.mojang.blaze3d.systems.RenderPass pass){return mode==Mode.FOUNDATION && materialFrameReady && lighting.bindWater(pass);}
     public void setExposure(float ev) {RenderSystem.assertOnRenderThread();lighting.setExposure(ev);}
     public void setShadowFilter(com.voxellight.world.ShadowFilter value){RenderSystem.assertOnRenderThread();shadows.setFilter(value);lighting.invalidateHistory();resetTiming();}
+    public void setPbr(boolean value){RenderSystem.assertOnRenderThread();lighting.setPbr(value);}
+    public void setWetness(boolean value){RenderSystem.assertOnRenderThread();lighting.setWetness(value);}
+    public void setPbrDebug(int value){RenderSystem.assertOnRenderThread();lighting.setPbrDebug(value);if(value>0)setMode(Mode.FOUNDATION);}
     public void setPathTrace(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTrace(value);if(value)setMode(Mode.FOUNDATION);}
     public void setPathTraceDenoise(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceDenoise(value);}
     public void setPathTraceFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceFreeze(value);}

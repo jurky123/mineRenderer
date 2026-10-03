@@ -28,7 +28,7 @@ class MaterialEncodingTest {
         assertFalse(MaterialEncoding.depthMatches(0,0));assertFalse(MaterialEncoding.depthMatches(Float.NaN,.5f));
     }
     @Test void targetBudgetUsesActualFormatsAndRejectsInvalidSizes() {
-        assertEquals(58_982_400,MaterialEncoding.targetBytes(2560,1440));
+        assertEquals(73_728_000,MaterialEncoding.targetBytes(2560,1440));
         assertTrue(MaterialEncoding.targetBytes(3840,2160)<=MaterialEncoding.TARGET_LIMIT);
         assertTrue(MaterialEncoding.targetBytes(7680,4320)>MaterialEncoding.TARGET_LIMIT);
         assertThrows(IllegalArgumentException.class,()->MaterialEncoding.targetBytes(0,1440));

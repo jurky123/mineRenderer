@@ -279,6 +279,31 @@ vec3 srgbToLinear(vec3 c) {
     return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, lessThanEqual(c, vec3(0.04045)));
 }
 float energy(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+uniform sampler2D MaterialPbr;
+uniform sampler2D MaterialTable;
+layout(std140) uniform PbrSettings { vec4 PbrControls; };
+vec3 octDecode(vec2 e) {
+    vec2 f=e*2.0-1.0;vec3 n=vec3(f,1.0-abs(f.x)-abs(f.y));
+    if(n.z<0.0)n.xy=(1.0-abs(n.yx))*mix(vec2(-1),vec2(1),greaterThanEqual(n.xy,vec2(0)));
+    return normalize(n);
+}
+vec3 fresnel(vec3 f0,float cosine){return f0+(1.0-f0)*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
+vec3 conductorF0(int metal,vec3 albedo) {
+    // LabPBR predefined conductors; RGB optical constants, normal-incidence Fresnel.
+    const vec3 ns[8]=vec3[](vec3(2.9114,2.9497,2.5845),vec3(.18299,.42108,1.3734),vec3(1.3456,.96521,.61722),vec3(3.1071,3.1812,2.3230),vec3(.27105,.67693,1.3164),vec3(1.91,1.83,1.44),vec3(2.3757,2.0847,1.8453),vec3(.15943,.14512,.13547));
+    const vec3 ks[8]=vec3[](vec3(3.0893,2.9318,2.7670),vec3(3.4242,2.3459,1.7704),vec3(7.4746,6.3995,5.3031),vec3(3.3314,3.3291,3.1350),vec3(3.6092,2.6248,2.2921),vec3(3.51,3.4,3.18),vec3(4.2655,3.7153,3.1365),vec3(3.9291,3.19,2.3808));
+    if(metal<230||metal>237)return albedo;
+    vec3 n=ns[metal-230],k=ks[metal-230];return ((n-1.0)*(n-1.0)+k*k)/((n+1.0)*(n+1.0)+k*k);
+}
+vec3 ggx(vec3 n,vec3 v,vec3 l,vec3 f0,float alpha) {
+    float nl=max(dot(n,l),0.0),nv=max(dot(n,v),0.001);
+    if(nl<=0.0||dot(v+l,v+l)<1e-8)return vec3(0);
+    vec3 h=normalize(v+l);float nh=max(dot(n,h),0.0),a2=alpha*alpha;
+    float d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
+    float gv=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv));
+    float gl=2.0*nl/(nl+sqrt(a2+(1.0-a2)*nl*nl));
+    return fresnel(f0,max(dot(v,h),0.0))*d*gv*gl/(4.0*nv*max(nl,.001))*nl*3.14159265;
+}
 void main() {
     fragColor = vec4(0.0);
 #ifdef TEMPORAL_SHADOW
@@ -298,6 +323,28 @@ void main() {
     float distanceToCamera = length(position);
     vec3 normal = normalize(geometryNormal.xyz);
     int flags = int(round(material.a * 255.0));
+    vec3 shadingNormal=normal;
+    vec4 packedPbr=texture(MaterialPbr,texCoord);
+    ivec2 idBytes=ivec2(round(packedPbr.rg*255.0));
+    vec4 pbr=texelFetch(MaterialTable,ivec2(idBytes.x,idBytes.y),0);
+    bool usePbr=PbrControls.x>.5 && (flags&21)==0;
+    float alpha=max(.045,(1.0-pbr.r)*(1.0-pbr.r));
+    int reflectance=int(round(pbr.g*255.0));bool metal=reflectance>=230;
+    float porosity=pbr.b*255.0<=64.0?pbr.b*255.0/64.0:0.0;
+    vec3 f0=metal?conductorF0(reflectance,albedo):vec3(pbr.g);
+    vec3 authoredAlbedo=albedo;
+    if(usePbr) {
+        shadingNormal=octDecode(packedPbr.ba);
+        float wet=clamp(PbrControls.y,0.0,1.0)*properties.b*smoothstep(.2,.9,normal.y);
+        albedo*=1.0-wet*porosity*.28;
+        alpha=mix(alpha,max(.045,alpha*.2),wet*(1.0-porosity));
+    }
+    vec3 viewDirection=normalize(-position);
+    if(PbrControls.z>.5) {
+        vec3 debugColor=PbrControls.z<1.5?vec3(alpha):PbrControls.z<2.5?(metal?vec3(1,.65,.1):vec3(.15)):shadingNormal*.5+.5;
+        fragColor=vec4(debugColor,1);return;
+    }
+    vec3 diffuseWeight=usePbr?(1.0-fresnel(f0,max(dot(shadingNormal,viewDirection),0.0)))*(metal?0.0:1.0):vec3(1);
     vec3 viewPosition=reconstruct(texCoord,depth,InvProjection);
     float ao=ambientVisibility(normal,viewPosition,flags);
     if(AoFilter.w>.5) { fragColor=vec4(vec3(ao),1.0);return; }
@@ -311,13 +358,13 @@ void main() {
     float skyFacing = (foliage ? abs(normal.y) : normal.y) * 0.5 + 0.5;
     vec3 sky = mix(HorizonColorLower.rgb, SkyColorStrength.rgb, max(normal.y, 0.0))
         * SkyColorStrength.a * skyAccess * mix(HorizonColorLower.a, 1.0, skyFacing);
-    float directFacing = dot(normal, LightDirectionAndMask.xyz);
+    float directFacing = dot(shadingNormal, LightDirectionAndMask.xyz);
     vec3 direct = DirectColorStrength.rgb * DirectColorStrength.a
         * (foliage ? abs(directFacing) : max(directFacing, 0.0)) * skyAccess;
     // Keep all native block-light sources, including ones beyond the 16-light selection.
     // Replace this baseline only if the selected colored, visible reference has greater energy.
     vec3 blockBaseline = vec3(1.0, 0.78, 0.55) * 0.8 * properties.a * properties.a;
-    vec3 selectedLocal = vec3(0.0), heldLocal = vec3(0.0);
+    vec3 selectedLocal = vec3(0.0), heldLocal = vec3(0.0),selectedSpecular=vec3(0),heldSpecular=vec3(0);
     float localCoverage = 1.0 - smoothstep(16.0, 24.0, distanceToCamera);
     if (GridBoundsAndEnabled.w > 0.5 && localCoverage > 0.0) {
         for (int i = 0; i < 16; i++) {
@@ -325,7 +372,7 @@ void main() {
             vec3 toLight = LightPositionRadius[i].xyz - position;
             float distanceToLight = length(toLight), radius = LightPositionRadius[i].w;
             if (distanceToLight >= radius || distanceToLight < 0.001) continue;
-            float lightFacing = dot(normal, toLight / distanceToLight);
+            float lightFacing = dot(shadingNormal, toLight / distanceToLight);
             float lambert = foliage ? abs(lightFacing) : max(lightFacing, 0.0);
             if (lambert <= 0.0 || LightColorStrength[i].w <= 0.0) continue;
             // Offset toward the emitter side for thin foliage, independent of the viewing side.
@@ -334,20 +381,25 @@ void main() {
             float falloff = 1.0 - distanceToLight / radius;
             vec3 contribution = LightColorStrength[i].rgb * LightColorStrength[i].w
                 * falloff * falloff * lambert * 0.7 * localCoverage;
-            if(i+1==int(MoonLight.w)) heldLocal+=contribution;
-            else selectedLocal+=contribution;
+            vec3 specular=usePbr?LightColorStrength[i].rgb*LightColorStrength[i].w*falloff*falloff*.7*localCoverage*ggx(shadingNormal,viewDirection,toLight/distanceToLight,f0,alpha):vec3(0);
+            if(i+1==int(MoonLight.w)){heldLocal+=contribution;heldSpecular+=specular;}
+            else {selectedLocal+=contribution;selectedSpecular+=specular;}
         }
     }
     float baselineEnergy = energy(blockBaseline);
     float replacement = smoothstep(baselineEnergy, baselineEnergy * 1.25 + 0.001, energy(selectedLocal));
     // Reference emission color uses authored albedo, not the already-lit scene or block light.
-    vec3 emission = albedo * max(properties.r, properties.g) * 2.4;
+    vec3 emission = authoredAlbedo * max(properties.r, properties.g) * 2.4;
     // AO modulates diffuse ambient/unshadowed block fill, never direct lamps, sun/moon or emission.
     vec3 ambient=vec3(0.012)+sky+blockBaseline*(1.0-replacement);
-    vec3 radiance=albedo*(ambient*ao+direct*visibility+selectedLocal*replacement+heldLocal)+emission;
+    vec3 sunSpecular=usePbr?DirectColorStrength.rgb*DirectColorStrength.a*skyAccess*ggx(shadingNormal,viewDirection,LightDirectionAndMask.xyz,f0,alpha):vec3(0);
+    vec3 reflected=reflect(-viewDirection,shadingNormal);
+    vec3 environmentSpecular=usePbr?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*fresnel(f0,max(dot(shadingNormal,viewDirection),0.0))*mix(1.0,.45,alpha)*ao:vec3(0);
+    vec3 directContribution=albedo*diffuseWeight*direct+sunSpecular;
+    vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*visibility+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
     fragColor = vec4(radiance, 1.0);
 #ifdef TEMPORAL_SHADOW
-    shadowTemporalInput = vec4(visibility, albedo * direct);
+    shadowTemporalInput = vec4(visibility, directContribution);
     // Display coverage stays valid; .75 marks pixels that must never enter shadow history.
     if (dynamicAffected || (flags & 24) != 0) fragColor.a = 0.75;
 #endif

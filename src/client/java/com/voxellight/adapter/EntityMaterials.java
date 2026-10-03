@@ -97,7 +97,7 @@ final class EntityMaterials implements AutoCloseable {
             try(var stack=MemoryStack.stackPush()){encoder.writeToBuffer(settings[i].slice(),Std140Builder.onStack(stack,16).putVec4(i==0?0:.1f,i==0?MaterialEncoding.ENTITY:MaterialEncoding.ENTITY|MaterialEncoding.CUTOUT,i>=2?0:1,i==3?1:0).get());}
         }
         var sequence=RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);var indices=sequence.getBuffer(maxIndices);
-        var views=new com.mojang.blaze3d.textures.GpuTextureView[]{material.view(0),material.view(1),material.view(2),material.view(3)};
+        var views=new com.mojang.blaze3d.textures.GpuTextureView[]{material.view(0),material.view(1),material.view(2),material.view(3),material.view(4)};
         try(var pass=encoder.createRenderPass(MaterialCapture.captureDescriptor(views,width,height))) {
             pass.setVertexBuffer(0,vertices.slice());pass.setIndexBuffer(indices,sequence.type());
             // Opaque decals already drew natively; clear their material coverage after base surfaces.
@@ -127,6 +127,6 @@ final class EntityMaterials implements AutoCloseable {
                 .withVertexBinding(0,DefaultVertexFormat.ENTITY).withPrimitiveTopology(PrimitiveTopology.QUADS).withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL,true)).withCull(cull);
         builder.withColorTargetState(0,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
         builder.withColorTargetState(1,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));
-        builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));return builder.build();
+        builder.withColorTargetState(2,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));builder.withColorTargetState(3,new ColorTargetState(Optional.empty(),GpuFormat.RGBA8_UNORM,ColorTargetState.WRITE_ALL));return builder.build();
     }
 }

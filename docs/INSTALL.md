@@ -1,6 +1,6 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.30.7。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap；新增可选OptiX denoised hybrid diffuse GI preview；默认关闭，功能开关不跨游戏启动保存。
+版本：0.31.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap；新增可选OptiX denoised hybrid diffuse GI preview；默认关闭，功能开关不跨游戏启动保存。
 
 稳定性修复与测试：[PT-STABILITY](https://github.com/jurky123/mineRenderer/blob/main/docs/PT-STABILITY.md)。已积累表面每批8样本，新显露且无有效history表面首批32样本；最多10Hz，计算可与150ms显示过渡重叠；不再移动后从全局零样本重新变亮。先测试慢走、转动、跨section、增删块和F3+T；`pathtraceWorkerBatches`是批次数，非全图有效spp。
 
@@ -8,7 +8,7 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.30.7.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.31.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -463,3 +463,7 @@ Use `/voxellight water_hzb on` to enable the new hierarchical screen-space trace
 Compare the same shoreline/building/ocean view on/off, especially grazing water, thin pillars/trees and screen edges. Check FPS and export profile on runs for both: the new water_hzb stage is pyramid overhead; native translucent includes SSR and other translucent work. Test odd-sized windows, F3+T, underwater and dimensions. Temporal/epochs remain off, density0.001 and waves0.09 unchanged. Checklist: https://github.com/jurky123/mineRenderer/blob/main/docs/HZB.md
 
 0.30原生库已包含在本安装包，无需另装CUDA toolkit。开启后静止几秒，检查status的pathtrace状态和samples；仅近场间接光，移动时重投影有效GI，缺history的表面暂时fallback。请按[PATH-TRACING.md](https://github.com/jurky123/mineRenderer/blob/main/docs/PATH-TRACING.md)测试颜色反弹、emissive、去噪与F3+T/传送。实机质量/FPS尚未验证。
+
+## 0.31 Material 2.0
+
+PBR默认在polished foundation开启；启动仍off。放置stone、wood、iron、gold、copper和ice，对比`/voxellight pbr off`与`on`，移动观察太阳高光。`/voxellight wetness on|off`比较雨天露天地面。`/voxellight pbr_debug roughness|metal|normal|off`检查材质。静态LabPBR `_n`/`_s`资源包随F3+T重新加载；animated maps、POM、SSS和实体PBR尚未实现。详细预算、材质包配置与实机检查：[Material 2.0](MATERIAL-2.md)。GI仍会在新视角获得后继续细化。

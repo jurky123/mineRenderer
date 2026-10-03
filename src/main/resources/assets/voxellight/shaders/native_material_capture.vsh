@@ -27,8 +27,10 @@ layout(location=1) out vec4 unlitTint;
 layout(location=2) flat out vec3 surfaceNormal;
 layout(location=3) flat out ivec2 emissionFlags;
 layout(location=4) out vec2 compatibilityLight;
+layout(location=5) out vec3 materialPosition;
 void main(){
     vec3 pos=Position+vec3(ChunkPosition-CameraBlockPos)+CameraOffset;
+    materialPosition=pos;
     gl_Position=ProjMat*ModelViewMat*vec4(pos,1);
     uint packed=uint(UV1.x)&65535u | ((uint(UV1.y)&65535u)<<16);
     texCoord=UV0;

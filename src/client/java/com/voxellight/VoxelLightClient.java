@@ -253,6 +253,13 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var pbrCommand=literal("pbr");var wetnessCommand=literal("wetness");var pbrDebugCommand=literal("pbr_debug");
+            for(boolean enabled:new boolean[]{true,false}){
+                pbrCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setPbr(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: PBR "+enabled));return 1;}));
+                wetnessCommand.then(literal(enabled?"on":"off").executes(context->{PROBE.setWetness(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: rain wetness "+enabled));return 1;}));
+            }
+            String[] pbrModes={"off","roughness","metal","normal"};
+            for(int i=0;i<pbrModes.length;i++){final int mode=i;pbrDebugCommand.then(literal(pbrModes[i]).executes(context->{PROBE.setPbrDebug(mode);context.getSource().sendFeedback(Component.literal("VoxelLight: PBR debug "+pbrModes[mode]));return 1;}));}
             var nativeMaterialCommand=literal("native_material");
             for(boolean enabled:new boolean[]{true,false})nativeMaterialCommand.then(literal(enabled?"on":"off").executes(context->{
                 PROBE.setNativeMaterial(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: material source "+(enabled?"native visible terrain":"local reference")));return 1;
@@ -278,7 +285,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                 denoiseCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceDenoise(value);context.getSource().sendFeedback(Component.literal("VoxelLight: OptiX HDR denoising "+value));return 1;}));
                 pathDebugCommand.then(literal(value?"on":"off").executes(context->{PROBE.setPathTraceDebug(value);context.getSource().sendFeedback(Component.literal("VoxelLight: indirect-only view "+value));return 1;}));
             }
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(epochCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand).then(shadowFilterCommand).then(hzbCommand).then(pathCommand).then(denoiseCommand).then(pathDebugCommand).then(freezeCommand).then(historyCommand).then(rejectionCommand).then(uploadDelayCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(epochCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(pbrCommand).then(wetnessCommand).then(pbrDebugCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand).then(shadowFilterCommand).then(hzbCommand).then(pathCommand).then(denoiseCommand).then(pathDebugCommand).then(freezeCommand).then(historyCommand).then(rejectionCommand).then(uploadDelayCommand));
         });
     }
 }

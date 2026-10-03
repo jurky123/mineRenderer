@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.31.0 — Material 2.0
+
+- Add packed material ID/LUT and shading normal, vanilla texture profiles, GGX sun/moon and selected-lamp highlights, approximate sky specular and receiver-gated rain wetness. Geometry normal and GI tracing/history policies remain unchanged; composite suppresses diffuse GI on conductors and preserves material debug views.
+- Support static LabPBR `_n`/`_s` normal, AO, roughness, reflectance/metal, porosity and emission channels. Animated maps, POM and SSS remain future work. Add PBR/wetness toggles and material debug views.
+- One RGBA8 target (+4 B/pixel), bounded atlas/LUT storage up to32.25 MiB; terrain vertex stride remains36 bytes. 216 tests pass, including actual shader/binding compilation; in-game appearance and GPU timings pending.
+
 ## 0.30.7 — Faster new-view GI acquisition
 
 - User confirms 0.30.6 no flicker on Vulkan. Remove new-only surfaces’ explicit fade from zero; retain continuous blending where old surface history exists.
