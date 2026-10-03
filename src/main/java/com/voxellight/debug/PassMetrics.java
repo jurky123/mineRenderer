@@ -35,6 +35,8 @@ public final class PassMetrics {
                 sample.width(), sample.height(), sample.cpuNanos(), gpuNanos));
     }
 
+    public int size(){return samples.size();}
+
     public List<Sample> snapshot() {
         return List.copyOf(samples.values());
     }

@@ -83,7 +83,7 @@ final class VisualComposite implements AutoCloseable {
         }
         volumetric.render(encoder,output,material,shadows,atmosphereSettings,environment,atmosphereActive && volumetricEnabled && atmosphereDensity>0 && !ao.debug());
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        try (var pass = encoder.createRenderPass(() -> "VoxelLight tone mapping and native fog",output.getColorTextureView(),Optional.empty())) {
+        try (var profile = RenderPassProfile.begin(encoder,"tone_composite"); var pass = encoder.createRenderPass(() -> "VoxelLight tone mapping and native fog",output.getColorTextureView(),Optional.empty())) {
             pass.setPipeline(OUTPUT);
             pass.bindTexture("LightingHdr",source,nearest);
             bloom.bind(pass);

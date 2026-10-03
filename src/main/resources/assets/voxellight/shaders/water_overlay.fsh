@@ -77,13 +77,20 @@ vec4 screenReflection(vec3 surface,vec3 normal,vec3 direction) {
     return vec4(0);
 }
 vec2 waveSlope(vec2 position,float phase) {
-    // Integer spatial harmonics make camera modulo64 crossings continuous.
-    float frequency=.09817477042;
-    float p=dot(position,vec2(2,1))*frequency+phase;
-    float q=dot(position,vec2(-1,3))*frequency-2.0*phase;
-    float r=dot(position,vec2(5,2))*frequency+3.0*phase;
-    return WaterParameters.z*(.65*normalize(vec2(2,1))*cos(p)
-        +.25*normalize(vec2(-1,3))*cos(q)+.1*normalize(vec2(5,2))*cos(r));
+    // Periodic, wind-biased ripples with independent harmonics; suppress unresolved wavelengths.
+    // All spatial frequencies wrap at 64 blocks; evaluate derivatives before any fragment rejection.
+    const vec2 directions[6]=vec2[6](vec2(7,3),vec2(13,5),vec2(19,-7),vec2(-9,17),vec2(31,11),vec2(-23,29));
+    const float rates[6]=float[6](2,3,5,-4,7,-9);
+    const float weights[6]=float[6](.32,.25,.18,.12,.08,.05);
+    vec2 slope=vec2(0);
+    for(int i=0;i<6;i++) {
+        vec2 k=directions[i]*.09817477042;
+        float angle=dot(position,k)+rates[i]*phase+float(i)*1.718;
+        float footprint=max(abs(dot(dFdx(position),k)),abs(dot(dFdy(position),k)));
+        float resolved=1.0-smoothstep(.5,2.5,footprint);
+        slope+=normalize(k)*cos(angle)*weights[i]*resolved;
+    }
+    return WaterParameters.z*slope;
 }
 void main() {
     // Derivatives require all quad/helper lanes, including pixels which later use native fallback.
@@ -91,6 +98,7 @@ void main() {
     vec2 uv=gl_FragCoord.xy/vec2(textureSize(WaterHdr,0));
     vec3 surface=waterPosition(uv,gl_FragCoord.z);
     vec3 crossed=cross(dFdx(surface),dFdy(surface));
+    vec2 slope=waveSlope(surface.xz+WaterCamera.xz,WaterCamera.w);
     voxellightNativeMain();
     if(!waterSprite(texCoord0,WaterStill) && !waterSprite(texCoord0,WaterFlow))return;
     vec3 base;float thickness;
@@ -99,9 +107,7 @@ void main() {
     vec3 normal=normalize(crossed);
     vec3 viewDirection=normalize(-surface);
     if(dot(normal,viewDirection)<0.0)normal=-normal;
-    vec3 absolute=surface+WaterCamera.xyz;
     if(abs(normal.y)>.8) {
-        vec2 slope=waveSlope(absolute.xz,WaterCamera.w);
         normal=normalize(normal+vec3(slope.x,0,slope.y));
     }
     vec3 viewNormal=transpose(mat3(ViewToWorld))*normal;

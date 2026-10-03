@@ -15,14 +15,23 @@ abstract class NativeTerrainBufferMixin implements VertexConsumer {
     @Shadow private VertexFormat format;
     @Shadow private long vertexPointer;
     @Shadow private int elementsToFill;
-    // The pinned BLOCK fast path writes only the original 28 bytes. Use setters for the extended format.
+    @Shadow private long beginVertex() { throw new AssertionError(); }
+    @Shadow private static void putRgba(long pointer,int color) { throw new AssertionError(); }
+    @Shadow private static void putPackedUv(long pointer,int value) { throw new AssertionError(); }
+    @Shadow private static void putNormals(long pointer,float x,float y,float z) { throw new AssertionError(); }
+    // Retain vanilla reservation/counting/endian conversion, write the extended stride directly.
     @Inject(method="addVertex(FFFIFFIIFFF)V",at=@At("HEAD"),cancellable=true)
     private void voxellight$extendedVertex(float x,float y,float z,int color,float u,float v,int overlay,int light,float nx,float ny,float nz,CallbackInfo ci){
         if(format!=NativeTerrainAttributes.FORMAT)return;
         var a=NativeTerrainAttributes.nextVertex();int packed=a==null?0:a.tintMetadata();
-        addVertex(x,y,z).setColor(color).setUv(u,v).setUv2(light&65535,light>>>16)
-                .setUv1(packed&65535,packed>>>16).setNormal(a==null?nx:a.normal().x,a==null?ny:a.normal().y,a==null?nz:a.normal().z);
-        MemoryUtil.memPutByte(vertexPointer+35,(byte)(a==null?0:16+a.blockEmission()));
+        long pointer=beginVertex();
+        MemoryUtil.memPutFloat(pointer,x);MemoryUtil.memPutFloat(pointer+4,y);MemoryUtil.memPutFloat(pointer+8,z);
+        putRgba(pointer+12,color);
+        MemoryUtil.memPutFloat(pointer+16,u);MemoryUtil.memPutFloat(pointer+20,v);
+        putPackedUv(pointer+24,light);putPackedUv(pointer+28,packed);
+        putNormals(pointer+32,a==null?nx:a.normal().x,a==null?ny:a.normal().y,a==null?nz:a.normal().z);
+        MemoryUtil.memPutByte(pointer+35,(byte)(a==null?0:16+a.blockEmission()));
+        elementsToFill=0;
         ci.cancel();
     }
     @Inject(method="beginVertex",at=@At("RETURN"))

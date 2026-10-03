@@ -36,7 +36,7 @@ final class VolumetricPass implements AutoCloseable {
             neutral = device.createTexture("VoxelLight neutral volumetric", GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING,
                     GpuFormat.RGBA16_FLOAT, 1, 1, 1, 1);
             neutralView = device.createTextureView(neutral);
-            try (var pass = encoder.createRenderPass(descriptor(neutralView, 1, 1))) { }
+            try (var profile = RenderPassProfile.begin(encoder,"volume_clear"); var pass = encoder.createRenderPass(descriptor(neutralView, 1, 1))) { }
             settings = device.createBuffer(() -> "VoxelLight volumetric controls", GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, VolumetricLight.SETTINGS_BYTES);
         }
         if (!enabled || VolumetricLight.targetBytes(output.width, output.height,filtered) > VolumetricLight.TARGET_LIMIT) releaseTarget();
@@ -62,7 +62,7 @@ final class VolumetricPass implements AutoCloseable {
                     .putVec4(quality.volumeSteps(),filtered?1:0,0,0).get());
         }
         if (!active) return;
-        try (var pass = encoder.createRenderPass(descriptor(view, width, height))) {
+        try (var profile = RenderPassProfile.begin(encoder,"volume_march"); var pass = encoder.createRenderPass(descriptor(view, width, height))) {
             pass.setPipeline(VOLUMETRIC);
             var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
             pass.bindTexture("SceneDepth", output.getDepthTextureView(), nearest);
@@ -81,7 +81,7 @@ final class VolumetricPass implements AutoCloseable {
                 try(var stack=MemoryStack.stackPush()) {
                     encoder.writeToBuffer(filterSettings.slice(),Std140Builder.onStack(stack,16).putVec4(axis==0?1:0,axis==1?1:0,.025f,0).get());
                 }
-                try(var pass=encoder.createRenderPass(descriptor(axis==0?scratchView:view,width,height))) {
+                try (var profile = RenderPassProfile.begin(encoder,"volume_filter"); var pass = encoder.createRenderPass(descriptor(axis==0?scratchView:view,width,height))) {
                     pass.setPipeline(VOLUME_FILTER);
                     var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
                     pass.bindTexture("VolumeInput",axis==0?view:scratchView,nearest);

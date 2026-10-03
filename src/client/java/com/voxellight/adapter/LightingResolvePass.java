@@ -93,7 +93,7 @@ final class LightingResolvePass implements AutoCloseable {
                     .putVec4(light.horizonR(),light.horizonG(),light.horizonB(),light.lowerHemisphere()).get());
         }
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        try (var pass = history ? encoder.createRenderPass(lightingDescriptor(hdrView,temporal.input(),output.width,output.height))
+        try (var profile=RenderPassProfile.begin(encoder,"lighting"); var pass = history ? encoder.createRenderPass(lightingDescriptor(hdrView,temporal.input(),output.width,output.height))
                 : encoder.createRenderPass(() -> "VoxelLight separated linear lighting",hdrView,Optional.of(new Vector4f(0,0,0,0)))) {
             pass.setPipeline(history ? LIGHTING_TEMPORAL : LIGHTING);
             String[] names = {"MaterialAlbedo","MaterialNormal","MaterialEmission","MaterialDepth"};

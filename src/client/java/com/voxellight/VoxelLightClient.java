@@ -39,8 +39,8 @@ public final class VoxelLightClient implements ClientModInitializer {
         com.voxellight.adapter.IndigoMaterials.verifyWriter();
         LoggerFactory.getLogger("VoxelLight").info("Native terrain material writer verified: 36-byte stride, vanilla + Indigo emission");
         LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 reference lighting prototype loaded; rendering effects are off by default");
-        ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false));
-        ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true));
+        ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> { RenderProbe.invalidateCasterAdmission(); SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false); });
+        ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> { RenderProbe.invalidateCasterAdmission(); SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true); });
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> SCENE.changeLevel(level));
         ClientTickEvents.END_CLIENT_TICK.register(SCENE::tick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> SCENE.close());
@@ -54,12 +54,20 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal(PROBE.status()));
                         return 1;
                     }))
+                    .then(literal("profile").then(literal("on").executes(context -> {
+                        com.voxellight.adapter.RenderPassProfile.setEnabled(true);
+                        context.getSource().sendFeedback(Component.literal("VoxelLight: per-pass profiling on; export after the comparison"));return 1;
+                    })).then(literal("off").executes(context -> {
+                        com.voxellight.adapter.RenderPassProfile.setEnabled(false);
+                        context.getSource().sendFeedback(Component.literal("VoxelLight: per-pass profiling off"));return 1;
+                    })))
                     .then(literal("export").executes(context -> {
                         try {
                             var directory = FabricLoader.getInstance().getGameDir().resolve("benchmark-results/voxellight");
                             Files.createDirectories(directory);
                             var path = directory.resolve("probe-" + Instant.now().toEpochMilli() + ".csv");
                             PROBE.metrics().export(path);
+                            com.voxellight.adapter.RenderPassProfile.export(path.resolveSibling(path.getFileName()+".passes.csv"));
                             SCENE.export(path.resolveSibling(path.getFileName() + ".scene.csv"));
                             Files.writeString(path.resolveSibling(path.getFileName() + ".txt"),
                                     "Minecraft=26.2\nVoxelLight=" + FabricLoader.getInstance().getModContainer("voxellight")

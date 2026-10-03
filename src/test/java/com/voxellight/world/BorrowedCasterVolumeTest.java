@@ -24,6 +24,18 @@ class BorrowedCasterVolumeTest {
         }
     }
 
+    @Test void cachedAdmissionPaddingCoversCameraAndLightDrift() {
+        var admittedLight=new Vector3f(.8f,.1f,.6f).normalize();
+        var currentLight=new Vector3f(admittedLight).add(.005f,-.003f,.002f).normalize();
+        // A camera can move nearly sixteen blocks along every axis without changing section.
+        for(double move:new double[]{-15.99,0,15.99}) {
+            for(int x=-224;x<=224;x+=8)for(int y=-144;y<=144;y+=8)for(int z=-224;z<=224;z+=8) {
+                if(BorrowedCasterVolume.intersects(x-move,y-move,z-move,currentLight,128))
+                    assertTrue(BorrowedCasterVolume.intersects(x,y,z,admittedLight,160),"Cached admission must not miss a newly visible caster");
+            }
+        }
+    }
+
     @Test void extendingNativeShadowsDoesNotExpandTheDuplicateSceneBridge() {
         assertEquals(128, ShadowCascades.RADIUS);
         assertEquals(384, CasterVolume.MAX_SECTIONS);

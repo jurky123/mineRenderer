@@ -1,5 +1,9 @@
 # VoxelLight release history
 
+## 0.25.1 — Water motion / CPU hotspot / baseline follow-up
+
+Direct36-byte BLOCK writer preserves vanilla reservation and packing; spatial native-shadow admission outside dispatcher lock with cached conservative candidates and fresh per-frame allocation borrowing. Smaller six-band filtered water normals, default strength0.09. Optional `/voxellight profile on/off`, exported per-pass CPU/GPU samples and summary utility. Density0.001 retained. No claim of measured speedup, displaced water, resolved continuous-sun cache or new GI. See TEST-0.25.1.md.
+
 ## 0.25.0 — Three-phase visual refinement bundle
 
 - User confirmed0.24 and requested three phases before another in-game test; deliver one client kit with three connected milestones.

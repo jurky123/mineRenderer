@@ -83,7 +83,7 @@ final class WaterPass implements AutoCloseable {
                 settings=device.createBuffer(()->"VoxelLight water settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,WaterOptics.SETTINGS_BYTES);
             }
             if(!terrain && !captured)return;
-            try(var pass=encoder.createRenderPass(storeDescriptor(hdrView,width,height,terrain))) {
+            try (var profile = RenderPassProfile.begin(encoder,"water_background"); var pass = encoder.createRenderPass(storeDescriptor(hdrView,width,height,terrain))) {
                 pass.setPipeline(WATER_STORE);
                 var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
                 pass.bindTexture("InputHdr",source,nearest);pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);

@@ -61,6 +61,7 @@ class WaterPipelineTest {
             String main=shader.substring(shader.indexOf("void main()"));
             int derivative=main.indexOf("dFdx(surface)");
             assertTrue(derivative>=0);
+            assertTrue(main.indexOf("waveSlope(surface.xz")<main.indexOf("voxellightNativeMain();"),"Ripple footprint derivatives must precede native discard");
             assertTrue(derivative<main.indexOf("voxellightNativeMain();"),"Native alpha test may discard helper lanes");
             assertTrue(derivative<main.indexOf("if(!background("),"Per-pixel rejection must not make derivatives divergent");
             assertTrue(derivative<main.indexOf("if(!waterSprite("));

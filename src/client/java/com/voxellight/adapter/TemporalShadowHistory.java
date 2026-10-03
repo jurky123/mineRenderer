@@ -59,7 +59,7 @@ final class TemporalShadowHistory implements AutoCloseable {
         int write=1-read;
         var descriptor=descriptor(views[3],views[write],width,height);
         var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        try(var pass=encoder.createRenderPass(descriptor)) {
+        try (var profile = RenderPassProfile.begin(encoder,"temporal"); var pass = encoder.createRenderPass(descriptor)) {
             pass.setPipeline(TEMPORAL);
             pass.bindTexture("CurrentHdr",currentHdr,nearest);pass.bindTexture("CurrentShadow",input(),nearest);
             pass.bindTexture("MaterialNormal",material.view(1),nearest);pass.bindTexture("MaterialDepth",material.view(3),nearest);pass.bindTexture("History",views[read],nearest);

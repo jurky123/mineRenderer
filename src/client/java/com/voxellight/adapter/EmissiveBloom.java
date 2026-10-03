@@ -29,7 +29,7 @@ final class EmissiveBloom implements AutoCloseable {
         if(neutral==null) {
             neutral=device.createTexture("VoxelLight black bloom",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA16_FLOAT,1,1,1,1);
             neutralView=device.createTextureView(neutral);
-            try(var pass=encoder.createRenderPass(descriptor(neutralView,1,1))){ }
+            try (var profile = RenderPassProfile.begin(encoder,"bloom_clear"); var pass = encoder.createRenderPass(descriptor(neutralView,1,1))){ }
         }
         if(!enabled || VisualPolish.bloomBytes(output.width,output.height)>VisualPolish.BLOOM_LIMIT){releaseTargets();return;}
         if(!device.precompilePipeline(BLOOM_EXTRACT,RenderProbe.SHADERS).isValid() || !device.precompilePipeline(BLOOM_BLUR,RenderProbe.SHADERS).isValid())
@@ -43,7 +43,7 @@ final class EmissiveBloom implements AutoCloseable {
             }
         }
         var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        try(var pass=encoder.createRenderPass(descriptor(views[0],width,height))) {
+        try (var profile = RenderPassProfile.begin(encoder,"bloom_extract"); var pass = encoder.createRenderPass(descriptor(views[0],width,height))) {
             pass.setPipeline(BLOOM_EXTRACT);
             pass.bindTexture("MaterialAlbedo",material.view(0),nearest);
             pass.bindTexture("MaterialNormal",material.view(1),nearest);
@@ -57,7 +57,7 @@ final class EmissiveBloom implements AutoCloseable {
             try(var stack=MemoryStack.stackPush()) {
                 encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,16).putVec4(axis==0?1:0,axis==1?1:0,0,0).get());
             }
-            try(var pass=encoder.createRenderPass(descriptor(views[1-axis],width,height))) {
+            try (var profile = RenderPassProfile.begin(encoder,"bloom_filter"); var pass = encoder.createRenderPass(descriptor(views[1-axis],width,height))) {
                 pass.setPipeline(BLOOM_BLUR);
                 pass.bindTexture("BloomInput",views[axis],RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
                 pass.setUniform("BloomSettings",settings);pass.draw(3,1,0,0);

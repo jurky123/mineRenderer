@@ -82,7 +82,7 @@ final class MaterialCapture implements AutoCloseable {
         try(var stack=MemoryStack.stackPush()) {
             encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,SETTINGS_BYTES).putVec4(diagnostic,entities?1:0,0,0).get());
         }
-        try(var pass=encoder.createRenderPass(()->"VoxelLight material diagnostic display",output.getColorTextureView(),Optional.empty())) {
+        try (var profile = RenderPassProfile.begin(encoder,"material_debug"); var pass = encoder.createRenderPass(()->"VoxelLight material diagnostic display",output.getColorTextureView(),Optional.empty())) {
             pass.setPipeline(DISPLAY);
             pass.bindTexture("SceneColor",sceneColor,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
@@ -108,7 +108,7 @@ final class MaterialCapture implements AutoCloseable {
         var ubos=RenderSystem.getDynamicUniforms().writeChunkSections(infos.toArray(new DynamicUniforms.ChunkSectionInfo[0]));
         var sequence=RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS); var indices=max==0?null:sequence.getBuffer(max);
         var descriptor=captureDescriptor(views,width,height);
-        try(var pass=encoder.createRenderPass(descriptor)) {
+        try (var profile = RenderPassProfile.begin(encoder,"material_local"); var pass = encoder.createRenderPass(descriptor)) {
             pass.setPipeline(CAPTURE);RenderSystem.bindDefaultUniforms(pass);
             pass.bindTexture("Sampler0",atlas,terrainSampler);
             if(!submissions.isEmpty())pass.drawMultipleIndexed(submissions,indices,sequence.type(),List.of("ChunkSection"),ubos);
@@ -121,7 +121,7 @@ final class MaterialCapture implements AutoCloseable {
         var sequence=RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
         var indices=terrain==null || terrain.maxIndicesRequired()==0?null:sequence.getBuffer(terrain.maxIndicesRequired());
         draws=0;
-        try(var pass=encoder.createRenderPass(captureDescriptor(views,width,height))){
+        try (var profile = RenderPassProfile.begin(encoder,"material_native"); var pass = encoder.createRenderPass(captureDescriptor(views,width,height))){
             pass.setPipeline(NATIVE_CAPTURE);RenderSystem.bindDefaultUniforms(pass);
             if(terrain==null)return;
             pass.bindTexture("Sampler0",terrain.textureView(),sampler);

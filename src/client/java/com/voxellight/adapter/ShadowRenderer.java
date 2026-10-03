@@ -219,7 +219,7 @@ public final class ShadowRenderer implements AutoCloseable {
 
     public void render(CommandEncoder encoder, RenderTarget target, GpuTextureView sceneColor, RenderProbe.Mode mode) {
         updateLighting(encoder, mode);
-        try (var pass = encoder.createRenderPass(() -> "VoxelLight cascade lighting resolve", target.getColorTextureView(), Optional.empty())) {
+        try (var profile = RenderPassProfile.begin(encoder,"shadow_legacy_resolve"); var pass = encoder.createRenderPass(() -> "VoxelLight cascade lighting resolve", target.getColorTextureView(), Optional.empty())) {
             pass.setPipeline(mode == RenderProbe.Mode.SHADOW_MAP ? MAP : mode == RenderProbe.Mode.SHADOW_MASK ? MASK : COMPOSITE);
             pass.bindTexture("SceneColor", sceneColor, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
             pass.bindTexture("SceneDepth", target.getDepthTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
@@ -301,7 +301,7 @@ public final class ShadowRenderer implements AutoCloseable {
 
     private void clearEntities(CommandEncoder encoder, Cascade cascade) {
         if (!cascade.dynamicInitialized || cascade.dynamicHadModels) {
-            try (var pass = encoder.createRenderPass(() -> "VoxelLight empty entity shadow layer", cascade.attachmentView,
+            try (var profile = RenderPassProfile.begin(encoder,"shadow_dynamic_clear_"+cascade.index); var pass = encoder.createRenderPass(() -> "VoxelLight empty entity shadow layer", cascade.attachmentView,
                     Optional.empty(), cascade.dynamicView, OptionalDouble.of(1))) { }
             cascade.dynamicInitialized = true; cascade.dynamicHadModels = false;
         }
@@ -310,7 +310,7 @@ public final class ShadowRenderer implements AutoCloseable {
     private void renderEntities(CommandEncoder encoder, Cascade cascade) {
         if (!dynamic.hasModels()) { clearEntities(encoder, cascade); return; }
         dynamic.prepareIndices();
-        try (var pass = encoder.createRenderPass(() -> "VoxelLight animated dynamic caster shadow layer", cascade.attachmentView,
+        try (var profile = RenderPassProfile.begin(encoder,"shadow_dynamic_"+cascade.index); var pass = encoder.createRenderPass(() -> "VoxelLight animated dynamic caster shadow layer", cascade.attachmentView,
                 Optional.empty(), cascade.dynamicView, OptionalDouble.of(1))) {
             pass.setPipeline(ENTITY);
             pass.setUniform("ShadowSettings", cascade.settings);
@@ -374,7 +374,7 @@ public final class ShadowRenderer implements AutoCloseable {
                         .withColorAttachment(cascade.attachmentView)
                         .withDepthAttachment(cascade.depthView, OptionalDouble.of(1))
                         .withRenderArea(new RenderPass.RenderArea(region.x(), region.y(), region.width(), region.height()));
-                try (var pass = encoder.createRenderPass(descriptor)) {
+                try (var profile = RenderPassProfile.begin(encoder,"shadow_terrain_"+cascade.index); var pass = encoder.createRenderPass(descriptor)) {
                     pass.setPipeline(CASTER);
                     RenderSystem.bindDefaultUniforms(pass);
                     pass.setUniform("ShadowSettings", cascade.settings);

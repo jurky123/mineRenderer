@@ -127,6 +127,8 @@ public final class RenderProbe {
         return mode;
     }
 
+    public static void invalidateCasterAdmission(){NativeShadowCasters.invalidateAdmission();}
+
     public PassMetrics metrics() {
         return metrics;
     }
@@ -136,7 +138,7 @@ public final class RenderProbe {
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
                 + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
                 + (mode.isMaterial() ? entityMaterials.status() + ", entityMaterialPass=" + entityMaterialPass : "")
-                + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
+                + RenderPassProfile.status() + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
                 + (mode == Mode.FOUNDATION ? ", " + lighting.status() + ", " + material.status() + ", " + shadows.status()
                 : mode.isShadow() ? ", " + shadows.status() : mode.isMaterial() ? ", " + material.status() : "");
     }
@@ -183,6 +185,7 @@ public final class RenderProbe {
     }
 
     public void render(RenderTarget target) {
+        RenderPassProfile.nextFrame();
         entityCaptureScope=false;
         entityMaterials.endFrame();
         lighting.endFrame();
@@ -351,6 +354,7 @@ public final class RenderProbe {
         timerAttempted = false;
         timing = "not observed";
         metrics.clear();
+        RenderPassProfile.clear();
     }
 
     private void ensureScratch(RenderTarget target) {

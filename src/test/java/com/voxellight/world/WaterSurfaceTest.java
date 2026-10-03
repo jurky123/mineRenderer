@@ -9,10 +9,10 @@ class WaterSurfaceTest {
             float p=WaterSurface.phase(Long.MAX_VALUE,speed);
             assertTrue(Float.isFinite(p) && p>=0 && p<Math.PI*2);
         }
-        for(int harmonic:new int[]{1,2,3}) {
+        for(int harmonic:new int[]{2,3,5,-4,7,-9}) {
             float before=WaterSurface.phase(11_999_999_000L,1),after=WaterSurface.phase(12_000_001_000L,1);
-            assertEquals(Math.cos(harmonic*before),Math.cos(harmonic*after),1e-5);
-            assertEquals(Math.sin(harmonic*before),Math.sin(harmonic*after),1e-5);
+            assertEquals(Math.cos(harmonic*before),Math.cos(harmonic*after),2e-5);
+            assertEquals(Math.sin(harmonic*before),Math.sin(harmonic*after),2e-5);
         }
     }
     @Test void zeroSpeedFreezesPhaseAndInvalidControlsAreRejected() {
@@ -24,7 +24,7 @@ class WaterSurfaceTest {
         assertEquals(.3f,WaterSurface.strength(.3f));
     }
     @Test void integerWaveSpatialFrequenciesRemainContinuousAtCameraModuloBoundaries() {
-        for(int[] wave:new int[][]{{2,1},{-1,3},{5,2}}) {
+        for(int[] wave:new int[][]{{7,3},{13,5},{19,-7},{-9,17},{31,11},{-23,29}}) {
             double before=(63.999*wave[0]+3*wave[1])*Math.PI*2/64;
             double after=(-.001*wave[0]+3*wave[1])*Math.PI*2/64;
             assertEquals(Math.cos(before),Math.cos(after),1e-10);

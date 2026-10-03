@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.25.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.25.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -21,7 +21,8 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | 0.25 phase1 — water reflections | Bounded HDR screen-space trace over existing pre-tone scene/depth; binary refinement and edge/distance/validity fade to sky. No new reflection image. Pending combined in-game test. |
 | 0.25 phase2 — volumetric filtering | Two depth-aware quarter-resolution5-tap filter passes; no volume history or RGB ghosting. Pending combined in-game test. |
 | 0.25 phase3 — animated water / quality controls | Three moving normal-wave harmonics, bounded phase and modulo64 continuity; waves/reflections/filter toggles and fixed fast/balanced/high sampling budgets. Pending combined in-game test. |
-| Next milestone | User requested three phases before testing: this bundle now needs the[combined in-game checklist](TEST-0.25.md). Review noise, edge fades, water motion and frame cost before further effects. |
+| 0.25.1 review follow-up | Direct36-byte writer; cached caster admission outside allocation lock; smaller filtered water ripples; optional delayed per-pass profiler. 178 tests passed; actual native shader compilation and direct vanilla/Indigo startup writer checks passed (graphics startup stops at missing DISPLAY); in-game motion and measured performance pending. |
+| Next milestone | [0.25.1 water/performance checks](TEST-0.25.1.md), then choose the next GPU optimization from exports. GI deferred until these regressions and costs are understood. |
 
 Current budgets: native material mode borrows visible native terrain geometry, adding8 bytes/vertex (BLOCK stride28→36) and one material MRT raster pass; no duplicate material mesh store. `/voxellight native_material off` selects the old125-section/16 MiB/one-build-per-frame local reference. Native compiler light updates still rebuild native section buffers. Light-aware scene cap384 loaded sections; independent near shadow terrain32 MiB; distant shadows borrow native allocations under a bounded128-block receiver +96-block light extrusion, with pending native compilation reported; local-light reference16 combined sources (one slot reserved while a held source exists). D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).
 

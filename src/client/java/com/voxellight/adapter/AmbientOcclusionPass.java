@@ -31,7 +31,7 @@ final class AmbientOcclusionPass implements AutoCloseable {
         if(neutral==null) {
             neutral=device.createTexture("VoxelLight neutral AO",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA16_FLOAT,1,1,1,1);
             neutralView=device.createTextureView(neutral);
-            try(var pass=encoder.createRenderPass(descriptor(neutralView,1,1,"VoxelLight neutral AO clear"))) { }
+            try (var profile = RenderPassProfile.begin(encoder,"ao_clear"); var pass = encoder.createRenderPass(descriptor(neutralView,1,1,"VoxelLight neutral AO clear"))) { }
         }
         if(!enabled || AmbientOcclusion.targetBytes(output.width,output.height)>AmbientOcclusion.TARGET_LIMIT) {
             releaseTargets();state=enabled?"target budget exceeded; ambient retained":"off";return false;
@@ -57,7 +57,7 @@ final class AmbientOcclusionPass implements AutoCloseable {
         }
         if(!active)return;
         var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        try(var pass=encoder.createRenderPass(descriptor(views[0],width,height,"VoxelLight terrain horizon AO"))) {
+        try (var profile = RenderPassProfile.begin(encoder,"ao_horizon"); var pass = encoder.createRenderPass(descriptor(views[0],width,height,"VoxelLight terrain horizon AO"))) {
             pass.setPipeline(AO);
             pass.bindTexture("MaterialNormal",material.view(1),nearest);
             pass.bindTexture("MaterialDepth",material.view(3),nearest);
@@ -65,7 +65,7 @@ final class AmbientOcclusionPass implements AutoCloseable {
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindTransform(pass);pass.setUniform("AoSettings",settings);pass.draw(3,1,0,0);
         }
-        try(var pass=encoder.createRenderPass(descriptor(views[1],width,height,"VoxelLight AO bilateral spatial filter"))) {
+        try (var profile = RenderPassProfile.begin(encoder,"ao_filter"); var pass = encoder.createRenderPass(descriptor(views[1],width,height,"VoxelLight AO bilateral spatial filter"))) {
             pass.setPipeline(AO_FILTER);pass.bindTexture("AoInput",views[0],nearest);
             pass.bindTexture("SceneDepth",output.getDepthTextureView(),nearest);
             shadows.bindTransform(pass);pass.setUniform("AoSettings",settings);pass.draw(3,1,0,0);
