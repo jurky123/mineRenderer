@@ -114,6 +114,7 @@ public final class ShadowRenderer implements AutoCloseable {
     // Opt-in: endpoint sampling can cost more than cached shadow-map redraws save.
     private boolean epochEnabled=false, epochActive;
     private float epochWeight;
+    private com.voxellight.world.ShadowFilter filter=com.voxellight.world.ShadowFilter.BALANCED;
     private boolean cacheEnabled = true;
     private boolean worldSun = true;
     private int receiverDistance = (int)ShadowCascades.RADIUS;
@@ -309,7 +310,7 @@ public final class ShadowRenderer implements AutoCloseable {
             for(var matrix:terrainMatrices)data.putMat4f(ShadowCascades.normalMatrix(matrix));
             for(var matrix:nextMatrices)data.putMat4f(matrix);
             for(var matrix:nextMatrices)data.putMat4f(ShadowCascades.normalMatrix(matrix));
-            data.putVec4(epochWeight,0,dynamic.hasModels()?1:0,epochActive?1:0);
+            data.putVec4(epochWeight,filter.radius(),dynamic.hasModels()?1:0,epochActive?1:0);
             encoder.writeToBuffer(resolveSettings.slice(),data.get());
         }
     }
@@ -466,6 +467,7 @@ public final class ShadowRenderer implements AutoCloseable {
         return "shadow=" + state + ", casters=" + meshes.size() + "/" + expected + ", casterDraws=" + drawCalls
                 + ", geometryBytes=" + geometryBytes + ", shadowMapBytes=" + (resolveSettings == null ? 0 : ShadowCascades.mapBytes() + 24L * 1024 * 1024 + nextMapBytes())
                 + nativeCasters.status()
+                + ", shadowFilter="+filter.name().toLowerCase(java.util.Locale.ROOT)+", shadowFilterTaps="+filter.taps()
                 + ", cascades=3, shadowDistance=" + receiverDistance
                 + ", sun=" + (worldSun ? "world" : "fixed") + ", lightSource=" + frameLight.source()
                 + ", lightAngleDeg=" + (float)Math.toDegrees(frameLight.angleRadians()) + ", lightStrength=" + frameLight.strength()
@@ -493,6 +495,7 @@ public final class ShadowRenderer implements AutoCloseable {
     public void setWorldSun(boolean enabled) { worldSun = enabled; resetEpochs(); }
     public void setCacheEnabled(boolean enabled) { cacheEnabled = enabled; resetEpochs(); }
 
+    public void setFilter(com.voxellight.world.ShadowFilter value){filter=java.util.Objects.requireNonNull(value);}
     public void setEpochs(boolean enabled){epochEnabled=enabled;resetEpochs();}
     private void resetEpochs(){epochs.clear();epochWeight=0;epochActive=false;for(var c:cascades){c.terrain.cache.clear();c.next.cache.clear();c.future.cache.clear();c.terrain.initialized=c.next.initialized=c.future.initialized=false;if(!epochEnabled || !cacheEnabled || !worldSun){c.next.close();c.future.close();}}}
     private long nextMapBytes(){long bytes=0;for(var c:cascades)for(var epoch:List.of(c.next,c.future))if(epoch.depth!=null)bytes+=4L*ShadowCascades.range(c.index).mapSize()*ShadowCascades.range(c.index).mapSize();return bytes;}

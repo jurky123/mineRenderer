@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.27.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.28.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -25,7 +25,9 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | 0.26 celestial cache | Two fixed-angle terrain epochs with visibility interpolation,8-page future construction budget and current dynamic shadow reprojection. Static cutout meshes now cache; animated/unknown emitters remain conservative.189 tests pass; native shader contracts and actual startup classification/writer checks pass (graphics stops at missing DISPLAY). In-game quality/performance pending. |
 | 0.26.1 epoch default | User reports higher FPS with epochs disabled. Epoch blending is now opt-in; static cutout caching remains enabled independently. No measured pass-level diagnosis yet. |
 | 0.27 performance foundation | Three RGBA8 material targets + D32 (16 bytes/pixel). Explicit signed-normal and validity/native-fade encoding across terrain/entity capture, lighting, AO, bloom, temporal and diagnostics. Temporal shadow defaults off; opt-in history remains available.191 tests pass; GPU acceptance and timings pending. |
-| Next milestone | [Packed material acceptance and pass profiling](PERFORMANCE-0.27.md); use measured costs to choose visibility/HZB/volume/single-raster work. RTX capability/interop design remains separate, unimplemented. |
+| 0.27 acceptance | User reports temporal off is15 FPS faster; keep it off. Packed-material precision/distant-fade checks are not separately confirmed. |
+| 0.28 surface shadow sampling | Independent shadow_filter fast/balanced/high budgets4/16/36 taps per cascade; default balanced. Continuous texel-phase weighting, existing world bias, cascades and dynamic blocker union retained.194 tests pass; visual/FPS acceptance pending. |
+| Next milestone | [Shadow filter acceptance](SHADOW-FILTERS.md) and pass profiling; compare balanced/high while temporal and epochs stay off. RTX capability/interop design remains separate, unimplemented. |
 
 Current budgets: material targets use16 bytes/pixel (1440p56.25 MiB,4K126.56 MiB), down from24; HDR lighting remains8 bytes/pixel. Temporal shadows and celestial epochs default off. Optional dual-angle terrain shadows add at most48 MiBD32 (102 MiB total shadow textures); shared resolve transforms1344 bytes. Native material mode borrows visible native terrain geometry, adding8 bytes/vertex (BLOCK stride28→36) and one material MRT raster pass; no duplicate material mesh store. `/voxellight native_material off` selects the old125-section/16 MiB/one-build-per-frame local reference. Native compiler light updates still rebuild native section buffers. Light-aware scene cap384 loaded sections; independent near shadow terrain32 MiB; distant shadows borrow native allocations under a bounded128-block receiver +96-block light extrusion, with pending native compilation reported; local-light reference16 combined sources (one slot reserved while a held source exists). When explicitly enabled, D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).
 

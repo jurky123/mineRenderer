@@ -29,7 +29,7 @@ layout(std140) uniform ShadowResolveSettings {
     mat4 LightNormalMatrix[3];
     mat4 TerrainLightMatrix[3];mat4 TerrainNormalMatrix[3];
     mat4 NextLightMatrix[3];mat4 NextNormalMatrix[3];
-    vec4 EpochBlend; // Visibility interpolation weight; w enables fixed-angle terrain epochs.
+    vec4 EpochBlend; // x visibility blend; y surface PCF radius; w enables fixed-angle terrain epochs.
 
 };
 layout(std140) uniform LocalLightSettings {
@@ -179,10 +179,13 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, mat3 norma
     // Keep the accepted ~0.036-block bias despite different cascade depth spans.
     float depthBias = 0.0357 * length(vec3(matrix[0].z, matrix[1].z, matrix[2].z));
     float blocked = 0.0;
-    for (int y = -2; y <= 3; y++) {
-        float wy = y == -2 ? 1.0 - phase.y : (y == 3 ? phase.y : 1.0);
-        for (int x = -2; x <= 3; x++) {
-            float wx = x == -2 ? 1.0 - phase.x : (x == 3 ? phase.x : 1.0);
+    // Integer-radius phase weights keep filtering continuous as the map scrolls.
+    int radius=clamp(int(round(EpochBlend.y)),0,2);
+    float width=float(2*radius+1);
+    for (int y = -radius; y <= radius+1; y++) {
+        float wy = y == -radius ? 1.0 - phase.y : (y == radius+1 ? phase.y : 1.0);
+        for (int x = -radius; x <= radius+1; x++) {
+            float wx = x == -radius ? 1.0 - phase.x : (x == radius+1 ? phase.x : 1.0);
             vec2 sampleUv = (base + vec2(x, y) + 0.5) * pixel;
             float receiverDepth = projected.z + dot(gradient, sampleUv - shadowUv);
             float casterDepth = texture(map, sampleUv).r;
@@ -198,7 +201,7 @@ float shadowOcclusion(sampler2D map, sampler2D entities, mat4 matrix, mat3 norma
         }
     }
     vec2 edge = min(shadowUv, vec2(1.0) - shadowUv) / pixel;
-    return blocked / 25.0 * smoothstep(3.0, 8.0, min(edge.x, edge.y));
+    return blocked / (width*width) * smoothstep(3.0, 8.0, min(edge.x, edge.y));
 }
 
 float epochMapOcclusion(sampler2D map, sampler2D entities, int cascade, mat4 matrix, mat3 normalMatrix, vec3 position, vec3 normal) {
@@ -220,10 +223,13 @@ float epochMapOcclusion(sampler2D map, sampler2D entities, int cascade, mat4 mat
     mat3 toDynamic=mat3(LightMatrix[cascade])*transpose(normalMatrix);
     float dynamicBias=.0357*length(vec3(LightMatrix[cascade][0].z,LightMatrix[cascade][1].z,LightMatrix[cascade][2].z));
     float blocked = 0.0;
-    for (int y = -2; y <= 3; y++) {
-        float wy = y == -2 ? 1.0 - phase.y : (y == 3 ? phase.y : 1.0);
-        for (int x = -2; x <= 3; x++) {
-            float wx = x == -2 ? 1.0 - phase.x : (x == 3 ? phase.x : 1.0);
+    // Integer-radius phase weights keep filtering continuous as the map scrolls.
+    int radius=clamp(int(round(EpochBlend.y)),0,2);
+    float width=float(2*radius+1);
+    for (int y = -radius; y <= radius+1; y++) {
+        float wy = y == -radius ? 1.0 - phase.y : (y == radius+1 ? phase.y : 1.0);
+        for (int x = -radius; x <= radius+1; x++) {
+            float wx = x == -radius ? 1.0 - phase.x : (x == radius+1 ? phase.x : 1.0);
             vec2 sampleUv = (base + vec2(x, y) + 0.5) * pixel;
             float receiverDepth = projected.z + dot(gradient, sampleUv - shadowUv);
             float casterDepth = texture(map, sampleUv).r;
@@ -241,7 +247,7 @@ float epochMapOcclusion(sampler2D map, sampler2D entities, int cascade, mat4 mat
         }
     }
     vec2 edge = min(shadowUv, vec2(1.0) - shadowUv) / pixel;
-    return blocked / 25.0 * smoothstep(3.0, 8.0, min(edge.x, edge.y));
+    return blocked / (width*width) * smoothstep(3.0, 8.0, min(edge.x, edge.y));
 }
 
 float epochOcclusion(sampler2D first,sampler2D next,sampler2D entities,int cascade,vec3 position,vec3 normal) {

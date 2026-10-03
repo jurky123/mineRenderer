@@ -8,7 +8,7 @@ layout(std140) uniform ShadowResolveSettings {
     mat4 InvProjection;mat4 LightNormalMatrix[3];
     mat4 TerrainLightMatrix[3];mat4 TerrainNormalMatrix[3];
     mat4 NextLightMatrix[3];mat4 NextNormalMatrix[3];
-    vec4 EpochBlend; // Visibility interpolation weight; w enables fixed-angle terrain epochs.
+    vec4 EpochBlend; // x visibility blend; y surface PCF radius; w enables fixed-angle terrain epochs.
 
 };
 layout(location=0) in vec2 texCoord;

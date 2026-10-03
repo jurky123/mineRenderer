@@ -96,6 +96,7 @@ public final class RenderProbe {
     public void prepareWater(RenderTarget target){if(mode==Mode.FOUNDATION && materialFrameReady)lighting.prepareWater(target,shadows);}
     public boolean bindWater(com.mojang.blaze3d.systems.RenderPass pass){return mode==Mode.FOUNDATION && materialFrameReady && lighting.bindWater(pass);}
     public void setExposure(float ev) {RenderSystem.assertOnRenderThread();lighting.setExposure(ev);}
+    public void setShadowFilter(com.voxellight.world.ShadowFilter value){RenderSystem.assertOnRenderThread();shadows.setFilter(value);lighting.invalidateHistory();resetTiming();}
     public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
 
     public void setEntityMaterials(boolean value) { RenderSystem.assertOnRenderThread(); entityMaterials.setEnabled(value); resetTiming(); }

@@ -179,6 +179,10 @@ public final class VoxelLightClient implements ClientModInitializer {
             var waveSpeedCommand=literal("water_wave_speed").then(argument("speed",FloatArgumentType.floatArg(0,3)).executes(context->{
                 float value=FloatArgumentType.getFloat(context,"speed");PROBE.setWaveSpeed(value);context.getSource().sendFeedback(Component.literal("VoxelLight: water wave speed "+value));return 1;
             }));
+            var shadowFilterCommand=literal("shadow_filter");
+            for(var filter:com.voxellight.world.ShadowFilter.values())shadowFilterCommand.then(literal(filter.name().toLowerCase(java.util.Locale.ROOT)).executes(context->{
+                PROBE.setShadowFilter(filter);context.getSource().sendFeedback(Component.literal("VoxelLight: shadow filter "+filter.name().toLowerCase(java.util.Locale.ROOT)+", taps="+filter.taps()));return 1;
+            }));
             var qualityCommand=literal("quality");
             for(var quality:com.voxellight.world.VisualQuality.values())qualityCommand.then(literal(quality.name().toLowerCase(java.util.Locale.ROOT)).executes(context->{
                 PROBE.setQuality(quality);context.getSource().sendFeedback(Component.literal("VoxelLight: quality "+quality.name().toLowerCase(java.util.Locale.ROOT)+", volumeSteps="+quality.volumeSteps()+", reflectionSteps="+quality.reflectionSteps()));return 1;
@@ -258,7 +262,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(epochCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(epochCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand).then(atmosphereCommand).then(densityCommand).then(volumetricCommand).then(waterCommand).then(nativeMaterialCommand).then(reflectionCommand).then(wavesCommand).then(filterCommand).then(waveStrengthCommand).then(waveSpeedCommand).then(qualityCommand).then(shadowFilterCommand));
         });
     }
 }

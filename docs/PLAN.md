@@ -200,3 +200,7 @@ Implemented dual-angle terrain epochs and static-cutout classification after0.25
 ## 0.27 performance architecture entry
 
 Implemented packed material MRT (16B/pixel) and temporal-shadow opt-in. Validate input precision/coverage and capture pass timings before selecting further raster changes. Directional visibility, HZB, froxel/temporal volume, single-raster material and RTX interop remain future work; full path tracing is not a performance mode.
+
+## 0.28 surface shadow sampling budgets
+
+Implemented4/16/36-tap continuous PCF and balanced default, preserving high reference. User-reported temporal-off gain15 FPS reinforces opt-in history. Compare filter appearance/pass timings before committing to screen-space visibility or HZB infrastructure.

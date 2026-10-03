@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.28.0 — Surface shadow filter budgets
+
+- Default surface PCF now16 taps per cascade; independent shadow_filter fast/balanced/high gives4/16/36 taps. High preserves the existing5-texel filter; reduced budgets use narrower footprints.
+- Preserve continuous subtexel phase weights, receiver-plane depth correction, world-space bias, terrain/dynamic union, cascade blending and distance. Filter changes invalidate optional temporal history. No new targets/resources; volume/reflection quality unchanged.
+- User reports temporal off improves15 FPS; it remains off.194 tests pass including real shader compilation, binding/UBO checks, phase normalization and scroll continuity. In-game shadow appearance and performance pending.
+
 ## 0.27.0 — Packed material buffers / temporal opt-in
 
 - Pack normal and emission/light MRTs as RGBA8_UNORM; material targets drop24→16 bytes/pixel, preserving signed normals, supported-surface markers and native chunk visibility. HDR radiance staysRGBA16F.
