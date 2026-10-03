@@ -2,6 +2,13 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.19.0 local-light materials and held source
+
+- Replace registry-name color heuristics with bounded exact-ID resource-pack JSON; transactional malformed-file fallback and resource-generation reload.
+- One interpolated local player's held emissive BlockItem source, choosing the brighter hand;15 static +1 dynamic within the existing16-light cap.
+- Held contribution is independent of vanilla block-light replacement, with the existing shape visibility/falloff and no RGB history.
+- `/voxellight held_lights on|off`; source/profile/fallback counts in status.0.18 confirmed working;0.19 in-game acceptance pending.
+
 ## 0.18.0 lighting/color polish
 
 - Manual EV and rational filmic tone curve, continuous hemisphere sky colors and weather/night policy.

@@ -92,6 +92,7 @@ public final class RenderProbe {
     public void setLightAwareCasters(boolean value) { RenderSystem.assertOnRenderThread(); VoxelLightClient.scene().setLightAware(value); resetTiming(); }
     public void setBlockEntityShadows(boolean value) { RenderSystem.assertOnRenderThread(); shadows.setBlockEntityShadows(value); resetTiming(); }
     public void setFineShapes(boolean value) { RenderSystem.assertOnRenderThread(); shadows.setFineShapes(value); resetTiming(); }
+    public void setHeldLights(boolean value){RenderSystem.assertOnRenderThread();shadows.setHeldLights(value);}
     public void setLocalLights(boolean enabled) {
         RenderSystem.assertOnRenderThread();
         shadows.setLocalLights(enabled);

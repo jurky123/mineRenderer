@@ -10,6 +10,9 @@ import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.voxellight.world.LocalLightVolume;
+import com.voxellight.world.LightMaterials;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.resources.Identifier;
 import com.voxellight.world.OccluderShapes;
 import net.minecraft.world.level.block.state.BlockState;
 import com.voxellight.world.SectionKey;
@@ -43,11 +46,40 @@ final class ArtificialLights implements AutoCloseable {
     private long worldGeneration, resourceGeneration, lastFrame;
     private long uploads, uploadBytes, extractionNanos, atlasNanos;
     private int active, tracked;
+    private boolean heldEnabled=true;
+    private int heldCount;
+    private LightMaterials materials=LightMaterials.defaults();
+    private String materialState="bundled";
+    private record Held(double x,double y,double z,int emission,LightMaterials.Color color) { }
+    private void loadMaterials() {
+        materials=LightMaterials.defaults();materialState="bundled";
+        try(var reader=Minecraft.getInstance().getResourceManager().getResource(Identifier.fromNamespaceAndPath("voxellight","light_materials.json")).orElseThrow().openAsReader()) {
+            materials=LightMaterials.read(reader);materialState="resource pack";
+        } catch(Exception e) {
+            materialState="invalid resource; bundled fallback";
+            org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("Invalid light materials; using bundled profiles",e);
+        }
+    }
+    private Held heldLight() {
+        var mc=Minecraft.getInstance();var player=mc.player;
+        if(!enabled || !heldEnabled || player==null || player.isSpectator() || !player.isAlive())return null;
+        int emission=0;LightMaterials.Color color=LightMaterials.FALLBACK;
+        for(var stack:List.of(player.getMainHandItem(),player.getOffhandItem())) {
+            if(stack.getItem() instanceof BlockItem item) {
+                int value=item.getBlock().defaultBlockState().getLightEmission();
+                if(value>emission) {emission=value;color=materials.color(BuiltInRegistries.BLOCK.getKey(item.getBlock()).toString());}
+            }
+        }
+        if(emission==0)return null;
+        var eye=player.getEyePosition(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false));
+        // Virtual source near the body, not attached to the camera in third person.
+        return new Held(eye.x,eye.y-.25,eye.z,emission,color);
+    }
 
     void prepare(WorldSceneBridge bridge, SectionKey camera) {
         long start = System.nanoTime();
         var stats = bridge.stats();
-        if (worldGeneration != stats.worldGeneration() || resourceGeneration != stats.resourceGeneration()) close();
+        if (worldGeneration != stats.worldGeneration() || resourceGeneration != stats.resourceGeneration()) {close();loadMaterials();}
         worldGeneration = stats.worldGeneration(); resourceGeneration = stats.resourceGeneration();
         // Directional casters use a larger window; local voxel lights retain their 80^3/125-section cap.
         var keys = bridge.keys().stream().filter(key -> Math.abs(key.x() - camera.x()) <= 2
@@ -98,15 +130,8 @@ final class ArtificialLights implements AutoCloseable {
                 if (emission == 0) continue;
                 int cell = (y >> 2) * 16 + (z >> 2) * 4 + (x >> 2);
                 if (clusters[cell] != null && clusters[cell].emission() >= emission) continue;
-                var name = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
-                float r = 0.85f, g = 0.82f, b = 0.75f;
-                if (name.contains("soul")) { r = 0.2f; g = 0.7f; b = 1; }
-                else if (name.contains("redstone")) { r = 1; g = 0.12f; b = 0.05f; }
-                else if (name.contains("sea_lantern")) { r = 0.65f; g = 0.9f; b = 1; }
-                else if (name.contains("torch") || name.contains("lantern") || name.contains("campfire")) { r = 1; g = 0.62f; b = 0.24f; }
-                else if (name.contains("lava") || name.contains("fire")) { r = 1; g = 0.3f; b = 0.08f; }
-                else if (name.contains("end_rod")) { r = 0.7f; g = 0.65f; b = 1; }
-                clusters[cell] = new LocalLightVolume.Emitter(key.x() * 16 + x, key.y() * 16 + y, key.z() * 16 + z, emission, r, g, b);
+                var color=materials.color(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+                clusters[cell] = new LocalLightVolume.Emitter(key.x() * 16 + x, key.y() * 16 + y, key.z() * 16 + z, emission, color.red(),color.green(),color.blue());
             }
         }
         return new LocalLightVolume.Section(key, opacity, Arrays.stream(clusters).filter(Objects::nonNull).toList());
@@ -162,24 +187,27 @@ final class ArtificialLights implements AutoCloseable {
         }
         long now = System.nanoTime();
         float seconds = lastFrame == 0 ? 0 : (now - lastFrame) / 1_000_000_000f; lastFrame = now;
-        var lights = enabled ? volume.select(cx, cy, cz, seconds) : List.<LocalLightVolume.Active>of();
-        active = lights.size();
+        var held=heldLight();
+        var lights = enabled ? volume.select(cx, cy, cz, seconds,LocalLightVolume.MAX_LIGHTS-(held==null?0:1)) : List.<LocalLightVolume.Active>of();
+        heldCount=held==null?0:1;active = lights.size()+heldCount;
         try (var stack = MemoryStack.stackPush()) {
             var data = Std140Builder.onStack(stack, LocalLightVolume.SETTINGS_BYTES)
-                    .putVec4((float)(volume.originX() - cx), (float)(volume.originY() - cy), (float)(volume.originZ() - cz), lights.size())
+                    .putVec4((float)(volume.originX() - cx), (float)(volume.originY() - cy), (float)(volume.originZ() - cz), active)
                     .putVec4(LocalLightVolume.SIZE, LocalLightVolume.SIZE, LocalLightVolume.SIZE, enabled ? 1 : 0)
-                    .putVec4(light.source() == ShadowLight.Source.MOON ? light.strength() : 0, fineShapes ? 1 : 0, entityModels ? 1 : 0, 0);
+                    .putVec4(light.source() == ShadowLight.Source.MOON ? light.strength() : 0, fineShapes ? 1 : 0, entityModels ? 1 : 0, held==null?0:lights.size()+1);
             for (int i = 0; i < LocalLightVolume.MAX_LIGHTS; i++) {
                 if (i < lights.size()) {
                     var e = lights.get(i).emitter();
                     data.putVec4((float)(e.x() + 0.5 - cx), (float)(e.y() + 0.5 - cy), (float)(e.z() + 0.5 - cz), e.radius());
-                } else data.putVec4(0, 0, 0, 0);
+                } else if(held!=null && i==lights.size())data.putVec4((float)(held.x()-cx),(float)(held.y()-cy),(float)(held.z()-cz),Math.min(12,held.emission()));
+                else data.putVec4(0, 0, 0, 0);
             }
             for (int i = 0; i < LocalLightVolume.MAX_LIGHTS; i++) {
                 if (i < lights.size()) {
                     var a = lights.get(i); var e = a.emitter();
                     data.putVec4(e.red(), e.green(), e.blue(), e.emission() / 15f * a.weight());
-                } else data.putVec4(0, 0, 0, 0);
+                } else if(held!=null && i==lights.size())data.putVec4(held.color().red(),held.color().green(),held.color().blue(),held.emission()/15f);
+                else data.putVec4(0, 0, 0, 0);
             }
             encoder.writeToBuffer(settings.slice(), data.get());
         }
@@ -190,14 +218,16 @@ final class ArtificialLights implements AutoCloseable {
         pass.bindTexture("ShapeBounds", shapeView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
         pass.bindTexture("VoxelOpacity", view, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
     }
+    void setHeldEnabled(boolean value){heldEnabled=value;}
     void setFineShapes(boolean value) { fineShapes = value; }
     void setEnabled(boolean value) { enabled = value; lastFrame = 0; }
     String status() { return ", localLights=" + (enabled ? "on" : "off") + ", activeLights=" + active + "/16, lightCandidates=" + volume.candidates()
+            + ", heldLights="+(heldEnabled?"on":"off")+", activeHeld="+heldCount+", lightMaterials="+materials.size()+" ("+materialState+")"
             + ", lightSections=" + sections.size() + "/" + tracked + ", voxelBytes=" + (texture == null ? 0 : LocalLightVolume.ATLAS_BYTES + OccluderShapes.TEXTURE_BYTES)
             + ", lightOcclusion=" + (fineShapes ? "shapes" : "full") + ", shapeRows=" + shapes.rowCount() + ", shapeFallbacks=" + shapes.complexFallbacks() + ", shapeOverflows=" + shapes.paletteOverflows() + ", uploadRegions=" + uploadRegions + ", shapeUploadBytes=" + shapeUploadBytes + ", voxelUploads=" + uploads + ", voxelUploadBytes=" + uploadBytes + ", lightExtractNs=" + extractionNanos + ", lastVoxelPrepareNs=" + atlasNanos; }
     @Override public void close() {
         sections.clear(); volume.clear(); shapes.clear(); stateShapes.clear(); uploadedRows = 0; uploadRegions = 0; shapeUploadBytes = 0; center = null; dirty = true; worldGeneration = 0; resourceGeneration = 0; lastFrame = 0;
-        active = 0; tracked = 0; uploads = 0; uploadBytes = 0; extractionNanos = 0; atlasNanos = 0;
+        active = 0; tracked = 0;heldCount=0; uploads = 0; uploadBytes = 0; extractionNanos = 0; atlasNanos = 0;
         if (shapeView != null) { shapeView.close(); shapeView = null; }
         if (shapeTexture != null) { shapeTexture.close(); shapeTexture = null; }
         if (view != null) { view.close(); view = null; }

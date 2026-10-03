@@ -6,6 +6,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 ## 文档
 
+- [局部灯/手持光](docs/LOCAL-LIGHTS.md)：resource-pack颜色和16源预算内的动态手持灯。
 - [色彩/光照polish](docs/POLISH.md)：filmic、手动曝光、天空半球色、emission bloom与reference比较。
 - [AO说明](docs/AO.md)：terrain horizon AO、ambient composition与验收。
 - [当前状态](docs/CURRENT.md)：唯一的当前阶段/验收/下一步记录。

@@ -383,6 +383,7 @@ public final class ShadowRenderer implements AutoCloseable {
     public void setEntityShadows(boolean value) { dynamic.setEntitiesEnabled(value); }
     public void setBlockEntityShadows(boolean value) { dynamic.setBlocksEnabled(value); }
     public void setFineShapes(boolean value) { artificial.setFineShapes(value); }
+    public void setHeldLights(boolean value){artificial.setHeldEnabled(value);}
     public void setLocalLights(boolean enabled) { artificial.setEnabled(enabled); }
     public void setWorldSun(boolean enabled) { worldSun = enabled; for (var c : cascades) c.cache.clear(); }
     public void setCacheEnabled(boolean enabled) { cacheEnabled = enabled; for (var c : cascades) c.cache.clear(); }

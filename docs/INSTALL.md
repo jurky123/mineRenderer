@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.18.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.19.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.18.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.19.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -33,6 +33,7 @@
 | `/voxellight entity_materials on` / `off` | 默认on；支持的opaque实体模型使用材质/normal分离lighting，off保留native实体颜色；不关闭terrain或实体阴影。 |
 | `/voxellight entity_shadows on` / `off` | 默认 on；开关新增太阳/月亮实体模型阴影，保留地形阴影与原生 blob shadow。 |
 | `/voxellight light_occlusion shapes` / `full` | 默认 shapes；比较人工灯形状遮挡与 full-block 参考。 |
+| `/voxellight held_lights on` / `off` | 默认on；玩家任一手持emissive BlockItem产生一盏动态灯，优先较亮手，包含于16源预算；需要local_lights on。 |
 | `/voxellight local_lights on` / `off` | 默认 on，独立开关新增人工灯；保留 vanilla lightmap 和 sun/moon。 |
 | `/voxellight sun world` / `fixed` | 默认 world，跟随当前原生天空角度；fixed 保留旧版固定光源用于比较。切换清空计时样本/缓存，保留 caster。 |
 | `/voxellight shadow_cache on` / `off` | 默认 on，复用有效局部 map；off 为相同画质/投影的每帧重绘参考。切换清空计时样本与缓存计数。 |
@@ -50,7 +51,7 @@ CSV 的 CPU 字段只表示该 pass 的命令准备时间，GPU 字段表示 col
 
 OpenGL/未知 backend 或不支持的 scene format 保留原生画面，status 会显示原因。shader/pass 出错时自动关闭并写日志，下一帧恢复原生渲染；可用 mode 命令重试。已有 vanilla spectator/post effects 会继续处理诊断结果。
 
-当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.18.0。
+当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.19.0。
 
 ## 实机 smoke checklist
 
@@ -326,3 +327,9 @@ status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world r
 进入`mode foundation`，同一位置轮流`look reference`和`look polished`，比较白墙明暗面、晨昏墙面、夜间torch/glowstone。新增film曲线、手动曝光、天空半球色和emission-only bloom；无需另开scene。`exposure 0.75`为默认，可试`0`或`1`；`bloom off/on`单独比较光晕。`coverage_blend off`可隔离色彩变化，on为24–32格淡回native，旧shadow receiver参数不变。AO view仍灰度。
 
 检查植物/动物、F3+T、resize、下界/回主世界、off后恢复。透明/水/lava、sky halo和未捕获表面仍native；bloom不是GI。status新增look/exposureEV/coverageBlend/bloomBytes。预算和边界见[POLISH.md](https://github.com/jurky123/mineRenderer/blob/main/docs/POLISH.md)。
+
+## 0.19.0 local-light polish 验收
+
+`mode foundation`后在暗处手持torch/soul_torch/lantern/glowstone/end_rod，比较`held_lights off/on`，在主/副手切换、移除物品、第三人称移动、薄墙附近和下界检查。光随玩家而非第三人称相机移动；最多15静态+1手持源，没有额外DDA循环。体素暖机阶段未知区域仍挡光。
+
+颜色由`assets/voxellight/light_materials.json`精确block ID决定，resource pack可替换；F3+T重读并更新局部源。未知ID暖白，非法JSON回退bundled并记日志。检测reload、resize、teleport、local_lights off、退出世界后没有残留。详见[LOCAL-LIGHTS.md](https://github.com/jurky123/mineRenderer/blob/main/docs/LOCAL-LIGHTS.md)。燃烧/掉落物/其他玩家手持灯和多emitter聚合尚未实现。

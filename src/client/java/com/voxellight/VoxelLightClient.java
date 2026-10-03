@@ -122,6 +122,10 @@ public final class VoxelLightClient implements ClientModInitializer {
                     return 1;
                 }));
             }
+            var heldCommand=literal("held_lights");
+            for(boolean enabled:new boolean[]{true,false})heldCommand.then(literal(enabled?"on":"off").executes(context->{
+                PROBE.setHeldLights(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: held emissive-block light "+enabled));return 1;
+            }));
             var aoCommand=literal("ao");
             for(String choice:new String[]{"on","off","view"}) {
                 aoCommand.then(literal(choice).executes(context -> {
@@ -201,7 +205,7 @@ public final class VoxelLightClient implements ClientModInitializer {
                         context.getSource().sendFeedback(Component.literal("VoxelLight: shadow distance " + distance + " blocks"));
                         return 1;
                     }));
-            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand));
+            dispatcher.register(command.then(modeCommand).then(sceneCommand).then(cacheCommand).then(sunCommand).then(localCommand).then(distanceCommand).then(occlusionCommand).then(entityCommand).then(blockEntityCommand).then(casterCommand).then(entityMaterialCommand).then(temporalCommand).then(aoCommand).then(lookCommand).then(bloomCommand).then(coverageCommand).then(exposureCommand).then(heldCommand));
         });
     }
 }

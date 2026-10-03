@@ -28,7 +28,7 @@ layout(std140) uniform ShadowResolveSettings {
 layout(std140) uniform LocalLightSettings {
     vec4 GridOriginAndCount;
     vec4 GridBoundsAndEnabled;
-    vec4 MoonLight;
+    vec4 MoonLight; // moon intensity, fine shapes, entity casters, one-based held-light slot (0 absent)
     vec4 LightPositionRadius[16];
     vec4 LightColorStrength[16];
 };
@@ -253,7 +253,7 @@ void main() {
     // Keep all native block-light sources, including ones beyond the 16-light selection.
     // Replace this baseline only if the selected colored, visible reference has greater energy.
     vec3 blockBaseline = vec3(1.0, 0.78, 0.55) * 0.8 * properties.a * properties.a;
-    vec3 selectedLocal = vec3(0.0);
+    vec3 selectedLocal = vec3(0.0), heldLocal = vec3(0.0);
     float localCoverage = 1.0 - smoothstep(16.0, 24.0, distanceToCamera);
     if (GridBoundsAndEnabled.w > 0.5 && localCoverage > 0.0) {
         for (int i = 0; i < 16; i++) {
@@ -268,8 +268,10 @@ void main() {
             vec3 emitterNormal = foliage && lightFacing < 0.0 ? -normal : normal;
             if (!visibleToEmitter(position + emitterNormal * 0.04, LightPositionRadius[i].xyz)) continue;
             float falloff = 1.0 - distanceToLight / radius;
-            selectedLocal += LightColorStrength[i].rgb * LightColorStrength[i].w
+            vec3 contribution = LightColorStrength[i].rgb * LightColorStrength[i].w
                 * falloff * falloff * lambert * 0.7 * localCoverage;
+            if(i+1==int(MoonLight.w)) heldLocal+=contribution;
+            else selectedLocal+=contribution;
         }
     }
     float baselineEnergy = energy(blockBaseline);
@@ -278,7 +280,7 @@ void main() {
     vec3 emission = albedo * max(properties.r, properties.g) * 2.4;
     // AO modulates diffuse ambient/unshadowed block fill, never direct lamps, sun/moon or emission.
     vec3 ambient=vec3(0.012)+sky+blockBaseline*(1.0-replacement);
-    vec3 radiance=albedo*(ambient*ao+direct*visibility+selectedLocal*replacement)+emission;
+    vec3 radiance=albedo*(ambient*ao+direct*visibility+selectedLocal*replacement+heldLocal)+emission;
     fragColor = vec4(radiance, 1.0);
 #ifdef TEMPORAL_SHADOW
     shadowTemporalInput = vec4(visibility, albedo * direct);

@@ -2,7 +2,7 @@
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 
-当前实现、用户验收与下一任务统一见[CURRENT.md](CURRENT.md)，本文件保留路线和历史实施记录。0.16.1 material refresh/frame transforms已获用户确认，D1 scope保持有限，0.17 Basic AO已确认运行但收益较细微，0.18实现lighting/color polish并等待实机；不以temporal细微差异宣称完整验收。
+当前实现、用户验收与下一任务统一见[CURRENT.md](CURRENT.md)，本文件保留路线和历史实施记录。0.16.1 material refresh/frame transforms已获用户确认，D1 scope保持有限，0.17 Basic AO已确认运行但收益较细微，0.18 lighting/color polish已获确认，0.19实现local-light颜色/手持源并等待实机；不以temporal细微差异宣称完整验收。
 
 | 顺序 | 下一里程碑 | 门槛 |
 | --- | --- | --- |

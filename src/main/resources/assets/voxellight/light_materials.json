@@ -1,0 +1,212 @@
+{
+  "minecraft:torch": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:wall_torch": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:lantern": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:campfire": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:jack_o_lantern": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:glowstone": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:shroomlight": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:soul_torch": [
+    0.2,
+    0.7,
+    1
+  ],
+  "minecraft:soul_wall_torch": [
+    0.2,
+    0.7,
+    1
+  ],
+  "minecraft:soul_lantern": [
+    0.2,
+    0.7,
+    1
+  ],
+  "minecraft:soul_campfire": [
+    0.2,
+    0.7,
+    1
+  ],
+  "minecraft:soul_fire": [
+    0.2,
+    0.7,
+    1
+  ],
+  "minecraft:redstone_torch": [
+    1,
+    0.12,
+    0.05
+  ],
+  "minecraft:redstone_wall_torch": [
+    1,
+    0.12,
+    0.05
+  ],
+  "minecraft:redstone_lamp": [
+    1,
+    0.12,
+    0.05
+  ],
+  "minecraft:redstone_ore": [
+    1,
+    0.12,
+    0.05
+  ],
+  "minecraft:deepslate_redstone_ore": [
+    1,
+    0.12,
+    0.05
+  ],
+  "minecraft:sea_lantern": [
+    0.65,
+    0.9,
+    1
+  ],
+  "minecraft:lava": [
+    1,
+    0.3,
+    0.08
+  ],
+  "minecraft:fire": [
+    1,
+    0.3,
+    0.08
+  ],
+  "minecraft:magma_block": [
+    1,
+    0.3,
+    0.08
+  ],
+  "minecraft:end_rod": [
+    0.7,
+    0.65,
+    1
+  ],
+  "minecraft:ochre_froglight": [
+    1,
+    0.8,
+    0.4
+  ],
+  "minecraft:verdant_froglight": [
+    0.65,
+    1,
+    0.7
+  ],
+  "minecraft:pearlescent_froglight": [
+    1,
+    0.72,
+    1
+  ],
+  "minecraft:candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:white_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:orange_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:magenta_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:light_blue_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:yellow_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:lime_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:pink_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:gray_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:light_gray_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:cyan_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:purple_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:blue_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:brown_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:green_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:red_candle": [
+    1,
+    0.62,
+    0.24
+  ],
+  "minecraft:black_candle": [
+    1,
+    0.62,
+    0.24
+  ]
+}

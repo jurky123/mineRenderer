@@ -107,13 +107,18 @@ public final class LocalLightVolume {
     }
 
     public List<Active> select(double x, double y, double z, float seconds) {
+        return select(x,y,z,seconds,MAX_LIGHTS);
+    }
+    public List<Active> select(double x,double y,double z,float seconds,int budget) {
+        if(budget<0 || budget>MAX_LIGHTS)throw new IllegalArgumentException("Invalid light budget");
+        while(slots.size()>budget)slots.removeLast();
         var retained = new HashSet<Emitter>();
         slots.forEach(slot -> retained.add(slot.emitter()));
         var ranked = emitters.stream().filter(e -> e.distanceSquared(x, y, z) < 36 * 36)
                 .sorted(Comparator.<Emitter>comparingDouble(e -> -e.emission() * (retained.contains(e) ? 1.25 : 1) / (1 + e.distanceSquared(x, y, z)))
                         .thenComparingInt(Emitter::x).thenComparingInt(Emitter::y).thenComparingInt(Emitter::z)).toList();
         candidates = ranked.size();
-        var desired = new HashSet<>(ranked.subList(0, Math.min(MAX_LIGHTS, ranked.size())));
+        var desired = new HashSet<>(ranked.subList(0, Math.min(budget, ranked.size())));
         float change = Math.clamp(seconds, 0, 0.1f) / 0.25f;
         for (var it = slots.listIterator(); it.hasNext();) {
             var slot = it.next();
@@ -123,7 +128,7 @@ public final class LocalLightVolume {
         }
         retained.clear(); slots.forEach(slot -> retained.add(slot.emitter()));
         for (var emitter : ranked) {
-            if (slots.size() >= MAX_LIGHTS) break;
+            if (slots.size() >= budget) break;
             if (desired.contains(emitter) && !retained.contains(emitter)) slots.add(new Slot(emitter, Math.min(1, change)));
         }
         return slots.stream().map(slot -> new Active(slot.emitter(), slot.weight())).toList();
