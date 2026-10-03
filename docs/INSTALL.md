@@ -1,12 +1,12 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.20.1。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
+版本：0.21.0。仅客户端，不安装到 Paper 服务端。此版本提供局部太阳/月亮地形阴影、三层局部 tile 缓存、连续 comparison PCF 和 emissive-block 人工灯，新增 material/GBuffer diagnostics 与 `foundation` 分离 HDR terrain lighting，加入有界 native block-entity 模型阴影，尚无分页 clipmap 或 GI；默认关闭，功能开关不跨游戏启动保存。
 
 ## 安装
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.20.1.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.21.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## 命令
@@ -25,6 +25,7 @@
 | `/voxellight mode shadow` | 世界太阳/月亮阴影、月光 fill 与人工灯；自动启用 scene，caster 准备完成后生效。 |
 | `/voxellight caster_volume light` / `cube` | 默认 light；沿当前光源方向选择已加载地形 caster，cube 恢复旧 7³ 窗口供比较。 |
 | `/voxellight look polished` / `reference` | foundation 默认polished；reference恢复0.17光照/Reinhard输出，关闭新增bloom/exposure/距离blend；AO/history保持独立。 |
+| `/voxellight water on` / `off` | polished foundation默认on；近处有HDR背景的Fast/Fancy水面：Fresnel/absorption/sky reflection/refraction；水下/Fabulous/缺背景native。 |
 | `/voxellight atmosphere on` / `off` | polished foundation默认on；局部高度/距离haze和朝向光源的analytic glow，非shadowed光柱；水下/非主世界native。 |
 | `/voxellight atmosphere_density 0.002` | 默认0.002，允许0..0.08；可用0.03放大比较，0无haze。 |
 | `/voxellight exposure 0.75` | polished默认+0.75EV，允许-2..2，手动曝光，无自动变化。 |
@@ -53,7 +54,7 @@ CSV 的 CPU 字段只表示该 pass 的命令准备时间，GPU 字段表示 col
 
 OpenGL/未知 backend 或不支持的 scene format 保留原生画面，status 会显示原因。shader/pass 出错时自动关闭并写日志，下一帧恢复原生渲染；可用 mode 命令重试。已有 vanilla spectator/post effects 会继续处理诊断结果。
 
-当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.20.0。
+当前scope和预算汇总见[CURRENT.md](https://github.com/jurky123/mineRenderer/blob/main/docs/CURRENT.md)。下方按版本列出的检查保留历史参数；最新差异见文末0.21.0。
 
 ## 实机 smoke checklist
 
@@ -343,3 +344,9 @@ status显示`ao=half-res spatial terrain`、`aoSize`、`aoBytes`。1.5格world r
 ## 0.20.1 atmosphere 默认密度
 
 用户已确认0.20 atmosphere运行，偏好density0.002；本版采用该默认值。旧版可用`/voxellight atmosphere_density 0.002`获得同一设置。命令范围和其它效果保持原样。
+
+## 0.21.0 HDR Water Foundation 验收
+
+使用Fast/Fancy图形，在24格内浅水、能看到石头/沙子底部的位置运行`mode foundation`、`water off/on`。观察normal ripples、掠射天空反射、随深度增强的吸收和小幅折射。水下、Fabulous独立透明target、未捕获背景/天空和非主世界保留native。不是SSR，不修改fluid geometry。
+
+测试流水/侧面、植物/动物、glass、hand/HUD、underwater、resize、F3+T、切世界和off恢复。`water` active表示shader已接入，不保证全湖每pixel都有HDR背景。保留atmosphere默认density0.002。预算和真实composition边界见[WATER.md](https://github.com/jurky123/mineRenderer/blob/main/docs/WATER.md)。

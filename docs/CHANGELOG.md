@@ -2,6 +2,14 @@
 
 历史说明保留当时参数与验收状态；当前状态以[CURRENT.md](CURRENT.md)为准，操作与最新安装见[INSTALL.md](INSTALL.md)。
 
+## 0.21.0 Water Foundation
+
+- Split opaque lighting/history from VisualComposite atmosphere/bloom/display ownership.
+- Native-stream water shades from one pre-tone HDR background, with an immutable depth snapshot, Fresnel, absorption, sky reflection, animated normals and guarded refraction.
+- Preserve native terrain shader fallback and BLOCK/depth/blend/draw contracts; no duplicate water geometry or LDR SceneColor input.
+- Nearby Fast/Fancy supported backgrounds only; underwater/Fabulous/unsupported pixels retain native water.96MiB additional image cap.
+- `/voxellight water on|off`; retain density0.002 and all prior effect controls. In-game acceptance pending, no SSR/GI/volumetric expansion.
+
 ## 0.20.1 atmosphere tuning
 
 - Adopt user-preferred atmosphere density0.002 instead of0.018.

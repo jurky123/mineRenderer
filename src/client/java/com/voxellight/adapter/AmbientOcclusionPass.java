@@ -75,6 +75,7 @@ final class AmbientOcclusionPass implements AutoCloseable {
         pass.bindTexture("AmbientVisibility",active?views[1]:neutralView,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
         pass.setUniform("AoSettings",settings);
     }
+    boolean debug(){return debug;}
     void bindSettings(RenderPass pass){pass.setUniform("AoSettings",settings);}
     void setEnabled(boolean value,boolean show){enabled=value;debug=show;active=false;state=value?"waiting":"off";if(!enabled)releaseTargets();}
     String status(){return ", ao="+state+(debug?"; grayscale view":"")+", aoBytes="+(textures[0]==null?0:(long)width*height*AmbientOcclusion.PIXEL_BYTES)+", aoSize="+width+"x"+height;}

@@ -1,6 +1,6 @@
 # VoxelLight current state
 
-Current release: **0.20.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.21.0** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 
@@ -14,7 +14,8 @@ Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vu
 | 0.18 lighting/color polish | Implemented: filmic/manual exposure, hemisphere sky palette, emissive terrain bloom, bounded material-distance blend. User confirmed working. |
 | 0.19 local-light polish | Implemented: exact-ID resource-pack colors and one player held-emissive-block source within16 combined lights. User confirmed working. |
 | 0.20 atmosphere foundation | Implemented analytic height/distance aerial perspective and directional glow; local supported receivers only; user confirmed working and prefers density0.002.0.20.1 adopts that default. |
-| Next visual milestone | Water surface/composition prototype, then explicitly shadowed low-resolution volumetrics; GI remains deferred. |
+| 0.21 Water Foundation | VisualComposite ownership split; native-stream HDR water with Fresnel/absorption/sky reflection/refraction. In-game acceptance pending. |
+| Next visual milestone | Validate the HDR/native water seam, then explicitly shadowed low-resolution volumetrics; SSR/GI remain deferred. |
 
 Current budgets: material125 sections within5³,16 MiB resident + up to1 MiB replacement staging,1 MiB/section,one material build/frame. Geometry/light attributes still rebuilt together. Light-aware scene cap384 loaded sections; shadow terrain32 MiB; local-light reference16 combined sources (one slot reserved while a held source exists). D1 adds32 bytes/pixel with128 MiB cap (1440p112.5 MiB;4K falls back to current shadows).
 
@@ -24,6 +25,8 @@ Polish adds two quarter-resolutionRGBA16F bloom targets (16MiB cap,1440p3.52MiB,
 
 Atmosphere adds16 bytes of settings and no extra image/history. It is an analytic local haze approximation, not shadowed shafts; underwater/non-overworld/unsupported pixels stay native. See[atmosphere scope](ATMOSPHERE.md).
 
-No full RGB TAA, motion vectors, water rewrite or shadowed volumetrics, GPU voxel DB or GI yet. Performance results are unmeasured. Continuous world-sun and cutout cache invalidation, duplicate meshes, DDA cost, and history compression remain future work; do not increase local-light count or extend temporal scope before evidence warrants it.
+Water adds oneRGBA16F HDR background + oneD32 immutable depth image (96MiB cap;1440p42.19MiB,4K94.92MiB), no duplicate water meshes. Supported nearby Fast/Fancy water only; Fabulous/underwater/uncaptured backgrounds stay native. See[water contract](WATER.md).
 
-Review decision: preserve the accepted material/lighting architecture; material refresh is confirmed and basic AO is confirmed operational with modest benefit. Lighting/color polish is confirmed working; local-light materials and held source are confirmed working; analytic atmosphere is confirmed working with user-preferred density0.002. See[local-light scope](LOCAL-LIGHTS.md). See[AO contract](AO.md). See [0.16 review decision](REVIEW-0.16.0.md) and [release history](CHANGELOG.md). This environment has no graphics device/display; automated native shader checks do not replace in-game acceptance.
+No full RGB TAA, motion vectors, complete transparent HDR rendering or shadowed volumetrics, GPU voxel DB or GI yet. Performance results are unmeasured. Continuous world-sun and cutout cache invalidation, duplicate meshes, DDA cost, and history compression remain future work; do not increase local-light count or extend temporal scope before evidence warrants it.
+
+Review decision: preserve the accepted material/lighting architecture; material refresh is confirmed and basic AO is confirmed operational with modest benefit. Lighting/color polish is confirmed working; local-light materials and held source are confirmed working; analytic atmosphere is confirmed working with user-preferred density0.002. The0.20 review leads to Water Foundation with a small composition ownership split; density0.002 is retained. See[local-light scope](LOCAL-LIGHTS.md). See[AO contract](AO.md). See [0.16 review decision](REVIEW-0.16.0.md) and [release history](CHANGELOG.md). This environment has no graphics device/display; automated native shader checks do not replace in-game acceptance.

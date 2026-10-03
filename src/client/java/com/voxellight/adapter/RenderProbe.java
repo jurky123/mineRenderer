@@ -85,6 +85,9 @@ public final class RenderProbe {
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
     public void setAtmosphereDensity(float density){RenderSystem.assertOnRenderThread();lighting.setAtmosphereDensity(density);}
+    public void setWater(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setWater(enabled);}
+    public void prepareWater(RenderTarget target){if(mode==Mode.FOUNDATION && materialFrameReady)lighting.prepareWater(target,shadows);}
+    public boolean bindWater(com.mojang.blaze3d.systems.RenderPass pass){return mode==Mode.FOUNDATION && materialFrameReady && lighting.bindWater(pass);}
     public void setExposure(float ev) {RenderSystem.assertOnRenderThread();lighting.setExposure(ev);}
     public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
 
