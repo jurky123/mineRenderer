@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.37.1 — Reference convergence & vanilla settings
+
+- Fix reference accumulation resetting on every unchanged quality application; suppress projection jitter, RGB TAA and adaptive budget changes during reference. Auto-enable Foundation/OptiX on reference on and freeze RT entity animation after the first reference sample.
+- Add searchable, paginated vanilla settings in Pause/Options and `/voxellight settings`: Rendering, RTX, Environment, Water and Diagnostics; validated choice/numeric controls and live reference progress. No MineUI dependency.
+- Commands and UI share actions/override state. Atomically save normal preferences, restore on world join, keep debug/reference activation session-only. Add accumulation-state and preference persistence regressions. NVIDIA UI/convergence acceptance remains pending.
+
 ## 0.37.0 — Physically Based Materials & Light Transport
 
 - Preserve single-raster primary visibility, incremental OptiX scene, GPU-only interop and raster fallback. Replace native material branches with production BSDF evaluation/sampling/PDF and separate material/light/path modules.

@@ -88,7 +88,7 @@ public final class RenderProbe {
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
     public void setRtOption(String option,boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtOption(option,enabled);}
-    public void referenceRt(boolean value){lighting.referenceRt(value);}
+    public void referenceRt(boolean value){RenderSystem.assertOnRenderThread();if(value){setMode(Mode.FOUNDATION);setPathTrace(false);}lighting.referenceRt(value);}
     public void referenceSpp(int value){lighting.referenceSpp(value);}
     public void referenceReset(){lighting.referenceReset();}
     public void fireflyClamp(boolean value){lighting.fireflyClamp(value);}
@@ -112,7 +112,7 @@ public final class RenderProbe {
     public void setAdaptiveQuality(boolean enabled){adaptive.enabled(enabled);}
     public void setGpuWorldTarget(float value){adaptive.target(value);}
     public void beginWorldBudget(){if("Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()))adaptive.begin(mode.name());}
-    public void endWorldBudget(RenderTarget target){lighting.setQuality(adaptive.end(target.width,target.height));}
+    public void endWorldBudget(RenderTarget target){var budget=adaptive.end(target.width,target.height);if(!lighting.referenceActive())lighting.setQuality(budget);}
     public void exportWorldBudget(java.nio.file.Path path)throws java.io.IOException{adaptive.export(path);}
     public void setVolumeFilter(boolean value){RenderSystem.assertOnRenderThread();lighting.setVolumeFilter(value);}
     public void setQuality(com.voxellight.world.VisualQuality value){RenderSystem.assertOnRenderThread();adaptive.ceiling(value);lighting.setQuality(value);}

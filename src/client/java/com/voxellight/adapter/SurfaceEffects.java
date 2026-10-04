@@ -22,7 +22,8 @@ final class SurfaceEffects implements AutoCloseable {
     private final GpuTextureView[] resolvedViews=new GpuTextureView[2];
     private GpuBuffer settings;
     private int width,height,read;
-    private boolean reflections=true,taa,historyValid,activeTaa,rtReflections;
+    private boolean reflections=true,taa,historyValid,activeTaa,rtReflections,reference;
+    void reference(boolean value){if(reference!=value)historyValid=false;reference=value;}
     void rtReflections(boolean value){rtReflections=value;}
     private long frames;
     private VisualQuality quality=VisualQuality.BALANCED;
@@ -42,7 +43,7 @@ final class SurfaceEffects implements AutoCloseable {
         quality=value;
     }
     boolean jitter(Matrix4f projection,RenderTarget target) {
-        if(!taa||(long)target.width*target.height*16>96L*1024*1024)return false;
+        if(reference||!taa||(long)target.width*target.height*16>96L*1024*1024)return false;
         var device=RenderSystem.getDevice();
         if(!device.precompilePipeline(COLOR_TEMPORAL,RenderProbe.SHADERS).isValid()||!device.precompilePipeline(MotionFrame.MOTION,RenderProbe.SHADERS).isValid())return false;
         int sample=(int)(frames%8)+1;
@@ -62,9 +63,9 @@ final class SurfaceEffects implements AutoCloseable {
     }
     GpuTextureView render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuTextureView input,GpuBuffer environment,GpuBuffer pbr,EnvironmentPass weather,MotionFrame motion) {
         activeTaa=false;
-        if(!motion.ready()||(!taa&&(!reflections||rtReflections))){close();return input;}
+        if(!motion.ready()||((!taa||reference)&&(!reflections||rtReflections))){close();return input;}
         var device=RenderSystem.getDevice();
-        boolean useTaa=taa&&(long)output.width*output.height*16<=96L*1024*1024;
+        boolean useTaa=taa&&!reference&&(long)output.width*output.height*16<=96L*1024*1024;
         var pipeline=useTaa?COLOR_TEMPORAL:SURFACE_COMPOSITE;
         if(!device.precompilePipeline(pipeline,RenderProbe.SHADERS).isValid())return input;
         int w=output.width,h=output.height;

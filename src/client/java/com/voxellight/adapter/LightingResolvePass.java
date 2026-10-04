@@ -28,9 +28,10 @@ final class LightingResolvePass implements AutoCloseable {
     boolean replacesClouds(){return weather.replacesClouds();}
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final RtxLightingPass rtx=new RtxLightingPass();
-    void setRtBackend(boolean enabled){rtx.enable(enabled);}
+    void setRtBackend(boolean enabled){if(!enabled)referenceRt(false);rtx.enable(enabled);}
     void setRtOption(String option,boolean value){rtx.option(option,value);}
-    void referenceRt(boolean value){rtx.reference(value);}
+    void referenceRt(boolean value){rtx.reference(value);surfaces.reference(value);}
+    boolean referenceActive(){return rtx.referenceEnabled();}
     void referenceSpp(int value){rtx.referenceSpp(value);}
     void referenceReset(){rtx.referenceReset();}
     void fireflyClamp(boolean value){rtx.fireflyClamp(value);}
@@ -106,7 +107,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setWaveSpeed(float value){composite.setWaveSpeed(value);}
     void setMaterialReflections(boolean value){surfaces.setReflections(value);}
     void setColorTaa(boolean value){surfaces.setTaa(value);}
-    void jitterProjection(Matrix4f matrix,RenderTarget target){if(composite.polished()&&!ao.debug()&&pbrDebug==0)surfaces.jitter(matrix,target);}
+    void jitterProjection(Matrix4f matrix,RenderTarget target){if(!rtx.referenceEnabled()&&composite.polished()&&!ao.debug()&&pbrDebug==0)surfaces.jitter(matrix,target);}
     void setVolumeTemporal(boolean value){composite.setVolumeTemporal(value);}
     void setVolumeFilter(boolean value){composite.setVolumeFilter(value);}
     void setQuality(com.voxellight.world.VisualQuality value){rtx.quality(value);composite.setQuality(value);surfaces.setQuality(value);pathtrace.setQuality(value);}

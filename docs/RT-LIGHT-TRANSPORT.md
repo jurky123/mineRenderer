@@ -95,3 +95,7 @@ New bounded allocations: table +1 MiB over the old table; surface key 16 bytes/R
 7. Dry/rain stone/wood/copper and front/back/grazing leaves: water film without making every surface a mirror.
 
 For each fixed camera/scene/quality, warm the scene, record at least 60 seconds, export profile, save realtime/reference screenshots and status. This host has no NVIDIA GPU/display; these image/performance gates remain pending. No ReSTIR, spectral renderer, full layered multiple scattering, full primary PT or unmeasured quality claim is added.
+
+## 0.37.1 convergence follow-up
+
+Reference quality is change-sensitive; unchanged per-frame budget updates cannot clear accumulation. Projection jitter and adaptive budget application are suppressed during reference. RT animated instances freeze after the first sample, resume on exit, and refresh after reset; use static primary scenes for screenshots. Enabling reference also enables OptiX/Foundation. Settings and progress are described in [SETTINGS.md](SETTINGS.md).

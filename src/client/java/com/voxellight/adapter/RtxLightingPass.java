@@ -31,20 +31,22 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  private GpuTexture atlas,composite,dielectric;private GpuTextureView atlasView,compositeView,dielectricView;
  private GpuBuffer frame;
  private int width,height,aw,ah,iw,ih,options=63,debug;private com.voxellight.world.VisualQuality quality=com.voxellight.world.VisualQuality.BALANCED;
- void quality(com.voxellight.world.VisualQuality value){quality=value;referenceDirty=true;}
- private boolean reference,referenceDirty=true;private int referenceSpp=256;private float fireflyClamp=10000;private Matrix4f referenceCamera;
- void reference(boolean value){reference=value;referenceDirty=true;}
- void referenceSpp(int value){referenceSpp=value;referenceDirty=true;}
- void referenceReset(){referenceDirty=true;}
- void fireflyClamp(boolean value){fireflyClamp=value?10000:0;referenceDirty=true;}
+ void quality(com.voxellight.world.VisualQuality value){quality=value;referenceHistory.quality(value);}
+ private final com.voxellight.rt.ReferenceHistory referenceHistory=new com.voxellight.rt.ReferenceHistory();
+ private boolean reference;private int referenceSpp=256;private float fireflyClamp=10000;
+ void reference(boolean value){if(value&&!enabled)enable(true);reference=value;referenceHistory.invalidate();}
+ boolean referenceEnabled(){return reference;}
+ void referenceSpp(int value){referenceSpp=value;referenceHistory.invalidate();}
+ void referenceReset(){referenceHistory.invalidate();}
+ void fireflyClamp(boolean value){fireflyClamp=value?10000:0;referenceHistory.invalidate();}
  private boolean enabled,active,failed,assetsUploaded,sceneReady;
  private String state="off";
  private final Map<SectionKey,Long> resident=new HashMap<>();
  private static void recompile(){var mc=Minecraft.getInstance();if(mc.level!=null)mc.levelRenderer.invalidateCompiledGeometry(mc.level,mc.options,mc.gameRenderer.mainCamera(),mc.getBlockColors());}
  void enable(boolean value){close();enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for compiled RT scene":"off";if(Minecraft.getInstance().level!=null)recompile();}
- void option(String option,boolean value){int bit=switch(option){case "rt_gi"->1;case "rt_reflections"->2;case "rt_transmission"->4;case "rt_denoiser"->8;case "radiance_cache"->16;case "rt_caustics"->32;default->throw new IllegalArgumentException(option);};options=value?options|bit:options&~bit;referenceDirty=true;}
+ void option(String option,boolean value){int bit=switch(option){case "rt_gi"->1;case "rt_reflections"->2;case "rt_transmission"->4;case "rt_denoiser"->8;case "radiance_cache"->16;case "rt_caustics"->32;default->throw new IllegalArgumentException(option);};options=value?options|bit:options&~bit;referenceHistory.invalidate();}
  void benchmark(){if(context==0)throw new IllegalStateException("Enable RTX and wait for RT scene before benchmarking");OptixNative.benchmark(context);}
- void debug(int value){if(debug!=value)referenceDirty=true;debug=value;}
+ void debug(int value){if(debug!=value)referenceHistory.invalidate();debug=value;}
  public com.voxellight.rt.RtTraversalBackend traversal(){return com.voxellight.rt.RtTraversalBackend.OPTIX_RT;}
  public boolean active(){return active;}
  int ownership(){return active?options:0;}
@@ -64,6 +66,10 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
    if(context!=0&&(width!=w||height!=h||composite.getWidth(0)!=target.width||composite.getHeight(0)!=target.height)){close();RtGeometryStream.enable(true);recompile();}
    if(context==0){if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);recompile();}init(vk,encoder,target,material,w,h);world=stats.worldGeneration();resources=stats.resourceGeneration();}
    var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;var pos=camera.pos;
+   // Apply resets before instance updates so a new reference refreshes its scene snapshot.
+   var currentClip=new Matrix4f(projection).mul(camera.viewRotationMatrix);var cameraKey=new Matrix4f(currentClip).translate((float)-pos.x(),(float)-pos.y(),(float)-pos.z());
+
+   OptixNative.reference(context,reference?referenceSpp:0,referenceHistory.consume(cameraKey.get(new float[16]),reference),reference?0:fireflyClamp);
    var measured=OptixNative.timings(context);String[] passes={"rt_as_build_update","rt_radiance_cache","rt_diffuse","rt_specular","rt_transmission","rt_denoiser","rt_benchmark_triangles","rt_benchmark_aabb","rt_caustic"};for(int i=0;i+1<measured.length;i+=2)RenderPassProfile.externalGpu(passes[(int)measured[i]],measured[i+1]);
    updateScene(pos.x(),pos.y(),pos.z());updateInstances(encoder);if(!sceneReady){state="warming compiled section GAS/IAS";return;}
    try(var stack=MemoryStack.stackPush()) {encoder.writeToBuffer(frame.slice(),Std140Builder.onStack(stack,144).putMat4f(new Matrix4f(projection).invert()).putMat4f(new Matrix4f(camera.viewRotationMatrix).invert()).putVec4(options,debug,Minecraft.getInstance().gameRenderer.mainCamera().getFluidInCamera()==net.minecraft.world.level.material.FogType.WATER?1:0,0).get());}
@@ -78,9 +84,6 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
     encoder.copyTextureToBuffer(atlas,interop.buffers[7],0,()->{},0);encoder.copyTextureToBuffer(material.rtAtlas(0).texture(),interop.buffers[8],0,()->{},0);encoder.copyTextureToBuffer(material.rtAtlas(2).texture(),interop.buffers[9],0,()->{},0);encoder.copyTextureToBuffer(material.rtAtlas(1).texture(),interop.buffers[10],0,()->{},0);assetsUploaded=true;
    }
    var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;var light=shadows.light();var env=LightingEnvironment.polished(light,sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);var sun=light.direction();var settings=ByteBuffer.allocateDirect(208).order(ByteOrder.nativeOrder());settings.putFloat((float)pos.x()).putFloat((float)pos.y()).putFloat((float)pos.z()).putFloat(sun.x).putFloat(sun.y).putFloat(sun.z).putFloat(env.directR()*env.directStrength()*(float)Math.PI).putFloat(env.directG()*env.directStrength()*(float)Math.PI).putFloat(env.directB()*env.directStrength()*(float)Math.PI).putFloat(env.skyR()*env.skyStrength()).putFloat(env.skyG()*env.skyStrength()).putFloat(env.skyB()*env.skyStrength());new Matrix4f(projection).mul(camera.viewRotationMatrix).get(48,settings);settings.position(112).putFloat(WaterSurface.clock()).putFloat(WaterSurface.waveStrength());for(float value:weather.rtSettings())settings.putFloat(value);settings.putFloat(Minecraft.getInstance().gameRenderer.mainCamera().getFluidInCamera()==net.minecraft.world.level.material.FogType.WATER?1:0);for(float value:shadows.rtVirtualLight())settings.putFloat(value);for(float value:material.waterMedium())settings.putFloat(value);settings.flip();
-   var currentClip=new Matrix4f(projection).mul(camera.viewRotationMatrix);var cameraKey=new Matrix4f(currentClip).translate((float)-pos.x(),(float)-pos.y(),(float)-pos.z());
-   if(reference&&(referenceCamera==null||!referenceCamera.equals(cameraKey,1e-6f)))referenceDirty=true;referenceCamera=cameraKey;
-   OptixNative.reference(context,reference?referenceSpp:0,referenceDirty,reference?0:fireflyClamp);referenceDirty=false;
    interop.releaseToCuda();OptixNative.render(context,settings,width,height,aw,ah,iw,ih,options|(quality.ordinal()<<16),debug);interop.acquireFromCuda();
    for(int i=0;i<4;i++)encoder.copyBufferToTexture(interop.buffers[i==3?11:4+i].slice(),width,0,0,0,signals[i],0,0,0,0,width,height);
    encoder.copyBufferToTexture(interop.buffers[13].slice(),width,0,0,0,signals[4],0,0,0,0,width,height);

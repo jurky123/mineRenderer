@@ -1,3 +1,9 @@
+## 0.37.1 settings and reference fix
+
+Open **Pause/Options → VoxelLight** or `/voxellight settings`. Rendering/RTX/environment/water/debug controls are now available through vanilla widgets. Normal preferences save automatically; reference activation stays session-only. See [SETTINGS.md](SETTINGS.md), included in the kit.
+
+Reference now enables OptiX automatically and avoids unchanged-quality, TAA jitter and animated-entity resets. Hold still and watch the settings footer reach the target sample count; world warm-up/uploads may reset it initially. Use native **Vulkan**, not OpenGL.
+
 # VoxelLight 26.2 接入原型
 
 版本：0.37.0。Minecraft26.2 / Java25 / Fabric客户端。默认effects off；原生Vulkan必需。新增实验性RTX Quality：真实OptiX GAS/IAS、GPU external-memory/semaphore、world probes、独立diffuse/specular/transmission和temporal AOV去噪。保留raster和旧CUDA GI reference。此包内含本mod的Windows/Linux x86-64 native组件，不含SDK、驱动或其他mods。
