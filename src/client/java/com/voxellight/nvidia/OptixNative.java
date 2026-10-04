@@ -3,6 +3,7 @@ import java.nio.ByteBuffer;
 /** Batched scene updates and one GPU-only lighting launch per frame; no per-triangle JNI. */
 public final class OptixNative {
  private OptixNative(){}
+ public static native int initializationStage();
  public static native long create(byte[] uuid,byte[] ptx);
  public static native void importBuffer(long context,long externalHandle,long allocationSize,long bufferSize);
  public static native void importSemaphore(long context,long externalHandle);

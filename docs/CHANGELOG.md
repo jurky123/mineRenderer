@@ -1,3 +1,10 @@
+# 0.37.3 — Nonblocking OptiX startup
+
+- Move CUDA/OptiX library, context, module compilation and pipeline linking to a daemon startup worker; retain raster frames while pending.
+- Report native startup stages and elapsed time; distinguish Vulkan import/shader preparation in logs.
+- Cancel ownership safely when disabled during startup; dispose late native handles off the render thread.
+- Add startup concurrency/error/lifetime regression tests. NVIDIA responsiveness acceptance is pending.
+
 # VoxelLight release history
 
 ## 0.37.2 — Reference crash hardening

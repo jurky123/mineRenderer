@@ -1,3 +1,7 @@
+## 0.37.3 initialization follow-up
+
+Implemented nonblocking native startup with safe abandonment and stage diagnostics. Pending: NVIDIA first-start responsiveness, reference convergence, and disable/re-enable acceptance.
+
 # VoxelLight 实施计划
 
 Current milestone: **0.37 Physically Based Materials & Light Transport**. Implementation retains the user-tested 0.36 RTX architecture and upgrades materials, BSDF/PDFs, NEE/MIS, signal edge reconstruction, water medium/caustics and reference diagnostics. Contracts and implementation limits: [MATERIAL-3](MATERIAL-3.md), [RT-LIGHT-TRANSPORT](RT-LIGHT-TRANSPORT.md).

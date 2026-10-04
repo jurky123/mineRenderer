@@ -1,3 +1,7 @@
+## 0.37.3 reference startup update
+
+Native OptiX initialization now runs in the background; raster and settings remain usable during compilation. Install the complete matching native kit and follow [REFERENCE-0.37.3.md](REFERENCE-0.37.3.md).
+
 ## 0.37.2 reference crash update
 
 Reference now renders one spp per frame in bounded OptiX launches. Start with 16 spp, then 256; the target quality is unchanged. The depth-pyramid `1x0` error and native telemetry exception hazard are fixed. See [REFERENCE-0.37.2.md](REFERENCE-0.37.2.md) for diagnostics if a fatal exit persists. NVIDIA crash reproduction remains pending.

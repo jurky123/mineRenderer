@@ -20,6 +20,9 @@ import java.util.*;
 /** Raster-primary RTX owner. Each normal frame exchanges GPU-only buffers and binary semaphores. */
 final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  static final RenderPipeline CAPTURE=capturePipeline(),COMPOSITE=compositePipeline(),ATLAS=atlasPipeline(),DIELECTRIC=dielectricPipeline();
+ private static final java.util.concurrent.ExecutorService STARTUP=java.util.concurrent.Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"VoxelLight OptiX startup");thread.setDaemon(true);return thread;});
+ private com.voxellight.rt.AsyncResource<Long> startup;
+ private int startupStage=-1;private long startupStarted;
  private long context,world=Long.MIN_VALUE,resources=Long.MIN_VALUE;
  private VulkanCudaInterop interop;
  private final RtTerrainWarmup warmup=new RtTerrainWarmup();
@@ -65,7 +68,25 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
    boolean win=System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");if(win?!vk.vkDevice().getCapabilities().VK_KHR_external_memory_win32||!vk.vkDevice().getCapabilities().VK_KHR_external_semaphore_win32:!vk.vkDevice().getCapabilities().VK_KHR_external_memory_fd||!vk.vkDevice().getCapabilities().VK_KHR_external_semaphore_fd)throw new IllegalStateException("Vulkan export extensions unavailable");
    int scale=Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360)),w=(target.width+scale-1)/scale,h=(target.height+scale-1)/scale;
    if(context!=0&&(width!=w||height!=h||composite.getWidth(0)!=target.width||composite.getHeight(0)!=target.height)){close();RtGeometryStream.enable(true);recompile();}
-   if(context==0){if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);recompile();}stage="OptiX context / interop initialization";org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX native initialization: {}x{} guides, reference={}",w,h,reference);init(vk,encoder,target,material,w,h);world=stats.worldGeneration();resources=stats.resourceGeneration();}
+   if(context==0){
+    if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);recompile();}
+    stage="OptiX background initialization";
+    if(startup==null){
+     byte[] uuid=deviceUuid(vk);startupStarted=System.nanoTime();
+     org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX background initialization: {}x{} guides, reference={}; raster continues",w,h,reference);
+     startup=new com.voxellight.rt.AsyncResource<>(STARTUP,()->{try{return OptixNative.create(uuid,OptixBridge.loadRt());}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}},handle->STARTUP.execute(()->OptixNative.destroy(handle)));
+    }
+    if(!startup.finished()){
+     int progress;try{progress=OptixNative.initializationStage();}catch(UnsatisfiedLinkError loading){progress=0;}
+     String[] stages={"loading native library","matching CUDA device","creating OptiX context","compiling OptiX transport module","creating OptiX program groups","linking OptiX pipeline","configuring OptiX stack","native context ready"};
+     state="initializing: "+stages[Math.max(0,Math.min(progress,stages.length-1))]+" ("+((System.nanoTime()-startupStarted)/1_000_000_000L)+"s); raster retained";
+     if(progress!=startupStage){startupStage=progress;org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX {}",state);}
+     return;
+    }
+    context=startup.take();startup=null;
+    stage="Vulkan/CUDA resource import";init(vk,encoder,target,material,w,h);world=stats.worldGeneration();resources=stats.resourceGeneration();
+    org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX initialization complete; preparing scene");
+   }
    var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;var pos=camera.pos;
    // Apply resets before instance updates so a new reference refreshes its scene snapshot.
    var currentClip=new Matrix4f(projection).mul(camera.viewRotationMatrix);var cameraKey=new Matrix4f(currentClip).translate((float)-pos.x(),(float)-pos.y(),(float)-pos.z());
@@ -112,10 +133,12 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  }
  private static double distance(SectionKey key,double x,double y,double z){double dx=key.x()*16.+8-x,dy=key.y()*16.+8-y,dz=key.z()*16.+8-z;return dx*dx+dy*dy+dz*dz;}
  private long builds,buildNs;
+ private static byte[] deviceUuid(VulkanDevice vk){try(var s=MemoryStack.stackPush()){var id=VkPhysicalDeviceIDProperties.calloc(s).sType$Default();var props=VkPhysicalDeviceProperties2.calloc(s).sType$Default().pNext(id.address());VK11.vkGetPhysicalDeviceProperties2(vk.vkDevice().getPhysicalDevice(),props);byte[] uuid=new byte[16];id.deviceUUID().get(uuid);return uuid;}}
  private void init(VulkanDevice vk,CommandEncoder encoder,RenderTarget target,MaterialCapture material,int w,int h)throws Exception{
-  try(var s=MemoryStack.stackPush()){var id=VkPhysicalDeviceIDProperties.calloc(s).sType$Default();var props=VkPhysicalDeviceProperties2.calloc(s).sType$Default().pNext(id.address());VK11.vkGetPhysicalDeviceProperties2(vk.vkDevice().getPhysicalDevice(),props);byte[] uuid=new byte[16];id.deviceUUID().get(uuid);context=OptixNative.create(uuid,OptixBridge.loadRt());}
   width=w;height=h;iw=material.rtAtlas(0).getWidth(0);ih=material.rtAtlas(0).getHeight(0);var nativeAtlas=((TextureAtlas)Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS)).getTextureView();aw=Math.min(2048,nativeAtlas.getWidth(0));ah=Math.min(2048,nativeAtlas.getHeight(0));long pixels=(long)w*h*16;
+  org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX importing external memory and semaphores");
   interop=new VulkanCudaInterop(vk,context,new long[]{pixels,pixels,pixels,pixels,pixels,pixels,pixels,(long)aw*ah*4,(long)iw*ih*4,256*1280*4,(long)iw*ih*4,pixels,2048L*2048*4,pixels});
+  org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX compiling Vulkan guide/composite pipelines");
   var device=RenderSystem.getDevice();for(var pipeline:List.of(CAPTURE,COMPOSITE,ATLAS,DIELECTRIC))if(!device.precompilePipeline(pipeline,RenderProbe.SHADERS).isValid())throw new IllegalStateException("RTX shader invalid");
   for(int i=0;i<4;i++){capture[i]=device.createTexture("VoxelLight RTX guide "+i,GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,w,h,1,1);captureViews[i]=device.createTextureView(capture[i]);}
   for(int i=0;i<5;i++){signals[i]=device.createTexture("VoxelLight RTX signal "+i,GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,w,h,1,1);signalViews[i]=device.createTextureView(signals[i]);}
@@ -127,7 +150,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  }
  GpuTextureView composite(CommandEncoder encoder,RenderTarget target,MaterialCapture material,GpuTextureView hdr){if(!active)return hdr;var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);try(var profile=RenderPassProfile.begin(encoder,"rt_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight RTX signals").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(compositeView,Optional.empty()))){pass.setPipeline(COMPOSITE);pass.setUniform("RtFrame",frame);pass.bindTexture("CurrentHdr",hdr,nearest);pass.bindTexture("SceneDepth",target.getDepthTextureView(),nearest);pass.bindTexture("MaterialNormal",material.view(1),nearest);pass.bindTexture("MaterialPbr",material.view(4),nearest);pass.bindTexture("MaterialTable",material.materialTable(),nearest);pass.bindTexture("RtMaterial",captureViews[3],nearest);pass.bindTexture("RtSurfaceKey",signalViews[4],nearest);pass.bindTexture("RtPosition",captureViews[0],nearest);pass.bindTexture("RtNormal",captureViews[1],nearest);pass.bindTexture("RtDiffuse",signalViews[0],nearest);pass.bindTexture("RtSpecular",signalViews[1],nearest);pass.bindTexture("RtTransmission",dielectricView,nearest);pass.draw(3,1,0,0);}return compositeView;}
  public String status(){long[] stats=context==0?new long[19]:OptixNative.stats(context);if(context==0)stats[6]=-1;return ", rtReferenceSamples="+stats[8]+", rtEmissiveNeeTriangles="+stats[9]+", rtRaysPerPixel="+(stats[10]/(double)Math.max(1,width*height))+", rtShadowRaysPerPixel="+(stats[11]/(double)Math.max(1,width*height))+", rtAverageBounce="+(stats[12]/(double)Math.max(1,stats[18]))+", rtMediumEvents="+stats[13]+", rtLightSamples="+stats[14]+", rtBsdfSamples="+stats[15]+", rtMaterialLookups="+stats[16]+", rtCausticPhotons="+stats[17]+", rtReference="+reference+", rtReferenceTargetSpp="+referenceSpp+", rt="+state+", rtBenchmarkMismatches="+stats[6]+", rtBenchmarkMaxError="+(stats[7]/1e6)+", rtGas="+(stats[0]+stats[1])+", rtIasInstances="+(stats[0]+stats[2])+", rtCudaOwnedBytes="+stats[3]+", rtRetiringAllocations="+stats[5]+", rtRadianceCache="+((options&16)!=0)+", rtDynamicModels="+dynamicModels+", rtSections="+resident.size()+", rtPending="+RtGeometryStream.pending()+", rtBuilds="+builds+", rtWarmupNs="+warmup.compileNanos()+", rtBuildNs="+buildNs+", rtCpuStaging="+(active?"false":"inactive")+", rtTraversal=optix_rt, rtRadianceCacheBytes=196608, rtDenoiser="+((options&8)!=0?"OptiX temporal AOV":"off")+"";}
- private void closeResources(){warmup.close();if(context!=0){OptixNative.destroy(context);context=0;}if(interop!=null){interop.close();interop=null;}for(int i=0;i<4;i++){if(captureViews[i]!=null){captureViews[i].close();captureViews[i]=null;}if(capture[i]!=null){capture[i].close();capture[i]=null;}}for(int i=0;i<5;i++){if(signalViews[i]!=null){signalViews[i].close();signalViews[i]=null;}if(signals[i]!=null){signals[i].close();signals[i]=null;}}if(dielectricView!=null){dielectricView.close();dielectricView=null;}if(dielectric!=null){dielectric.close();dielectric=null;}if(entityAtlasView!=null){entityAtlasView.close();entityAtlasView=null;}if(entityAtlas!=null){entityAtlas.close();entityAtlas=null;}entitySlots.clear();dynamicModels=0;
+ private void closeResources(){if(startup!=null){startup.close();startup=null;}startupStage=-1;warmup.close();if(context!=0){OptixNative.destroy(context);context=0;}if(interop!=null){interop.close();interop=null;}for(int i=0;i<4;i++){if(captureViews[i]!=null){captureViews[i].close();captureViews[i]=null;}if(capture[i]!=null){capture[i].close();capture[i]=null;}}for(int i=0;i<5;i++){if(signalViews[i]!=null){signalViews[i].close();signalViews[i]=null;}if(signals[i]!=null){signals[i].close();signals[i]=null;}}if(dielectricView!=null){dielectricView.close();dielectricView=null;}if(dielectric!=null){dielectric.close();dielectric=null;}if(entityAtlasView!=null){entityAtlasView.close();entityAtlasView=null;}if(entityAtlas!=null){entityAtlas.close();entityAtlas=null;}entitySlots.clear();dynamicModels=0;
   if(atlasView!=null){atlasView.close();atlasView=null;}if(atlas!=null){atlas.close();atlas=null;}if(compositeView!=null){compositeView.close();compositeView=null;}if(composite!=null){composite.close();composite=null;}if(frame!=null){frame.close();frame=null;}resident.clear();assetsUploaded=active=sceneReady=false;}
  public void close(){closeResources();RtGeometryStream.enable(false);world=resources=Long.MIN_VALUE;}
  private static RenderPipeline.Builder base(String name,BindGroupLayout layout){return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/"+name)).withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight",name)).withBindGroupLayout(layout).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withCull(false);}
