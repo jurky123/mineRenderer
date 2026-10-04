@@ -1,5 +1,10 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.38.0-alpha.1 — first integration increment
+
+Primary opaque glossy NEE/MIS, RT coated-substrate semantics and UV tangent frames implemented. User confirmed 0.37.6 responsiveness; night iron/indirect quality remains unaccepted. The full 0.38 review is **not complete**. Implementation/acceptance ledger: [RTX Quality 0.38](RTX-QUALITY-0.38.md). No NVIDIA baseline available on this host.
+
+
 - Replace three full-image reference signal dispatches with one shared 8–1024-pixel adaptive window per display frame, initially 64.
 - Count spp only after complete image sweeps; stop transport at target; reset cursor/sums on camera/configuration/scene changes.
 - Preserve guide snapshots and resolved dielectric interfaces; keep raster for untouched pixels.

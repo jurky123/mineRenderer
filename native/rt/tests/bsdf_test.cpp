@@ -13,6 +13,11 @@ int main(){
  for(unsigned pixels:{1u,8192u,8193u,640u*360u}){unsigned covered=0;while(covered<pixels){auto chunk=referenceChunk(pixels,covered);assert(chunk>0&&chunk<=8192&&covered+chunk<=pixels);covered+=chunk;}assert(covered==pixels&&referenceChunk(pixels,covered)==0);}
 
  assert(!cutoutVisible(127,255,0)&&cutoutVisible(128,255,0));assert(!cutoutVisible(25,255,16)&&cutoutVisible(26,255,16));assert(!cutoutVisible(255,127,0));assert(cutoutVisible(200,163,0));
+ // UV-derived frames preserve material U/V axes, including mirrored UV handedness.
+ {Frame f(V(0,0,1),V(0,1,0),V(1,0,0));assert(dot(f.t,V(0,1,0))>.999f&&dot(f.b,V(1,0,0))>.999f);
+  Vec w=normalize(V(.2f,.3f,1));assert(maxComponent(f.world(f.local(w))-w)<1e-6f);
+  Frame degenerate(V(0,0,1),V(0,0,1),V(0,0,0));assert(finite(degenerate.t));
+ }
  Frame frame(V(0,0,1));unsigned seed=736284;
  for(unsigned type=0;type<=9;type++)for(float rough:{.02f,.05f,.1f,.2f,.4f,.7f,1.f}){
   Material m;m.type=type;m.baseColor=V(.65f,.35f,.12f);m.microfacetAlpha=m.alphaV=rough*rough;m.transmission=.7f;
@@ -43,6 +48,24 @@ int main(){
  {Material m;m.type=THIN_DIELECTRIC;m.transmission=1;m.sigmaA=V(0,0,0);Vec wo=normalize(V(.4f,0,1));auto r=sampleBsdf(m,frame,wo,seed,1.5f,1),t=sampleBsdf(m,frame,wo,seed,1.5f,2);assert(fabsf(r.weight.x+t.weight.x-1)<1e-5f);assert((r.flags&DELTA)&&(t.flags&TRANSMISSION));assert(dot(t.wi,wo)<-.999f);}
  {Material m;m.type=DIELECTRIC;m.transmission=1;m.microfacetAlpha=m.alphaV=.0005f;Vec wo=normalize(V(.98f,0,.2f));for(int j=0;j<10000;j++){auto s=sampleBsdf(m,frame,wo,seed,1/1.5f);if(s.pdf>0)assert(s.flags&REFLECTION);}}
  {Material m;m.type=DIFFUSE;assert(evalGlossy(m,frame,V(0,0,1),V(0,0,1)).pdf==0);assert(sampleGlossy(m,frame,V(0,0,1),seed).pdf==0);}
+ // A coated diffuse substrate has only the authored top interface, not a hidden plastic highlight.
+ {Material m;m.type=COATED_DIFFUSE;m.coatWeight=0;m.baseColor=V(.6f,.5f,.4f);
+  auto e=evalBsdf(m,frame,V(0,0,1),V(0,0,1));assert(fabsf(e.f.x-.6f/Pi)<1e-6f);
+  assert(evalGlossy(m,frame,V(0,0,1),V(0,0,1)).f.x==0);
+ }
+ // Two-technique primary glossy environment MIS agrees with direct hemisphere quadrature.
+ // BSDF null events remain in the estimator; never renormalize accepted VNDF samples.
+ {Material m;setConductor(m,230);m.baseColor=V(1,1,1);m.microfacetAlpha=m.alphaV=.3f;
+  Vec wo=normalize(V(.3f,0,1)),sum=V(0,0,0),reference=V(0,0,0);const int N=400000;
+  for(int i=0;i<N;i++){
+   float z=rng(seed),a=2*Pi*rng(seed),r=sqrtf(1-z*z);Vec wi=V(r*cosf(a),r*sinf(a),z);
+   auto e=evalGlossy(m,frame,wo,wi);float lp=1/(2*Pi);
+   reference=reference+e.f*(z/lp/N);
+   sum=sum+e.f*(z/lp*powerHeuristic(lp,e.pdf)/N);
+   auto b=sampleGlossy(m,frame,wo,seed);if(b.pdf>0)sum=sum+b.weight*(powerHeuristic(b.pdf,lp)/N);
+  }
+  assert(fabsf(sum.x-reference.x)<.015f&&fabsf(sum.y-reference.y)<.015f&&fabsf(sum.z-reference.z)<.015f);
+ }
  Material gold,copper;setConductor(gold,231);setConductor(copper,234);auto gf=conductorFresnel(gold,1),cf=conductorFresnel(copper,1);assert(gf.x>gf.z&&cf.x>cf.z);assert(fresnelDielectric(.1f,1/1.5f)==1);
  MediumStack stack;Medium glass{V(.2f,.1f,0),V(0,0,0),0,1.5f,1},water{V(.16f,.06f,.035f),V(.018f,.035f,.045f),.7f,1.333f,2};assert(stack.enter(glass));assert(stack.enter(water));assert(stack.outside(2)==1.5f);assert(stack.exit(1));assert(stack.ior()==1.333f);assert(stack.exit(2)&&stack.ior()==1);assert(!stack.exit(123));
  // Nested same-material boundaries are counted and removed one at a time.

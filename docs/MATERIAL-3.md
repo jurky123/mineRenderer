@@ -88,3 +88,8 @@ The report lists assignment class/source and coverage/fallback counts. Pack-map 
 `native/rt/tests/bsdf_test.cpp` includes white/grazing furnace, sample/eval/PDF agreement, numerical PDF integral versus accepted-sample probability, reciprocity, roughness ladder, conductor tint, thin-sheet energy, TIR, nested identity, RGB Beer and HG normalization. Java tests execute this **production** header on CPU and test material precedence, LabPBR semantics, quantized medium agreement and database coverage.
 
 GPU acceptance must compare roughness ladder, metal-to-white-wall bounce, dry/rain coating, front/back foliage, nested/stained glass and shoreline silhouettes. Compilation/tests do not establish visual acceptance.
+
+
+## 0.38 alpha integration
+
+See [0.38 implementation ledger](RTX-QUALITY-0.38.md), [environment status](RT-ENVIRONMENT.md) and [full-reference status](FULL-REFERENCE.md). This alpha adds opaque primary glossy NEE with independent `/voxellight rt_primary_glossy_nee on|off`; the sun remains raster-owned, while RT owns local/emissive/environment glossy transport when enabled. Coated RT diffuse substrates no longer add base plastic specular under the coat. UV tangent directions are retained for RT anisotropy. Full primary reference, environment importance sampling, async reference banks and the other ledger items remain pending; no GPU acceptance claimed.

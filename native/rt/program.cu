@@ -51,11 +51,14 @@ extern "C" __global__ void __closesthit__surface(){
  p->n=norm(optixTransformNormalFromObjectToWorldSpace(add(add(mul(a.n,w),mul(c.n,b.x)),mul(d.n,b.y))));float2 uv=make_float2(a.uv.x*w+c.uv.x*b.x+d.uv.x*b.y,a.uv.y*w+c.uv.y*b.x+d.uv.y*b.y);
  unsigned tex=hitTexture(data,uv),id=data->textureSlot<0?sample(params.ids,params.idsWidth,params.idsHeight,uv):0,profile=data->textureSlot<0?params.lut[id&65535]:0xff200a33;
  if(dot3(p->n,p->n)<.1f)p->n=norm(optixTransformNormalFromObjectToWorldSpace(cross3(add(c.p,mul(a.p,-1)),add(d.p,mul(a.p,-1)))));
- p->geometryNormal=p->n;
+ p->geometryNormal=norm(optixTransformNormalFromObjectToWorldSpace(cross3(add(c.p,mul(a.p,-1)),add(d.p,mul(a.p,-1)))));
+ if(dot3(p->n,p->geometryNormal)<0)p->n=mul(p->n,-1);
+ rt::Frame baseFrame(rv(p->n));p->tangent=cv(baseFrame.t);p->bitangent=cv(baseFrame.b);
  unsigned packedNormal=data->textureSlot<0?sample(params.normalMap,params.idsWidth,params.idsHeight,uv):0xff008080;
  float nx=(packedNormal&255)/127.5f-1,ny=((packedNormal>>8)&255)/127.5f-1;
  float3 e1=add(c.p,mul(a.p,-1)),e2=add(d.p,mul(a.p,-1));float ux=c.uv.x-a.uv.x,uy=c.uv.y-a.uv.y,vx=d.uv.x-a.uv.x,vy=d.uv.y-a.uv.y,det=ux*vy-uy*vx;
- if(fabsf(det)>1.e-10f){float3 tangent=optixTransformVectorFromObjectToWorldSpace(mul(add(mul(e1,vy),mul(e2,-uy)),1/det));tangent=norm(add(tangent,mul(p->n,-dot3(tangent,p->n))));float3 bitangent=optixTransformVectorFromObjectToWorldSpace(mul(add(mul(e2,ux),mul(e1,-vx)),1/det));bitangent=norm(add(bitangent,mul(p->n,-dot3(bitangent,p->n))));p->n=norm(add(add(mul(tangent,nx),mul(bitangent,ny)),mul(p->n,sqrtf(fmaxf(0,1-nx*nx-ny*ny)))));}
+ if(fabsf(det)>1.e-10f){float3 tangent=optixTransformVectorFromObjectToWorldSpace(mul(add(mul(e1,vy),mul(e2,-uy)),1/det));tangent=norm(add(tangent,mul(p->n,-dot3(tangent,p->n))));float3 bitangent=optixTransformVectorFromObjectToWorldSpace(mul(add(mul(e2,ux),mul(e1,-vx)),1/det));bitangent=norm(add(bitangent,mul(p->n,-dot3(bitangent,p->n))));p->tangent=tangent;p->bitangent=bitangent;p->n=norm(add(add(mul(tangent,nx),mul(bitangent,ny)),mul(p->n,sqrtf(fmaxf(0,1-nx*nx-ny*ny)))));}
+ if(dot3(p->n,p->geometryNormal)<=0)p->n=p->geometryNormal;
  p->color=prod(rgb(tex),rgb(a.tint));p->roughness=1-(profile&255)/255.f;p->f0=((profile>>8)&255)/255.f;p->metal=(profile>>8)&255;p->flags=a.flags;
  unsigned type=(id>>24)&3;if(type==2)p->n=waterNormal(p->n,p->p);p->transmission=type?1:0;p->ior=type==2?1.333f:1.5f;p->absorption=type==2?v(.16f,.06f,.035f):v(-logf(fmaxf(.05f,p->color.x))*.7f,-logf(fmaxf(.05f,p->color.y))*.7f,-logf(fmaxf(.05f,p->color.z))*.7f);
  p->emission=mul(p->color,(((id>>24)&4)?((id>>16)&255)/254.f:(a.flags>>16)/15.f)*2.4f);
@@ -144,7 +147,7 @@ if(coverage){sunT=visibility(add(p,mul(n,.025f)),params.sun);if((params.options&
   }
   if(params.mode==5&&params.sunVisibility[i].w>.5f&&(params.options&2)){
    if(nn.w>1.5f)observation=incoming(params.camera,norm(v(pp.x,pp.y,pp.z)),seed,8,false,1,&diagnostic);
-   else{auto glossy=first.bsdf;rt::Frame frame(rv(dot3(first.n,view)>0?first.n:mul(first.n,-1)));auto bs=rt::sampleGlossy(glossy,frame,rv(view),seed);if(bs.pdf>0){auto reflectedHit=trace(add(first.p,mul(first.geometryNormal,.02f)),cv(bs.wi));signalHitDistance=reflectedHit.hit?reflectedHit.distance:512;observation=prod(cv(bs.weight),incoming(add(first.p,mul(first.geometryNormal,.02f)),cv(bs.wi),seed,params.referenceSpp?8:4,false,0,&diagnostic,true));}}
+   else{observation=(params.options&64)?primaryGlossyDirect(first,view,seed):v(0,0,0);auto glossy=first.bsdf;rt::Frame frame(rv(dot3(first.n,view)>0?first.n:mul(first.n,-1)),rv(first.tangent),rv(first.bitangent));auto bs=rt::sampleGlossy(glossy,frame,rv(view),seed);if(bs.pdf>0){auto reflectedHit=trace(add(first.p,mul(first.geometryNormal,.02f)),cv(bs.wi));signalHitDistance=reflectedHit.hit?reflectedHit.distance:512;observation=add(observation,prod(cv(bs.weight),incoming(add(first.p,mul(first.geometryNormal,.02f)),cv(bs.wi),seed,params.referenceSpp?8:4,false,0,&diagnostic,true,(params.options&64)?bs.pdf:0)));}}
   }
   if(params.mode==6&&(params.options&4)&&(rt::dielectric(first.bsdf)||params.underwater>.5f))observation=incoming(params.camera,norm(v(pp.x,pp.y,pp.z)),seed,8,false,rt::dielectric(first.bsdf)?2:0,&diagnostic);
   light=add(light,mul(observation,1/fmaxf(1,batch)));

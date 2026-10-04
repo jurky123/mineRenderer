@@ -33,7 +33,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  private GpuTexture entityAtlas;private GpuTextureView entityAtlasView;private final IdentityHashMap<GpuTextureView,Integer> entitySlots=new IdentityHashMap<>();private int dynamicModels;
  private GpuTexture atlas,composite,dielectric;private GpuTextureView atlasView,compositeView,dielectricView;
  private GpuBuffer frame;
- private int width,height,aw,ah,iw,ih,options=63,debug;private com.voxellight.world.VisualQuality quality=com.voxellight.world.VisualQuality.BALANCED;
+ private int width,height,aw,ah,iw,ih,options=127,debug;private com.voxellight.world.VisualQuality quality=com.voxellight.world.VisualQuality.BALANCED;
  void quality(com.voxellight.world.VisualQuality value){quality=value;referenceHistory.quality(value);}
  private final com.voxellight.rt.ReferenceHistory referenceHistory=new com.voxellight.rt.ReferenceHistory();
  private boolean reference,referenceAnnouncement;private int referenceSpp=256;private float fireflyClamp=10000;
@@ -47,7 +47,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  private final Map<SectionKey,Long> resident=new HashMap<>();
  private static void recompile(){var mc=Minecraft.getInstance();if(mc.level!=null)mc.levelRenderer.invalidateCompiledGeometry(mc.level,mc.options,mc.gameRenderer.mainCamera(),mc.getBlockColors());}
  void enable(boolean value){close();enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for compiled RT scene":"off";if(Minecraft.getInstance().level!=null)recompile();}
- void option(String option,boolean value){int bit=switch(option){case "rt_gi"->1;case "rt_reflections"->2;case "rt_transmission"->4;case "rt_denoiser"->8;case "radiance_cache"->16;case "rt_caustics"->32;default->throw new IllegalArgumentException(option);};options=value?options|bit:options&~bit;referenceHistory.invalidate();}
+ void option(String option,boolean value){int bit=switch(option){case "rt_gi"->1;case "rt_reflections"->2;case "rt_transmission"->4;case "rt_denoiser"->8;case "radiance_cache"->16;case "rt_caustics"->32;case "rt_primary_glossy_nee"->64;default->throw new IllegalArgumentException(option);};options=value?options|bit:options&~bit;referenceHistory.invalidate();}
  void benchmark(){if(context==0)throw new IllegalStateException("Enable RTX and wait for RT scene before benchmarking");OptixNative.benchmark(context);}
  void debug(int value){if(debug!=value)referenceHistory.invalidate();debug=value;}
  public com.voxellight.rt.RtTraversalBackend traversal(){return com.voxellight.rt.RtTraversalBackend.OPTIX_RT;}

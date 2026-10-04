@@ -154,3 +154,8 @@ Use the same seed, camera route, resolution, render distance, weather/time and r
 9. Profile all three signals, denoiser, scene updates, clouds and composite; compare every A/B switch and verify `rtCpuStaging=false` only for the active RTX path.
 
 All nine GPU acceptance groups remain pending on this build host. Full primary-ray PT, general caustic receiver coverage, perfect offscreen animated poses and multiple-scattering water are not claimed by 0.37.0. The bounded directional caustic and single-scattering models are detailed in RT-LIGHT-TRANSPORT.
+
+
+## 0.38 alpha integration
+
+See [0.38 implementation ledger](RTX-QUALITY-0.38.md), [environment status](RT-ENVIRONMENT.md) and [full-reference status](FULL-REFERENCE.md). This alpha adds opaque primary glossy NEE with independent `/voxellight rt_primary_glossy_nee on|off`; the sun remains raster-owned, while RT owns local/emissive/environment glossy transport when enabled. Coated RT diffuse substrates no longer add base plastic specular under the coat. UV tangent directions are retained for RT anisotropy. Full primary reference, environment importance sampling, async reference banks and the other ledger items remain pending; no GPU acceptance claimed.

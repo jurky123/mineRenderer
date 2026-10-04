@@ -26,11 +26,11 @@ struct RtParams {
  float4 *surfaceKey,*previousKey,*referenceSum,*previousSignal;unsigned referenceSpp,referenceSamples;float fireflyClamp;
  float4* caustics;float4* causticHistory;unsigned* counters;unsigned* counterTotals;unsigned launchOffset;
 };
-struct RtPayload {rt::Material bsdf;unsigned objectId,primitiveId;float3 p,n,geometryNormal,color,emission,absorption;float roughness,f0,ior,transmission;unsigned metal,flags;float distance;int hit;};
+struct RtPayload {rt::Material bsdf;unsigned objectId,primitiveId;float3 p,n,geometryNormal,tangent,bitangent,color,emission,absorption;float roughness,f0,ior,transmission;unsigned metal,flags;float distance;int hit;};
 
 static_assert(sizeof(RtVertex)==40,"RT vertex ABI");
 
 static_assert(sizeof(float3)==12 && alignof(float4)==16,"CUDA vector ABI");
 static_assert(sizeof(RtHitData)==16 && sizeof(RtCube)==24,"RTX host/device ABI");
 
-static_assert(sizeof(RtParams)==560 && sizeof(RtPayload)==252 && sizeof(RtAreaLight)==132 && sizeof(rt::Material)==140,"Material 3 host/device ABI");
+static_assert(sizeof(RtParams)==560 && sizeof(RtPayload)==276 && sizeof(RtAreaLight)==132 && sizeof(rt::Material)==140,"Material 3 host/device ABI");

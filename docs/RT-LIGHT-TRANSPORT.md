@@ -99,3 +99,8 @@ For each fixed camera/scene/quality, warm the scene, record at least 60 seconds,
 ## 0.37.1 convergence follow-up
 
 Reference quality is change-sensitive; unchanged per-frame budget updates cannot clear accumulation. Projection jitter and adaptive budget application are suppressed during reference. RT animated instances freeze after the first sample, resume on exit, and refresh after reset; use static primary scenes for screenshots. Enabling reference also enables OptiX/Foundation. Settings and progress are described in [SETTINGS.md](SETTINGS.md).
+
+
+## 0.38 alpha integration
+
+See [0.38 implementation ledger](RTX-QUALITY-0.38.md), [environment status](RT-ENVIRONMENT.md) and [full-reference status](FULL-REFERENCE.md). This alpha adds opaque primary glossy NEE with independent `/voxellight rt_primary_glossy_nee on|off`; the sun remains raster-owned, while RT owns local/emissive/environment glossy transport when enabled. Coated RT diffuse substrates no longer add base plastic specular under the coat. UV tangent directions are retained for RT anisotropy. Full primary reference, environment importance sampling, async reference banks and the other ledger items remain pending; no GPU acceptance claimed.

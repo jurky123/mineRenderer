@@ -1,6 +1,11 @@
 # VoxelLight current state
 
-Current release: **0.37.6 — Reference progressive frame budget**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+## 0.38.0-alpha.1 — first integration increment
+
+Primary opaque glossy NEE/MIS, RT coated-substrate semantics and UV tangent frames implemented. User confirmed 0.37.6 responsiveness; night iron/indirect quality remains unaccepted. The full 0.38 review is **not complete**. Implementation/acceptance ledger: [RTX Quality 0.38](RTX-QUALITY-0.38.md). No NVIDIA baseline available on this host.
+
+
+Previous stable release: **0.37.6 — Reference progressive frame budget**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
 
 User measured 0.37.5 compilation/linking at ~134s, then reported unusable reference frame rate. 0.37.6 replaces full-image per-frame reference work with adaptive 8–1024-pixel windows (initially 64), complete-sweep spp accounting and persistent guide snapshots. Untouched surfaces retain raster. Normal RTX Quality scheduling is unchanged. See [reference frame scheduling](REFERENCE-0.37.6.md). NVIDIA FPS/convergence acceptance is pending.
 

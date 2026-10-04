@@ -413,7 +413,8 @@ void main() {
     conductorType=0;vec3 coatSpecular=usePbr?DirectColorStrength.rgb*DirectColorStrength.a*skyAccess*coatWeight*ggx(shadingNormal,viewDirection,LightDirectionAndMask.xyz,vec3(coatF0),coatAlpha):vec3(0);
     vec3 directContribution=(albedo*diffuseWeight*direct+sunSpecular)*coatAttenuation+coatSpecular;
     if((rtOwner&1)!=0)ambient=blockBaseline*(1.0-replacement); // direct local baseline stays raster; GI skips primary-to-emitter emission
-    if((rtOwner&2)!=0)selectedSpecular=vec3(0);
+    // RT primary glossy NEE owns both block emitters and the held point source.
+    if((rtOwner&2)!=0){selectedSpecular=vec3(0);if((rtOwner&64)!=0)heldSpecular=vec3(0);}
     vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*((rtOwner&4)!=0?texture(RtSunVisibility,texCoord).rgb:vec3(visibility))+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
     float waterDepth=texture(WaterSurfaceDepth,texCoord).r;
     vec3 waterPosition=waterDepth>0.0?(ViewToWorld*vec4(reconstruct(texCoord,waterDepth,InvProjection),1)).xyz:vec3(0);

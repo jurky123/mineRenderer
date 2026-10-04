@@ -31,3 +31,6 @@ screenshots/
 benchmark-results/
 *.jfr
 hs_err_pid*
+
+__pycache__/
+*.pyc

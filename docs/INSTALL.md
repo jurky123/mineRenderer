@@ -536,3 +536,8 @@ PBR默认在polished foundation开启；启动仍off。放置stone、wood、iron
 ## 0.37.0 reflection / GI response check
 
 Compare dry stone/wood with iron/gold/ice: rough surfaces should no longer receive sharp screen reflections. Test rain separately. With `/voxellight pathtrace on`, look at a wall, turn away, then return; cached static block-face lighting should be available before the next worker result. Newly revealed, never-sampled faces can still acquire GI asynchronously. Inspect `pathtraceSurfaceCache` and `pathtraceCacheBytes` in status. Freeze retains screen-reprojected observations and disables cache fallback. Compare FPS during motion: new views may submit up to20 Hz (Fast10 Hz), steady refinement stays10/5 Hz.
+
+
+## 0.38 alpha integration
+
+See [0.38 implementation ledger](RTX-QUALITY-0.38.md), [environment status](RT-ENVIRONMENT.md) and [full-reference status](FULL-REFERENCE.md). This alpha adds opaque primary glossy NEE with independent `/voxellight rt_primary_glossy_nee on|off`; the sun remains raster-owned, while RT owns local/emissive/environment glossy transport when enabled. Coated RT diffuse substrates no longer add base plastic specular under the coat. UV tangent directions are retained for RT anisotropy. Full primary reference, environment importance sampling, async reference banks and the other ledger items remain pending; no GPU acceptance claimed.

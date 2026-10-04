@@ -1,5 +1,10 @@
 ## 0.37.6 reference responsiveness
 
+## 0.38.0-alpha.1 — first integration increment
+
+Primary opaque glossy NEE/MIS, RT coated-substrate semantics and UV tangent frames implemented. User confirmed 0.37.6 responsiveness; night iron/indirect quality remains unaccepted. The full 0.38 review is **not complete**. Implementation/acceptance ledger: [RTX Quality 0.38](RTX-QUALITY-0.38.md). No NVIDIA baseline available on this host.
+
+
 0.37.5 compiler completed in ~134s, but full-image reference frames were unusable. Implemented progressive windows, GPU-budget feedback, snapshot guides and sweep telemetry. Pending NVIDIA display responsiveness, sweep/sample/reset correctness and screenshot convergence. No normal RTX performance improvement claimed.
 
 ## 0.37.5 compiler follow-up
