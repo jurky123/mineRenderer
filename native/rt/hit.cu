@@ -34,3 +34,6 @@ extern "C" __global__ void __closesthit__surface(){
 // Isolated A/B geometry kernel. The application world continues to use exact compiled triangles.
 extern "C" __global__ void __intersection__cube(){auto data=reinterpret_cast<const RtHitData*>(optixGetSbtDataPointer());auto cube=reinterpret_cast<RtCube*>(data->vertices)[optixGetPrimitiveIndex()];float3 o=optixGetObjectRayOrigin(),d=optixGetObjectRayDirection();float3 lo=v((cube.minimum.x-o.x)/d.x,(cube.minimum.y-o.y)/d.y,(cube.minimum.z-o.z)/d.z),hi=v((cube.maximum.x-o.x)/d.x,(cube.maximum.y-o.y)/d.y,(cube.maximum.z-o.z)/d.z);float near=fmaxf(fmaxf(fminf(lo.x,hi.x),fminf(lo.y,hi.y)),fminf(lo.z,hi.z)),far=fminf(fminf(fmaxf(lo.x,hi.x),fmaxf(lo.y,hi.y)),fmaxf(lo.z,hi.z));if(near<=far){float t=near>=optixGetRayTmin()?near:far;if(t>=optixGetRayTmin()&&t<=optixGetRayTmax())optixReportIntersection(t,0);}}
 extern "C" __global__ void __closesthit__cube(){auto p=payload();p->hit=1;p->distance=optixGetRayTmax();}
+
+// Geometry benchmark has no transport/material integrator.
+extern "C" __global__ void __raygen__benchmark(){unsigned i=optixGetLaunchIndex().x,seed=i*9781u+params.frame*6271u+1;float3 origin=v(random(seed)*5,10,random(seed)*5),destination=v(random(seed)*5,0,random(seed)*5);auto h=trace(origin,norm(add(destination,mul(origin,-1))));params.diffuse[i]=make_float4(h.hit?h.distance:-1,0,0,0);}

@@ -4,6 +4,7 @@ static __forceinline__ __device__ void causticPhoton(unsigned i,unsigned& seed){
  countOperation(7);float cell=.25f;int cx=(int)floorf(params.camera.x/cell)-32,cz=(int)floorf(params.camera.z/cell)-32;
  int gx=cx+(i&63),gz=cz+((i>>6)&63);float3 destination=v((gx+random(seed))*cell,params.camera.y,(gz+random(seed))*cell);
  if(params.sun.y<.08f)return;float3 direction=mul(params.sun,-1),origin=add(destination,mul(params.sun,64/params.sun.y));rt::Vec power=rv(params.sunColor)*(params.sun.y*cloudVisibility(destination));rt::MediumStack stack;bool refracted=false;
+ #pragma unroll 1
  for(int bounce=0;bounce<12;bounce++){
   auto hit=trace(origin,direction,256);if(!hit.hit)return;
   if(stack.count)power=power*rt::expNeg(stack.entries[stack.count-1].sigmaA+stack.entries[stack.count-1].sigmaS,hit.distance);

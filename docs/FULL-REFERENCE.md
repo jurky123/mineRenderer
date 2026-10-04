@@ -11,9 +11,9 @@ Commands:
 
 The existing `rt_reference` remains raster-primary for comparison. Both modes use progressive adaptive windows and completed sweep counts. Target SPP is not completed SPP. Hold the camera still; changes reset convergence. Uncomputed full-reference pixels retain raster until observed, and the low-resolution reference display uses nearest sampling.
 
-## Lazy compiler ownership (alpha.4)
+## Lazy compiler ownership (alpha.4, alpha.5 lifecycle follow-up)
 
-Full reference uses its own strict-math module/context, created in the background after `rt_reference_full on`. Ordinary RTX Quality does not compile it. Realtime remains active until successful creation; compiler failure leaves realtime intact. Adoption imports the reference resources and prepares its scene, then uses the asynchronous window ownership below. Exiting reference recreates realtime using normal disk cache. GPU switching/failure/close validation remains pending. See [compiler architecture](OPTIX-COMPILATION-0.38.md).
+Full reference uses its own strict-math module/context, created in the background after `rt_reference_full on`. Ordinary RTX Quality does not compile it. Alpha.5 makes full-reference on/off session-only and ignores older saved on state; scale remains persistent. Realtime remains active until successful creation; compiler failure leaves realtime intact. Adoption imports the reference resources and prepares its scene, then uses the asynchronous window ownership below. Exiting reference recreates realtime using normal disk cache. GPU switching/failure/close validation remains pending. See [compiler architecture](OPTIX-COMPILATION-0.38.md).
 
 ## Asynchronous ownership
 

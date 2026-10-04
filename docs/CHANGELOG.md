@@ -1,5 +1,9 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.38.0-alpha.5 — realtime compiler/lifecycle follow-up (acceptance candidate)
+
+User alpha.4 / 591.74 test stalled in realtime task 2 and exited immediately after watchdog cancellation. Split constant-signal realtime modules/probes; non-inline glossy BSDF boundaries; preserve compiler ownership across render resets and skip abandoned queued creation. Full reference no longer replays saved on state; RTX Quality exits reference. Native diagnostics reach latest.log and a flushed compiler file. Watchdog binds CUDA and cancels the published module with entry/return diagnostics. Exact prior native fault and GPU fix acceptance remain unconfirmed. [Evidence and next checks](OPTIX-COMPILATION-0.38-ALPHA5.md).
+
 ## 0.38.0-alpha.4 — OptiX Compilation Architecture (acceptance candidate)
 
 Split hit/realtime/full-reference/caustic compiler ownership; full reference compiles lazily in an isolated background context while realtime continues. Non-tracing CDF/reduction/clear/resolve work moves to CUDA. Added per-task keys/timestamps/durations/threads, module/group/link timings, stable SDK disk-cache readback, 120 s realtime / 600 s reference creation watchdogs with cooperative cancellation and joined task lifetimes. Build strict/fast PTX/IR A/B artifacts; retain strict PTX baseline pending GPU numeric/visual checks. Windows/Linux native and Java builds pass; RTX 4060 / 591.74 cold/warm startup, cache and watchdog acceptance remain pending. Synchronous pipeline-link cancellation is unavailable in the current SDK. No P1–P7 quality work. See [architecture/gates](OPTIX-COMPILATION-0.38.md).

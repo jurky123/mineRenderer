@@ -1,5 +1,9 @@
 # VoxelLight current state
 
+## 0.38.0-alpha.5 — compiler graph/lifecycle follow-up (GPU acceptance candidate)
+
+**Alpha.4 failed user GPU acceptance:** 591.74 realtime task 2 did not finish within 120 seconds; the process exited immediately after the cancellation request. Exact native fault remains unconfirmed. Alpha.5 splits realtime signal/probe raygens into separate constant-signal modules, adds non-inline glossy BSDF boundaries, retains pending compiler ownership across render resets, skips abandoned queued work, makes full reference session-only, bridges native diagnostics to latest.log plus a flushed dedicated file, and binds CUDA on the watchdog before targeting a published module. Windows/Linux and host regression verification do not establish crash recovery or startup targets. See [GPU evidence and follow-up](OPTIX-COMPILATION-0.38-ALPHA5.md). P0 remains open; P1–P7 remain deferred.
+
 ## 0.38.0-alpha.4 — OptiX Compilation Architecture (GPU acceptance candidate)
 
 P0 compiler ownership split: hit/realtime/full-reference/caustic modules, independent caustic pipeline, non-tracing CUDA utilities, lazy isolated full-reference creation retaining realtime during compilation, task-level telemetry and per-module/group/link times, stable SDK disk cache with status readback, and cooperative OptiX 9.1 creation cancellation watchdog. Strict/fast PTX/IR artifacts support four-way A/B; strict PTX remains the baseline until numerical/visual acceptance. **Startup improvement, cache cold/warm behavior and cancellation are not yet validated on RTX 4060 Laptop.** The alpha.3 591.74 baseline remains 1185+ seconds at tasks=2/3. Synchronous link cancellation remains a stated limitation. P1–P7 are deferred. See [architecture and GPU acceptance](OPTIX-COMPILATION-0.38.md).

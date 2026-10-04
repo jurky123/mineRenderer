@@ -13,7 +13,7 @@ nv.nvrtcGetPTXSize(prog,C.byref(n));ptx=C.create_string_buffer(n.value);nv.nvrtc
 # Independent compiler graphs; preserve all four math/format experiments.
 import time
 rtOptions=[b'--gpu-architecture=compute_75',b'--std=c++17',('-I'+str(optix)).encode(),('-I'+str(cuda)).encode(),('-I'+str(r/'native/rt')).encode()]
-modules={'rt_hit':'hit.cu','rt_realtime':'program.cu','rt_reference':'reference.cu','rt_caustics':'caustic.cu','rt_utility':'utility.cu'}
+modules={'rt_hit':'hit.cu','rt_realtime':'program.cu','rt_specular':'specular.cu','rt_transmission':'transmission.cu','rt_probes':'probes.cu','rt_reference':'reference.cu','rt_caustics':'caustic.cu','rt_utility':'utility.cu'}
 builds=[]
 for name,filename in modules.items():
     for fast in ([False] if name in ('rt_reference','rt_utility') else [False,True]):
@@ -47,5 +47,5 @@ shutil.copy(next(d.glob('llvm-mingw-*/LICENSE.TXT')),licenseDir/'LLVM-runtime.tx
 shutil.copy(next((d/'cuda').glob('nvidia_cuda_runtime_cu12-*.dist-info/licenses/License.txt')),licenseDir/'NVIDIA-CUDA.txt')
 for name in ['optix_stubs.h','optix_function_table_definition.h']:
     text=(optix/name).read_text();(licenseDir/(name+'.txt')).write_text(text[:text.index('*/')+2]+'\n')
-sources=['native/optix/pathtrace.cu','native/optix/bridge.cpp','native/optix/include/jni_md.h','tools/build_optix.py','native/rt/bridge.hpp','native/rt/contract.h','native/rt/program.cu','native/rt/bsdf.h','native/rt/surface.h','native/rt/environment.h','native/rt/light_sampling.h','native/rt/ggx_energy.h','native/rt/dispatch.h','native/rt/task_pool.h','native/rt/transport.cuh','native/rt/caustics.cuh','native/rt/device.cuh','native/rt/material.cuh','native/rt/hit.cu','native/rt/reference.cu','native/rt/caustic.cu','native/rt/caustic_lookup.cuh','native/rt/utility.cu','native/rt/compiler.hpp']
+sources=['native/optix/pathtrace.cu','native/optix/bridge.cpp','native/optix/include/jni_md.h','tools/build_optix.py','native/rt/bridge.hpp','native/rt/contract.h','native/rt/program.cu','native/rt/bsdf.h','native/rt/surface.h','native/rt/environment.h','native/rt/light_sampling.h','native/rt/ggx_energy.h','native/rt/dispatch.h','native/rt/task_pool.h','native/rt/transport.cuh','native/rt/caustics.cuh','native/rt/device.cuh','native/rt/material.cuh','native/rt/hit.cu','native/rt/reference.cu','native/rt/caustic.cu','native/rt/caustic_lookup.cuh','native/rt/utility.cu','native/rt/compiler.hpp','native/rt/probes.cu','native/rt/specular.cu','native/rt/transmission.cu','native/rt/compiler_log.hpp']
 (out/'build.json').write_text(json.dumps({'optix':'9.1.0','cuda':'12.9','sources':{name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in sources}},indent=2)+'\n')

@@ -8,11 +8,12 @@ import java.util.function.Supplier;
 public final class AsyncResource<T> implements AutoCloseable {
  private T value;
  private Throwable failure;
- private boolean finished, abandoned, taken;
+ private boolean started, finished, abandoned, taken;
  private final Consumer<T> dispose;
  public AsyncResource(Executor executor,Supplier<T> create,Consumer<T> dispose){
   this.dispose=dispose;
   executor.execute(()->{
+   synchronized(this){if(abandoned){finished=true;return;}started=true;}
    T result;
    try{result=create.get();}catch(Throwable error){synchronized(this){failure=error;finished=true;}return;}
    boolean discard;
@@ -20,6 +21,7 @@ public final class AsyncResource<T> implements AutoCloseable {
    if(discard)dispose.accept(result);
   });
  }
+ public synchronized boolean started(){return started;}
  public synchronized boolean finished(){return finished;}
  public synchronized T take(){
   if(!finished||abandoned||taken)throw new IllegalStateException("Startup result unavailable");

@@ -7,7 +7,7 @@ import java.nio.file.Path;
 
 /** Optional native library, loaded only when path tracing is explicitly enabled. */
 final class OptixBridge {
-    private static boolean loaded;
+    private static volatile boolean loaded;
     static synchronized byte[] load() throws IOException {
         if (!loaded) {
             String os=System.getProperty("os.name").toLowerCase();
@@ -16,9 +16,16 @@ final class OptixBridge {
             String name=os.contains("win")?"voxellight_optix.dll":os.contains("linux")?"libvoxellight_optix.so":null;
             if(name==null)throw new IOException("OptiX prototype supports Windows/Linux only");
             byte[] code=resource(name);Path file=Files.createTempFile("voxellight-optix-",os.contains("win")?".dll":".so");
-            Files.write(file,code);file.toFile().deleteOnExit();System.load(file.toAbsolutePath().toString());loaded=true;
+            Files.write(file,code);file.toFile().deleteOnExit();System.load(file.toAbsolutePath().toString());
+            var client=net.minecraft.client.Minecraft.getInstance();Path logs=client==null?Path.of(System.getProperty("java.io.tmpdir"),"voxellight-diagnostics"):client.gameDirectory.toPath().resolve("logs");Files.createDirectories(logs);
+            com.voxellight.nvidia.OptixNative.configureDiagnostics(logs.resolve("voxellight-optix.log").toAbsolutePath().toString());loaded=true;
         }
         return resource("pathtrace.ptx");
+    }
+    static void drainRtDiagnostics(){
+        if(!loaded)return;
+        String text=com.voxellight.nvidia.OptixNative.drainDiagnostics();
+        if(!text.isEmpty())for(String line:text.split("\\R"))org.slf4j.LoggerFactory.getLogger("VoxelLight").info("{}",line);
     }
     static long createRt(byte[] uuid,boolean full) throws IOException {
         load();
@@ -38,7 +45,7 @@ final class OptixBridge {
     }
     private static long createModules(byte[] uuid,boolean full,boolean fast,boolean ir,String cache)throws IOException {
         String suffix=(fast?"_fast":"")+(ir?".optixir":".ptx");
-        return com.voxellight.nvidia.OptixNative.create(uuid,new byte[][]{resource("rt_hit"+suffix),resource((full?"rt_reference":"rt_realtime")+suffix),full?new byte[0]:resource("rt_caustics"+suffix),resource("rt_utility.ptx")},full,cache);
+        return com.voxellight.nvidia.OptixNative.create(uuid,new byte[][]{resource("rt_hit"+suffix),resource((full?"rt_reference":"rt_realtime")+suffix),full?new byte[0]:resource("rt_specular"+suffix),full?new byte[0]:resource("rt_transmission"+suffix),full?new byte[0]:resource("rt_probes"+suffix),full?new byte[0]:resource("rt_caustics"+suffix),resource("rt_utility.ptx")},full,cache);
     }
     private static byte[] uncheckedResource(String name){try{return resource(name);}catch(IOException failure){throw new java.io.UncheckedIOException(failure);}}
     private static byte[] resource(String name) throws IOException {

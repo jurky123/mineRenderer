@@ -23,5 +23,13 @@ class RendererPreferencesTest {
         assertEquals(List.of("rt_reference spp"),List.copyOf(prefs.snapshot().keySet()));
         assertFalse(prefs.record("time set day",true));
     }
+    @Test void fullReferenceIsSessionOnlyEvenForLegacySavedOn()throws Exception{
+        var prefs=new RendererPreferences();assertFalse(prefs.record("voxellight rt_reference_full on",true));
+        assertTrue(prefs.record("voxellight rt_reference_full scale 2",true));
+        prefs.save(directory.resolve("settings.json"));var loaded=new RendererPreferences();loaded.load(directory.resolve("settings.json"));
+        assertEquals(List.of("rt_reference_full scale"),List.copyOf(loaded.snapshot().keySet()));
+        java.nio.file.Files.writeString(directory.resolve("legacy.json"),"{\"rt_reference_full\":\"on\",\"rt_reference spp\":\"4\"}");
+        loaded=new RendererPreferences();loaded.load(directory.resolve("legacy.json"));assertEquals(List.of("rt_reference spp"),List.copyOf(loaded.snapshot().keySet()));
+    }
     @Test void replayDoesNotRewritePreferences(){var prefs=new RendererPreferences();assertFalse(prefs.record("voxellight bloom off",false));assertEquals("off",prefs.value("bloom"));assertTrue(prefs.snapshot().isEmpty());}
 }

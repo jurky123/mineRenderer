@@ -24,7 +24,7 @@
   // Keep SDK watermarks until measured entries justify an increase; optional measured override.
   if(const char* bytes=std::getenv("VOXELLIGHT_RT_CACHE_HIGH_BYTES")){size_t requested=std::stoull(bytes);if(requested>high){high=requested;low=high/2;check(optixDeviceContextSetCacheDatabaseSizes(optix,low,high));check(optixDeviceContextGetCacheDatabaseSizes(optix,&low,&high));}}
   cacheStatus=", rtCacheEnabled="+std::to_string(enabled)+", rtCachePath="+location+", rtCacheLowWater="+std::to_string(low)+", rtCacheHighWater="+std::to_string(high);
-  fprintf(stderr,"VoxelLight OptiX cache%s\n",cacheStatus.c_str());
+  rtLog("VoxelLight OptiX cache%s\n",cacheStatus.c_str());
  }
  void compileModule(OptixModule& target,const char* name,const std::vector<char>& code){
   OptixModuleCompileOptions mo{};mo.debugLevel=OPTIX_COMPILE_DEBUG_LEVEL_NONE;mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
@@ -33,17 +33,18 @@
   if(optimization){std::string value=optimization;if(value=="0")mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;else if(value=="1")mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_1;else if(value=="2")mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_2;}
   auto po=pipelineOptions();std::vector<char> log(1024*1024);size_t logSize=log.size();OptixTask first=nullptr;
   auto start=std::chrono::steady_clock::now();rtInitializationStage=3;
-  fprintf(stderr,"VoxelLight compile start module=%s bytes=%zu optimization=%d profile=%s driver=%s cudaDriverApi=%d GPU=%s timestamp=%lld\n",name,code.size()-1,int(mo.optLevel),strictReference?"REFERENCE_STRICT":profile?profile:"REALTIME_RELEASE",nvidiaDriver.c_str(),driverVersion,gpuName.c_str(),timestamp());
+  rtLog("VoxelLight compile start module=%s bytes=%zu optimization=%d profile=%s driver=%s cudaDriverApi=%d GPU=%s timestamp=%lld\n",name,code.size()-1,int(mo.optLevel),strictReference?"REFERENCE_STRICT":profile?profile:"REALTIME_RELEASE",nvidiaDriver.c_str(),driverVersion,gpuName.c_str(),timestamp());
   // This guard also covers the initial task-creation call. Cancellation targets
   // only this isolated OptiX context; every task is joined before guard/module destruction.
   struct Watchdog {
-   std::mutex lock;std::condition_variable wake;bool done=false;std::atomic<bool> timeout{false};std::thread thread;
-   Watchdog(OptixDeviceContext context,const char* name,std::chrono::steady_clock::time_point deadline):thread([this,context,name,deadline]{std::unique_lock<std::mutex> guard(lock);if(!wake.wait_until(guard,deadline,[&]{return done;})){timeout=true;fprintf(stderr,"VoxelLight compile timeout module=%s; requesting cancellation; draining tasks before destroy\n",name);auto result=optixDeviceContextCancelCreations(context,OPTIX_CREATION_FLAG_NONE);if(result!=OPTIX_SUCCESS)fprintf(stderr,"VoxelLight cancellation error=%d\n",int(result));}}){}
+   std::mutex lock;std::condition_variable wake;bool done=false;std::atomic<bool> timeout{false};std::atomic<OptixModule> module{nullptr};std::thread thread;
+   Watchdog(OptixDeviceContext context,CUcontext cuda,Driver& driver,const char* name,std::chrono::steady_clock::time_point deadline):thread([this,context,cuda,&driver,name,deadline]{std::unique_lock<std::mutex> guard(lock);if(!wake.wait_until(guard,deadline,[&]{return done;})){timeout=true;rtLog("VoxelLight compile timeout module=%s; requesting cancellation; draining tasks before destroy\n",name);auto bound=driver.cuCtxSetCurrent(cuda);rtLog("VoxelLight cancellation bind module=%s cuda_result=%d\n",name,int(bound));if(bound!=CUDA_SUCCESS)return;auto target=module.load();rtLog("VoxelLight cancellation enter module=%s scope=%s timestamp=%lld\n",name,target?"module":"context",RtContext::timestamp());auto result=target?optixModuleCancelCreation(target,OPTIX_CREATION_FLAG_NONE):optixDeviceContextCancelCreations(context,OPTIX_CREATION_FLAG_NONE);rtLog("VoxelLight cancellation return module=%s result=%d timestamp=%lld\n",name,int(result),RtContext::timestamp());}}){}
    void finish(){{std::lock_guard<std::mutex> guard(lock);done=true;}wake.notify_all();if(thread.joinable())thread.join();}
    ~Watchdog(){finish();}
-  } watchdog(optix,name,start+std::chrono::seconds(strictReference?600:120));
+  } watchdog(optix,cuda,d,name,start+std::chrono::seconds(strictReference?600:120));
   auto creation=optixModuleCreateWithTasks(optix,&mo,&po,code.data(),code.size()-1,log.data(),&logSize,&target,&first);
   if(creation!=OPTIX_SUCCESS)throw std::runtime_error(std::string(name)+" creation: OptiX error "+std::to_string(int(creation))+"; "+diagnostics()+"; "+log.data());
+  watchdog.module=target;
   if(first)rtCompileScheduled++;
   std::atomic<int> taskError{0};std::atomic<unsigned> serial{0};
   std::exception_ptr failure;
@@ -51,21 +52,21 @@
    check(d.cuCtxSetCurrent(cuda));unsigned id=++serial;auto began=std::chrono::steady_clock::now();size_t keySize=0;std::string key="unavailable";
    if(optixTaskGetSerializationKey(task,nullptr,&keySize)==OPTIX_SUCCESS&&keySize){std::vector<unsigned char> bytes(keySize);if(optixTaskGetSerializationKey(task,bytes.data(),&keySize)==OPTIX_SUCCESS){key.clear();const char* hex="0123456789abcdef";for(auto byte:bytes){key+=hex[byte>>4];key+=hex[byte&15];}}}
    auto thread=std::hash<std::thread::id>{}(std::this_thread::get_id());
-   fprintf(stderr,"VoxelLight task start module=%s id=%u handle=%p key=%s timestamp=%lld thread=%zu\n",name,id,(void*)task,key.c_str(),timestamp(),thread);
+   rtLog("VoxelLight task start module=%s id=%u handle=%p key=%s timestamp=%lld thread=%zu\n",name,id,(void*)task,key.c_str(),timestamp(),thread);
    OptixTask children[32]{};unsigned count=0;auto result=optixTaskExecute(task,children,32,&count);
    rtCompileScheduled+=count;rtCompileFinished++;
-   fprintf(stderr,"VoxelLight task finish module=%s id=%u timestamp=%lld active_ms=%lld children=%u thread=%zu result=%d\n",name,id,timestamp(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-began).count(),count,thread,int(result));
+   rtLog("VoxelLight task finish module=%s id=%u timestamp=%lld active_ms=%lld children=%u thread=%zu result=%d\n",name,id,timestamp(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-began).count(),count,thread,int(result));
    if(result!=OPTIX_SUCCESS){int noError=0;taskError.compare_exchange_strong(noError,int(result));optixModuleCancelCreation(target,OPTIX_CREATION_FLAG_NONE);}
    return std::vector<OptixTask>(children,children+count);
   });}catch(...){failure=std::current_exception();optixModuleCancelCreation(target,OPTIX_CREATION_FLAG_BLOCK_UNTIL_EFFECTIVE);}
   watchdog.finish();
-  auto ms=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-start).count();fprintf(stderr,"VoxelLight compile finish module=%s elapsed_ms=%lld timeout=%d\n",name,(long long)ms,int(watchdog.timeout.load()));
+  auto ms=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-start).count();rtLog("VoxelLight compile finish module=%s elapsed_ms=%lld timeout=%d\n",name,(long long)ms,int(watchdog.timeout.load()));
   if(failure)std::rethrow_exception(failure);
   OptixModuleCompileState state;check(optixModuleGetCompilationState(target,&state));
   if(watchdog.timeout||taskError||state!=OPTIX_MODULE_COMPILE_STATE_COMPLETED)throw std::runtime_error(std::string(name)+" module compilation failed/timeout: OptiX error "+std::to_string(taskError.load())+"; "+diagnostics()+"; "+log.data());
  }
  void launch(unsigned count){
   if(params.mode==2||params.mode==4||params.mode==10||params.mode==11||params.mode==12||params.mode==13||params.mode==14){params.utilityCount=count;void* args[]={&params};check(d.cuLaunchKernel(utility,(count+127)/128,1,1,128,1,1,0,stream,args,nullptr));return;}
-  auto table=sbt;if(params.mode==8)table.raygenRecord=causticRecord;
+  auto table=sbt;if(params.mode==8)table.raygenRecord=causticRecord;else if(params.mode==7)table.raygenRecord=signalRecords[3];else if(!strictReference){int entry=params.mode==5?0:params.mode==6?1:params.mode==1?2:params.mode==7?3:-1;if(entry>=0)table.raygenRecord=signalRecords[entry];}
   check(optixLaunch(params.mode==8?causticPipeline:pipeline,stream,paramsGpu,sizeof(params),&table,count,1,1));
  }

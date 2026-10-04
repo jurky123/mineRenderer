@@ -71,7 +71,11 @@ RT_FN float specProbability(const Material& m){return m.type==COATED_DIFFUSE?0:m
 #include "ggx_energy.h"
 namespace rt {
 RT_FN float multiscatterMix(const Material& m,float cosine){return m.multipleScattering?clamp(1-ggxEnergy(sqrtf(m.microfacetAlpha*m.alphaV),cosine),0,.9f):0;}
-RT_FN Vec multiscatterF(const Material& m,Vec wo,Vec wi){if(!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return V(0,0,0);float alpha=sqrtf(m.microfacetAlpha*m.alphaV),eo=ggxEnergy(alpha,wo.z),ei=ggxEnergy(alpha,wi.z),average=ggxAverageEnergy(alpha);if(average>.99999f)return V(0,0,0);Vec F=V(0,0,0);for(int i=0;i<8;i++){float c=(i+.5f)/8;F=F+(metal(m)?conductorFresnel(m,c):V(1,1,1)*fresnelDielectric(c,(1+sqrtf(m.f0))/(1-sqrtf(m.f0))))*(2*c/8);}Vec factor=V(F.x*F.x*average/fmaxf(1e-6f,1-F.x*(1-average)),F.y*F.y*average/fmaxf(1e-6f,1-F.y*(1-average)),F.z*F.z*average/fmaxf(1e-6f,1-F.z*(1-average)));return factor*((1-eo)*(1-ei)/(Pi*fmaxf(1e-6f,1-average)));}
+RT_HEAVY Vec multiscatterF(const Material& m,Vec wo,Vec wi){if(!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return V(0,0,0);float alpha=sqrtf(m.microfacetAlpha*m.alphaV),eo=ggxEnergy(alpha,wo.z),ei=ggxEnergy(alpha,wi.z),average=ggxAverageEnergy(alpha);if(average>.99999f)return V(0,0,0);Vec F=V(0,0,0);
+#ifdef __CUDACC__
+#pragma unroll 1
+#endif
+for(int i=0;i<8;i++){float c=(i+.5f)/8;F=F+(metal(m)?conductorFresnel(m,c):V(1,1,1)*fresnelDielectric(c,(1+sqrtf(m.f0))/(1-sqrtf(m.f0))))*(2*c/8);}Vec factor=V(F.x*F.x*average/fmaxf(1e-6f,1-F.x*(1-average)),F.y*F.y*average/fmaxf(1e-6f,1-F.y*(1-average)),F.z*F.z*average/fmaxf(1e-6f,1-F.z*(1-average)));return factor*((1-eo)*(1-ei)/(Pi*fmaxf(1e-6f,1-average)));}
 RT_HEAVY BsdfEval evalLocal(const Material& m,Vec wo,Vec wi,float eta=1.5f,int forced=0){
  BsdfEval result{V(0,0,0),0};if(wo.z<=0||fabsf(wi.z)<1e-7f)return result;
  float ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV);
@@ -115,7 +119,7 @@ RT_HEAVY BsdfSample sampleBsdf(const Material& m,const Frame& f,Vec woWorld,unsi
  auto e=evalLocal(m,wo,wi,eta,forced);if(e.pdf<=1e-12f)return s;s.wi=f.world(wi);s.pdf=e.pdf;s.weight=e.f*(fabsf(wi.z)/e.pdf);s.flags=flags;return s;
 }
 
-RT_FN BsdfEval evalGlossy(const Material& m,const Frame& f,Vec woWorld,Vec wiWorld){
+RT_HEAVY BsdfEval evalGlossy(const Material& m,const Frame& f,Vec woWorld,Vec wiWorld){
  if(m.type==DIFFUSE||m.type==EMISSIVE||m.type==DIFFUSE_TRANSMISSION)return {V(0,0,0),0};
  Vec wo=f.local(woWorld),wi=f.local(wiWorld);if(wo.z<=0||wi.z<=0)return {V(0,0,0),0};Vec h=normalize(wo+wi);float oh=fabsf(dot(wo,h)),ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV),ior=(1+sqrtf(m.f0))/(1-sqrtf(m.f0));
  Vec F=metal(m)?conductorFresnel(m,oh):V(1,1,1)*fresnelDielectric(oh,ior);Vec base=F*(D(h,ax,ay)*G(wo,wi,ax,ay)/(4*wo.z*wi.z));float pdf=normalPdf(wo,h,ax,ay)/fmaxf(1e-7f,4*oh);
@@ -124,7 +128,7 @@ RT_FN BsdfEval evalGlossy(const Material& m,const Frame& f,Vec woWorld,Vec wiWor
  float cp=m.type==COATED_DIFFUSE?1:m.coatWeight*.5f,ca=fmaxf(.0005f,m.coatAlpha);if(m.coatWeight>0){float attenuation=1-m.coatWeight+m.coatWeight*(1-fresnelDielectric(wo.z,m.coatIOR))*(1-fresnelDielectric(wi.z,m.coatIOR));Vec coat=V(1,1,1)*(fresnelDielectric(oh,m.coatIOR)*D(h,ca,ca)*G(wo,wi,ca,ca)/(4*wo.z*wi.z));base=base*attenuation+coat*m.coatWeight;pdf=pdf*(1-cp)+normalPdf(wo,h,ca,ca)/(4*oh)*cp;}
  return {base,pdf};
 }
-RT_FN BsdfSample sampleGlossy(const Material& m,const Frame& f,Vec woWorld,unsigned& seed){
+RT_HEAVY BsdfSample sampleGlossy(const Material& m,const Frame& f,Vec woWorld,unsigned& seed){
  Vec wo=f.local(woWorld);BsdfSample s{V(0,0,0),V(0,0,0),0,1,0};if(m.type==DIFFUSE||m.type==EMISSIVE||m.type==DIFFUSE_TRANSMISSION)return s;if(wo.z<=0)return s;bool coat=m.type==COATED_DIFFUSE||rng(seed)<m.coatWeight*.5f;float ax=fmaxf(.0005f,coat?m.coatAlpha:m.microfacetAlpha),ay=fmaxf(.0005f,coat?m.coatAlpha:m.alphaV);Vec wi;if(!coat&&rng(seed)<multiscatterMix(m,wo.z))wi=cosine(seed);else{Vec h=sampleNormal(wo,ax,ay,seed);wi=h*(2*dot(wo,h))-wo;}if(wi.z<=0)return s;s.wi=f.world(wi);auto e=evalGlossy(m,f,woWorld,s.wi);if(e.pdf<=0)return s;s.weight=e.f*(wi.z/e.pdf);s.pdf=e.pdf;s.flags=GLOSSY|REFLECTION;return s;
 }
 RT_FN float hg(float cosine,float g){float d=1+g*g-2*g*cosine;return (1-g*g)/(4*Pi*d*sqrtf(d));}

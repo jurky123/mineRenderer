@@ -1,5 +1,7 @@
 # 0.38.0-alpha.4 — OptiX Compilation Architecture
 
+**Subsequent user GPU gate failed.** Realtime task 2 stalled to the deadline, followed by process exit after cancellation. See [alpha.5 follow-up](OPTIX-COMPILATION-0.38-ALPHA5.md) for further graph split, startup ownership and diagnostic/cancellation-thread changes. The design below describes the alpha.4 baseline.
+
 This is a GPU acceptance candidate, **not a demonstrated startup fix**. The user baseline is RTX 4060 Laptop / Windows / NVIDIA 591.74 / alpha.3 / strict PTX / default optimization: `tasks=2/3` was still running after 1185 seconds. No NVIDIA device/display is available on the build host. P1–P7 remain deferred until the P0 gates below pass.
 
 ## Compiler graph and ownership

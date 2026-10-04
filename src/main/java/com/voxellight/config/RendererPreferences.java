@@ -21,13 +21,14 @@ public final class RendererPreferences {
             if(value.startsWith("spp ")){key="rt_reference spp";value=value.substring(4);}
             else if(value.equals("reset"))return false;
         }
+        if(key.equals("rt_reference_full")&&value.startsWith("scale ")){key="rt_reference_full scale";value=value.substring(6);}
         if(key.equals("preset"))current.clear();
         current.put(key,value);
         if(!persist||!persistent(key))return false;
         if(key.equals("preset"))saved.clear();
         saved.remove(key);saved.put(key,value);return true;
     }
-    private static boolean persistent(String key){return key.equals("rt_reference spp")||(!key.contains("debug")&&!key.equals("rt_reference")&&!Set.of("scene","profile","export","settings","status","rt_benchmark","pathtrace_freeze").contains(key));}
+    private static boolean persistent(String key){return key.equals("rt_reference spp")||(!key.contains("debug")&&!key.equals("rt_reference")&&!key.equals("rt_reference_full")&&!Set.of("scene","profile","export","settings","status","rt_benchmark","pathtrace_freeze").contains(key));}
     public void load(Path file)throws IOException{
         if(!Files.exists(file))return;
         Map<String,String> loaded=new Gson().fromJson(Files.readString(file),new TypeToken<LinkedHashMap<String,String>>(){}.getType());

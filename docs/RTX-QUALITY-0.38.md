@@ -1,6 +1,6 @@
 # 0.38 Physical Scene Integration — work and acceptance ledger
 
-P0 now takes precedence: [alpha.4 compilation architecture](OPTIX-COMPILATION-0.38.md). Module split/lazy reference/CUDA utilities/cache/task telemetry/watchdog are implemented as a GPU acceptance candidate; cold/warm driver compile and in-game lifecycle remain unmeasured. P1–P7 must wait for P0 acceptance.
+Alpha.4 user GPU gate failed in realtime compilation/cancellation; [alpha.5 follow-up](OPTIX-COMPILATION-0.38-ALPHA5.md) remains a GPU acceptance candidate. P0 now takes precedence: [alpha.4 compilation architecture](OPTIX-COMPILATION-0.38.md). Module split/lazy reference/CUDA utilities/cache/task telemetry/watchdog are implemented as a GPU acceptance candidate; cold/warm driver compile and in-game lifecycle remain unmeasured. P1–P7 must wait for P0 acceptance.
 
 **0.38.0-alpha.2 is an incomplete first implementation increment, not completion of the 0.38 review.** No NVIDIA device or display is available on the build host. No new GPU baseline, screenshot, VRAM measurement or visual acceptance is claimed.
 
