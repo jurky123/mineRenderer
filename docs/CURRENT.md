@@ -1,5 +1,9 @@
 # VoxelLight current state
 
+## 0.38.0-alpha.4 — OptiX Compilation Architecture (GPU acceptance candidate)
+
+P0 compiler ownership split: hit/realtime/full-reference/caustic modules, independent caustic pipeline, non-tracing CUDA utilities, lazy isolated full-reference creation retaining realtime during compilation, task-level telemetry and per-module/group/link times, stable SDK disk cache with status readback, and cooperative OptiX 9.1 creation cancellation watchdog. Strict/fast PTX/IR artifacts support four-way A/B; strict PTX remains the baseline until numerical/visual acceptance. **Startup improvement, cache cold/warm behavior and cancellation are not yet validated on RTX 4060 Laptop.** The alpha.3 591.74 baseline remains 1185+ seconds at tasks=2/3. Synchronous link cancellation remains a stated limitation. P1–P7 are deferred. See [architecture and GPU acceptance](OPTIX-COMPILATION-0.38.md).
+
 ## 0.38.0-alpha.3 — OptiX startup compatibility
 
 Alpha 2 failed OptiX-IR compilation on the user's NVIDIA 591.74 driver (error 7251), retaining raster fallback. Strict-math PTX is now the default; IR remains opt-in with a logged single PTX retry on compilation error 7251. Device errors do not retry. Native compiler callbacks retain errors/warnings, and compiler buffers grow from 8 KiB to heap-backed 1 MiB; module creation/program-group/link errors include diagnostics. Debug level is explicitly NONE for release modules. Default optimization remains optimized, not O0. GPU recovery is pending user verification.

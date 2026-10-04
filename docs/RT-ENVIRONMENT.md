@@ -7,3 +7,5 @@ RT miss, glossy/dielectric reflection, diffuse miss and probe update query this 
 `/voxellight rt_environment on|off` compares the shared map against the legacy gradient. `rt_environment_map` and `rt_environment_distribution` are separately profiled.
 
 Limits: fixed resolution/nearest lookup, unresolved small stars, approximate cloud march, no sun disk, no full atmospheric multiple scattering. Raster clouds may still use their plane fallback rather than voxel clouds; matching the cloud renderer selection is outstanding. No screenshot/GPU timing comparison has been captured. CPU PDF tests establish proposal correctness, not environment visual calibration.
+
+Alpha.4 builds the environment row CDF and row reduction with an ordinary CUDA kernel, outside the OptiX compiler graph. The radiance map, weighting and sampling algorithms are unchanged.

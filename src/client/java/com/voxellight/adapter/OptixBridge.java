@@ -20,9 +20,25 @@ final class OptixBridge {
         }
         return resource("pathtrace.ptx");
     }
-    static long createRt(byte[] uuid) throws IOException {
-        load();boolean ir=System.getProperty("voxellight.rt.module","ptx").equals("ir");
-        return com.voxellight.rt.RtModuleStartup.start(ir,()->uncheckedResource("rt_program.optixir"),()->uncheckedResource("rt_program.ptx"),code->com.voxellight.nvidia.OptixNative.create(uuid,code),failure->org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("OptiX-IR compilation failed; retrying strict-math PTX",failure));
+    static long createRt(byte[] uuid,boolean full) throws IOException {
+        load();
+        String profile=System.getenv().getOrDefault("VOXELLIGHT_RT_PROFILE","REALTIME_RELEASE");
+        if(!java.util.Set.of("REALTIME_RELEASE","REFERENCE_STRICT","DEVELOPMENT").contains(profile))throw new IOException("Unknown RT compilation profile: "+profile);
+        boolean fast=!full&&!profile.equals("REFERENCE_STRICT")&&System.getProperty("voxellight.rt.math","strict").equals("fast");
+        boolean ir=System.getProperty("voxellight.rt.module","ptx").equals("ir");
+        String cache=Path.of(System.getProperty("user.home"),".cache","voxellight","optix").toAbsolutePath().toString();
+        org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX compile profile={} full={} math={} format={} cache={}",full?"REFERENCE_STRICT":profile,full,fast?"fast":"strict",ir?"IR":"PTX",cache);
+        // Strict PTX stays the baseline until the user GPU numerical/visual A/B is accepted.
+        try{return createModules(uuid,full,fast,ir,cache);}
+        catch(IllegalStateException failure){
+            if(!ir||!failure.getMessage().contains("OptiX error 7251"))throw failure;
+            org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("OptiX-IR 7251; retrying the same math profile in PTX",failure);
+            try{return createModules(uuid,full,fast,false,cache);}catch(RuntimeException retry){retry.addSuppressed(failure);throw retry;}
+        }
+    }
+    private static long createModules(byte[] uuid,boolean full,boolean fast,boolean ir,String cache)throws IOException {
+        String suffix=(fast?"_fast":"")+(ir?".optixir":".ptx");
+        return com.voxellight.nvidia.OptixNative.create(uuid,new byte[][]{resource("rt_hit"+suffix),resource((full?"rt_reference":"rt_realtime")+suffix),full?new byte[0]:resource("rt_caustics"+suffix),resource("rt_utility.ptx")},full,cache);
     }
     private static byte[] uncheckedResource(String name){try{return resource(name);}catch(IOException failure){throw new java.io.UncheckedIOException(failure);}}
     private static byte[] resource(String name) throws IOException {

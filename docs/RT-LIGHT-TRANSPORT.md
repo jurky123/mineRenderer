@@ -4,7 +4,7 @@ The 0.36 RTX architecture remains: native single-raster primary visibility → e
 
 ## Ownership and integrator
 
-`bsdf.h` evaluates/samples BSDFs. `transport.cuh` implements light sampling and path transport. `caustics.cuh` implements bounded directional light tracing. `program.cu` owns OptiX programs and dispatches signals. This separation replaces the previous material branch chain in `incoming()`.
+`bsdf.h` evaluates/samples BSDFs. `transport.cuh` implements light sampling and path transport. `caustics.cuh` implements bounded directional light tracing. Alpha.4 splits OptiX hit, realtime signal, full reference and photon compilation ownership, with non-tracing work in CUDA; see [compilation architecture](OPTIX-COMPILATION-0.38.md). `program.cu` retains realtime signal dispatch. This separation replaces the previous material branch chain in `incoming()`.
 
 The path tracks throughput, radiance, depth, previous BSDF PDF/delta flag, eta scale and an eight-entry identity-aware medium stack. Every secondary/tertiary hit loads its full textured Material 3. The next ray carries **f × |cos| / PDF**, not just albedo. Russian roulette starts after two bounces and compensates surviving throughput. Linear RGB is used throughout.
 

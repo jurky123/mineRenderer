@@ -1,5 +1,9 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.38.0-alpha.4 — OptiX Compilation Architecture (acceptance candidate)
+
+Split hit/realtime/full-reference/caustic compiler ownership; full reference compiles lazily in an isolated background context while realtime continues. Non-tracing CDF/reduction/clear/resolve work moves to CUDA. Added per-task keys/timestamps/durations/threads, module/group/link timings, stable SDK disk-cache readback, 120 s realtime / 600 s reference creation watchdogs with cooperative cancellation and joined task lifetimes. Build strict/fast PTX/IR A/B artifacts; retain strict PTX baseline pending GPU numeric/visual checks. Windows/Linux native and Java builds pass; RTX 4060 / 591.74 cold/warm startup, cache and watchdog acceptance remain pending. Synchronous pipeline-link cancellation is unavailable in the current SDK. No P1–P7 quality work. See [architecture/gates](OPTIX-COMPILATION-0.38.md).
+
 ## 0.38.0-alpha.3 — OptiX startup compatibility
 
 Alpha 2 failed OptiX-IR compilation on the user's NVIDIA 591.74 driver (error 7251), retaining raster fallback. Strict-math PTX is now the default; IR remains opt-in with a logged single PTX retry on compilation error 7251. Device errors do not retry. Native compiler callbacks retain errors/warnings, and compiler buffers grow from 8 KiB to heap-backed 1 MiB; module creation/program-group/link errors include diagnostics. Debug level is explicitly NONE for release modules. Default optimization remains optimized, not O0. GPU recovery is pending user verification.

@@ -1,81 +1,8 @@
-#include <optix.h>
-#include <optix_device.h>
-#include "contract.h"
-#include "surface.h"
-extern "C" __constant__ RtParams params;
-static __forceinline__ __device__ float3 v(float x,float y,float z){return make_float3(x,y,z);}
-static __forceinline__ __device__ float3 add(float3 a,float3 b){return v(a.x+b.x,a.y+b.y,a.z+b.z);}
-static __forceinline__ __device__ float3 mul(float3 a,float b){return v(a.x*b,a.y*b,a.z*b);}
-static __forceinline__ __device__ float3 prod(float3 a,float3 b){return v(a.x*b.x,a.y*b.y,a.z*b.z);}
-static __forceinline__ __device__ float dot3(float3 a,float3 b){return a.x*b.x+a.y*b.y+a.z*b.z;}
-static __forceinline__ __device__ float3 norm(float3 a){return mul(a,rsqrtf(fmaxf(dot3(a,a),1.e-15f)));}
-static __forceinline__ __device__ float3 cross3(float3 a,float3 b){return v(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x);}
-static __forceinline__ __device__ float linear(float x){return x<=.04045f?x/12.92f:powf((x+.055f)/1.055f,2.4f);}
-static __forceinline__ __device__ float3 rgb(unsigned c){return v(linear((c&255)/255.f),linear(((c>>8)&255)/255.f),linear(((c>>16)&255)/255.f));}
-static __forceinline__ __device__ float random(unsigned& state){state=state*1664525u+1013904223u;return (state>>8)*0x1p-24f;}
-static __forceinline__ __device__ RtPayload* payload(){return reinterpret_cast<RtPayload*>((static_cast<unsigned long long>(optixGetPayload_1())<<32)|optixGetPayload_0());}
-static __forceinline__ __device__ void countOperation(int kind){unsigned i=params.launchOffset+optixGetLaunchIndex().x;if(params.counters&&i<(unsigned)(params.width*params.height))atomicAdd(params.counters+i*9+kind,1u);}
-static __forceinline__ __device__ RtPayload trace(float3 o,float3 d,float maximum=512.f){
- countOperation(0);RtPayload p={};unsigned long long address=reinterpret_cast<unsigned long long>(&p);unsigned low=(unsigned)address,high=(unsigned)(address>>32);
- optixTrace(params.scene,o,d,0.f,maximum,0,255,OPTIX_RAY_FLAG_NONE,0,1,0,low,high);return p;
-}
-static __forceinline__ __device__ float3 spawn(const RtPayload& hit,float3 direction){auto p=rt::offsetRayOrigin(rt::V(hit.p.x,hit.p.y,hit.p.z),rt::V(hit.geometryNormal.x,hit.geometryNormal.y,hit.geometryNormal.z),rt::V(direction.x,direction.y,direction.z));return v(p.x,p.y,p.z);}
-static __forceinline__ __device__ unsigned sample(unsigned* map,int w,int h,float2 uv){int x=max(0,min(w-1,(int)(uv.x*w))),y=max(0,min(h-1,(int)(uv.y*h)));return map[y*w+x];}
-static __forceinline__ __device__ unsigned hitTexture(const RtHitData* data,float2 uv){if(data->textureSlot<0)return sample(params.atlas,params.atlasWidth,params.atlasHeight,uv);int slot=data->textureSlot,x=(slot&7)*256+max(0,min(255,(int)(uv.x*256))),y=(slot>>3)*256+max(0,min(255,(int)(uv.y*256)));return params.entityAtlas[y*2048+x];}
-static __forceinline__ __device__ float3 cosine(float3 n,unsigned& seed){float r=sqrtf(random(seed)),a=6.283185307f*random(seed);float3 t=norm(cross3(fabsf(n.y)<.9f?v(0,1,0):v(1,0,0),n)),b=cross3(n,t);return norm(add(add(mul(t,r*cosf(a)),mul(b,r*sinf(a))),mul(n,sqrtf(fmaxf(0,1-r*r)))));}
-static __forceinline__ __device__ float hash2(float x,float y){x=x-floorf(x/128)*128;y=y-floorf(y/128)*128;float t=sinf(x*127.1f+y*311.7f)*43758.5453f;return t-floorf(t);}
-static __forceinline__ __device__ float noise2(float x,float y){float ix=floorf(x),iy=floorf(y),fx=x-ix,fy=y-iy;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);float a=hash2(ix,iy)*(1-fx)+hash2(ix+1,iy)*fx,b=hash2(ix,iy+1)*(1-fx)+hash2(ix+1,iy+1)*fx;return a*(1-fy)+b*fy;}
-static __forceinline__ __device__ float3 waterNormal(float3 normal,float3 p){if(fabsf(normal.y)<.8f)return normal;float x=fmodf(p.x,16384.f),z=fmodf(p.z,16384.f),sx=0,sz=0;const float kx[3]={1.7f,.64f,-3.14f},kz[3]={.51f,2.38f,1.07f},weights[3]={.45f,.32f,.23f};
- for(int i=0;i<3;i++){float len=sqrtf(kx[i]*kx[i]+kz[i]*kz[i]),angle=x*kx[i]+z*kz[i]-sqrtf(9.81f*len)*params.time+i*1.73f,amplitude=cosf(angle)*weights[i]/len;sx+=kx[i]*amplitude;sz+=kz[i]*amplitude;}
- float qx=x*6.7f+params.time*.31f,qz=z*6.7f-params.time*.19f,e=.13f;sx+=.28f*(noise2(qx+e,qz)-noise2(qx-e,qz))/(2*e);sz+=.28f*(noise2(qx,qz+e)-noise2(qx,qz-e))/(2*e);float rx=x*1.3f,rz=z*1.3f,cx=floorf(rx),cz=floorf(rz),lx=rx-cx-.5f,lz=rz-cz-.5f,radius=sqrtf(lx*lx+lz*lz),phase=params.cloudWind*4+hash2(cx,cz);phase-=floorf(phase);float ring=radius-phase*.65f,amplitude=expf(-ring*ring*220)*(1-phase)*.045f*params.rain*params.rainRipples;
- float distance=sqrtf(dot3(add(p,mul(params.camera,-1)),add(p,mul(params.camera,-1)))),microFade=fmaxf(0,1-distance/96);
- sx=sx*params.waveStrength+(radius>.001f?lx/radius*amplitude:0)*microFade;sz=sz*params.waveStrength+(radius>.001f?lz/radius*amplitude:0)*microFade;return norm(add(normal,v(sx,0,sz)));
-}
-static __forceinline__ __device__ float smooth(float a,float b,float x){float t=fminf(1,fmaxf(0,(x-a)/(b-a)));return t*t*(3-2*t);}
-static __forceinline__ __device__ float cloudDensity(float3 world){float x=fmodf(world.x,16384.f)+params.cloudWind,z=fmodf(world.z,16384.f)+params.cloudWind*.5f,altitude=world.y-params.cloudAltitude;if(altitude<0||altitude>32)return 0;float shape=0;
- for(int y=0;y<2;y++)for(int k=0;k<2;k++){float cx=floorf(x/8+(k==0?-.12f:.12f)),cz=floorf(z/8+(y==0?-.12f:.12f));float noise=noise2(cx*.09f,cz*.09f),occupied=noise>=.48f-params.rain*.14f?1:0,height=4*(3+floorf(noise*5));float face=fmaxf(fmaxf(fabsf(x-(cx+.5f)*8)-4,fabsf(z-(cz+.5f)*8)-4),altitude-height);shape=fmaxf(shape,occupied*(1-smooth(-.7f,.8f,face)));}
- shape*=smooth(0,3,altitude)*(1-smooth(25,32,altitude));float detail=noise2(x*.47f+world.y*.31f,z*.47f-world.y*.17f);return fmaxf(0,shape*(.65f+.35f*noise2(floorf(x/8)*.31f+floorf(world.y/4),floorf(z/8)*.31f+floorf(world.y/4)))-(1-detail)*.27f);
-}
-static __forceinline__ __device__ float cloudVisibility(float3 p){if(params.cloudShadows<.5f||params.sun.y<.08f||p.y>=params.cloudAltitude)return 1;float t=(params.cloudAltitude-p.y)/params.sun.y;float3 projected=add(p,mul(params.sun,t));float density=0;for(int i=0;i<4;i++)density+=cloudDensity(v(projected.x,params.cloudAltitude+4+i*8,projected.z));return expf(-density*(.4f+.25f*params.rain));}
-static __forceinline__ __device__ float3 causticIrradiance(float3 p,float3 n);
+// Realtime signals, raster-primary comparison and world probes. Full camera reference is a separate module.
+#include "device.cuh"
+#include "caustic_lookup.cuh"
 #include "transport.cuh"
-#include "caustics.cuh"
-static __forceinline__ __device__ float3 visibility(float3 o,float3 d){return mul(lightVisibility(o,d,512),cloudVisibility(o));}
-extern "C" __global__ void __miss__radiance(){payload()->hit=0;}
-extern "C" __global__ void __anyhit__surface(){
- const auto* data=reinterpret_cast<const RtHitData*>(optixGetSbtDataPointer());int i=optixGetPrimitiveIndex()*3;float2 b=optixGetTriangleBarycentrics();const auto& a=data->vertices[i];const auto& c=data->vertices[i+1];const auto& d=data->vertices[i+2];
- if(a.flags&1){float2 uv=make_float2(a.uv.x*(1-b.x-b.y)+c.uv.x*b.x+d.uv.x*b.y,a.uv.y*(1-b.x-b.y)+c.uv.y*b.x+d.uv.y*b.y);if(data->textureSlot<0&&((sample(params.ids,params.idsWidth,params.idsHeight,uv)>>24)&3)>0)return;if(!rt::cutoutVisible(hitTexture(data,uv)>>24,a.tint>>24,a.flags))optixIgnoreIntersection();}
-}
-extern "C" __global__ void __closesthit__surface(){
- countOperation(6);auto* p=payload();p->hit=1;p->distance=optixGetRayTmax();p->p=add(optixGetWorldRayOrigin(),mul(optixGetWorldRayDirection(),p->distance));
- const auto* data=reinterpret_cast<const RtHitData*>(optixGetSbtDataPointer());int i=optixGetPrimitiveIndex()*3;float2 b=optixGetTriangleBarycentrics();auto a=data->vertices[i],c=data->vertices[i+1],d=data->vertices[i+2];float w=1-b.x-b.y;
- p->n=norm(optixTransformNormalFromObjectToWorldSpace(add(add(mul(a.n,w),mul(c.n,b.x)),mul(d.n,b.y))));float2 uv=make_float2(a.uv.x*w+c.uv.x*b.x+d.uv.x*b.y,a.uv.y*w+c.uv.y*b.x+d.uv.y*b.y);
- unsigned tex=hitTexture(data,uv),id=data->textureSlot<0?sample(params.ids,params.idsWidth,params.idsHeight,uv):0,profile=data->textureSlot<0?params.lut[id&65535]:0xff200a33;
- if(dot3(p->n,p->n)<.1f)p->n=norm(optixTransformNormalFromObjectToWorldSpace(cross3(add(c.p,mul(a.p,-1)),add(d.p,mul(a.p,-1)))));
- p->geometryNormal=norm(optixTransformNormalFromObjectToWorldSpace(cross3(add(c.p,mul(a.p,-1)),add(d.p,mul(a.p,-1)))));
- if(dot3(p->n,p->geometryNormal)<0)p->n=mul(p->n,-1);
- rt::Frame baseFrame(rv(p->n));p->tangent=cv(baseFrame.t);p->bitangent=cv(baseFrame.b);
- unsigned packedNormal=data->textureSlot<0?sample(params.normalMap,params.idsWidth,params.idsHeight,uv):0xff008080;
- float nx=(packedNormal&255)/127.5f-1,ny=((packedNormal>>8)&255)/127.5f-1;
- float3 e1=add(c.p,mul(a.p,-1)),e2=add(d.p,mul(a.p,-1));float ux=c.uv.x-a.uv.x,uy=c.uv.y-a.uv.y,vx=d.uv.x-a.uv.x,vy=d.uv.y-a.uv.y,det=ux*vy-uy*vx;
- if(fabsf(det)>1.e-10f){float3 tangent=optixTransformVectorFromObjectToWorldSpace(mul(add(mul(e1,vy),mul(e2,-uy)),1/det));tangent=norm(add(tangent,mul(p->n,-dot3(tangent,p->n))));float3 bitangent=optixTransformVectorFromObjectToWorldSpace(mul(add(mul(e2,ux),mul(e1,-vx)),1/det));bitangent=norm(add(bitangent,mul(p->n,-dot3(bitangent,p->n))));p->tangent=tangent;p->bitangent=bitangent;p->n=norm(add(add(mul(tangent,nx),mul(bitangent,ny)),mul(p->n,sqrtf(fmaxf(0,1-nx*nx-ny*ny)))));}
- if(dot3(p->n,p->geometryNormal)<=0)p->n=p->geometryNormal;
- p->color=prod(rgb(tex),rgb(a.tint));p->roughness=1-(profile&255)/255.f;p->f0=((profile>>8)&255)/255.f;p->metal=(profile>>8)&255;p->flags=a.flags;
- unsigned type=(id>>24)&3;if(type==2)p->n=waterNormal(p->n,p->p);p->transmission=type?1:0;p->ior=type==2?1.333f:1.5f;p->absorption=type==2?v(.16f,.06f,.035f):v(-logf(fmaxf(.05f,p->color.x))*.7f,-logf(fmaxf(.05f,p->color.y))*.7f,-logf(fmaxf(.05f,p->color.z))*.7f);
- p->emission=mul(p->color,(((id>>24)&4)?((id>>16)&255)/254.f:(a.flags>>16)/15.f)*2.4f);
- p->objectId=optixGetInstanceId();p->primitiveId=optixGetPrimitiveIndex();p->bsdf=decodeMaterial(id,profile,p->color,p->flags);
- p->bsdf.emission=rv(p->emission);p->roughness=sqrtf(p->bsdf.microfacetAlpha);p->transmission=rt::dielectric(p->bsdf)?p->bsdf.transmission:0;p->ior=p->bsdf.ior;p->absorption=cv(p->bsdf.sigmaA);
- if(type==1&&rt::maxComponent(p->bsdf.sigmaA)==0)p->bsdf.sigmaA=rv(p->absorption=v(-logf(fmaxf(.001f,p->color.x))*.7f,-logf(fmaxf(.001f,p->color.y))*.7f,-logf(fmaxf(.001f,p->color.z))*.7f));
- if(p->flags&8&&rt::dielectric(p->bsdf))p->bsdf.type=rt::THIN_DIELECTRIC;
- // Medium identity excludes per-texel roughness IDs; textured entry/exit share their object/class/IOR volume.
- p->bsdf.mediumId=1+(p->objectId<<16)+(p->bsdf.type<<8)+(unsigned)roundf(p->ior*255/3);
- if(params.rain>0&&!rt::dielectric(p->bsdf)&&p->bsdf.type!=rt::DIFFUSE_TRANSMISSION){auto& m=p->bsdf;float skyAccess=((a.flags>>8)&15)/15.f;float wet=params.rain*skyAccess*smooth(.2f,.9f,p->geometryNormal.y);m.coatWeight=fmaxf(m.coatWeight,wet*(1-m.porosity)*.6f);if(wet>0){m.coatIOR=1.333f;m.coatAlpha=.025f;}m.baseColor=m.baseColor*(1-wet*m.porosity*.18f);if(m.coatWeight>0)m.type=rt::metal(m)?rt::COATED_CONDUCTOR:rt::COATED_DIFFUSE;}
-
-
-}
-// Isolated A/B geometry kernel. The application world continues to use exact compiled triangles.
-extern "C" __global__ void __intersection__cube(){auto data=reinterpret_cast<const RtHitData*>(optixGetSbtDataPointer());auto cube=reinterpret_cast<RtCube*>(data->vertices)[optixGetPrimitiveIndex()];float3 o=optixGetObjectRayOrigin(),d=optixGetObjectRayDirection();float3 lo=v((cube.minimum.x-o.x)/d.x,(cube.minimum.y-o.y)/d.y,(cube.minimum.z-o.z)/d.z),hi=v((cube.maximum.x-o.x)/d.x,(cube.maximum.y-o.y)/d.y,(cube.maximum.z-o.z)/d.z);float near=fmaxf(fmaxf(fminf(lo.x,hi.x),fminf(lo.y,hi.y)),fminf(lo.z,hi.z)),far=fminf(fminf(fmaxf(lo.x,hi.x),fmaxf(lo.y,hi.y)),fmaxf(lo.z,hi.z));if(near<=far){float t=near>=optixGetRayTmin()?near:far;if(t>=optixGetRayTmin()&&t<=optixGetRayTmax())optixReportIntersection(t,0);}}
-extern "C" __global__ void __closesthit__cube(){auto p=payload();p->hit=1;p->distance=optixGetRayTmax();}
+static __device__ float3 visibility(float3 o,float3 d){return mul(lightVisibility(o,d,512),cloudVisibility(o));}
 // Probe coordinates are world anchored. Turning the camera never changes tags or admission.
 static __forceinline__ __device__ float3 probeLight(float3 p,float3 n){
  for(int cascade=0;cascade<3;cascade++){float spacing=4.f*(1<<cascade);int cx=(int)floorf(p.x/spacing),cy=(int)floorf(p.y/spacing),cz=(int)floorf(p.z/spacing);float3 total=v(0,0,0);float weights=0;
@@ -88,16 +15,7 @@ static __forceinline__ __device__ float3 probeLight(float3 p,float3 n){
 }
 extern "C" __global__ void __raygen__lighting(){
  unsigned i=params.launchOffset+optixGetLaunchIndex().x,seed=i*9781u+params.frame*6271u+1;
- if(params.mode==13){int row=i;if(row>=rt::EnvironmentHeight)return;float total=0;for(int x=0;x<rt::EnvironmentWidth;x++){auto c=params.environmentMap[row*rt::EnvironmentWidth+x];total+=fmaxf(0,c.x*.2126f+c.y*.7152f+c.z*.0722f)*rt::environmentSolidAngle(row);params.environmentCdf[row*rt::EnvironmentWidth+x]=total;}return;}
- if(params.mode==14){if(i)return;float total=0;for(int y=0;y<rt::EnvironmentHeight;y++){total+=params.environmentCdf[y*rt::EnvironmentWidth+rt::EnvironmentWidth-1];params.environmentCdf[rt::EnvironmentWidth*rt::EnvironmentHeight+y]=total;}return;}
- if(params.mode==12){if(i<(unsigned)(params.width*params.height))for(int kind=0;kind<9;kind++)atomicAdd(params.counterTotals+kind,params.counters[i*9+kind]);return;}
- if(params.mode==10){float cell=.25f;int cx=(int)floorf(params.camera.x/cell)-32,cz=(int)floorf(params.camera.z/cell)-32,x=cx+(i&63),z=cz+((i>>6)&63),slot=(x&63)|((z&63)<<6);auto record=params.caustics+slot*2;record[0]=make_float4(x*cell,0,z*cell,0);record[1]=make_float4(0,0,0,0);return;}
- if(params.mode==8){causticPhoton(i,seed);return;}
- if(params.mode==11){auto a=params.caustics+i*2,b=params.causticHistory+i*2;bool same=a[0].w>0&&b[0].w>0&&fabsf(a[0].x-b[0].x)+fabsf(a[0].z-b[0].z)<.01f&&fabsf(a[0].y-b[0].y)<.1f;if(same){a[1].x=.2f*a[1].x+.8f*b[1].x;a[1].y=.2f*a[1].y+.8f*b[1].y;a[1].z=.2f*a[1].z+.8f*b[1].z;}b[0]=a[0];b[1]=a[1];return;}
  if(params.mode==7){float3 origin=v(random(seed)*5,10,random(seed)*5),destination=v(random(seed)*5,0,random(seed)*5);auto h=trace(origin,norm(add(destination,mul(origin,-1))));params.diffuse[i]=make_float4(h.hit?h.distance:-1,0,0,0);return;}
- if(params.mode==2){auto a=params.probes+i*8;float margin=8.f*(1<<(i/512));float3 p=v(a[0].x,a[0].y,a[0].z);
-  if(p.x>=params.invalidateMin.x-margin&&p.x<=params.invalidateMax.x+margin&&p.y>=params.invalidateMin.y-margin&&p.y<=params.invalidateMax.y+margin&&p.z>=params.invalidateMin.z-margin&&p.z<=params.invalidateMax.z+margin){a[0].w=0;a[7].w+=1;}return;
- }
  if(params.mode==1){int cascade=i/512;float spacing=4.f*(1<<cascade);int cx=(int)floorf(params.camera.x/spacing)-4,cy=(int)floorf(params.camera.y/spacing)-4,cz=(int)floorf(params.camera.z/spacing)-4;
   int gx=cx+(i&7),gy=cy+((i>>3)&7),gz=cz+((i>>6)&7);int slot=cascade*512+((gx&7)|((gy&7)<<3)|((gz&7)<<6));float3 p=v(gx*spacing,gy*spacing,gz*spacing);auto a=params.probes+slot*8;
   bool same=a[0].w>0&&fabsf(a[0].x-p.x)+fabsf(a[0].y-p.y)+fabsf(a[0].z-p.z)<.1f;
@@ -110,19 +28,9 @@ extern "C" __global__ void __raygen__lighting(){
   }float alpha=same?.15f:1;a[0]=make_float4(p.x,p.y,p.z,1);for(int k=0;k<4;k++){float3 old=v(a[k+1].x,a[k+1].y,a[k+1].z),value=add(mul(old,1-alpha),mul(sh[k],alpha));a[k+1]=make_float4(value.x,value.y,value.z,0);}a[5]=make_float4(mean,second,params.frame,same?a[5].w+1:1);a[7]=make_float4(luminance,luminanceSecond,fmaxf(0,luminanceSecond-luminance*luminance),same?a[7].w:a[7].w+1);return;
  }
  int count=params.width*params.height;if(i>=count)return;
- if(params.options&(1u<<25)){
-  if(params.mode!=0)return;
-  float x=2*((i%params.width+random(seed))/params.width)-1,y=2*((i/params.width+random(seed))/params.height)-1;
-  auto m=params.inverseCamera;float z=.00001f,w=m[3]*x+m[7]*y+m[11]*z+m[15];
-  float3 ray=norm(v((m[0]*x+m[4]*y+m[8]*z+m[12])/w,(m[1]*x+m[5]*y+m[9]*z+m[13])/w,(m[2]*x+m[6]*y+m[10]*z+m[14])/w));
-  float3 result=incoming(params.camera,ray,seed,12,false);int slot=i;
-  auto old=params.referenceSamples?params.referenceSum[slot]:make_float4(0,0,0,0);
-  float weight=params.referenceSamples+1;float3 sum=add(v(old.x,old.y,old.z),result);
-  params.referenceSum[slot]=make_float4(sum.x,sum.y,sum.z,weight);result=mul(sum,1/weight);
-  params.diffuse[i]=make_float4(result.x,result.y,result.z,1);params.specular[i]=params.transmission[i]=make_float4(0,0,0,0);return;
- }
 
- if(params.mode==4){params.previousKey[i]=params.surfaceKey[i];params.previousSignal[i]=make_float4(params.specular[i].w,params.transmission[i].w,params.material[i].x,params.material[i].z);float4 p=params.position[i];params.previousPosition[i]=make_float4(p.x+params.camera.x,p.y+params.camera.y,p.z+params.camera.z,p.w);params.previousNormal[i]=params.normal[i];return;}float4 pp=params.position[i],nn=params.normal[i],aa=params.albedo[i],mm=params.material[i];
+
+ float4 pp=params.position[i],nn=params.normal[i],aa=params.albedo[i],mm=params.material[i];
  if(params.mode==0){params.surfaceKey[i]=make_float4(-1,-1,0,0);params.sunVisibility[i]=make_float4(1,1,1,0);params.flow[i*2]=params.flow[i*2+1]=0;params.flowTrust[i]=0;params.diffuse[i]=params.specular[i]=params.transmission[i]=make_float4(0,0,0,0);}if(pp.w<.5f)return;float3 p=add(v(pp.x,pp.y,pp.z),params.camera),n=norm(v(nn.x,nn.y,nn.z)),view=norm(v(-pp.x,-pp.y,-pp.z));float3 color=v(aa.x,aa.y,aa.z);
  float3 sunT=v(1,1,1);bool dielectric=false;
  if(params.mode==0){float radial=sqrtf(pp.x*pp.x+pp.y*pp.y+pp.z*pp.z);auto primary=trace(params.camera,norm(v(pp.x,pp.y,pp.z)),radial+.1f);bool coverage=primary.hit&&(primary.transmission>0||fabsf(primary.distance-radial)<.12f+.003f*radial);

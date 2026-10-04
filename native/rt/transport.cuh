@@ -1,21 +1,4 @@
- #include "environment.h"
-// Material lookup, sampling and path transport deliberately have separate responsibilities.
-static __forceinline__ __device__ rt::Vec rv(float3 a){return rt::V(a.x,a.y,a.z);}
-static __forceinline__ __device__ float3 cv(rt::Vec a){return v(a.x,a.y,a.z);}
-static __forceinline__ __device__ rt::Material decodeMaterial(unsigned id,unsigned packed,float3 color,unsigned flags){
- rt::Material m;m.multipleScattering=(params.options&256)!=0;unsigned index=id&65535;
- m.baseColor=rv(color);float perceptualRoughness=1-(packed&255)/255.f;m.microfacetAlpha=perceptualRoughness*perceptualRoughness;m.alphaV=m.microfacetAlpha;
- unsigned green=(packed>>8)&255,blue=(packed>>16)&255;m.f0=green<230?green/255.f:.04f;m.porosity=blue<=64?blue/64.f:0;m.sss=blue>=65?(blue-65)/190.f:0;
- unsigned a=params.lut[index+65536],b=params.lut[index+2*65536],c=params.lut[index+3*65536],d=params.lut[index+4*65536];
- m.type=a&255;m.ior=fmaxf(1,((a>>8)&255)*3/255.f);m.coatWeight=((a>>16)&255)/255.f;m.coatAlpha=((a>>24)&255)/255.f;m.coatIOR=fmaxf(1,(d&255)*3/255.f);m.alphaV=fmaxf(.0005f,((d>>8)&255)/255.f);
- m.sigmaA=rt::V((b&255)*8/255.f,((b>>8)&255)*8/255.f,((b>>16)&255)*8/255.f);m.phaseG=((b>>24)&255)*1.8f/255.f-.9f;
- m.sigmaS=rt::V((c&255)/255.f,((c>>8)&255)/255.f,((c>>16)&255)/255.f);m.transmission=((c>>24)&255)/255.f;
- if(green>=230)rt::setConductor(m,green<=237?green:255);
- if(flags&16){m.type=rt::ROUGH_DIFFUSE;m.coatWeight=0;m.f0=.04f;m.ior=1.5f;m.transmission=0;m.alphaV=m.microfacetAlpha;}
- if(m.sss>0&&!rt::metal(m)&&!rt::dielectric(m)){m.type=rt::DIFFUSE_TRANSMISSION;m.coatWeight=0;m.transmission=m.sss*.5f;}
-
- m.materialId=index;m.mediumId=index+1;return m;
-}
+#include "material.cuh"
 struct LightSample {float3 wi,radiance;float distance,pdf;int kind;};
 static __forceinline__ __device__ float3 environment(float3 d){if((params.options&128)&&params.environmentMap){auto pixel=params.environmentMap[rt::environmentCell(rv(d))];return v(pixel.x,pixel.y,pixel.z);}return mul(params.sky,.4f+.6f*fmaxf(0,d.y));}
 static __forceinline__ __device__ float lightProbability(int kind){float sun=fmaxf(0,dot3(params.sunColor,v(.2126f,.7152f,.0722f))),env=fmaxf(.001f,((params.options&128)&&params.environmentCdf?params.environmentCdf[rt::EnvironmentWidth*rt::EnvironmentHeight+rt::EnvironmentHeight-1]:dot3(params.sky,v(.2126f,.7152f,.0722f))*6.28f)),area=fmaxf(0,params.lightPower);float point=params.pointPosition.w>0?dot3(v(params.pointIntensity.x,params.pointIntensity.y,params.pointIntensity.z),v(.2126f,.7152f,.0722f))*4*rt::Pi:0;float total=sun+env+area+point;return (kind==0?sun:kind==1?env:kind==2?area:point)/total;}
@@ -56,7 +39,8 @@ static __noinline__ __device__ float3 incoming(float3 o,float3 d,unsigned& seed,
   bool entering=h.hit&&dot3(h.geometryNormal,path.direction)<0;
   if(h.hit&&!entering&&rt::dielectric(h.bsdf)&&h.bsdf.type!=rt::THIN_DIELECTRIC&&path.media.count==0)path.media.enter({h.bsdf.sigmaA,h.bsdf.sigmaS,h.bsdf.phaseG,h.ior,h.bsdf.mediumId});
   if(path.media.count){auto medium=path.media.entries[path.media.count-1];rt::Vec extinction=medium.sigmaA+medium.sigmaS;float3 segmentT=cv(rt::expNeg(extinction,distance));
-   if(params.options&(1u<<25)){
+   #ifdef RT_FULL_REFERENCE
+   {
     // RGB mixture free flight: reference follows actual multiple medium events.
     int channel=(int)(random(seed)*3);float rate=channel==0?extinction.x:channel==1?extinction.y:extinction.z;
     float eventDistance=rate>0?-logf(fmaxf(1e-8f,1-random(seed)))/rate:1e30f;
@@ -68,11 +52,14 @@ static __noinline__ __device__ float3 incoming(float3 o,float3 d,unsigned& seed,
      if(bounce>=2){float survival=fminf(.95f,fmaxf(.05f,rt::maxComponent(rv(path.throughput))));if(random(seed)>survival)break;path.throughput=mul(path.throughput,1/survival);}continue;
     }
     float survivalPdf=(segmentT.x+segmentT.y+segmentT.z)/3;path.throughput=prod(path.throughput,mul(segmentT,1/fmaxf(1e-12f,survivalPdf)));
-   }else{
+   }
+   #else
+   {
    // Truncated free-flight proposal: RGB attenuation / proposal PDF keeps this unbiased.
    if(rt::maxComponent(medium.sigmaS)>0){countOperation(3);auto mediumSample=rt::sampleMediumDistance(extinction,distance,seed);float t=mediumSample.distance;float3 p=add(path.origin,mul(path.direction,t));auto light=sampleOneLight(p,seed);if(light.pdf>0){float3 vis=lightVisibility(p,light.wi,light.distance,path.media);float phase=rt::hg(dot3(path.direction,light.wi),medium.g);float3 scatter=prod(cv(rt::expNeg(extinction,t)*medium.sigmaS*(phase/(light.pdf*mediumSample.pdf))),prod(light.radiance,vis));path.radiance=add(path.radiance,prod(path.throughput,scatter));}}
    path.throughput=prod(path.throughput,segmentT);
    }
+   #endif
   }
   if(!h.hit){float envPdf=lightProbability(1)*((params.options&128)?rt::environmentDensity(params.environmentCdf,rv(path.direction)):1/(4*rt::Pi)),w=path.previousWasDelta?1:rt::powerHeuristic(path.previousBsdfPdf,envPdf);path.radiance=add(path.radiance,prod(path.throughput,mul(environment(path.direction),w)));const float omega=6.793e-5f;if(!(bounce==0&&(indirectOnly||excludeFirstSun))&&dot3(path.direction,params.sun)>1-omega/(2*rt::Pi)){float pdf=lightProbability(0)/omega;path.radiance=add(path.radiance,prod(path.throughput,mul(params.sunColor,(path.previousWasDelta?1:rt::powerHeuristic(path.previousBsdfPdf,pdf))/omega)));}break;}
   if((!indirectOnly||bounce>0)&&!(bounce==0&&firstLobe==1)){float w=path.previousWasDelta?1:rt::powerHeuristic(path.previousBsdfPdf,emitterPdf(previous,h));path.radiance=add(path.radiance,prod(path.throughput,mul(h.emission,w)));}

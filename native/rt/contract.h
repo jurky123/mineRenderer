@@ -13,6 +13,7 @@ struct RtCube {float3 minimum,maximum;};
 struct RtHitData {RtVertex* vertices;int textureSlot;};
 struct RtAreaLight {RtVertex a,b,c;float area,cdf;unsigned identity;};
 struct RtParams {
+ unsigned utilityCount;
  OptixTraversableHandle scene;
  float4 *position,*normal,*albedo,*material,*diffuse,*specular,*transmission,*sunVisibility;
  unsigned *atlas,*ids,*lut,*normalMap,*entityAtlas;
