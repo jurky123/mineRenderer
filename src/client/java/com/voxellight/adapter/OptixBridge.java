@@ -20,7 +20,11 @@ final class OptixBridge {
         }
         return resource("pathtrace.ptx");
     }
-    static byte[] loadRt() throws IOException {load();String format=System.getProperty("voxellight.rt.module","ir");if(format.equals("ptx"))return resource("rt_program.ptx");try{return resource("rt_program.optixir");}catch(IOException absent){return resource("rt_program.ptx");}}
+    static long createRt(byte[] uuid) throws IOException {
+        load();boolean ir=System.getProperty("voxellight.rt.module","ptx").equals("ir");
+        return com.voxellight.rt.RtModuleStartup.start(ir,()->uncheckedResource("rt_program.optixir"),()->uncheckedResource("rt_program.ptx"),code->com.voxellight.nvidia.OptixNative.create(uuid,code),failure->org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("OptiX-IR compilation failed; retrying strict-math PTX",failure));
+    }
+    private static byte[] uncheckedResource(String name){try{return resource(name);}catch(IOException failure){throw new java.io.UncheckedIOException(failure);}}
     private static byte[] resource(String name) throws IOException {
         try(var input=OptixBridge.class.getResourceAsStream("/voxellight/native/"+name)) {
             if(input==null)throw new IOException("Native OptiX component missing; use the native-enabled client kit");return input.readAllBytes();

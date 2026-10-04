@@ -545,3 +545,5 @@ See [0.38 implementation ledger](RTX-QUALITY-0.38.md), [environment status](RT-E
 ### 0.38 alpha 2 checkpoint
 
 Shared environment importance sampling, full-primary asynchronous reference, GGX reflection energy compensation and medium free-flight are now implemented. Details and limitations are recorded in [0.38 ledger](RTX-QUALITY-0.38.md), [RT environment](RT-ENVIRONMENT.md) and [full reference](FULL-REFERENCE.md). Native modules include build-time OptiX-IR plus PTX; `-Dvoxellight.rt.module=ptx` selects the comparison, `VOXELLIGHT_RT_OPTIMIZATION=0|1|2` selects compilation optimization; default uses OptiX default optimization. Native startup/runtime GPU benchmarks remain pending.
+
+Alpha 3 defaults to strict-math PTX after an OptiX-IR compilation failure on driver 591.74. `-Dvoxellight.rt.module=ir` opts into IR comparison and automatically retries PTX once on error 7251. Failed retries retain both errors. Optimization remains OptiX default unless explicitly overridden.

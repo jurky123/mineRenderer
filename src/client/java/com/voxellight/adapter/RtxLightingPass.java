@@ -79,7 +79,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
     if(startup==null){
      byte[] uuid=deviceUuid(vk);startupStarted=System.nanoTime();startupLogged=startupStarted;
      org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX background initialization: {}x{} guides, reference={}; raster continues",w,h,reference);
-     startup=new com.voxellight.rt.AsyncResource<>(STARTUP,()->{try{return OptixNative.create(uuid,OptixBridge.loadRt());}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}},handle->STARTUP.execute(()->OptixNative.destroy(handle)));
+     startup=new com.voxellight.rt.AsyncResource<>(STARTUP,()->{try{return OptixBridge.createRt(uuid);}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}},handle->STARTUP.execute(()->OptixNative.destroy(handle)));
     }
     if(!startup.finished()){
      int progress;try{progress=OptixNative.initializationStage();}catch(UnsatisfiedLinkError loading){progress=0;}

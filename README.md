@@ -4,7 +4,7 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current development release: **VoxelLight 0.38.0-alpha.2 — shared environment and asynchronous full reference**. Adds a GPU HDR sky/cloud environment with importance sampling, OptiX primary-camera reference, nonblocking reference display, GGX reflection energy compensation, robust ray origins and water free-flight transport. The full 0.38 review remains **in progress**; GPU baseline and visual acceptance are pending. [Implementation ledger](docs/RTX-QUALITY-0.38.md), [environment](docs/RT-ENVIRONMENT.md), [full reference](docs/FULL-REFERENCE.md). Previous stable: 0.37.6.
+Current development release: **VoxelLight 0.38.0-alpha.3 — OptiX startup compatibility**. Adds a GPU HDR sky/cloud environment with importance sampling, OptiX primary-camera reference, nonblocking reference display, GGX reflection energy compensation, robust ray origins and water free-flight transport. The full 0.38 review remains **in progress**; GPU baseline and visual acceptance are pending. [Implementation ledger](docs/RTX-QUALITY-0.38.md), [environment](docs/RT-ENVIRONMENT.md), [full reference](docs/FULL-REFERENCE.md). Previous stable: 0.37.6.
 
 [Download the native 0.37.6 client kit](https://temp.sh/kffQf/voxellight-client-kit-26.2-0.37.6.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
 

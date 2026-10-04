@@ -46,3 +46,7 @@ Keep a copy of 0.37.6 and its native kit. Capture 2560×1440, the same world/coo
 | Extended debug and acceptance scenes | Pending beyond existing debug/status/A-B |
 
 Alpha acceptance focuses on iron/gold/copper under local emitters at night, with light positions unchanged, `rt_primary_glossy_nee` on/off and sufficient completed reference sweeps. CPU Monte Carlo tests check glossy environment MIS against independent quadrature, coated substrate semantics, VNDF PDFs and UV frame handedness. They cannot establish GPU lighting or edge quality.
+
+### User GPU startup result: alpha 2
+
+On RTX 4060 Laptop, driver 591.74, module startup failed with OptiX 7251 before interop/scene/trace. No alpha 2 RT frame was accepted. The old 8 KiB log truncated the decisive error. [NVIDIA reports a related IR regression in the 591 series](https://forums.developer.nvidia.com/t/optix-ir-seems-to-fail-for-me-with-vector-types-updated-with-reproduction/353662); a matching driver defect is an inference, not established from this log. Alpha 3 defaults to PTX and retains IR with explicit compilation fallback; strict math and default optimization remain. Native error callbacks and a heap-backed 1 MiB log preserve useful diagnostics if compilation still fails. GPU retest pending.

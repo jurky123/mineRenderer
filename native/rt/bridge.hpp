@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <mutex>
 // Included after the shared CUDA driver loader in bridge.cpp. No Vulkan loader or SDK redistribution.
 #include <map>
 #include <atomic>
@@ -76,27 +77,32 @@ struct RtContext {
   void* host;check(api.cuMemHostAlloc(&host,sizeof(RtParams),CU_MEMHOSTALLOC_PORTABLE));memcpy(host,&params,sizeof(params));check(api.cuMemcpyHtoDAsync(paramsGpu,host,sizeof(params),stream));CUevent event;check(api.cuEventCreate(&event,CU_EVENT_DISABLE_TIMING));check(api.cuEventRecord(event,stream));hostRetired.push_back({event,host});
  }
  void collect(){if(counterReady&&api.cuEventQuery(counterReady)==CUDA_SUCCESS){memcpy(operationStats.data(),counterHost,36);api.cuEventDestroy(counterReady);counterReady=nullptr;}collectBenchmark();for(auto i=timings.begin();i!=timings.end();){auto ready=api.cuEventQuery(i->end);if(ready==CUDA_SUCCESS){float ms;check(api.cuEventElapsedTime(&ms,i->begin,i->end));if(params.referenceSpp&&i->pass>=2&&i->pass<=4){if(i->pass==2)referenceMilliseconds=0;referenceMilliseconds+=ms;if(i->pass==4)referencePixels=rt::referenceBudget(referencePixels,(unsigned long long)(referenceMilliseconds*1000000));}measured.push_back(i->pass);measured.push_back((long long)(ms*1000000));api.cuEventDestroy(i->begin);api.cuEventDestroy(i->end);i=timings.erase(i);}else if(ready==CUDA_ERROR_NOT_READY)++i;else check(ready);}for(auto i=hostRetired.begin();i!=hostRetired.end();){auto ready=api.cuEventQuery(i->event);if(ready==CUDA_SUCCESS){api.cuMemFreeHost(i->pointer);api.cuEventDestroy(i->event);i=hostRetired.erase(i);}else if(ready==CUDA_ERROR_NOT_READY)++i;else check(ready);}for(auto i=retired.begin();i!=retired.end();){auto ready=api.cuEventQuery(i->event);if(ready==CUDA_SUCCESS){for(auto p:i->pointers)free(p);api.cuEventDestroy(i->event);i=retired.erase(i);}else if(ready==CUDA_ERROR_NOT_READY)++i;else check(ready);}}
+ std::mutex diagnosticMutex;std::string compilerDiagnostics;
+ static void compilerLog(unsigned level,const char* tag,const char* message,void* data){if(level>2)return;auto* self=static_cast<RtContext*>(data);std::lock_guard<std::mutex> guard(self->diagnosticMutex);std::string line=std::string(tag?tag:"")+": "+(message?message:"")+"\n";constexpr size_t limit=1024*1024;if(line.size()>limit)line=line.substr(line.size()-limit);if(self->compilerDiagnostics.size()+line.size()>limit)self->compilerDiagnostics.erase(0,self->compilerDiagnostics.size()+line.size()-limit);self->compilerDiagnostics+=line;}
+ std::string diagnostics(){std::lock_guard<std::mutex> guard(diagnosticMutex);return compilerDiagnostics;}
  void init(const unsigned char* uuid,const char* code,size_t codeSize){
   rtInitializationStage=1;check(d.cuInit(0));int count;check(d.cuDeviceGetCount(&count));for(int i=0;i<count;i++){CUdevice dev;CUuuid id;check(d.cuDeviceGet(&dev,i));check(d.cuDeviceGetUuid(&id,dev));if(!memcmp(uuid,id.bytes,16)){device=dev;break;}}
   if(device<0)throw std::runtime_error("RTX CUDA/Vulkan physical UUID mismatch");
-  check(d.cuDevicePrimaryCtxRetain(&cuda,device));check(d.cuCtxSetCurrent(cuda));check(d.cuStreamCreate(&stream,CU_STREAM_NON_BLOCKING));rtInitializationStage=2;check(optixInit());OptixDeviceContextOptions contextOptions{};check(optixDeviceContextCreate(cuda,&contextOptions,&optix));
+  check(d.cuDevicePrimaryCtxRetain(&cuda,device));check(d.cuCtxSetCurrent(cuda));check(d.cuStreamCreate(&stream,CU_STREAM_NON_BLOCKING));rtInitializationStage=2;check(optixInit());OptixDeviceContextOptions contextOptions{};contextOptions.logCallbackFunction=compilerLog;contextOptions.logCallbackData=this;contextOptions.logCallbackLevel=2;check(optixDeviceContextCreate(cuda,&contextOptions,&optix));
   OptixModuleCompileOptions mo{};const char* optimization=std::getenv("VOXELLIGHT_RT_OPTIMIZATION");mo.optLevel=optimization&&std::string(optimization)=="0"?OPTIX_COMPILE_OPTIMIZATION_LEVEL_0:optimization&&std::string(optimization)=="1"?OPTIX_COMPILE_OPTIMIZATION_LEVEL_1:optimization&&std::string(optimization)=="2"?OPTIX_COMPILE_OPTIMIZATION_LEVEL_2:OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
   OptixPipelineCompileOptions po{};po.usesMotionBlur=false;po.traversableGraphFlags=OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING|OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;po.numPayloadValues=2;po.numAttributeValues=2;po.pipelineLaunchParamsVariableName="params";po.usesPrimitiveTypeFlags=OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE|OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
-  char log[8192]{};size_t logSize=sizeof(log);rtInitializationStage=3;rtCompileFinished=0;rtCompileScheduled=0;
-  OptixTask first=nullptr;check(optixModuleCreateWithTasks(optix,&mo,&po,code,codeSize,log,&logSize,&module,&first));
+  mo.debugLevel=OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+  std::vector<char> log(1024*1024);size_t logSize=log.size();rtInitializationStage=3;rtCompileFinished=0;rtCompileScheduled=0;
+  auto compilationCheck=[&](OptixResult result,const char* stage){if(result!=OPTIX_SUCCESS)throw std::runtime_error(std::string(stage)+": OptiX error "+std::to_string((int)result)+"; "+diagnostics()+"; "+log.data());};
+  OptixTask first=nullptr;compilationCheck(optixModuleCreateWithTasks(optix,&mo,&po,code,codeSize,log.data(),&logSize,&module,&first),"RT module creation");
   rtCompileScheduled=first?1:0;
   unsigned workers=std::max(1u,std::min(4u,std::thread::hardware_concurrency()>2?std::thread::hardware_concurrency()-2:1u));
   try{rt::compileTasks(first,workers,[&](OptixTask task){
    check(d.cuCtxSetCurrent(cuda));OptixTask next[32]{};unsigned count=0;check(optixTaskExecute(task,next,32,&count));
    rtCompileScheduled+=count;rtCompileFinished++;return std::vector<OptixTask>(next,next+count);
-  });}catch(const std::exception& error){throw std::runtime_error(std::string("RT module tasks: ")+error.what()+"; "+log);}
-  OptixModuleCompileState compilation;check(optixModuleGetCompilationState(module,&compilation));if(compilation!=OPTIX_MODULE_COMPILE_STATE_COMPLETED)throw std::runtime_error(std::string("RT module incomplete: ")+log);
+  });}catch(const std::exception& error){throw std::runtime_error(std::string("RT module tasks: ")+error.what()+"; "+diagnostics()+"; "+log.data());}
+  OptixModuleCompileState compilation;check(optixModuleGetCompilationState(module,&compilation));if(compilation!=OPTIX_MODULE_COMPILE_STATE_COMPLETED)throw std::runtime_error(std::string("RT module incomplete: ")+diagnostics()+"; "+log.data());
   OptixProgramGroupDesc desc[4]{};desc[0].kind=OPTIX_PROGRAM_GROUP_KIND_RAYGEN;desc[0].raygen.module=module;desc[0].raygen.entryFunctionName="__raygen__lighting";
   desc[1].kind=OPTIX_PROGRAM_GROUP_KIND_MISS;desc[1].miss.module=module;desc[1].miss.entryFunctionName="__miss__radiance";
   desc[2].kind=OPTIX_PROGRAM_GROUP_KIND_HITGROUP;desc[2].hitgroup.moduleCH=module;desc[2].hitgroup.entryFunctionNameCH="__closesthit__surface";desc[2].hitgroup.moduleAH=module;desc[2].hitgroup.entryFunctionNameAH="__anyhit__surface";
   desc[3].kind=OPTIX_PROGRAM_GROUP_KIND_HITGROUP;desc[3].hitgroup.moduleIS=module;desc[3].hitgroup.entryFunctionNameIS="__intersection__cube";desc[3].hitgroup.moduleCH=module;desc[3].hitgroup.entryFunctionNameCH="__closesthit__cube";
-  rtInitializationStage=4;OptixProgramGroupOptions go{};logSize=sizeof(log);check(optixProgramGroupCreate(optix,desc,4,&go,log,&logSize,groups));
-  rtInitializationStage=5;OptixPipelineLinkOptions link{};link.maxTraceDepth=1;logSize=sizeof(log);check(optixPipelineCreate(optix,&po,&link,groups,4,log,&logSize,&pipeline));
+  rtInitializationStage=4;OptixProgramGroupOptions go{};logSize=log.size();compilationCheck(optixProgramGroupCreate(optix,desc,4,&go,log.data(),&logSize,groups),"RT program groups");
+  rtInitializationStage=5;OptixPipelineLinkOptions link{};link.maxTraceDepth=1;logSize=log.size();compilationCheck(optixPipelineCreate(optix,&po,&link,groups,4,log.data(),&logSize,&pipeline),"RT pipeline link");
   rtInitializationStage=6;OptixStackSizes sizes{};for(auto g:groups)check(optixUtilAccumulateStackSizes(g,&sizes,pipeline));unsigned fromTraversal,fromState,continuation;check(optixUtilComputeStackSizes(&sizes,1,0,0,&fromTraversal,&fromState,&continuation));check(optixPipelineSetStackSize(pipeline,fromTraversal,fromState,continuation,2));
   EmptyRecord record{};check(optixSbtRecordPackHeader(groups[0],&record));sbt.raygenRecord=alloc(sizeof(record));owned.push_back(sbt.raygenRecord);check(d.cuMemcpyHtoD(sbt.raygenRecord,&record,sizeof(record)));
   check(optixSbtRecordPackHeader(groups[1],&record));sbt.missRecordBase=alloc(sizeof(record));owned.push_back(sbt.missRecordBase);check(d.cuMemcpyHtoD(sbt.missRecordBase,&record,sizeof(record)));sbt.missRecordCount=1;sbt.missRecordStrideInBytes=sizeof(record);

@@ -1,5 +1,9 @@
 # VoxelLight current state
 
+## 0.38.0-alpha.3 — OptiX startup compatibility
+
+Alpha 2 failed OptiX-IR compilation on the user's NVIDIA 591.74 driver (error 7251), retaining raster fallback. Strict-math PTX is now the default; IR remains opt-in with a logged single PTX retry on compilation error 7251. Device errors do not retry. Native compiler callbacks retain errors/warnings, and compiler buffers grow from 8 KiB to heap-backed 1 MiB; module creation/program-group/link errors include diagnostics. Debug level is explicitly NONE for release modules. Default optimization remains optimized, not O0. GPU recovery is pending user verification.
+
 ## 0.38.0-alpha.2 — environment and asynchronous full reference
 
 Shared GPU HDR sky/cloud environment and exact solid-angle importance CDF; OptiX primary-camera progressive reference; nonblocking reference completion/display ownership; stale-camera rejection; coordinate-aware ray origins and shading hemisphere checks; matched GGX reflection multiple-scattering sampling; water free-flight and full-reference medium events; build-time OptiX-IR/PTX and optimization A/B. See [0.38 ledger](RTX-QUALITY-0.38.md), [environment](RT-ENVIRONMENT.md), [reference](FULL-REFERENCE.md). This is still a checkpoint: adaptive full-resolution RTX rays, canonical calibration, RT texture mips/animation, primary diffuse ownership, hierarchical lights, layered reference, caustic clipmaps and signal-guide improvements remain unfinished. NVIDIA acceptance has not been run on this host.
