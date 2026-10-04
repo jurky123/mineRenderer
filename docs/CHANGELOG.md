@@ -1,3 +1,10 @@
+# 0.37.5 — Parallel OptiX compilation / fast startup policy
+
+- Use OptiX module task creation/execution with up to four background workers and safe dependency/error/lifetime handling.
+- Use optimization level 0 to avoid the expensive optimizer pass; GPU execution may be slower and needs measurement.
+- Log completed/discovered compiler tasks and elapsed time every 15 seconds.
+- Native dependency/failure/empty-workload tests; keep asynchronous raster fallback and corrected RT texture transfers.
+
 # 0.37.4 — RT output copies and compiler expansion
 
 - Fix MC 26.2 buffer-to-texture source extents/mip/layer argument order for every RT guide/signal.

@@ -27,5 +27,5 @@ shutil.copy(next(d.glob('llvm-mingw-*/LICENSE.TXT')),licenseDir/'LLVM-runtime.tx
 shutil.copy(next((d/'cuda').glob('nvidia_cuda_runtime_cu12-*.dist-info/licenses/License.txt')),licenseDir/'NVIDIA-CUDA.txt')
 for name in ['optix_stubs.h','optix_function_table_definition.h']:
     text=(optix/name).read_text();(licenseDir/(name+'.txt')).write_text(text[:text.index('*/')+2]+'\n')
-sources=['native/optix/pathtrace.cu','native/optix/bridge.cpp','native/optix/include/jni_md.h','tools/build_optix.py','native/rt/bridge.hpp','native/rt/contract.h','native/rt/program.cu','native/rt/bsdf.h','native/rt/surface.h','native/rt/dispatch.h','native/rt/transport.cuh','native/rt/caustics.cuh']
+sources=['native/optix/pathtrace.cu','native/optix/bridge.cpp','native/optix/include/jni_md.h','tools/build_optix.py','native/rt/bridge.hpp','native/rt/contract.h','native/rt/program.cu','native/rt/bsdf.h','native/rt/surface.h','native/rt/dispatch.h','native/rt/task_pool.h','native/rt/transport.cuh','native/rt/caustics.cuh']
 (out/'build.json').write_text(json.dumps({'optix':'9.1.0','cuda':'12.9','sources':{name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in sources}},indent=2)+'\n')

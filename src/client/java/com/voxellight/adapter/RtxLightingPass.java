@@ -22,7 +22,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  static final RenderPipeline CAPTURE=capturePipeline(),COMPOSITE=compositePipeline(),ATLAS=atlasPipeline(),DIELECTRIC=dielectricPipeline();
  private static final java.util.concurrent.ExecutorService STARTUP=java.util.concurrent.Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"VoxelLight OptiX startup");thread.setDaemon(true);return thread;});
  private com.voxellight.rt.AsyncResource<Long> startup;
- private int startupStage=-1;private long startupStarted;
+ private int startupStage=-1;private long startupStarted,startupLogged;
  private long context,world=Long.MIN_VALUE,resources=Long.MIN_VALUE;
  private VulkanCudaInterop interop;
  private final RtTerrainWarmup warmup=new RtTerrainWarmup();
@@ -72,15 +72,16 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
     if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);recompile();}
     stage="OptiX background initialization";
     if(startup==null){
-     byte[] uuid=deviceUuid(vk);startupStarted=System.nanoTime();
+     byte[] uuid=deviceUuid(vk);startupStarted=System.nanoTime();startupLogged=startupStarted;
      org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX background initialization: {}x{} guides, reference={}; raster continues",w,h,reference);
      startup=new com.voxellight.rt.AsyncResource<>(STARTUP,()->{try{return OptixNative.create(uuid,OptixBridge.loadRt());}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}},handle->STARTUP.execute(()->OptixNative.destroy(handle)));
     }
     if(!startup.finished()){
      int progress;try{progress=OptixNative.initializationStage();}catch(UnsatisfiedLinkError loading){progress=0;}
      String[] stages={"loading native library","matching CUDA device","creating OptiX context","compiling OptiX transport module","creating OptiX program groups","linking OptiX pipeline","configuring OptiX stack","native context ready"};
-     state="initializing: "+stages[Math.max(0,Math.min(progress,stages.length-1))]+" ("+((System.nanoTime()-startupStarted)/1_000_000_000L)+"s); raster retained";
-     if(progress!=startupStage){startupStage=progress;org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX {}",state);}
+     long tasks=progress==3?OptixNative.initializationTasks():0;
+     state="initializing: "+stages[Math.max(0,Math.min(progress,stages.length-1))]+" ("+((System.nanoTime()-startupStarted)/1_000_000_000L)+"s)"+(progress==3?"; compiler tasks="+(tasks&0xffffffffL)+"/"+(tasks>>>32)+"; optimization=0":"")+"; raster retained";
+     if(progress!=startupStage||System.nanoTime()-startupLogged>15_000_000_000L){startupStage=progress;startupLogged=System.nanoTime();org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX {}",state);}
      return;
     }
     context=startup.take();startup=null;

@@ -1,6 +1,8 @@
 # VoxelLight current state
 
-Current release: **0.37.4 — RT output copies and compiler expansion**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+Current release: **0.37.5 — Parallel OptiX compiler tasks**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+
+0.37.4 still compiled for at least 3m51s in the supplied log. 0.37.5 uses task-based compilation on up to four workers, optimization level 0 and 15-second task/elapsed heartbeat logs. GPU execution may be slower; NVIDIA startup and runtime measurements are pending. See [compiler follow-up](REFERENCE-0.37.5.md).
 
 User confirmed 0.37.3 stays responsive, but compilation took ~37m28s and the first output transfer failed with invalid mip. 0.37.4 corrects every RT buffer/texture copy and limits heavy CUDA inlining/compiler optimization. See [follow-up](REFERENCE-0.37.4.md). New packaged transport PTX is 1168476 bytes (previous 4,077,162); driver-time improvement remains unmeasured.
 
@@ -12,7 +14,7 @@ User confirmed 0.37.3 stays responsive, but compilation took ~37m28s and the fir
 
 Implemented: Material 3 class/LUT and 1,269 Vanilla block texture presets, LabPBR 1.3 channel priority, exact RGB conductor Fresnel, matched GGX VNDF/eval/PDF, coating/wetness and thin foliage, full textured secondary BSDFs, power-CDF emissive/environment/sun/held-light NEE with MIS, rough/thin dielectric identity-aware media, shared participating-water single scattering, refracted-sun photon caustic cache, signal-specific edge rejection and conservative raster fallback, 256-spp configurable reference accumulation, expanded debug and operation telemetry. See [Material 3](MATERIAL-3.md) and [RT light transport](RT-LIGHT-TRANSPORT.md).
 
-**0.37 visual acceptance is pending.** This Linux host has no NVIDIA GPU/display. **245 tests pass**, including production CPU BSDF Monte Carlo/regressions and actual GLSL/SPIR-V/pipeline bindings; Windows/Linux native builds pass. These are verification; they do not establish edge quality, transport convergence or FPS. Remaining model/coverage approximations and all acceptance scenes are listed in the transport document. The earlier 0.36 user acceptance does not imply 0.37 acceptance.
+**0.37 visual acceptance is pending.** This Linux host has no NVIDIA GPU/display. **246 tests pass**, including production CPU BSDF Monte Carlo/regressions and actual GLSL/SPIR-V/pipeline bindings; Windows/Linux native builds pass. These are verification; they do not establish edge quality, transport convergence or FPS. Remaining model/coverage approximations and all acceptance scenes are listed in the transport document. The earlier 0.36 user acceptance does not imply 0.37 acceptance.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off on a fresh installation, saved settings restored on world join. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 

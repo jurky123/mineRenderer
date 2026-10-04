@@ -1,3 +1,7 @@
+## 0.37.5 compiler follow-up
+
+Implemented bounded OptiX task compilation, no-optimizer startup policy and heartbeat telemetry. Pending NVIDIA first-start/cache timings, reference convergence and GPU performance cost of level 0 before selecting a production optimization policy.
+
 ## 0.37.4 dispatch follow-up
 
 Confirmed 0.37.3 startup responsiveness; driver compile took ~37 minutes. Fix invalid-mip output transfer and reduce heavy forced inlining. Pending NVIDIA compilation timing, reference samples/convergence and runtime performance.

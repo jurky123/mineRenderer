@@ -1,7 +1,9 @@
 // Included after the shared CUDA driver loader in bridge.cpp. No Vulkan loader or SDK redistribution.
 #include <map>
 #include <atomic>
+#include "task_pool.h"
 static std::atomic<int> rtInitializationStage{0};
+static std::atomic<unsigned> rtCompileFinished{0},rtCompileScheduled{0};
 #include <cmath>
 #include <array>
 #include <memory>
@@ -72,9 +74,17 @@ struct RtContext {
   rtInitializationStage=1;check(d.cuInit(0));int count;check(d.cuDeviceGetCount(&count));for(int i=0;i<count;i++){CUdevice dev;CUuuid id;check(d.cuDeviceGet(&dev,i));check(d.cuDeviceGetUuid(&id,dev));if(!memcmp(uuid,id.bytes,16)){device=dev;break;}}
   if(device<0)throw std::runtime_error("RTX CUDA/Vulkan physical UUID mismatch");
   check(d.cuDevicePrimaryCtxRetain(&cuda,device));check(d.cuCtxSetCurrent(cuda));check(d.cuStreamCreate(&stream,CU_STREAM_NON_BLOCKING));rtInitializationStage=2;check(optixInit());OptixDeviceContextOptions contextOptions{};check(optixDeviceContextCreate(cuda,&contextOptions,&optix));
-  OptixModuleCompileOptions mo{};mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_2;
+  OptixModuleCompileOptions mo{};mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
   OptixPipelineCompileOptions po{};po.usesMotionBlur=false;po.traversableGraphFlags=OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING|OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;po.numPayloadValues=2;po.numAttributeValues=2;po.pipelineLaunchParamsVariableName="params";po.usesPrimitiveTypeFlags=OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE|OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
-  char log[8192];size_t logSize=sizeof(log);rtInitializationStage=3;auto result=optixModuleCreate(optix,&mo,&po,code,strlen(code),log,&logSize,&module);if(result!=OPTIX_SUCCESS)throw std::runtime_error(std::string("RT module: ")+log);
+  char log[8192]{};size_t logSize=sizeof(log);rtInitializationStage=3;rtCompileFinished=0;rtCompileScheduled=0;
+  OptixTask first=nullptr;check(optixModuleCreateWithTasks(optix,&mo,&po,code,strlen(code),log,&logSize,&module,&first));
+  rtCompileScheduled=first?1:0;
+  unsigned workers=std::max(1u,std::min(4u,std::thread::hardware_concurrency()>2?std::thread::hardware_concurrency()-2:1u));
+  try{rt::compileTasks(first,workers,[&](OptixTask task){
+   check(d.cuCtxSetCurrent(cuda));OptixTask next[32]{};unsigned count=0;check(optixTaskExecute(task,next,32,&count));
+   rtCompileScheduled+=count;rtCompileFinished++;return std::vector<OptixTask>(next,next+count);
+  });}catch(const std::exception& error){throw std::runtime_error(std::string("RT module tasks: ")+error.what()+"; "+log);}
+  OptixModuleCompileState compilation;check(optixModuleGetCompilationState(module,&compilation));if(compilation!=OPTIX_MODULE_COMPILE_STATE_COMPLETED)throw std::runtime_error(std::string("RT module incomplete: ")+log);
   OptixProgramGroupDesc desc[4]{};desc[0].kind=OPTIX_PROGRAM_GROUP_KIND_RAYGEN;desc[0].raygen.module=module;desc[0].raygen.entryFunctionName="__raygen__lighting";
   desc[1].kind=OPTIX_PROGRAM_GROUP_KIND_MISS;desc[1].miss.module=module;desc[1].miss.entryFunctionName="__miss__radiance";
   desc[2].kind=OPTIX_PROGRAM_GROUP_KIND_HITGROUP;desc[2].hitgroup.moduleCH=module;desc[2].hitgroup.entryFunctionNameCH="__closesthit__surface";desc[2].hitgroup.moduleAH=module;desc[2].hitgroup.entryFunctionNameAH="__anyhit__surface";
@@ -187,6 +197,7 @@ struct RtContext {
  }
  ~RtContext(){if(!cuda)return;d.cuCtxSetCurrent(cuda);if(stream)d.cuStreamSynchronize(stream);if(counterReady)api.cuEventDestroy(counterReady);if(counterHost)api.cuMemFreeHost(counterHost);for(auto& read:benchmarkReads){api.cuEventDestroy(read.event);api.cuMemFreeHost(read.pointer);}if(benchmarkReference)api.cuMemFreeHost(benchmarkReference);for(auto& t:timings){api.cuEventDestroy(t.begin);api.cuEventDestroy(t.end);}for(auto& h:hostRetired){api.cuMemFreeHost(h.pointer);api.cuEventDestroy(h.event);}for(auto s:semaphores)api.cuDestroyExternalSemaphore(s);for(auto p:imports)free(p);for(auto m:memories)api.cuDestroyExternalMemory(m);for(auto& r:retired){for(auto p:r.pointers)free(p);api.cuEventDestroy(r.event);}for(auto& e:sections){free(e.second.vertices);free(e.second.gasGpu);}for(auto& entry:models){free(entry.second.vertices);free(entry.second.gasGpu);}for(auto p:owned)free(p);for(auto p:{iasGpu,instancesGpu,sbtHit})if(p)free(p);while(!allocationBytes.empty())free(allocationBytes.begin()->first);if(denoiser)optixDenoiserDestroy(denoiser);if(pipeline)optixPipelineDestroy(pipeline);for(auto g:groups)if(g)optixProgramGroupDestroy(g);if(module)optixModuleDestroy(module);if(optix)optixDeviceContextDestroy(optix);if(stream)d.cuStreamDestroy(stream);d.cuDevicePrimaryCtxRelease(device);}
 };
+EXPORT jlong JNICALL Java_com_voxellight_nvidia_OptixNative_initializationTasks(JNIEnv*,jclass){return (static_cast<jlong>(rtCompileScheduled.load())<<32)|rtCompileFinished.load();}
 EXPORT jint JNICALL Java_com_voxellight_nvidia_OptixNative_initializationStage(JNIEnv*,jclass){return rtInitializationStage.load();}
 EXPORT jlong JNICALL Java_com_voxellight_nvidia_OptixNative_create(JNIEnv* e,jclass,jbyteArray id,jbyteArray code){RtContext* c=nullptr;try{if(e->GetArrayLength(id)!=16)throw std::runtime_error("Invalid UUID");unsigned char uuid[16];e->GetByteArrayRegion(id,0,16,reinterpret_cast<jbyte*>(uuid));int size=e->GetArrayLength(code);std::vector<char> ptx(size+1);e->GetByteArrayRegion(code,0,size,reinterpret_cast<jbyte*>(ptx.data()));c=new RtContext;c->init(uuid,ptx.data());return reinterpret_cast<jlong>(c);}catch(const std::exception& ex){delete c;fail(e,ex);return 0;}}
 EXPORT void JNICALL Java_com_voxellight_nvidia_OptixNative_importBuffer(JNIEnv* e,jclass,jlong h,jlong external,jlong allocation,jlong size){try{reinterpret_cast<RtContext*>(h)->importMemory(external,allocation,size);}catch(const std::exception& ex){fail(e,ex);}}

@@ -1,3 +1,7 @@
+## 0.37.5 compiler startup update
+
+Install the complete matching native kit. Compilation now uses parallel OptiX tasks with optimization level 0; logs include progress every 15 seconds. Compare startup time and reference execution separately using [REFERENCE-0.37.5.md](REFERENCE-0.37.5.md).
+
 ## 0.37.4 reference transfer update
 
 Install the matching native kit to get corrected RT texture copies and reduced compiler expansion. See [REFERENCE-0.37.4.md](REFERENCE-0.37.4.md) for the convergence/startup comparison.
