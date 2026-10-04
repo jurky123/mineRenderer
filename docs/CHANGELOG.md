@@ -1,5 +1,12 @@
 # VoxelLight release history
 
+## 0.35.2 — Rough material reflections and world-space GI reuse
+
+- Roughness-aware environment Fresnel avoids mirror-like grazing sky reflections on diffuse blocks. Sharp screen reflections now require effective roughness below0.5, smoothly attenuated toward that threshold; rain and authored smooth/metal materials retain highlights. Direct GGX remains physically material-driven.
+- Keep a bounded world-space irradiance cache for sampled static axis-aligned faces. Validate world cell, face and plane, apply the current surface albedo, and use it only where screen-space observations cannot reproject. World/resource/material edits and significant celestial/weather changes invalidate it. Freeze preserves its original screen-history semantics.
+- Two128×128 RGBA32F images add0.5 MiB GPU storage and at most0.5 MiB upload per accepted batch; no additional samples per batch or full-resolution targets. The incoming batch retains its albedo guide (~3.5 MiB maximum) until consumed to separate irradiance from surface color. Moving/new views admit observations up to20 Hz (Fast10 Hz), settled refinement retains10/5 Hz. Increased submission rate can cost GPU/CPU time. Completely unknown faces still wait for tracing; this reduces rediscovery from zero, not all asynchronous acquisition latency.
+- 223 tests pass, including actual shader/binding compilation, world-cache irradiance/color separation, collision tags, opposing faces, invalid data and reset. In-game gloss/motion/FPS acceptance pending.
+
 ## 0.35.1 — Water mask atlas lookup fix
 
 - Resolve the block texture atlas through TextureManager, matching the existing water renderer; texture paths are not AtlasManager registry IDs. Fixes foundation disabling on entry.

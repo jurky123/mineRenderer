@@ -24,5 +24,5 @@ void main(){
  vec4 p=PtInvProjection*vec4(uv*2-1,scene,1);p/=p.w;
  vec3 world=(PtViewToWorld*vec4(p.xyz,0)).xyz;
  if(length(world)>24)return;
- ptPosition=vec4(world,1);ptNormal=vec4(normalize(n.xyz),1);ptAlbedo=vec4(srgbToLinear(a.rgb),1);
+ ptPosition=vec4(world,1);ptNormal=vec4(normalize(n.xyz),(flags&24)==0?1.0:0.0);ptAlbedo=vec4(srgbToLinear(a.rgb),1);
 }

@@ -1,6 +1,8 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
 uniform sampler2D CurrentHdr;
+uniform sampler2D CachedGiTags;
+uniform sampler2D CachedGiLight;
 uniform sampler2D MaterialPbr;
 uniform sampler2D MaterialTable;
 layout(std140) uniform PbrSettings { vec4 PbrControls; };
@@ -15,7 +17,7 @@ uniform sampler2D MaterialNormal;
 uniform sampler2D MaterialAlbedo;
 uniform sampler2D SceneDepth;
 layout(std140) uniform PathTraceSettings {mat4 PtInvProjection;mat4 PtViewToWorld;vec4 PtControls;};
-layout(std140) uniform PathTraceHistory {mat4 PreviousClip;vec4 CameraDelta;mat4 OlderClip;vec4 OlderDelta;vec4 BatchTransition;};
+layout(std140) uniform PathTraceHistory {mat4 PreviousClip;vec4 CameraDelta;mat4 OlderClip;vec4 OlderDelta;vec4 BatchTransition;vec4 CacheCamera;};
 layout(location=0) in vec2 texCoord;
 layout(location=0) out vec4 result;
 float viewDepth(vec2 uv,float d){vec4 p=PtInvProjection*vec4(uv*2-1,d,1);return -p.z/p.w;}
@@ -51,6 +53,27 @@ bool lookup(sampler2D radiance,sampler2D positions,sampler2D normals,mat4 clip,v
  if(total<=1e-5){rejection=normalRejected?vec3(1,0,1):vec3(0,1,1);return false;}
  light/=total;return true;
 }
+// Reuse only sampled, coplanar static block faces; no fabricated light for unknown surfaces.
+bool cachedLight(vec3 world,vec3 normal,out vec3 light){
+ light=vec3(0);if(CacheCamera.w<.5)return false;
+ int axis=abs(normal.x)>.999?0:abs(normal.y)>.999?1:abs(normal.z)>.999?2:-1;if(axis<0)return false;
+ int face=axis*2+(normal[axis]<0.0?1:0);
+ vec3 absolute=world+CacheCamera.xyz;ivec3 cell=ivec3(floor((absolute+normal*.02)/2.0));float total=0;
+ for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
+  ivec3 q=cell;q[(axis+1)%3]+=x;q[(axis+2)%3]+=y;
+  uint slot=(uint(q.x)*73856093u ^ uint(q.y)*19349663u ^ uint(q.z)*83492791u ^ uint(face)*2654435761u)&16383u;
+  ivec2 uv=ivec2(int(slot)&127,int(slot)>>7);vec4 tag=texelFetch(CachedGiTags,uv,0);
+  if(any(notEqual(tag.xyz,vec3(q)))||int(floor(tag.w))!=face+1)continue;
+  float plane=float(q[axis])*2.0+fract(tag.w)*32.0;
+  if(abs(absolute[axis]-plane)>.12)continue;
+  float weight=x==0&&y==0?4.0:1.0;
+  light+=texelFetch(CachedGiLight,uv,0).rgb*weight;total+=weight;
+ }
+ if(total==0.0)return false;
+ vec3 a=texture(MaterialAlbedo,texCoord).rgb;
+ a=mix(a/12.92,pow((a+.055)/1.055,vec3(2.4)),greaterThan(a,vec3(.04045)));
+ light=light/total*a;return true;
+}
 void main(){
  result=texture(CurrentHdr,texCoord);
  if(PbrControls.z>.5)return;
@@ -60,20 +83,22 @@ void main(){
  if(d<=0 || scene<=0 || n.a<.5 || (flags&21)!=0){reject(vec3(1,0,0));return;}
  float zs=viewDepth(texCoord,scene),zm=viewDepth(texCoord,d);
  if(abs(zm-zs)>max(.01,.001*abs(zs))){reject(vec3(1,.4,0));return;}
- if(PtControls.w<.5){reject(vec3(1,1,0));return;}
+
  vec4 p=PtInvProjection*vec4(texCoord*2-1,scene,1);p/=p.w;vec3 world=(PtViewToWorld*vec4(p.xyz,0)).xyz;
- vec3 incoming,older,reason,olderReason;
- bool hasIncoming=lookup(PathRadiance,PathPosition,PathNormal,PreviousClip,CameraDelta.xyz,world,normalize(n.xyz),incoming,reason);
+ vec3 incoming,older,reason=vec3(1,1,0),olderReason;
+ bool hasIncoming=PtControls.w>.5 && lookup(PathRadiance,PathPosition,PathNormal,PreviousClip,CameraDelta.xyz,world,normalize(n.xyz),incoming,reason);
  bool hasOlder=false;
  if(BatchTransition.y>.5 && (BatchTransition.x<1 || !hasIncoming))
   hasOlder=lookup(OlderRadiance,OlderPosition,OlderNormal,OlderClip,OlderDelta.xyz,world,normalize(n.xyz),older,olderReason);
- if(!hasIncoming && !hasOlder){reject(reason);return;}
+ vec3 cached;bool hasCached=(flags&24)==0 && cachedLight(world,normalize(n.xyz),cached);
+ if(!hasIncoming && !hasOlder && !hasCached){reject(reason);return;}
  if(PtControls.z>.5){result=vec4(0,1,0,1);return;}
  vec3 light;
  if(hasIncoming && hasOlder)light=mix(older,incoming,BatchTransition.x);
  else if(hasOlder)light=older;
  // No compatible old surface: use the first estimate at full strength.
- else light=incoming;
+ else if(hasIncoming)light=incoming;
+ else light=cached;
  // The existing worker supplies diffuse GI only. Conductors need a later specular tracer.
  if(PbrControls.x>.5){ivec2 id=ivec2(round(texture(MaterialPbr,texCoord).rg*255.0));vec4 profile=texelFetch(MaterialTable,id,0);light*=profile.g*255.0>=229.5?0.0:1.0-profile.g;}
  float fade=1-smoothstep(16,24,length(world));

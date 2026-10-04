@@ -1,6 +1,8 @@
 # VoxelLight current state
 
-Current release: **0.35.1** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.35.2** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+
+0.35.2 addresses rough-surface gloss and new-view GI acquisition: roughness-aware environment Fresnel, smooth/wet-only sharp SSR and bounded static world-face irradiance reuse. Previously traced faces and nearby coplanar faces can display GI without waiting for the worker. Completely unobserved surfaces still require asynchronous tracing; no instantaneous-convergence claim. See CHANGELOG for costs and pending GPU acceptance.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 

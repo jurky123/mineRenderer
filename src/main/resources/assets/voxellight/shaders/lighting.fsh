@@ -396,7 +396,7 @@ void main() {
     vec3 ambient=vec3(0.012)+sky+blockBaseline*(1.0-replacement);
     vec3 sunSpecular=usePbr?DirectColorStrength.rgb*DirectColorStrength.a*skyAccess*ggx(shadingNormal,viewDirection,LightDirectionAndMask.xyz,f0,alpha):vec3(0);
     vec3 reflected=reflect(-viewDirection,shadingNormal);
-    vec3 environmentSpecular=usePbr?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*fresnel(f0,max(dot(shadingNormal,viewDirection),0.0))*mix(1.0,.45,alpha)*ao:vec3(0);
+    vec3 environmentSpecular=usePbr?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*(f0+(max(vec3(1.0-sqrt(alpha)),f0)-f0)*pow(1.0-max(dot(shadingNormal,viewDirection),0.0),5.0))*mix(1.0,.15,alpha)*ao:vec3(0);
     vec3 directContribution=albedo*diffuseWeight*direct+sunSpecular;
     vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*visibility+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
     float waterDepth=texture(WaterSurfaceDepth,texCoord).r;

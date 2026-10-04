@@ -136,11 +136,11 @@ void main(){
  vec4 packed=texture(MaterialPbr,texCoord);ivec2 id=ivec2(round(packed.rg*255.0));vec4 pbr=texelFetch(MaterialTable,id,0);vec4 properties=texture(MaterialEmission,texCoord);
  vec3 n=octNormal(packed.ba),p=waterPosition(texCoord,d),v=normalize(-p);float alpha=max(.045,pow(1.0-pbr.r,2.0));
  float porosity=pbr.b*255.0<=64.0?pbr.b*255.0/64.0:0.0;float wet=PbrControls.y*properties.b*smoothstep(.2,.9,gn.y*2.0-1.0);alpha=mix(alpha,max(.045,alpha*.2),wet*(1.0-porosity));
- if(alpha>.5||dot(n,v)<=0.0)return;
+ if(alpha>.25||dot(n,v)<=0.0)return;
  vec3 ray=reflect(-v,n);vec4 hit=screenReflection(p,n,ray);if(hit.a<=0.0)return;
  int reflectance=int(round(pbr.g*255.0));vec3 f0=reflectance>=230?conductorF0(reflectance,linearAlbedo(albedo.rgb)):vec3(pbr.g);
- vec3 fresnel=f0+(1.0-f0)*pow(1.0-max(dot(n,v),0.0),5.0);
+ vec3 fresnel=f0+(max(vec3(1.0-sqrt(alpha)),f0)-f0)*pow(1.0-max(dot(n,v),0.0),5.0);
  vec3 fallback=mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(ray.y,0.0))*SkyColorStrength.a*properties.b;
- float weight=hit.a*(1.0-smoothstep(.15,.5,alpha))*mix(1.0,.45,alpha);
+ float weight=hit.a*(1.0-smoothstep(.08,.25,alpha))*mix(1.0,.15,alpha);
  fragColor=vec4((hit.rgb-fallback)*fresnel*weight,1);
 }
