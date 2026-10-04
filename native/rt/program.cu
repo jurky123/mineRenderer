@@ -14,7 +14,7 @@ static __forceinline__ __device__ float linear(float x){return x<=.04045f?x/12.9
 static __forceinline__ __device__ float3 rgb(unsigned c){return v(linear((c&255)/255.f),linear(((c>>8)&255)/255.f),linear(((c>>16)&255)/255.f));}
 static __forceinline__ __device__ float random(unsigned& state){state=state*1664525u+1013904223u;return (state>>8)*0x1p-24f;}
 static __forceinline__ __device__ RtPayload* payload(){return reinterpret_cast<RtPayload*>((static_cast<unsigned long long>(optixGetPayload_1())<<32)|optixGetPayload_0());}
-static __forceinline__ __device__ void countOperation(int kind){unsigned i=optixGetLaunchIndex().x;if(params.counters&&i<(unsigned)(params.width*params.height))atomicAdd(params.counters+i*9+kind,1u);}
+static __forceinline__ __device__ void countOperation(int kind){unsigned i=params.launchOffset+optixGetLaunchIndex().x;if(params.counters&&i<(unsigned)(params.width*params.height))atomicAdd(params.counters+i*9+kind,1u);}
 static __forceinline__ __device__ RtPayload trace(float3 o,float3 d,float maximum=512.f){
  countOperation(0);RtPayload p={};unsigned long long address=reinterpret_cast<unsigned long long>(&p);unsigned low=(unsigned)address,high=(unsigned)(address>>32);
  optixTrace(params.scene,o,d,.015f,maximum,0,255,OPTIX_RAY_FLAG_NONE,0,1,0,low,high);return p;
@@ -83,7 +83,7 @@ static __forceinline__ __device__ float3 probeLight(float3 p,float3 n){
  }return mul(params.sky,.25f); // explicit environment base, never black while cache fills
 }
 extern "C" __global__ void __raygen__lighting(){
- unsigned i=optixGetLaunchIndex().x,seed=i*9781u+params.frame*6271u+1;
+ unsigned i=params.launchOffset+optixGetLaunchIndex().x,seed=i*9781u+params.frame*6271u+1;
  if(params.mode==12){if(i<(unsigned)(params.width*params.height))for(int kind=0;kind<9;kind++)atomicAdd(params.counterTotals+kind,params.counters[i*9+kind]);return;}
  if(params.mode==10){float cell=.25f;int cx=(int)floorf(params.camera.x/cell)-32,cz=(int)floorf(params.camera.z/cell)-32,x=cx+(i&63),z=cz+((i>>6)&63),slot=(x&63)|((z&63)<<6);auto record=params.caustics+slot*2;record[0]=make_float4(x*cell,0,z*cell,0);record[1]=make_float4(0,0,0,0);return;}
  if(params.mode==8){causticPhoton(i,seed);return;}
@@ -133,7 +133,7 @@ if(coverage){sunT=visibility(add(p,mul(n,.025f)),params.sun);if((params.options&
  if(params.debug>=32){if(params.mode!=0)return;TransportDebug info;float3 diffuse=incoming(add(first.p,mul(first.geometryNormal,.025f)),cosine(first.geometryNormal,seed),seed,8,true,0,&info);float3 out=v(0,0,0);unsigned debug=params.debug;
  if(debug==32)out=info.throughput;else if(debug==33)out=v(info.bounce/8.f,info.bounce/8.f,info.bounce/8.f);else if(debug==34)out=info.kind==0?v(1,1,0):info.kind==1?v(0,.5f,1):v(1,0,1);else if(debug==35)out=v((info.lobe&rt::DIFFUSE_LOBE)?1:0,(info.lobe&rt::GLOSSY)?1:0,(info.lobe&rt::TRANSMISSION)?1:0);else if(debug==36)out=v(info.mis,info.mis,info.mis);else if(debug==37)out=info.secondary;else if(debug==38)out=diffuse;else if(debug==39){auto bs=rt::sampleGlossy(first.bsdf,rt::Frame(rv(first.n)),rv(view),seed);if(bs.pdf>0)out=prod(cv(bs.weight),incoming(add(first.p,mul(first.geometryNormal,.025f)),cv(bs.wi),seed,8,false));}else if(debug==40)out=info.emissive;else if(debug==41)out=info.sun;else if(debug==42)out=v(info.bsdfPdf/(1+info.bsdfPdf),0,0);else if(debug==43)out=v(info.lightPdf/(1+info.lightPdf),0,0);else if(debug==44)out=params.sunVisibility[i].w>.5f?v(0,1,0):v(1,0,0);
  params.diffuse[i]=make_float4(out.x,out.y,out.z,1);if(dielectric)params.transmission[i]=make_float4(out.x,out.y,out.z,first.distance);return;}
- unsigned batch=params.referenceSpp?min(4u,params.referenceSpp-params.referenceSamples):1;float3 light=v(0,0,0);float signalHitDistance=0;TransportDebug diagnostic;
+ unsigned batch=params.referenceSpp?rt::referenceBatch(params.referenceSpp,params.referenceSamples):1;float3 light=v(0,0,0);float signalHitDistance=0;TransportDebug diagnostic;
  for(unsigned r=0;r<batch;r++){
   float3 observation=v(0,0,0);
   if(params.mode==0&&!dielectric&&(params.options&1)&&!rt::metal(first.bsdf)){

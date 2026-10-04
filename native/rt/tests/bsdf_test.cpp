@@ -1,10 +1,14 @@
 #include "../bsdf.h"
 #include "../surface.h"
+#include "../dispatch.h"
 #include <cassert>
 #include <iostream>
 using namespace rt;
 static bool finite(Vec a){return std::isfinite(a.x)&&std::isfinite(a.y)&&std::isfinite(a.z);}
 int main(){
+ for(unsigned target:{4u,256u,4096u}){unsigned samples=0;while(samples<target){assert(referenceBatch(target,samples)==1);samples+=referenceBatch(target,samples);}assert(samples==target&&referenceBatch(target,samples)==0);assert(referenceBatch(target,target+1)==0);}
+ for(unsigned pixels:{1u,8192u,8193u,640u*360u}){unsigned covered=0;while(covered<pixels){auto chunk=referenceChunk(pixels,covered);assert(chunk>0&&chunk<=8192&&covered+chunk<=pixels);covered+=chunk;}assert(covered==pixels&&referenceChunk(pixels,covered)==0);}
+
  assert(!cutoutVisible(127,255,0)&&cutoutVisible(128,255,0));assert(!cutoutVisible(25,255,16)&&cutoutVisible(26,255,16));assert(!cutoutVisible(255,127,0));assert(cutoutVisible(200,163,0));
  Frame frame(V(0,0,1));unsigned seed=736284;
  for(unsigned type=0;type<=9;type++)for(float rough:{.02f,.05f,.1f,.2f,.4f,.7f,1.f}){

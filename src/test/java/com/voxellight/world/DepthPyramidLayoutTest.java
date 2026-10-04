@@ -8,10 +8,16 @@ class DepthPyramidLayoutTest {
         for(int[] size:new int[][]{{1,1},{1,17},{17,1},{853,479},{2560,1440},{3840,2160}}) {
             var layout=DepthPyramidLayout.of(size[0],size[1]);long bytes=0;
             for(int i=0;i<layout.levels();i++)bytes+=4L*layout.width(i)*layout.height(i);
-            assertEquals(bytes,layout.bytes());assertEquals(1,layout.width(layout.levels()-1));assertEquals(1,layout.height(layout.levels()-1));
+            assertEquals(bytes,layout.bytes());assertEquals(1,Math.min(layout.width(layout.levels()-1),layout.height(layout.levels()-1)));
             assertTrue(bytes<=DepthPyramidLayout.LIMIT);
         }
         assertThrows(IllegalArgumentException.class,()->DepthPyramidLayout.of(0,12));
+    }
+    @Test void rectangularMipViewsNeverShiftEitherNativeDimensionToZero(){
+        for(int[] size:new int[][]{{2560,1352},{1,17},{17,1},{3840,1080},{1080,3840}}){
+            var layout=DepthPyramidLayout.of(size[0],size[1]);
+            for(int level=0;level<layout.levels();level++){assertTrue((layout.width()>>level)>0);assertTrue((layout.height()>>level)>0);}
+        }
     }
     @Test void everyOddTailAndSinglePixelOccluderSurvivesAllReductionLevels() {
         for(int[] size:new int[][]{{1,1},{1,17},{17,1},{7,13},{13,7},{19,23}}) {
@@ -28,7 +34,7 @@ class DepthPyramidLayoutTest {
                         assertEquals(expected,source[y][x]);
                     }
                 }
-                assertEquals(.875,source[0][0]);
+                double maximum=0;for(var row:source)for(double value:row)maximum=Math.max(maximum,value);assertEquals(.875,maximum);
             }
         }
     }

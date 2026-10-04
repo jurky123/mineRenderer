@@ -1,5 +1,12 @@
 # VoxelLight release history
 
+## 0.37.2 — Reference crash hardening
+
+- Fix rectangular depth pyramids producing native `1x0` mip views. End the chain when either axis reaches one; retain conservative coarse cells and test portrait/ultrawide sizes.
+- Make JNI stats CPU-only and exception-safe, removing CUDA collection/process-termination risk from settings draws.
+- Schedule reference at one spp/frame with at most 8,192 pixels per OptiX launch; preserve target spp/eight-bounce transport and global output/counter indexing. Disable reference reuse of probes and stale approximate caustics.
+- Add native-startup/reference-dispatch markers and failure-stage reporting. Crash root cause remains unconfirmed because the supplied log stops before a fatal error; NVIDIA reproduction remains pending.
+
 ## 0.37.1 — Reference convergence & vanilla settings
 
 - Fix reference accumulation resetting on every unchanged quality application; suppress projection jitter, RGB TAA and adaptive budget changes during reference. Auto-enable Foundation/OptiX on reference on and freeze RT entity animation after the first reference sample.

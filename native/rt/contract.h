@@ -1,6 +1,7 @@
 #pragma once
 #include <optix.h>
 #include "bsdf.h"
+#include "dispatch.h"
 #ifndef __CUDACC__
 struct float3 {float x,y,z;};
 struct alignas(16) float4 {float x,y,z,w;};
@@ -23,7 +24,7 @@ struct RtParams {
  float time,waveStrength,cloudWind,cloudAltitude,rain,cloudShadows,rainRipples;unsigned options,debug;float underwater;float4 pointPosition,pointIntensity;rt::Medium cameraWater;
  RtAreaLight* lights;int lightCount;float lightPower;
  float4 *surfaceKey,*previousKey,*referenceSum,*previousSignal;unsigned referenceSpp,referenceSamples;float fireflyClamp;
- float4* caustics;float4* causticHistory;unsigned* counters;unsigned* counterTotals;
+ float4* caustics;float4* causticHistory;unsigned* counters;unsigned* counterTotals;unsigned launchOffset;
 };
 struct RtPayload {rt::Material bsdf;unsigned objectId,primitiveId;float3 p,n,geometryNormal,color,emission,absorption;float roughness,f0,ior,transmission;unsigned metal,flags;float distance;int hit;};
 

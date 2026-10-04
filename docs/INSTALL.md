@@ -1,3 +1,7 @@
+## 0.37.2 reference crash update
+
+Reference now renders one spp per frame in bounded OptiX launches. Start with 16 spp, then 256; the target quality is unchanged. The depth-pyramid `1x0` error and native telemetry exception hazard are fixed. See [REFERENCE-0.37.2.md](REFERENCE-0.37.2.md) for diagnostics if a fatal exit persists. NVIDIA crash reproduction remains pending.
+
 ## 0.37.1 settings and reference fix
 
 Open **Pause/Options → VoxelLight** or `/voxellight settings`. Rendering/RTX/environment/water/debug controls are now available through vanilla widgets. Normal preferences save automatically; reference activation stays session-only. See [SETTINGS.md](SETTINGS.md), included in the kit.

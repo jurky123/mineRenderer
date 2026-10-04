@@ -1,12 +1,14 @@
 # VoxelLight current state
 
-Current release: **0.37.1 — Reference convergence & vanilla settings**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+Current release: **0.37.2 — Reference crash hardening**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+
+0.37.2 fixes rectangular depth-pyramid zero-height mip views, removes CUDA collection from GUI telemetry and tiles one-spp reference launches. The supplied crash log has no fatal tail, so the original termination cause remains unconfirmed. See [reference crash hardening](REFERENCE-0.37.2.md).
 
 0.37.1 fixes per-frame reference resets, suppresses reference projection jitter/adaptive budget changes and freezes RT dynamic animation while converging. A searchable vanilla settings screen in Pause/Options and `/voxellight settings` shares validated command actions and atomically persists normal preferences. See [Settings](SETTINGS.md). In-game UI/reference acceptance remains pending.
 
 Implemented: Material 3 class/LUT and 1,269 Vanilla block texture presets, LabPBR 1.3 channel priority, exact RGB conductor Fresnel, matched GGX VNDF/eval/PDF, coating/wetness and thin foliage, full textured secondary BSDFs, power-CDF emissive/environment/sun/held-light NEE with MIS, rough/thin dielectric identity-aware media, shared participating-water single scattering, refracted-sun photon caustic cache, signal-specific edge rejection and conservative raster fallback, 256-spp configurable reference accumulation, expanded debug and operation telemetry. See [Material 3](MATERIAL-3.md) and [RT light transport](RT-LIGHT-TRANSPORT.md).
 
-**0.37 visual acceptance is pending.** This Linux host has no NVIDIA GPU/display. **239 tests pass**, including production CPU BSDF Monte Carlo/regressions and actual GLSL/SPIR-V/pipeline bindings; Windows/Linux native builds pass. These are verification; they do not establish edge quality, transport convergence or FPS. Remaining model/coverage approximations and all acceptance scenes are listed in the transport document. The earlier 0.36 user acceptance does not imply 0.37 acceptance.
+**0.37 visual acceptance is pending.** This Linux host has no NVIDIA GPU/display. **240 tests pass**, including production CPU BSDF Monte Carlo/regressions and actual GLSL/SPIR-V/pipeline bindings; Windows/Linux native builds pass. These are verification; they do not establish edge quality, transport convergence or FPS. Remaining model/coverage approximations and all acceptance scenes are listed in the transport document. The earlier 0.36 user acceptance does not imply 0.37 acceptance.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off on a fresh installation, saved settings restored on world join. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 

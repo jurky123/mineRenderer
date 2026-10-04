@@ -8,7 +8,9 @@ public record DepthPyramidLayout(int width,int height,int levels,long bytes) {
         int w=(int)((fullWidth+1L)/2),h=(int)((fullHeight+1L)/2),levels=0;long bytes=0;
         for(int x=w,y=h;;x=Math.max(1,x/2),y=Math.max(1,y/2)) {
             bytes=Math.addExact(bytes,Math.multiplyExact(4L*x,y));levels++;
-            if(x==1 && y==1)break;
+            // Minecraft 26.2 texture-view dimensions use raw shifts rather than Vulkan max(1,...).
+            // Stop before either dimension would become zero in the native API.
+            if(x==1 || y==1)break;
         }
         return new DepthPyramidLayout(w,h,levels,bytes);
     }

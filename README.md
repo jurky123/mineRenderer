@@ -4,9 +4,11 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current release: **VoxelLight 0.37.1 — Reference convergence & vanilla settings**. Material 3, matched BSDF/PDFs, conductor/coating/dielectric models, NEE/MIS, shared water medium, wave-driven sun caustics, strict RT edge reconstruction and reference convergence. Existing OptiX GAS/IAS, GPU-only interop, world probes and raster fallback are retained. CPU/shader/native builds pass; 0.37 NVIDIA visual acceptance remains pending. [Architecture, limits and test checklist](docs/RTX-PATH-TRACING-ARCHITECTURE.md).
+Current release: **VoxelLight 0.37.2 — Reference crash hardening**. Material 3, matched BSDF/PDFs, conductor/coating/dielectric models, NEE/MIS, shared water medium, wave-driven sun caustics, strict RT edge reconstruction and reference convergence. Existing OptiX GAS/IAS, GPU-only interop, world probes and raster fallback are retained. CPU/shader/native builds pass; 0.37 NVIDIA visual acceptance remains pending. [Architecture, limits and test checklist](docs/RTX-PATH-TRACING-ARCHITECTURE.md).
 
-[Download the native 0.37.1 client kit](https://temp.sh/QbLdK/voxellight-client-kit-26.2-0.37.1.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
+[Download the native 0.37.2 client kit](https://temp.sh/Yfvry/voxellight-client-kit-26.2-0.37.2.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
+
+Reference now uses bounded one-spp launches, and GUI telemetry performs no CUDA work. The rectangular depth-pyramid `1x0` error is fixed. [Crash diagnostics and test instructions](docs/REFERENCE-0.37.2.md).
 
 Open **Pause/Options → VoxelLight** or `/voxellight settings` for searchable vanilla controls and saved preferences. Reference mode now enables RTX automatically and shows convergence progress. [Settings guide](docs/SETTINGS.md).
 
