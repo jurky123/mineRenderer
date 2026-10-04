@@ -1,5 +1,11 @@
 # VoxelLight release history
 
+## 0.35.1 — Water mask atlas lookup fix
+
+- Resolve the block texture atlas through TextureManager, matching the existing water renderer; texture paths are not AtlasManager registry IDs. Fixes foundation disabling on entry.
+- Missing water sprites or mask runtime failures retain a neutral mask and opaque lighting; report the local fallback in status. Resource reload resets the failure latch.
+- Build/client kit and all 221 tests pass; in-game retry pending.
+
 ## 0.35.0 — Raster visual review bundle
 
 - User confirmed PBR and single-raster MRT. Bundle the subsequent review milestones: procedural HDR Overworld sky/sun/moon/stars/weather, cheap world-space clouds and directional cloud shadows.

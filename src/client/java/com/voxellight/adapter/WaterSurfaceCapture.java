@@ -21,7 +21,8 @@ final class WaterSurfaceCapture implements AutoCloseable  {
     private GpuTextureView maskView,depthView,neutralView;
     private GpuBuffer settings;
     private int width,height;
-    private boolean active;
+    private boolean active,failed;
+    private String state="waiting";
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,boolean enabled) {
         active=false;
         var device=RenderSystem.getDevice();
@@ -31,49 +32,63 @@ final class WaterSurfaceCapture implements AutoCloseable  {
             try(var pass=encoder.createRenderPass(descriptor(neutralView,null,1,1))) {
             }
         }
-        var terrain=material.nativeSubmissions();
-        int w=(output.width+1)/2,h=(output.height+1)/2;
-        if(!enabled||terrain==null||(long)w*h*8>24L*1024*1024) {
-            release();
-            return;
-        }
-        if(!device.precompilePipeline(WATER_MASK,RenderProbe.SHADERS).isValid())return;
-        if(mask==null||width!=w||height!=h) {
-            release();
-            width=w;
-            height=h;
-            mask=device.createTexture("VoxelLight water surface depth mask",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.R32_FLOAT,w,h,1,1);
-            depth=device.createTexture("VoxelLight private water mask Z",GpuTexture.USAGE_RENDER_ATTACHMENT,GpuFormat.D32_FLOAT,w,h,1,1);
-            maskView=device.createTextureView(mask);
-            depthView=device.createTextureView(depth);
-            settings=device.createBuffer(()->"VoxelLight water sprite admission",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,48);
-        }
-        var atlas=Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(TextureAtlas.LOCATION_BLOCKS);
-        var still=atlas.getSprite(Identifier.withDefaultNamespace("block/water_still"));
-        var flow=atlas.getSprite(Identifier.withDefaultNamespace("block/water_flow"));
-        try(var stack=MemoryStack.stackPush()) {
-            encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,48).putVec4(still.getU0(),still.getV0(),still.getU1(),still.getV1()).putVec4(flow.getU0(),flow.getV0(),flow.getU1(),flow.getV1()).putVec4(w,h,0,0).get());
-        }
-        var sequence=RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
-        var indices=terrain.maxIndicesRequired()==0?null:sequence.getBuffer(terrain.maxIndicesRequired());
-        try(var profile=RenderPassProfile.begin(encoder,"water_surface_mask");var pass=encoder.createRenderPass(descriptor(maskView,depthView,w,h))) {
-            pass.setPipeline(WATER_MASK);
-            RenderSystem.bindDefaultUniforms(pass);
-            pass.setUniform("WaterMaskSettings",settings);
-            pass.bindTexture("SceneDepth",output.getDepthTextureView(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            for(var layer:ChunkSectionLayerGroup.TRANSLUCENT.layers()) {
-                var groups=terrain.drawGroupsPerLayer().get(layer);
-                if(groups==null)continue;
-                for(var list:groups.values())if(!list.isEmpty())pass.drawMultipleIndexed(list,indices,sequence.type(),List.of("ChunkSection"),terrain.chunkSectionInfos());
+        if(failed)return;
+        try {
+            var terrain=material.nativeSubmissions();
+            int w=(output.width+1)/2,h=(output.height+1)/2;
+            if(!enabled||terrain==null||(long)w*h*8>24L*1024*1024) {
+                release();
+                return;
             }
+            if(!device.precompilePipeline(WATER_MASK,RenderProbe.SHADERS).isValid())return;
+            if(mask==null||width!=w||height!=h) {
+                release();
+                width=w;
+                height=h;
+                mask=device.createTexture("VoxelLight water surface depth mask",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.R32_FLOAT,w,h,1,1);
+                depth=device.createTexture("VoxelLight private water mask Z",GpuTexture.USAGE_RENDER_ATTACHMENT,GpuFormat.D32_FLOAT,w,h,1,1);
+                maskView=device.createTextureView(mask);
+                depthView=device.createTextureView(depth);
+                settings=device.createBuffer(()->"VoxelLight water sprite admission",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,48);
+            }
+            var atlas=(TextureAtlas)Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+            var still=atlas.getSprite(Identifier.withDefaultNamespace("block/water_still"));
+            var flow=atlas.getSprite(Identifier.withDefaultNamespace("block/water_flow"));
+            if(still==atlas.missingSprite()||flow==atlas.missingSprite()) {
+                release();
+                state="missing water sprites; caustics mask disabled";
+                return;
+            }
+            try(var stack=MemoryStack.stackPush()) {
+                encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,48).putVec4(still.getU0(),still.getV0(),still.getU1(),still.getV1()).putVec4(flow.getU0(),flow.getV0(),flow.getU1(),flow.getV1()).putVec4(w,h,0,0).get());
+            }
+            var sequence=RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
+            var indices=terrain.maxIndicesRequired()==0?null:sequence.getBuffer(terrain.maxIndicesRequired());
+            try(var profile=RenderPassProfile.begin(encoder,"water_surface_mask");var pass=encoder.createRenderPass(descriptor(maskView,depthView,w,h))) {
+                pass.setPipeline(WATER_MASK);
+                RenderSystem.bindDefaultUniforms(pass);
+                pass.setUniform("WaterMaskSettings",settings);
+                pass.bindTexture("SceneDepth",output.getDepthTextureView(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+                for(var layer:ChunkSectionLayerGroup.TRANSLUCENT.layers()) {
+                    var groups=terrain.drawGroupsPerLayer().get(layer);
+                    if(groups==null)continue;
+                    for(var list:groups.values())if(!list.isEmpty())pass.drawMultipleIndexed(list,indices,sequence.type(),List.of("ChunkSection"),terrain.chunkSectionInfos());
+                }
+            }
+            active=true;
+            state="active";
+        } catch(RuntimeException error) {
+            failed=true;
+            release();
+            state="failed; neutral mask retained";
+            org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("Water surface mask disabled; opaque lighting retained",error);
         }
-        active=true;
     }
     void bind(RenderPass pass) {
         pass.bindTexture("WaterSurfaceDepth",active?maskView:neutralView,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
     }
     String status() {
-        return ", waterMaskBytes="+(mask==null?0:(long)width*height*8);
+        return ", waterMask="+state+", waterMaskBytes="+(mask==null?0:(long)width*height*8);
     }
     static RenderPassDescriptor descriptor(GpuTextureView color,GpuTextureView depth,int w,int h) {
         var d=RenderPassDescriptor.create(()->"VoxelLight water receiver admission").withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(color,Optional.of(new Vector4f(0)));
@@ -105,6 +120,8 @@ final class WaterSurfaceCapture implements AutoCloseable  {
     }
     @Override public void close() {
         release();
+        failed=false;
+        state="waiting";
         if(neutralView!=null) {
             neutralView.close();
             neutralView=null;
