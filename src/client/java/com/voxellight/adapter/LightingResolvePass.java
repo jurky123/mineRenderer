@@ -30,6 +30,10 @@ final class LightingResolvePass implements AutoCloseable {
     private final RtxLightingPass rtx=new RtxLightingPass();
     void setRtBackend(boolean enabled){rtx.enable(enabled);}
     void setRtOption(String option,boolean value){rtx.option(option,value);}
+    void referenceRt(boolean value){rtx.reference(value);}
+    void referenceSpp(int value){rtx.referenceSpp(value);}
+    void referenceReset(){rtx.referenceReset();}
+    void fireflyClamp(boolean value){rtx.fireflyClamp(value);}
     void benchmarkRt(){rtx.benchmark();}
     void setRtDebug(int value){rtx.debug(value);}
     void setCloudDebug(int value){composite.setCloudDebug(value);}
@@ -74,7 +78,7 @@ final class LightingResolvePass implements AutoCloseable {
         boolean useTemporal = temporal.prepare(output,projectionObserved);
         if(useTemporal && !RenderSystem.getDevice().precompilePipeline(LIGHTING_TEMPORAL,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Temporal lighting shader compilation failed");
         weather.prepare(encoder,composite.polished()&&!ao.debug());
-        rtx.trace(encoder,output,material,shadows,actualProjection,projectionObserved,weather);composite.setRtTransmission(rtx.transmission());
+        rtx.trace(encoder,output,material,shadows,actualProjection,projectionObserved,weather);composite.setRtTransmission(rtx.transmission());composite.setRtGuides(rtx.coverage(),rtx.interfaceNormal(),rtx.surfaceKey(),rtx.materialIds());
         renderCurrent(encoder,output,material,shadows,useTemporal);
         var result = useTemporal ? temporal.resolve(encoder,hdrView,material,shadows,actualProjection) : hdrView;
         result=rtx.active()?rtx.composite(encoder,output,material,result):pathtrace.render(encoder,output,material,shadows,result,actualProjection,projectionObserved,pbrSettings);
@@ -106,7 +110,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setVolumeTemporal(boolean value){composite.setVolumeTemporal(value);}
     void setVolumeFilter(boolean value){composite.setVolumeFilter(value);}
     void setQuality(com.voxellight.world.VisualQuality value){rtx.quality(value);composite.setQuality(value);surfaces.setQuality(value);pathtrace.setQuality(value);}
-    void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.setRtTransmission(rtx.transmission());composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
+    void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.setRtTransmission(rtx.transmission());composite.setRtGuides(rtx.coverage(),rtx.interfaceNormal(),rtx.surfaceKey(),rtx.materialIds());composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
     void setPathTrace(boolean enabled){pathtrace.setEnabled(enabled);}
     void setPathTraceDenoise(boolean enabled){pathtrace.setDenoise(enabled);}
@@ -143,6 +147,8 @@ final class LightingResolvePass implements AutoCloseable {
             for (int i=0;i<names.length;i++) pass.bindTexture(names[i],material.view(i),nearest);
             pass.bindTexture("MaterialPbr",material.view(4),nearest);
             pass.bindTexture("RtSunVisibility",rtx.sunVisibility()==null?material.view(1):rtx.sunVisibility(),nearest);
+            pass.bindTexture("RtSurfaceKey",rtx.surfaceKey()==null?material.view(1):rtx.surfaceKey(),nearest);
+            pass.bindTexture("RtGeometryNormal",rtx.interfaceNormal()==null?material.view(1):rtx.interfaceNormal(),nearest);
             pass.bindTexture("RtCoverage",rtx.coverage()==null?material.view(1):rtx.coverage(),nearest);
             pass.bindTexture("MaterialTable",material.materialTable(),nearest);
             pass.setUniform("PbrSettings",pbrSettings);
@@ -171,7 +177,7 @@ final class LightingResolvePass implements AutoCloseable {
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting"))
                 .withBindGroupLayout(BindGroupLayout.builder().withSampler("SceneDepth")
-                        .withSampler("RtSunVisibility").withSampler("RtCoverage").withSampler("MaterialPbr").withSampler("MaterialTable").withUniform("PbrSettings",UniformType.UNIFORM_BUFFER).withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
+                        .withSampler("RtSunVisibility").withSampler("RtGeometryNormal").withSampler("RtCoverage").withSampler("RtSurfaceKey").withSampler("MaterialPbr").withSampler("MaterialTable").withUniform("PbrSettings",UniformType.UNIFORM_BUFFER).withSampler("MaterialAlbedo").withSampler("MaterialNormal").withSampler("MaterialEmission").withSampler("MaterialDepth")
                         .withSampler("ShadowMap").withSampler("MiddleShadowMap").withSampler("FarShadowMap").withSampler("NextShadowMap").withSampler("MiddleNextShadowMap").withSampler("FarNextShadowMap")
                         .withSampler("EntityShadowMap").withSampler("MiddleEntityShadowMap").withSampler("FarEntityShadowMap")
                         .withSampler("WaterSurfaceDepth").withSampler("VoxelOpacity").withSampler("ShapeBounds").withSampler("AmbientVisibility")

@@ -10,6 +10,7 @@ public final class OptixNative {
  public static native void updateSections(long context,ByteBuffer batch);
  public static native void invalidate(long context,ByteBuffer regions);
  public static native void render(long context,ByteBuffer settings,int width,int height,int atlasWidth,int atlasHeight,int idsWidth,int idsHeight,int options,int debug);
+ public static native void reference(long context,int spp,boolean reset,float clamp);
  public static native void benchmark(long context);
  public static native long[] stats(long context);
  public static native long[] timings(long context);

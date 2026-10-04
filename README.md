@@ -4,11 +4,14 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current release: **VoxelLight 0.36.0**, experimental raster-primary RTX lighting. Actual OptiX GAS/IAS traversal, GPU-only interop, separate diffuse/specular/transmission, world-space probes, textured LabPBR hits and dielectric glass/water; raster fallback retained. Native builds and CPU/shader tests pass; NVIDIA image/synchronization/FPS acceptance pending. [Architecture, limits and test checklist](docs/RTX-PATH-TRACING-ARCHITECTURE.md).
+Current release: **VoxelLight 0.37.0 — Physically Based Materials & Light Transport**. Material 3, matched BSDF/PDFs, conductor/coating/dielectric models, NEE/MIS, shared water medium, wave-driven sun caustics, strict RT edge reconstruction and reference convergence. Existing OptiX GAS/IAS, GPU-only interop, world probes and raster fallback are retained. CPU/shader/native builds pass; 0.37 NVIDIA visual acceptance remains pending. [Architecture, limits and test checklist](docs/RTX-PATH-TRACING-ARCHITECTURE.md).
 
-[Download 0.36.0 native client kit](https://temp.sh/yAssS/voxellight-client-kit-26.2-0.36.0.zip).
+[Download the native 0.37.0 client kit](https://temp.sh/qsUmu/voxellight-client-kit-26.2-0.37.0.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
 
 ## 文档
+
+- [Material 3](docs/MATERIAL-3.md)：material classes、LabPBR、coating、Vanilla presets、override API。
+- [RT light transport](docs/RT-LIGHT-TRANSPORT.md)：BSDF/NEE/MIS、edge reconstruction、media/caustics、reference与验收。
 
 - [RTX / path-tracing architecture](docs/RTX-PATH-TRACING-ARCHITECTURE.md)：0.36 ownership、GPU interop、GAS/IAS、world cache、BSDF/AOV、预算、诊断和验收。
 

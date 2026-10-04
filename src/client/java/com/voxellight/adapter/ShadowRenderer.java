@@ -107,6 +107,7 @@ public final class ShadowRenderer implements AutoCloseable {
     private long budgetEvictions;
     private GpuBuffer resolveSettings;
     private final ShadowAnchor anchor = new ShadowAnchor();
+    float[] rtVirtualLight(){return artificial.rtVirtualLight();}
     private final ArtificialLights artificial = new ArtificialLights();
     private final DynamicCasterSystem dynamic = new DynamicCasterSystem();
     private final NativeShadowCasters nativeCasters = new NativeShadowCasters();

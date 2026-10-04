@@ -76,6 +76,7 @@ final class ArtificialLights implements AutoCloseable {
         return new Held(eye.x,eye.y-.25,eye.z,emission,color);
     }
 
+    float[] rtVirtualLight(){var held=heldLight();if(held==null)return new float[8];float intensity=held.emission()/15f*.7f;return new float[]{(float)held.x(),(float)held.y(),(float)held.z(),1,held.color().red()*intensity,held.color().green()*intensity,held.color().blue()*intensity,0};}
     void prepare(WorldSceneBridge bridge, SectionKey camera) {
         long start = System.nanoTime();
         var stats = bridge.stats();

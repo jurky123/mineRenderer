@@ -131,7 +131,7 @@ void main() {
     hdr.rgb=MediumControls.z>.5?hdr.rgb*(1-cloud.a)+cloud.rgb:mix(hdr.rgb,cloud.rgb,cloud.a);
     if(MediumControls.w>.5&&transmitted.a>0&&UnderwaterControls.x>.5){
         vec3 t=exp(-vec3(.16,.060,.035)*min(length(position),96.0));
-        hdr.rgb+=vec3(.025,.11,.16)*(.35+max(DirectColorStrength.a,0.0))*(1.0-t);
+        // RTX owns participating water extinction and in-scattering; no additional blue overlay.
     }else hdr.rgb=underwaterMedium(hdr.rgb,position,SkyColorStrength.rgb,DirectColorStrength.a);
     vec3 displayed;
     if(VolumeParameters.x>.5) {

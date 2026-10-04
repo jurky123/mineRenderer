@@ -77,6 +77,8 @@ tasks.register('clientKit', Zip) {
     from(tasks.named('jar')) { into 'mods' }
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
     from('docs/RTX-PATH-TRACING-ARCHITECTURE.md')
+    from('docs/MATERIAL-3.md')
+    from('docs/RT-LIGHT-TRANSPORT.md')
 }
 
 // Optional native build is explicit; the regular Java build remains usable without SDKs.

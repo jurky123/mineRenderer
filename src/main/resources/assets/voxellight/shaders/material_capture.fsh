@@ -147,6 +147,7 @@ void main() {
     outNormal.a=(2.0+clamp(ChunkVisibility,0.0,1.0))/3.0;
 #endif
     // Material strengths only. This is deliberately not a claim of emissive RGB radiance.
-    outEmission = vec4(max(float(emissionFlags.x) / 15.0,pbrId.b*255.0/254.0), float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));
+    bool labEmission=(int(round(pbrId.a*255.0))&4)!=0;
+    outEmission = vec4(labEmission?pbrId.b*255.0/254.0:float(emissionFlags.x)/15.0, labEmission?0.0:float(emissionFlags.y & 15) / 15.0, clamp(compatibilityLight.y, 0.0, 1.0), clamp(compatibilityLight.x, 0.0, 1.0));
     outMaterialPbr=vec4(pbrId.rg,octEncode(shadingNormal));
 }

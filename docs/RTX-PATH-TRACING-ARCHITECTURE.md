@@ -1,4 +1,6 @@
-# Raster-primary RTX architecture — 0.36.0
+# Raster-primary RTX architecture — 0.37.0
+
+0.37 supersedes the earlier material/transport details below with [Material 3](MATERIAL-3.md) and [RT light transport](RT-LIGHT-TRANSPORT.md): BSDF evaluation/PDF, NEE/MIS, shared participating-water single scattering, caustic photons, strict edge reconstruction and reference accumulation. The original ownership, GAS/IAS and interop design remains in place. The user confirmed the 0.36 RTX paths run; the new 0.37 visual suite is pending.
 
 Implementation status: experimental, compiled for Windows/Linux x86-64 against OptiX 9.1 and CUDA 12.9. CPU tests and real GLSL/SPIR-V contracts run on the build host. The host has no NVIDIA GPU or display: RT image quality, synchronization validation, GAS/AABB measurements and FPS acceptance are **not measured**. This document distinguishes the implemented architecture from those acceptance gates.
 
@@ -6,7 +8,7 @@ Implementation status: experimental, compiled for Windows/Linux x86-64 against O
 
 ```mermaid
 flowchart TD
-    Native[Native terrain: single raster MRT] --> Guides[Material2 / LabPBR / depth / normal]
+    Native[Native terrain: single raster MRT] --> Guides[Material3 / LabPBR / depth / normal]
     Guides --> Export[GPU guide buffers + exportable memory]
     Scene[Incremental section GAS + model GAS + IAS] --> Optix[OptiX RT Core traversal]
     Export --> Optix
@@ -39,7 +41,7 @@ Coverage is validated against the raster surface. Uncompiled/out-of-budget recei
 
 ## OptiX scene
 
-Terrain uses exact native compiled triangles, including stairs, fences, slabs, cutout foliage, fluids and supported modded baked models. Positions are section-local; IAS provides the section world transform. Each changed section rebuilds its own GAS. A geometry hash excludes packed vanilla light, so LIGHT-only recompilation does not rebuild identical GAS. World unchanged means no terrain AS build. Edits reject old section snapshots and invalidate nearby probes. Unloaded/evicted sections are removed. AS/vertex storage from previous submissions retires behind CUDA events.
+Terrain uses exact native compiled triangles, including stairs, fences, slabs, cutout foliage, fluids and supported modded baked models. Positions are section-local; IAS provides the section world transform. Each changed section rebuilds its own GAS. A geometry hash excludes native block-light values; skylight access is retained as coating metadata. Identical geometry/attributes do not rebuild GAS; changed sky-access metadata may require a section upload/build. World unchanged means no terrain AS build. Edits reject old section snapshots and invalidate nearby probes. Unloaded/evicted sections are removed. AS/vertex storage from previous submissions retires behind CUDA events.
 
 Missing loaded sections are admitted outside the camera frustum through one bounded background native compiler. It creates RT triangles only: there is no second material raster and no duplicate native terrain GPU upload. Admission is nearest-first, capped at 512 sections, four completed updates per frame. Resident sections are rechecked against loaded chunks and a bounded camera region. This warms offscreen geometry without making camera rotation the RT scene identity.
 
@@ -49,19 +51,19 @@ Supported opaque/cutout entity and block-entity model submissions are transforme
 
 ## Unified material semantics
 
-Primary and secondary surfaces use the same Material2/LabPBR palette: encoded base atlas color is decoded to linear reflectance; smoothness becomes roughness; dielectric F0 and LabPBR conductor IDs use the same optical constants; emission, normal maps and material IDs come from the same authored assets. Secondary hit UVs sample the actual block texture and unlit vertex tint, not map color. Supported entity models use a GPU skin/model atlas and a conservative dielectric profile. Triangle UV derivatives construct a tangent frame for the authored normal map; geometric normal remains separate for medium entry/exit.
+Primary and secondary surfaces use the same Material3/LabPBR palette: encoded base atlas color is decoded to linear reflectance; perceptual smoothness becomes microfacet alpha (1−s)²; dielectric F0 and LabPBR conductor IDs use the same optical constants; emission, normal maps and material IDs come from the same authored assets. Secondary hit UVs sample the actual block texture and unlit vertex tint, not map color. Supported entity models use a GPU skin/model atlas and a conservative dielectric profile. Triangle UV derivatives construct a tangent frame for the authored normal map; geometric normal remains separate for medium entry/exit.
 
-The resolved RT material carries base color, shading/geometric normal, roughness, conductor/F0, emission, transmission, IOR, absorption RGB, thin-surface and geometry flags. A material identifier texture labels glass and water without adding full-resolution float attachments. Vanilla clear/stained-glass profiles are included. Resource texture naming identifies glass/water; arbitrary custom transmissive resource naming currently needs that convention. The public `RtMaterial` record defines the common linear optical contract, while the GPU representation is packed palette data plus hit attributes.
+The resolved RT material carries base color, shading/geometric normal, roughness, conductor/F0, emission, transmission, IOR, absorption RGB, thin-surface and geometry flags. A material identifier texture labels glass and water without adding full-resolution float attachments. Vanilla clear/stained-glass profiles are included. Resource texture naming identifies glass/water; arbitrary custom transmissive resource naming currently needs that convention. The legacy public `RtMaterial` record remains for reference optical helpers; `world/Material3` and `native/rt/bsdf.h` are the authoritative scattering contract, packed in the shared five-plane table.
 
-GGX uses visible-normal distribution sampling, Smith masking and Schlick Fresnel; secondary dielectric paths choose diffuse/specular lobes with sampling probability compensation. Conductor Fresnel constants match primary PBR. Russian roulette begins after the first bounce. Colored wall bounces multiply linear texture reflectance; metallic surfaces have no diffuse term. There is no brightness bootstrap or display crossfade in RTX Quality.
+GGX uses visible-normal distribution sampling, correlated Smith masking and exact dielectric/conductor Fresnel (custom albedo-F0 metal uses Schlick). All hits evaluate/sample the complete BSDF with matched PDFs, NEE and MIS. Russian roulette starts after two bounces. Colored wall bounces carry BSDF × cosine / PDF; metallic surfaces have no diffuse term. There is no brightness bootstrap or display crossfade in RTX Quality.
 
 ## Reflection, glass and water
 
 RT specular traces the real bounded scene, including offscreen compiled geometry and retained instances. Roughness changes the GGX distribution; smooth surfaces are not SSR, and rough surfaces are not an artificially blurred mirror. Misses use the environment estimate. Generic raster presets keep HZB SSR.
 
-Glass volume paths use IOR 1.5, stochastic Fresnel reflection/refraction, Snell's law, total internal reflection, radiance-mode eta compensation and a four-medium stack. Water uses IOR 1.333. Beer–Lambert absorption is RGB and measures interface-to-interface distance. Panes use a thin-surface approximation; alpha-test rejection is bypassed for dielectric surfaces, including clear glass texels. Directional visibility traverses up to 16 interfaces and carries RGB transmittance, so stained glass colors transmitted sunlight on diffuse receivers. This is straight directional transmittance, **not refractive focused caustic transport**.
+Glass volume paths use IOR 1.5, stochastic Fresnel reflection/refraction, Snell's law, total internal reflection, radiance-mode eta compensation and an eight-entry identity-aware medium stack. Water uses IOR 1.333. Beer–Lambert absorption is RGB and measures interface-to-interface distance. Panes use a thin-surface approximation; alpha-test rejection is bypassed for dielectric surfaces, including clear glass texels. Directional visibility traverses up to 24 interfaces and carries RGB transmittance, so stained glass colors transmitted sunlight on diffuse receivers. Straight directional transmittance remains available; the independent 0.37 sun-photon cache supplies bounded refractive caustics as described in RT-LIGHT-TRANSPORT.
 
-Water and glass share the dielectric integrator. Water uses the same macro/micro normal field and wind clock as raster water, plus independent rain ripples. Three dispersive differently directed long-wave slopes supply macro structure; advected procedural noise supplies micro detail. Raster derivative filtering reduces distant frequencies. These are normal waves, not displaced wave geometry. The raster water volume supplies scattering; RT already supplies absorption, so the RTX post path avoids applying absorption twice. Photon-traced caustics and volumetric multiple scattering are not implemented.
+Water and glass share the dielectric integrator. Water uses the same macro/micro normal field and wind clock as raster water, plus independent rain ripples. Three dispersive differently directed long-wave slopes supply macro structure; advected procedural noise supplies micro detail. Raster derivative filtering reduces distant frequencies. These are normal waves, not displaced wave geometry. RTX water owns RGB extinction and HG single-scattering NEE, with camera and surface using the same material medium. The bounded sun-photon caustic cache uses these actual wave normals. Raster volume/caustics remain the Performance fallback; volumetric multiple scattering is not implemented.
 
 ## World radiance cache and new views
 
@@ -83,7 +85,7 @@ Optional external-memory/semaphore device extensions are enabled only when suppo
 
 Per frame: Vulkan writes guides → graphics-to-EXTERNAL ownership barrier → signal `ready` and submit → CUDA waits `ready`, traces/denoises → signal `done` → Vulkan waits `done`, EXTERNAL-to-graphics barrier → GPU buffer-to-texture copies and HDR composition. Two binary semaphores have explicit single ordered producer/consumer ownership. Windows handles are closed after import; successful CUDA FD imports own their FDs. CUDA imports are destroyed before Vulkan resources are deferred for destruction.
 
-Normal RTX frames do not read image data to the CPU or upload image results from it. CPU scene geometry/transform/parameter batches are ordinary AS inputs; GPU atlas/guide/signal exchange remains GPU-only. Normal frames do not call `vkDeviceWaitIdle`, `cuStreamSynchronize` or wait on an event. Context shutdown synchronizes the CUDA stream to retire resources. Benchmark-only hit comparison uses asynchronous diagnostic readback.
+Normal RTX frames do not read image data to the CPU or upload image results from it. CPU scene geometry/transform/parameter batches are ordinary AS inputs; GPU atlas/guide/signal exchange remains GPU-only. Normal frames do not call `vkDeviceWaitIdle`, `cuStreamSynchronize` or wait on an event. Context shutdown synchronizes the CUDA stream to retire resources. Benchmark hit comparison and delayed 36-byte operation telemetry use asynchronous diagnostic readback; neither transfers image results.
 
 Official contracts: [CUDA graphics interop](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/graphics-interop.html), [CUDA external resources](https://docs.nvidia.com/cuda/cuda-driver-api/cuda_driver_api/group__CUDA__EXTRES__INTEROP.html), [OptiX denoiser API](https://raytracing-docs.nvidia.com/optix9/api/group__optix__host__api__denoiser.html).
 
@@ -151,4 +153,4 @@ Use the same seed, camera route, resolution, render distance, weather/time and r
 8. Run triangle/AABB diagnostic: compare p50/p95 and `rtBenchmarkMismatches=0`; measure synthetic rays/s separately from actual scene performance.
 9. Profile all three signals, denoiser, scene updates, clouds and composite; compare every A/B switch and verify `rtCpuStaging=false` only for the active RTX path.
 
-All nine GPU acceptance groups remain pending on this build host. Full primary-ray PT, physically focused caustics, arbitrary transmissive mod conventions, perfect offscreen animated poses and full RT volume scattering are not claimed by 0.36.0.
+All nine GPU acceptance groups remain pending on this build host. Full primary-ray PT, general caustic receiver coverage, perfect offscreen animated poses and multiple-scattering water are not claimed by 0.37.0. The bounded directional caustic and single-scattering models are detailed in RT-LIGHT-TRANSPORT.

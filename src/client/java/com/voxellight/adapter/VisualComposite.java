@@ -69,6 +69,7 @@ final class VisualComposite implements AutoCloseable {
         display(encoder,output,shadows,material,source,environment,ao,weather,motion,terrain);
     }
     private GpuTextureView rtTransmission;
+    void setRtGuides(GpuTextureView p,GpuTextureView n,GpuTextureView key,GpuTextureView ids){water.setRtGuides(p,n,key,ids);}
     void setRtTransmission(GpuTextureView view){rtTransmission=view;water.setRtTransmission(view);}
     void prepareWater(RenderTarget target,ShadowRenderer shadows,GpuBuffer environment,AmbientOcclusionPass ao,EnvironmentPass weather) {
         water.prepareTranslucent(target,shadows,visualSettings,atmosphereSettings,environment,weather.settings(),bloom,polished && (waterEnabled||rtTransmission!=null) && !ao.debug());

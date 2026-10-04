@@ -1,5 +1,15 @@
 # VoxelLight release history
 
+## 0.37.0 — Physically Based Materials & Light Transport
+
+- Preserve single-raster primary visibility, incremental OptiX scene, GPU-only interop and raster fallback. Replace native material branches with production BSDF evaluation/sampling/PDF and separate material/light/path modules.
+- Material 3 classes, explicit perceptual roughness/microfacet alpha, shared five-plane table, LabPBR 1.3 source priority, normal/AO/height decoding, published conductor eta/k, coats/foliage/rough dielectrics, 1,269 Vanilla texture presets and material override/report tooling.
+- Every secondary bounce uses textured linear material BSDF. Add sun/environment/emissive/held-point NEE, power-CDF area sampling, solid-angle PDFs and power-heuristic MIS; retain explicit primary direct ownership.
+- Match Minecraft terrain cutout alpha 0.5 instead of the previous RT 0.1; signal-specific material/normal/plane/footprint/hit-distance reconstruction and trust reject cross-object reuse. Translucent effects resolve at their actual native interface; rejected observations preserve raster lighting.
+- Shared water medium parameters, extinction and HG single-scattering NEE; eight-entry identity-aware nested media; bounded sun-photon caustics driven by actual wave refraction. Preserve separate raster approximations for fallback.
+- Configurable 4–4,096-spp, eight-bounce reference convergence; independent debug/A-B/clamp controls, delayed GPU stage times and operation counters; furnace/reciprocity/PDF/Monte Carlo/medium tests use the actual CUDA BSDF header on CPU.
+- 233 tests, native Windows/Linux builds and GLSL/SPIR-V compilation verified. NVIDIA visual correctness/performance acceptance is pending; known finite coverage, thin-layer/microfacet/single-scattering/caustic/animated-map limits remain explicit in [RT-LIGHT-TRANSPORT](RT-LIGHT-TRANSPORT.md).
+
 ## 0.36.0 — Experimental raster-primary RTX lighting
 
 - Actual OptiX raygen/miss/closest-hit/any-hit, exact native section triangle GAS and incremental world IAS. Bounded offscreen loaded-section admission, geometry hashes, stale snapshot rejection, shared/refittable captured model GAS and retained entity/block-entity instances. Isolated triangle/custom-AABB performance and asynchronous hit-correctness benchmark.

@@ -88,6 +88,10 @@ public final class RenderProbe {
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
     public void setRtOption(String option,boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtOption(option,enabled);}
+    public void referenceRt(boolean value){lighting.referenceRt(value);}
+    public void referenceSpp(int value){lighting.referenceSpp(value);}
+    public void referenceReset(){lighting.referenceReset();}
+    public void fireflyClamp(boolean value){lighting.fireflyClamp(value);}
     public void benchmarkRt(){RenderSystem.assertOnRenderThread();lighting.benchmarkRt();}
     public void setCloudDebug(int value){RenderSystem.assertOnRenderThread();lighting.setCloudDebug(value);}
     public void setRtDebug(int debug){RenderSystem.assertOnRenderThread();lighting.setRtDebug(debug);}

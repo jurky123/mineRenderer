@@ -1,8 +1,8 @@
 # VoxelLight 实施计划
 
-Current milestone: **0.36.0 RTX Quality architecture**. Implemented phases A–F: exportable GPU resources and OptiX scene, specular/dielectric transmission, world-probe diffuse GI, separate temporal AOVs, voxel/fuzzy clouds and split atmosphere/waves, presets/debug/profiling/geometry benchmark. Full GPU acceptance remains pending; do not mark the success criteria accepted until measurements and visual scenes pass on NVIDIA hardware. [Architecture, constraints and acceptance methodology](RTX-PATH-TRACING-ARCHITECTURE.md).
+Current milestone: **0.37 Physically Based Materials & Light Transport**. Implementation retains the user-tested 0.36 RTX architecture and upgrades materials, BSDF/PDFs, NEE/MIS, signal edge reconstruction, water medium/caustics and reference diagnostics. Contracts and implementation limits: [MATERIAL-3](MATERIAL-3.md), [RT-LIGHT-TRANSPORT](RT-LIGHT-TRANSPORT.md).
 
-Next gate: NVIDIA Vulkan validation and the GI/metal/glass/water/cloud acceptance suite; export true pass/world p50/p95 and triangle/AABB hit comparisons. Then prioritize measured defects/costs. Future work includes complete independent entity/model extraction, animated secondary textures, distant scene representation, reflected/refracted motion, aliasing and Cinematic primary rays. CUDA reference remains frozen for A/B. Earlier sections below are historical, not the active release state.
+Next gate: the seven 0.37 visual correctness scenes (edges, Cornell/color bleeding, metals, roughness, glass/media, water, wetness/foliage), comparing realtime against reference. Export GPU/CPU p50/p95 only on actual NVIDIA hardware. Do not move to pure performance optimization until these image checks pass. Later work includes complete animated secondary maps, independent offscreen model materials/velocity, full layered/microfacet multiple scattering, general caustic receiver representation and Cinematic primary rays. Earlier sections below are historical.
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 

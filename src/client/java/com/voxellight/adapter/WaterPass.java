@@ -25,7 +25,7 @@ final class WaterPass implements AutoCloseable {
             .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","water_native"))
             .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","water_native"))
             .withShaderDefine("ALPHA_CUTOUT",.1f)
-            .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtTransmission").withSampler("WaterHdr").withSampler("WaterDepth").withSampler("WaterHzb").withSampler("EmissiveBloom")
+            .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtTransmission").withSampler("RtInterfacePosition").withSampler("RtInterfaceNormal").withSampler("RtSurfaceKey").withSampler("RtMaterialIds").withSampler("WaterHdr").withSampler("WaterDepth").withSampler("WaterHzb").withSampler("EmissiveBloom")
                     .withUniform("WaterSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
                     .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                     .withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER).build())
@@ -52,7 +52,8 @@ final class WaterPass implements AutoCloseable {
     private VisualQuality quality=VisualQuality.BALANCED;
     private long waveTick=System.nanoTime();
     private double wavePhase;
-    private GpuTextureView rtTransmission;
+    private GpuTextureView rtTransmission,rtInterfacePosition,rtInterfaceNormal,rtSurfaceKey,rtMaterialIds;
+ void setRtGuides(GpuTextureView p,GpuTextureView n,GpuTextureView key,GpuTextureView ids){rtInterfacePosition=p;rtInterfaceNormal=n;rtSurfaceKey=key;rtMaterialIds=ids;}
     void setRtTransmission(GpuTextureView view){rtTransmission=view;}
     private String state="waiting";
     private int width,height;
@@ -133,7 +134,7 @@ final class WaterPass implements AutoCloseable {
         pass.setPipeline(WATER);
         var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         pass.bindTexture("WaterHzb",hzbActive()?hzb.view():depthView,nearest);
-        pass.bindTexture("RtTransmission",rtTransmission==null?depthView:rtTransmission,nearest);
+        pass.bindTexture("RtSurfaceKey",rtSurfaceKey==null?hdrView:rtSurfaceKey,nearest);pass.bindTexture("RtMaterialIds",rtMaterialIds==null?hdrView:rtMaterialIds,nearest);pass.bindTexture("RtInterfacePosition",rtInterfacePosition==null?hdrView:rtInterfacePosition,nearest);pass.bindTexture("RtInterfaceNormal",rtInterfaceNormal==null?hdrView:rtInterfaceNormal,nearest);pass.bindTexture("RtTransmission",rtTransmission==null?depthView:rtTransmission,nearest);
         pass.bindTexture("WaterHdr",hdrView,nearest);pass.bindTexture("WaterDepth",depthView,nearest);bloom.bind(pass);
         pass.setUniform("WaterSettings",settings);pass.setUniform("VisualSettings",visual);pass.setUniform("AtmosphereSettings",atmosphere);pass.setUniform("LightingEnvironment",environment);pass.setUniform("EnvironmentSettings",weather);
         shadows.bindTransform(pass);return true;

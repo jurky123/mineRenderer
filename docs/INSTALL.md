@@ -1,6 +1,6 @@
 # VoxelLight 26.2 接入原型
 
-版本：0.36.0。Minecraft26.2 / Java25 / Fabric客户端。默认effects off；原生Vulkan必需。新增实验性RTX Quality：真实OptiX GAS/IAS、GPU external-memory/semaphore、world probes、独立diffuse/specular/transmission和temporal AOV去噪。保留raster和旧CUDA GI reference。此包内含本mod的Windows/Linux x86-64 native组件，不含SDK、驱动或其他mods。
+版本：0.37.0。Minecraft26.2 / Java25 / Fabric客户端。默认effects off；原生Vulkan必需。新增实验性RTX Quality：真实OptiX GAS/IAS、GPU external-memory/semaphore、world probes、独立diffuse/specular/transmission和temporal AOV去噪。保留raster和旧CUDA GI reference。此包内含本mod的Windows/Linux x86-64 native组件，不含SDK、驱动或其他mods。
 
 需要兼容OptiX9.1/CUDA12.9的NVIDIA RTX驱动；用户现有591.74是目标测试配置，仍需实机确认。无支持/UUID不匹配/预算/运行失败时自动保留raster，查看status。构建主机无NVIDIA GPU，不能宣称此版已经通过GPU验收。完整[架构/约束/测试](RTX-PATH-TRACING-ARCHITECTURE.md)。旧`pathtrace`命令仍运行原CUDA reference及其bootstrap，不是新的RTX路径。
 
@@ -8,7 +8,7 @@
 
 1. 创建 Minecraft Java **26.2** 的 Fabric 客户端，使用 Java **25**、Fabric Loader **0.19.5** 或兼容的新版本。
 2. 安装 [Fabric API 0.160.0+26.2](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.160.0+26.2/fabric-api-0.160.0+26.2.jar)。已有兼容的 Fabric API 时无需重复安装。
-3. 将安装包 `mods/voxellight-client-26.2-0.36.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
+3. 将安装包 `mods/voxellight-client-26.2-0.37.0.jar` 放进该客户端的 `mods/`，替换旧版 VoxelLight，保留其他前置。
 4. 视频设置中选择 Vulkan，然后进入测试世界。首次验证使用 vanilla 材质和不含其他 renderer mod 的独立测试配置。
 
 ## RTX Quality 测试
@@ -26,6 +26,16 @@
 A/B：`rt_gi`、`rt_reflections`、`rt_transmission`、`radiance_cache`、`rt_denoiser`、`voxel_clouds`均支持`on/off`。`rt_backend cuda_voxel_reference`保留旧GI对照。`rt_benchmark`运行triangle/AABB诊断；status中的mismatch=-1表示尚未完成，不是通过。通过后应为0；导出profiling比较p50/p95，不能凭FPS猜AS表示胜负。
 
 默认aerial density0.00035；`atmosphere_density`、`volume_density`（默认0.001）、`forward_scatter`（默认0.35）独立调节。新RTX GI不使用32/64spp bootstrap；未知未加载世界仍需要scene/cache warmup。光线场和反射有资源/scene覆盖预算，unsupported模型保持native/raster；详见架构限制。`preset cinematic`仅预留接口，没有Full primary PT。
+
+## 0.37 材质 / 输运验收
+
+先用 `/voxellight preset rtx_quality`，检查 status 正常，然后 `/voxellight rt_debug edge_confidence` 查看物体边缘；`rt_debug off` 恢复画面。分别看树叶/fence/stairs/slab/pane/岸边/金属轮廓，再做 Cornell 彩墙白房间、金属反射和 roughness ladder。
+
+Reference 对照：`rt_reference on`、`rt_reference spp 256`、`rt_reference reset`，保持镜头不动直到 `rtReferenceSamples=256`。该模式使用当前 BSDF+NEE/MIS、8 bounce，禁用 probe、temporal denoise、caustic approximation 和 clamp；它仍是 raster-primary reference。转头会重新开始 reference 积累，**不是** realtime world-cache 模式。`rt_reference off` 返回 realtime。
+
+`rt_caustics on/off`、`rt_firefly_clamp on/off` 支持独立 A/B。`rt_debug material_class/microfacet_alpha/eta/k/coat_weight/sigma_a/sigma_s/bsdf_pdf/light_pdf/mis_weight/bounce_count` 等视图定位材质和采样错误。完整模型、override JSON、已知限制及验收见 [MATERIAL-3](MATERIAL-3.md) 和 [RT-LIGHT-TRANSPORT](RT-LIGHT-TRANSPORT.md)，两份文档随包提供。
+
+新增 override 放 `config/voxellight-materials.json`，或资源包 `assets/<namespace>/material_overrides/*.json`，F3+T 重载。LabPBR 提供的 channel 拥有最高优先级。此次 GPU 图像验收仍需实机完成，不把 CPU/shader tests 当视觉证明。
 
 ## 命令
 
@@ -493,10 +503,10 @@ Compare the same shoreline/building/ocean view on/off, especially grazing water,
 
 PBR默认在polished foundation开启；启动仍off。放置stone、wood、iron、gold、copper和ice，对比`/voxellight pbr off`与`on`，移动观察太阳高光。`/voxellight wetness on|off`比较雨天露天地面。`/voxellight pbr_debug roughness|metal|normal|off`检查材质。静态LabPBR `_n`/`_s`资源包随F3+T重新加载；animated maps、POM、SSS和实体PBR尚未实现。详细预算、材质包配置与实机检查：[Material 2.0](MATERIAL-2.md)。GI仍会在新视角获得后继续细化。
 
-## 0.36.0 Single-raster MRT
+## 0.37.0 Single-raster MRT
 
 在foundation模式对比`/voxellight single_raster off`与`on`。默认on；status应显示`materialRaster=single`。检查plants、远处chunk fade、PBR材质、opaque entity、水、F3+T、resize与维度切换。画面应基本一致；profiler中on为`native_material_single`，没有额外`material_native`地形pass。`off`恢复0.31.0的两次terrain raster。实测FPS尚未知；新pass包含native terrain工作，不能只比较旧material pass单项计时。详见仓库docs/SINGLE-RASTER.md。
 
-## 0.36.0 reflection / GI response check
+## 0.37.0 reflection / GI response check
 
 Compare dry stone/wood with iron/gold/ice: rough surfaces should no longer receive sharp screen reflections. Test rain separately. With `/voxellight pathtrace on`, look at a wall, turn away, then return; cached static block-face lighting should be available before the next worker result. Newly revealed, never-sampled faces can still acquire GI asynchronously. Inspect `pathtraceSurfaceCache` and `pathtraceCacheBytes` in status. Freeze retains screen-reprojected observations and disables cache fallback. Compare FPS during motion: new views may submit up to20 Hz (Fast10 Hz), steady refinement stays10/5 Hz.
