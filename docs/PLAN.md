@@ -1,3 +1,7 @@
+## 0.37.4 dispatch follow-up
+
+Confirmed 0.37.3 startup responsiveness; driver compile took ~37 minutes. Fix invalid-mip output transfer and reduce heavy forced inlining. Pending NVIDIA compilation timing, reference samples/convergence and runtime performance.
+
 ## 0.37.3 initialization follow-up
 
 Implemented nonblocking native startup with safe abandonment and stage diagnostics. Pending: NVIDIA first-start responsiveness, reference convergence, and disable/re-enable acceptance.

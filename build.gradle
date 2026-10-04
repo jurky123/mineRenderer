@@ -79,6 +79,7 @@ tasks.register('clientKit', Zip) {
     from('docs/RTX-PATH-TRACING-ARCHITECTURE.md')
     from('docs/REFERENCE-0.37.2.md')
     from('docs/REFERENCE-0.37.3.md')
+    from('docs/REFERENCE-0.37.4.md')
     from('docs/SETTINGS.md')
     from('docs/MATERIAL-3.md')
     from('docs/RT-LIGHT-TRANSPORT.md')

@@ -1,3 +1,10 @@
+# 0.37.4 — RT output copies and compiler expansion
+
+- Fix MC 26.2 buffer-to-texture source extents/mip/layer argument order for every RT guide/signal.
+- Regression tests exercise the real Minecraft validation and reproduce the previous invalid-mip error.
+- Keep heavy CUDA BSDF/transport routines out of line; use OptiX optimization level 2 to reduce compiler expansion.
+- Background startup retained; NVIDIA startup timing/convergence/performance acceptance pending.
+
 # 0.37.3 — Nonblocking OptiX startup
 
 - Move CUDA/OptiX library, context, module compilation and pipeline linking to a daemon startup worker; retain raster frames while pending.

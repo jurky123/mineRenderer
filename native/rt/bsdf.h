@@ -3,11 +3,13 @@
 // Shared verbatim by CUDA and the CPU Monte Carlo regression executable.
 #ifdef __CUDACC__
 #define RT_FN static __forceinline__ __device__
+#define RT_HEAVY static __noinline__ __device__
 #define RT_METHOD __forceinline__ __device__
 #else
 #include <cmath>
 #include <algorithm>
 #define RT_FN static inline
+#define RT_HEAVY static inline
 #define RT_METHOD inline
 #endif
 namespace rt {
@@ -61,7 +63,7 @@ RT_FN Vec cosine(unsigned& s){float r=sqrtf(rng(s)),a=2*Pi*rng(s);return V(r*cos
 RT_FN bool dielectric(const Material& m){return m.type==DIELECTRIC||m.type==THIN_DIELECTRIC||m.type==WATER;}
 RT_FN bool metal(const Material& m){return m.type==CONDUCTOR||m.type==COATED_CONDUCTOR;}
 RT_FN float specProbability(const Material& m){return metal(m)?1:clamp(m.f0*2,.05f,.5f);}
-RT_FN BsdfEval evalLocal(const Material& m,Vec wo,Vec wi,float eta=1.5f,int forced=0){
+RT_HEAVY BsdfEval evalLocal(const Material& m,Vec wo,Vec wi,float eta=1.5f,int forced=0){
  BsdfEval result{V(0,0,0),0};if(wo.z<=0||fabsf(wi.z)<1e-7f)return result;
  float ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV);
  bool refl=wi.z>0;
@@ -89,7 +91,7 @@ RT_FN BsdfEval evalLocal(const Material& m,Vec wo,Vec wi,float eta=1.5f,int forc
  return result;
 }
 RT_FN BsdfEval evalBsdf(const Material& m,const Frame& f,Vec wo,Vec wi,float eta=1.5f,int forced=0){return evalLocal(m,f.local(wo),f.local(wi),eta,forced);}
-RT_FN BsdfSample sampleBsdf(const Material& m,const Frame& f,Vec woWorld,unsigned& seed,float eta=1.5f,int forced=0){
+RT_HEAVY BsdfSample sampleBsdf(const Material& m,const Frame& f,Vec woWorld,unsigned& seed,float eta=1.5f,int forced=0){
  Vec wo=f.local(woWorld),wi=V(0,0,0);BsdfSample s{V(0,0,0),V(0,0,0),0,1,0};if(wo.z<=0)return s;
  float ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV);unsigned flags=0;
  if(m.type==THIN_DIELECTRIC){float R=fresnelDielectric(wo.z,eta);R=2*R/(1+R);bool refl=forced==1||forced!=2&&rng(seed)<R;float probability=forced?1:refl?R:1-R;s.wi=f.world(refl?V(-wo.x,-wo.y,wo.z):wo*-1);s.weight=V(1,1,1)*((refl?R:(1-R)*m.transmission)/fmaxf(probability,1e-7f));if(!refl)s.weight=s.weight*expNeg(m.sigmaA,m.thickness/fmaxf(.01f,wo.z));s.pdf=probability;s.flags=SPECULAR|DELTA|(refl?REFLECTION:TRANSMISSION);return s;}

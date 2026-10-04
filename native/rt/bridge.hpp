@@ -72,7 +72,7 @@ struct RtContext {
   rtInitializationStage=1;check(d.cuInit(0));int count;check(d.cuDeviceGetCount(&count));for(int i=0;i<count;i++){CUdevice dev;CUuuid id;check(d.cuDeviceGet(&dev,i));check(d.cuDeviceGetUuid(&id,dev));if(!memcmp(uuid,id.bytes,16)){device=dev;break;}}
   if(device<0)throw std::runtime_error("RTX CUDA/Vulkan physical UUID mismatch");
   check(d.cuDevicePrimaryCtxRetain(&cuda,device));check(d.cuCtxSetCurrent(cuda));check(d.cuStreamCreate(&stream,CU_STREAM_NON_BLOCKING));rtInitializationStage=2;check(optixInit());OptixDeviceContextOptions contextOptions{};check(optixDeviceContextCreate(cuda,&contextOptions,&optix));
-  OptixModuleCompileOptions mo{};mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
+  OptixModuleCompileOptions mo{};mo.optLevel=OPTIX_COMPILE_OPTIMIZATION_LEVEL_2;
   OptixPipelineCompileOptions po{};po.usesMotionBlur=false;po.traversableGraphFlags=OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING|OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;po.numPayloadValues=2;po.numAttributeValues=2;po.pipelineLaunchParamsVariableName="params";po.usesPrimitiveTypeFlags=OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE|OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
   char log[8192];size_t logSize=sizeof(log);rtInitializationStage=3;auto result=optixModuleCreate(optix,&mo,&po,code,strlen(code),log,&logSize,&module);if(result!=OPTIX_SUCCESS)throw std::runtime_error(std::string("RT module: ")+log);
   OptixProgramGroupDesc desc[4]{};desc[0].kind=OPTIX_PROGRAM_GROUP_KIND_RAYGEN;desc[0].raygen.module=module;desc[0].raygen.entryFunctionName="__raygen__lighting";

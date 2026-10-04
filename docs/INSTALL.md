@@ -1,3 +1,7 @@
+## 0.37.4 reference transfer update
+
+Install the matching native kit to get corrected RT texture copies and reduced compiler expansion. See [REFERENCE-0.37.4.md](REFERENCE-0.37.4.md) for the convergence/startup comparison.
+
 ## 0.37.3 reference startup update
 
 Native OptiX initialization now runs in the background; raster and settings remain usable during compilation. Install the complete matching native kit and follow [REFERENCE-0.37.3.md](REFERENCE-0.37.3.md).
