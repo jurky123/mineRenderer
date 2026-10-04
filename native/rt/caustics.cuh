@@ -1,3 +1,4 @@
+#include "callable_api.cuh"
 // Bounded directional photon cache: actual current wave normals and Snell refraction.
 // One frame owns deposition; a separate launch resolves it before receiver sampling.
 static __forceinline__ __device__ void causticPhoton(unsigned i,unsigned& seed){

@@ -45,7 +45,7 @@ final class OptixBridge {
     }
     private static long createModules(byte[] uuid,boolean full,boolean fast,boolean ir,String cache)throws IOException {
         String suffix=(fast?"_fast":"")+(ir?".optixir":".ptx");
-        return com.voxellight.nvidia.OptixNative.create(uuid,new byte[][]{resource("rt_hit"+suffix),resource((full?"rt_reference":"rt_realtime")+suffix),full?new byte[0]:resource("rt_specular"+suffix),full?new byte[0]:resource("rt_transmission"+suffix),full?new byte[0]:resource("rt_probes"+suffix),full?new byte[0]:resource("rt_caustics"+suffix),resource("rt_utility.ptx")},full,cache);
+        return com.voxellight.nvidia.OptixNative.create(uuid,new byte[][]{resource("rt_hit"+suffix),resource((full?"rt_reference":"rt_realtime")+suffix),full?new byte[0]:resource("rt_specular"+suffix),full?new byte[0]:resource("rt_transmission"+suffix),full?new byte[0]:resource("rt_probes"+suffix),full?new byte[0]:resource("rt_caustics"+suffix),resource("rt_utility.ptx"),resource((full?"rt_reference_transport":"rt_transport")+suffix),resource("rt_visibility"+suffix),resource("rt_bsdf"+suffix)},full,cache);
     }
     private static byte[] uncheckedResource(String name){try{return resource(name);}catch(IOException failure){throw new java.io.UncheckedIOException(failure);}}
     private static byte[] resource(String name) throws IOException {

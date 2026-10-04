@@ -81,6 +81,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
     if(referenceStartup==null){byte[] uuid=deviceUuid(vk);referenceCompileState="compiling in background; realtime retained";
      referenceStartup=new com.voxellight.rt.AsyncResource<>(STARTUP,()->{try{return OptixBridge.createRt(uuid,true);}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}},handle->STARTUP.execute(()->OptixNative.destroy(handle)));
     }
+    if(referenceStartup.started()&&!referenceStartup.finished()&&OptixNative.initializationStage()==8)referenceCompileState="timed out; realtime retained; waiting for safe compiler cleanup";
     if(referenceStartup.finished()){
      long prepared=0;
      try{prepared=referenceStartup.take();}catch(RuntimeException error){referenceStartup.close();fullReferenceRequested=false;referenceCompileState="failed; realtime retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Full reference compile failed; realtime retained",error);}
@@ -105,6 +106,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
     if(!startup.finished()){
      if(!startup.started()){state="queued behind previous compiler cleanup; raster retained";return;}
      int progress;try{progress=OptixNative.initializationStage();}catch(UnsatisfiedLinkError loading){progress=0;}
+     if(progress==8){state="compile timed out; raster fallback active; waiting for safe compiler cleanup";if(startupStage!=8){startupStage=8;org.slf4j.LoggerFactory.getLogger("VoxelLight").error("RTX {}",state);}return;}
      String[] stages={"loading native library","matching CUDA device","creating OptiX context","compiling split OptiX modules","creating OptiX program groups","linking OptiX pipeline","configuring OptiX stack","native context ready"};
      long tasks=progress==3?OptixNative.initializationTasks():0;
      state="initializing: "+stages[Math.max(0,Math.min(progress,stages.length-1))]+" ("+((System.nanoTime()-startupStarted)/1_000_000_000L)+"s)"+(progress==3?"; compiler tasks="+(tasks&0xffffffffL)+"/"+(tasks>>>32)+"; optimization="+System.getenv().getOrDefault("VOXELLIGHT_RT_OPTIMIZATION","default")+"":"")+"; raster retained";

@@ -1,5 +1,9 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.38.0-alpha.6 — callable compiler boundaries (acceptance candidate)
+
+Alpha.5 diffuse compiled to 62,994 instructions and canceled after 267.3 s. Move the existing integrator/visibility out of raygens into continuation callable modules; move BSDF evaluation/sampling to direct callable programs. Add callable groups/SBT, depth-aware stack sizing, strict lazy reference transport and NVRTC export validation. Log successful driver graph/cache feedback and explicit timeout/fallback/cleanup state. Windows/Linux builds and 253 host tests pass; real GPU startup/cache/correctness/runtime gates remain pending. [Architecture and limitations](OPTIX-COMPILATION-0.38-ALPHA6.md).
+
 ## 0.38.0-alpha.5 — realtime compiler/lifecycle follow-up (acceptance candidate)
 
 User alpha.4 / 591.74 test stalled in realtime task 2 and exited immediately after watchdog cancellation. Split constant-signal realtime modules/probes; non-inline glossy BSDF boundaries; preserve compiler ownership across render resets and skip abandoned queued creation. Full reference no longer replays saved on state; RTX Quality exits reference. Native diagnostics reach latest.log and a flushed compiler file. Watchdog binds CUDA and cancels the published module with entry/return diagnostics. Exact prior native fault and GPU fix acceptance remain unconfirmed. [Evidence and next checks](OPTIX-COMPILATION-0.38-ALPHA5.md).

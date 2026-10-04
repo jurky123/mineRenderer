@@ -88,6 +88,7 @@ tasks.register('clientKit', Zip) {
     from('docs/SETTINGS.md')
     from('docs/MATERIAL-3.md')
     from('docs/RT-LIGHT-TRANSPORT.md')
+    from('docs/OPTIX-COMPILATION-0.38-ALPHA6.md')
 }
 
 // Optional native build is explicit; the regular Java build remains usable without SDKs.

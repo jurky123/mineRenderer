@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build optional native binaries with externally installed SDKs. No SDK files are vendored."""
-import argparse,ctypes as C,pathlib,subprocess,os,hashlib,json,shutil
+import argparse,ctypes as C,pathlib,subprocess,os,hashlib,json,shutil,re
 p=argparse.ArgumentParser();p.add_argument('--deps',required=True);a=p.parse_args()
 r=pathlib.Path(__file__).resolve().parents[1];d=pathlib.Path(a.deps);out=r/'build/optix-native';out.mkdir(parents=True,exist_ok=True)
 optix=next(d.glob('optix-dev-*/include'));cuda=d/'cuda/nvidia/cuda_runtime/include';nvlib=next((d/'cuda/nvidia/cuda_nvrtc/lib').glob('libnvrtc.so*'))
@@ -13,14 +13,14 @@ nv.nvrtcGetPTXSize(prog,C.byref(n));ptx=C.create_string_buffer(n.value);nv.nvrtc
 # Independent compiler graphs; preserve all four math/format experiments.
 import time
 rtOptions=[b'--gpu-architecture=compute_75',b'--std=c++17',('-I'+str(optix)).encode(),('-I'+str(cuda)).encode(),('-I'+str(r/'native/rt')).encode()]
-modules={'rt_hit':'hit.cu','rt_realtime':'program.cu','rt_specular':'specular.cu','rt_transmission':'transmission.cu','rt_probes':'probes.cu','rt_reference':'reference.cu','rt_caustics':'caustic.cu','rt_utility':'utility.cu'}
+modules={'rt_hit':'hit.cu','rt_realtime':'program.cu','rt_specular':'specular.cu','rt_transmission':'transmission.cu','rt_probes':'probes.cu','rt_reference':'reference.cu','rt_caustics':'caustic.cu','rt_utility':'utility.cu','rt_transport':'transport.cu','rt_reference_transport':'reference_transport.cu','rt_visibility':'visibility.cu','rt_bsdf':'bsdf.cu'}
 builds=[]
 for name,filename in modules.items():
-    for fast in ([False] if name in ('rt_reference','rt_utility') else [False,True]):
+    for fast in ([False] if name in ('rt_reference','rt_reference_transport','rt_utility') else [False,True]):
         for ir in ([False] if name=='rt_utility' else [False,True]):
             prog=C.c_void_p();source=(r/'native/rt'/filename).read_bytes()
             assert nv.nvrtcCreateProgram(C.byref(prog),source,filename.encode(),0,None,None)==0
-            flags=rtOptions+([b'--use_fast_math'] if fast else [])+([b'--optix-ir'] if ir else [])
+            flags=rtOptions+([b'--relocatable-device-code=true'] if name in ('rt_transport','rt_reference_transport','rt_visibility','rt_bsdf') else [])+([b'--use_fast_math'] if fast else [])+([b'--optix-ir'] if ir else [])
             options=(C.c_char_p*len(flags))(*flags);started=time.monotonic()
             result=nv.nvrtcCompileProgram(prog,len(flags),options)
             n=C.c_size_t();nv.nvrtcGetProgramLogSize(prog,C.byref(n));log=C.create_string_buffer(n.value);nv.nvrtcGetProgramLog(prog,log)
@@ -32,7 +32,19 @@ for name,filename in modules.items():
             code=C.create_string_buffer(n.value);assert getCode(prog,code)==0
             artifact=name+('_fast' if fast else '')+('.optixir' if ir else '.ptx')
             (out/artifact).write_bytes(code.raw);nv.nvrtcDestroyProgram(C.byref(prog))
-            builds.append({'artifact':artifact,'nvrtcSeconds':time.monotonic()-started,'bytes':n.value,'math':'fast' if fast else 'strict'})
+            record={'artifact':artifact,'nvrtcSeconds':time.monotonic()-started,'bytes':n.value,'math':'fast' if fast else 'strict'}
+            if not ir:
+                text=code.raw.decode('utf-8').rstrip('\0')
+                entries=re.findall(r'\.visible\s+\.(?:entry|func)(?:\s+\([^)]*\))?\s+(__\w+)',text)
+                record['entries']=entries
+                record['nvrtcTraceSites']=text.count('_optix_trace_typed_')
+                record['nvrtcContinuationCallSites']=text.count('_optix_call_continuation_callable')
+                record['nvrtcDirectCallSites']=text.count('_optix_call_direct_callable')
+                if name in ('rt_transport','rt_reference_transport','rt_visibility','rt_bsdf'):
+                    expected=['__direct_callable__evaluate','__direct_callable__sample','__direct_callable__evaluate_glossy','__direct_callable__sample_glossy'] if name=='rt_bsdf' else ['__continuation_callable__visibility' if name=='rt_visibility' else '__continuation_callable__transport']
+                    if entries!=expected:raise SystemExit(f'{artifact}: callable exports missing or unexpected: {entries}')
+                if name=='rt_bsdf' and record['nvrtcTraceSites']:raise SystemExit('BSDF module must not trace')
+            builds.append(record)
             print(builds[-1],flush=True)
 for old in ('rt_program.ptx','rt_program.optixir'):
     (out/old).unlink(missing_ok=True)
@@ -47,5 +59,5 @@ shutil.copy(next(d.glob('llvm-mingw-*/LICENSE.TXT')),licenseDir/'LLVM-runtime.tx
 shutil.copy(next((d/'cuda').glob('nvidia_cuda_runtime_cu12-*.dist-info/licenses/License.txt')),licenseDir/'NVIDIA-CUDA.txt')
 for name in ['optix_stubs.h','optix_function_table_definition.h']:
     text=(optix/name).read_text();(licenseDir/(name+'.txt')).write_text(text[:text.index('*/')+2]+'\n')
-sources=['native/optix/pathtrace.cu','native/optix/bridge.cpp','native/optix/include/jni_md.h','tools/build_optix.py','native/rt/bridge.hpp','native/rt/contract.h','native/rt/program.cu','native/rt/bsdf.h','native/rt/surface.h','native/rt/environment.h','native/rt/light_sampling.h','native/rt/ggx_energy.h','native/rt/dispatch.h','native/rt/task_pool.h','native/rt/transport.cuh','native/rt/caustics.cuh','native/rt/device.cuh','native/rt/material.cuh','native/rt/hit.cu','native/rt/reference.cu','native/rt/caustic.cu','native/rt/caustic_lookup.cuh','native/rt/utility.cu','native/rt/compiler.hpp','native/rt/probes.cu','native/rt/specular.cu','native/rt/transmission.cu','native/rt/compiler_log.hpp']
+sources=['native/optix/pathtrace.cu','native/optix/bridge.cpp','native/optix/include/jni_md.h','tools/build_optix.py','native/rt/bridge.hpp','native/rt/contract.h','native/rt/program.cu','native/rt/bsdf.h','native/rt/surface.h','native/rt/environment.h','native/rt/light_sampling.h','native/rt/ggx_energy.h','native/rt/dispatch.h','native/rt/task_pool.h','native/rt/transport.cuh','native/rt/caustics.cuh','native/rt/device.cuh','native/rt/material.cuh','native/rt/hit.cu','native/rt/reference.cu','native/rt/caustic.cu','native/rt/caustic_lookup.cuh','native/rt/utility.cu','native/rt/compiler.hpp','native/rt/probes.cu','native/rt/specular.cu','native/rt/transmission.cu','native/rt/compiler_log.hpp','native/rt/callable_api.cuh','native/rt/transport_impl.cuh','native/rt/transport.cu','native/rt/reference_transport.cu','native/rt/visibility.cu','native/rt/bsdf.cu']
 (out/'build.json').write_text(json.dumps({'optix':'9.1.0','cuda':'12.9','sources':{name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in sources}},indent=2)+'\n')
