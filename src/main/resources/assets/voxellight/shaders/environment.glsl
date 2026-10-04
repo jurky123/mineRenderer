@@ -12,12 +12,22 @@ float cloudField(vec2 world){
     float threshold=CelestialData.w-WeatherControls.w*.14;
     return smoothstep(threshold,threshold+.20,noise);
 }
+// 8x4x8 macro cells retain square silhouettes. Small-scale erosion softens their boundaries.
+float voxelCloudDensity(vec3 world){
+ vec3 moving=world+vec3(CloudOriginTime.w,0,CloudOriginTime.w*.5),cell=floor(moving/vec3(8,4,8));
+ float altitude=world.y-CelestialData.z;if(altitude<0||altitude>32)return 0;
+ float shape=0;vec2 edge=moving.xz/8.0;
+ for(int y=0;y<2;y++)for(int x=0;x<2;x++){vec2 candidate=floor(edge+vec2(x==0?-.12:.12,y==0?-.12:.12));float noise=envNoise(candidate*.09),occupied=step(CelestialData.w-WeatherControls.w*.14,noise),height=4*(3+floor(noise*5));vec2 delta=abs(moving.xz-(candidate+.5)*8)-4;float face=max(max(delta.x,delta.y),altitude-height);shape=max(shape,occupied*(1-smoothstep(-.7,.8,face)));}
+ shape*=smoothstep(0,3,altitude)*(1-smoothstep(25,32,altitude));
+ float detail=envNoise(moving.xz*.47+vec2(world.y*.31,-world.y*.17));
+ return max(0,shape*(.65+.35*envNoise(cell.xz*.31+cell.y))-(1-detail)*.27);
+}
 float cloudVisibility(vec3 position,vec3 light){
     if(WeatherControls.z<.5 || light.y<.08)return 1.0;
     float height=CelestialData.z-CloudOriginTime.z-position.y;
     if(height<=0.0)return 1.0;
     vec2 projected=CloudOriginTime.xy+position.xz+light.xz*(height/light.y);
-    return 1.0-cloudField(projected)*mix(.50,.80,WeatherControls.w);
+    float density=0;for(int i=0;i<4;i++)density+=voxelCloudDensity(vec3(projected.x,CelestialData.z+4+float(i)*8,projected.y));return exp(-density*mix(.4,.65,WeatherControls.w));
 }
 vec3 environmentSky(vec3 ray,vec3 zenith,vec3 horizon,float brightness){
     vec3 sun=vec3(-sin(CelestialData.x),cos(CelestialData.x),0);

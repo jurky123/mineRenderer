@@ -59,6 +59,7 @@ public final class RenderPassProfile {
             if(pool!=null && slot>=0)try{encoder.writeTimestamp(pool,slot*2+1);}catch(RuntimeException e){disable();}
         }
     }
+    static void externalGpu(String name,long nanos){if(enabled){long id=++serial;metrics.record(id,name,0,0,0);metrics.completeGpu(id,nanos);}}
     static void cpu(String name,long nanos){if(enabled)metrics.record(++serial,name,0,0,nanos);}
     public static void export(Path path)throws IOException{metrics.export(path);}
     static String status(){return ", passProfile="+(!enabled?"off":failed?"CPU only":pool==null?"not observed":"delayed GPU timestamps")+", passProfileSamples="+metrics.size()+", passProfileSkipped="+skipped;}

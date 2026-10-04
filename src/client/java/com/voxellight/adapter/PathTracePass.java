@@ -25,7 +25,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
 /** Experimental reprojected hybrid PT. GPU readback is asynchronous; CUDA waits only on the worker. */
-final class PathTracePass implements AutoCloseable {
+final class PathTracePass implements com.voxellight.rt.RtBackend {
     static final RenderPipeline PT_CAPTURE=pipeline(true),PT_COMPOSITE=pipeline(false);
     private final ExecutorService worker=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"VoxelLight-OptiX");t.setDaemon(true);return t;});
     private final AtomicBoolean busy=new AtomicBoolean();
@@ -82,7 +82,9 @@ final class PathTracePass implements AutoCloseable {
     void setEnabled(boolean value){enabled=value;failed=false;close();state=value?"waiting for traced surfaces":"off";}
     void setDenoise(boolean value){denoise=value;generation++;displayKey=null;olderKey=null;transition.reset();failed=false;}
     void setDebug(boolean value){debug=value;}
-    String status(){return ", pathtrace="+state+", pathtraceDenoise="+(denoise?"OptiX HDR":"raw")+", pathtraceWorkerBatches="+samples+", pathtraceHistory="+temporalHistory+", pathtraceFrozen="+freeze+", pathtraceDisplayValid="+(displayKey!=null)+", pathtraceAccepted="+accepted+", pathtraceRejected="+rejected+", pathtraceSurfaceCache="+surfaceCache.populated()+", pathtraceCacheBytes="+(cacheTags==null?0:524288)+", pathtraceSize="+width+"x"+height+", pathtraceWorkerNs="+traceNs+", pathtraceBatchBlend="+transition.blend(System.nanoTime())+", pathtraceHistoryResets="+historyResets.get()+", pathtraceHistoryResetReason="+historyResetReason;}
+    public com.voxellight.rt.RtTraversalBackend traversal(){return com.voxellight.rt.RtTraversalBackend.CUDA_VOXEL_REFERENCE;}
+    public boolean active(){return enabled&&!failed&&displayKey!=null;}
+    public String status(){return ", pathtrace="+state+", pathtraceDenoise="+(denoise?"OptiX HDR":"raw")+", pathtraceWorkerBatches="+samples+", pathtraceHistory="+temporalHistory+", pathtraceFrozen="+freeze+", pathtraceDisplayValid="+(displayKey!=null)+", pathtraceAccepted="+accepted+", pathtraceRejected="+rejected+", pathtraceSurfaceCache="+surfaceCache.populated()+", pathtraceCacheBytes="+(cacheTags==null?0:524288)+", pathtraceSize="+width+"x"+height+", pathtraceWorkerNs="+traceNs+", pathtraceBatchBlend="+transition.blend(System.nanoTime())+", pathtraceHistoryResets="+historyResets.get()+", pathtraceHistoryResetReason="+historyResetReason;}
     GpuTextureView render(CommandEncoder encoder,RenderTarget target,MaterialCapture material,ShadowRenderer shadows,GpuTextureView hdr,Matrix4f projection,boolean observed,GpuBuffer pbrSettings){
         if(!enabled||failed||!observed)return hdr;
         try{

@@ -60,7 +60,11 @@ public final class NativeTerrainAttributes {
         }
         // Force version-specific compiler transformation while startup can report a clear failure.
         try{Class.forName("net.minecraft.client.renderer.chunk.SectionCompiler");
-            Class.forName("net.minecraft.client.renderer.chunk.CompiledSectionMesh");}
+            Class.forName("net.minecraft.client.renderer.chunk.CompiledSectionMesh");
+            Class.forName("net.minecraft.client.renderer.entity.EntityRenderer",false,NativeTerrainAttributes.class.getClassLoader());
+            Class.forName("net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher",false,NativeTerrainAttributes.class.getClassLoader());
+            Class.forName("net.minecraft.client.renderer.chunk.RenderRegionCache",false,NativeTerrainAttributes.class.getClassLoader());
+            Class.forName("com.mojang.blaze3d.vulkan.VulkanBackend",false,NativeTerrainAttributes.class.getClassLoader());}
         catch(ClassNotFoundException e){throw new IllegalStateException(e);}
     }
     public static Attributes current(){return CURRENT.get();}

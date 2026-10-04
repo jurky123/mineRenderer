@@ -11,7 +11,7 @@ uniform sampler2D FarNextShadowMap;
 uniform sampler2D EntityShadowMap;
 uniform sampler2D MiddleEntityShadowMap;
 uniform sampler2D FarEntityShadowMap;
-layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters; };
+layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters;vec4 MediumControls; };
 layout(std140) uniform LightingEnvironment { vec4 DirectColorStrength; vec4 SkyColorStrength; vec4 HorizonColorLower; };
 layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; vec4 VolumeQuality; }; // active, distance, anisotropy, phase scale
 layout(std140) uniform ShadowResolveSettings {
@@ -86,7 +86,7 @@ float visibility(vec3 p) {
 void main() {
     fragColor=vec4(0,0,0,1);
     float depth=texture(SceneDepth,texCoord).r;
-    if(depth<=0.0 || VolumeParameters.x<.5 || (AtmosphereParameters.x<=0.0 && UnderwaterControls.x<.5))return;
+    if(depth<=0.0 || VolumeParameters.x<.5 || (MediumControls.x<=0.0 && UnderwaterControls.x<.5))return;
     vec4 v=InvProjection*vec4(texCoord*2.0-1.0,depth,1.0);
     if(abs(v.w)<1e-7)return;
     vec3 endpoint=(ViewToWorld*vec4(v.xyz/v.w,1)).xyz;
@@ -99,7 +99,7 @@ void main() {
     // Fixed interleaved spatial gradient; no frame-varying noise or unvalidated history.
     float jitter=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715)))+VolumeQuality.z*.61803398875);
     float g=VolumeParameters.z, cosine=clamp(dot(ray,LightDirectionAndMask.xyz),-1.0,1.0);
-    float phase=VolumeParameters.w*(1.0-g*g)/pow(1.0+g*g-2.0*g*cosine,1.5);
+    float phase=VolumeParameters.w*(MediumControls.y/.35)*(1.0-g*g)/pow(1.0+g*g-2.0*g*cosine,1.5);
     float skyAccess=clamp(texture(MaterialEmission,texCoord).b,0.0,1.0);
     vec3 ambient=UnderwaterControls.x>.5?vec3(0):HorizonColorLower.rgb*(.01+SkyColorStrength.a*1.5)*skyAccess;
     vec3 scattered=vec3(0);
@@ -107,7 +107,7 @@ void main() {
         if(i>=steps)break;
         vec3 p=ray*((float(i)+jitter)*ds);
         float height=AtmosphereParameters.y+p.y;
-        float tau=min((UnderwaterControls.x>.5?.045:AtmosphereParameters.x*exp(-clamp(height/48.0,-1.0,4.0)))*ds,2.0/float(steps));
+        float tau=min((UnderwaterControls.x>.5?.045:MediumControls.x*exp(-clamp(height/48.0,-1.0,4.0)))*ds,2.0/float(steps));
         float stepTransmission=exp(-tau);
         // Shadow only direct in-scattering; ambient keeps the stated receiver-skylight approximation.
         float direct=Coverage.z>0.0?visibility(p)*cloudVisibility(p,LightDirectionAndMask.xyz):0.0;

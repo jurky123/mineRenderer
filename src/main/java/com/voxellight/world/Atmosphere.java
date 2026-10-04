@@ -2,8 +2,8 @@ package com.voxellight.world;
 
 /** Bounded analytic aerial perspective, not a shadow-marched volumetric integrator. */
 public final class Atmosphere {
-    public static final int SETTINGS_BYTES=16;
-    public static final float DEFAULT_DENSITY=.001f, MAX_DISTANCE=48, HEIGHT_SCALE=48;
+    public static final int SETTINGS_BYTES=32;
+    public static final float DEFAULT_DENSITY=.00035f, DEFAULT_VOLUME_DENSITY=.001f, DEFAULT_FORWARD_STRENGTH=.35f, MAX_DISTANCE=48, HEIGHT_SCALE=48;
     private Atmosphere() { }
     public static float density(float value) {
         if(!Float.isFinite(value)||value<0||value>.08f)throw new IllegalArgumentException("Atmosphere density must be between 0 and .08");

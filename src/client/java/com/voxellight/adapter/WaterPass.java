@@ -25,7 +25,7 @@ final class WaterPass implements AutoCloseable {
             .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","water_native"))
             .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","water_native"))
             .withShaderDefine("ALPHA_CUTOUT",.1f)
-            .withBindGroupLayout(BindGroupLayout.builder().withSampler("WaterHdr").withSampler("WaterDepth").withSampler("WaterHzb").withSampler("EmissiveBloom")
+            .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtTransmission").withSampler("WaterHdr").withSampler("WaterDepth").withSampler("WaterHzb").withSampler("EmissiveBloom")
                     .withUniform("WaterSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
                     .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                     .withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER).build())
@@ -52,17 +52,19 @@ final class WaterPass implements AutoCloseable {
     private VisualQuality quality=VisualQuality.BALANCED;
     private long waveTick=System.nanoTime();
     private double wavePhase;
+    private GpuTextureView rtTransmission;
+    void setRtTransmission(GpuTextureView view){rtTransmission=view;}
     private String state="waiting";
     private int width,height;
     private boolean hzbActive(){return hzbEnabled&&reflectionsEnabled&&hzb.ready();}
     void setReflections(boolean value){reflectionsEnabled=value;if(!value)ownedHzb.close();}
     void setHzb(boolean value){hzbEnabled=value;ownedHzb.close();}
-    void setWaves(boolean value){wavesEnabled=value;}
-    void setWaveStrength(float value){waveStrength=WaterSurface.strength(value);}
-    void setWaveSpeed(float value){float speed=WaterSurface.speed(value);advanceWaves();waveSpeed=speed;}
+    void setWaves(boolean value){wavesEnabled=value;WaterSurface.waves(value);}
+    void setWaveStrength(float value){waveStrength=WaterSurface.strength(value);WaterSurface.waveStrength(value);}
+    void setWaveSpeed(float value){float speed=WaterSurface.speed(value);advanceWaves();waveSpeed=speed;WaterSurface.windSpeed(speed);}
     private float advanceWaves(){
         long now=System.nanoTime();
-        wavePhase=(wavePhase+WaterSurface.phase(now-waveTick,waveSpeed))%(Math.PI*2);
+        wavePhase=WaterSurface.clock();
         waveTick=now;return (float)wavePhase;
     }
     void setQuality(VisualQuality value){quality=value;}
@@ -118,9 +120,9 @@ final class WaterPass implements AutoCloseable {
                 encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,WaterOptics.SETTINGS_BYTES)
                         .putVec4(still.getU0(),still.getV0(),still.getU1(),still.getV1())
                         .putVec4(flow.getU0(),flow.getV0(),flow.getU1(),flow.getV1())
-                        .putVec4((float)(camera.x%64),(float)(camera.y%64),(float)(camera.z%64),advanceWaves())
+                        .putVec4((float)(camera.x%16384),(float)(camera.y%16384),(float)(camera.z%16384),advanceWaves())
                         .putVec4(24,32,wavesEnabled?waveStrength:0,reflectionsEnabled?quality.reflectionSteps():0)
-                        .putVec4(hzbActive()?1:0,hzbActive()?hzb.levels()-1:0,quality.reflectionSteps()*4,0).get());
+                        .putVec4(hzbActive()?1:0,hzbActive()?hzb.levels()-1:0,quality.reflectionSteps()*4,rtTransmission==null?0:1).get());
             }
             this.shadows=shadows;this.visual=visual;this.atmosphere=atmosphere;this.environment=environment;this.weather=weather;this.bloom=bloom;
             ready=true;state="native-stream HDR water active";
@@ -131,6 +133,7 @@ final class WaterPass implements AutoCloseable {
         pass.setPipeline(WATER);
         var nearest=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         pass.bindTexture("WaterHzb",hzbActive()?hzb.view():depthView,nearest);
+        pass.bindTexture("RtTransmission",rtTransmission==null?depthView:rtTransmission,nearest);
         pass.bindTexture("WaterHdr",hdrView,nearest);pass.bindTexture("WaterDepth",depthView,nearest);bloom.bind(pass);
         pass.setUniform("WaterSettings",settings);pass.setUniform("VisualSettings",visual);pass.setUniform("AtmosphereSettings",atmosphere);pass.setUniform("LightingEnvironment",environment);pass.setUniform("EnvironmentSettings",weather);
         shadows.bindTransform(pass);return true;

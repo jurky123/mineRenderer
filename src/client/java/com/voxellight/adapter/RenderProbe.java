@@ -86,6 +86,13 @@ public final class RenderProbe {
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
+    public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
+    public void setRtOption(String option,boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtOption(option,enabled);}
+    public void benchmarkRt(){RenderSystem.assertOnRenderThread();lighting.benchmarkRt();}
+    public void setCloudDebug(int value){RenderSystem.assertOnRenderThread();lighting.setCloudDebug(value);}
+    public void setRtDebug(int debug){RenderSystem.assertOnRenderThread();lighting.setRtDebug(debug);}
+    public void setVolumeDensity(float density){RenderSystem.assertOnRenderThread();lighting.setVolumeDensity(density);}
+    public void setForwardStrength(float strength){RenderSystem.assertOnRenderThread();lighting.setForwardStrength(strength);}
     public void setAtmosphereDensity(float density){RenderSystem.assertOnRenderThread();lighting.setAtmosphereDensity(density);}
     public void setWater(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setWater(enabled);}
     public void setWaterHzb(boolean value){RenderSystem.assertOnRenderThread();lighting.setWaterHzb(value);}

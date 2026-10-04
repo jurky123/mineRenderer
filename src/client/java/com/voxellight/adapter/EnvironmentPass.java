@@ -12,6 +12,8 @@ final class EnvironmentPass implements AutoCloseable  {
     private GpuBuffer settings;
     private boolean sky=true,clouds=true,shadows=true,underwater=true,caustics=true,ripples=true,composed,active;
     private boolean submerged;
+    private float rtRain,rtCloud,rtRipples;
+    float[] rtSettings(){return new float[]{(float)wind,192,rtRain,rtCloud,rtRipples};}
     boolean submerged() {
         return submerged;
     }
@@ -59,6 +61,7 @@ final class EnvironmentPass implements AutoCloseable  {
             }
         }
         boolean cloud=clouds&&mc.options.cloudStatus().get()!=CloudStatus.OFF;
+        rtRain=1-Math.clamp(state.rainBrightness,0,1);rtCloud=polished&&overworld&&shadows&&cloud?1:0;rtRipples=ripples?1:0;
         long now=System.nanoTime();
         wind=(wind+Math.clamp((now-clock)/1e9,0,.25)*.35)%16384;
         clock=now;

@@ -146,6 +146,7 @@ final class MaterialCapture implements AutoCloseable {
 
     net.minecraft.client.renderer.chunk.ChunkSectionsToRender nativeSubmissions(){return nativeSubmissions;}
     void bindPbr(RenderPass pass){var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);pass.bindTexture("PbrIdsAtlas",pbr.view(0),sampler);pass.bindTexture("PbrNormalAtlas",pbr.view(1),sampler);}
+    GpuTextureView rtAtlas(int index){return pbr.view(index);}
     GpuTextureView materialTable(){return pbr.view(2);}
     GpuTextureView view(int index) { return views[index]; }
 

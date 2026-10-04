@@ -484,5 +484,119 @@
     "f0": 0.04,
     "metal": 0,
     "porosity": 0.59375
+  },
+  "minecraft:block/glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/white_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/orange_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/magenta_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/light_blue_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/yellow_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/lime_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/pink_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/gray_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/light_gray_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/cyan_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/purple_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/blue_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/brown_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/green_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/red_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/black_stained_glass": {
+    "roughness": 0.025,
+    "f0": 0.04,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/water_still": {
+    "roughness": 0.04,
+    "f0": 0.02037,
+    "metal": 0,
+    "porosity": 0
+  },
+  "minecraft:block/water_flow": {
+    "roughness": 0.04,
+    "f0": 0.02037,
+    "metal": 0,
+    "porosity": 0
   }
 }

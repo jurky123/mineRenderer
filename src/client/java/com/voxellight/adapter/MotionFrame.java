@@ -77,6 +77,7 @@ final class MotionFrame implements AutoCloseable  {
         pass.bindTexture("PreviousNormal",views[read*2+1],nearest);
         pass.bindTexture("MotionVectors",views[4],nearest);
     }
+    void bindSettings(RenderPass pass){pass.setUniform("MotionSettings",settings);}
     boolean ready() {
         return ready;
     }

@@ -102,3 +102,6 @@ EXPORT jlong JNICALL Java_com_voxellight_adapter_OptixBridge_create(JNIEnv* e,jc
 EXPORT jint JNICALL Java_com_voxellight_adapter_OptixBridge_trace(JNIEnv* e,jclass,jlong handle,jobject pos,jobject normals,jobject alb,jobject vox,jobject settings,jobject result,jboolean reset,jboolean denoise){
  try{auto* c=reinterpret_cast<Context*>(handle);if(!c)throw std::runtime_error("Closed path tracer");size_t bytes=(size_t)c->width*c->height*16;return c->render(buffer(e,pos,bytes),buffer(e,normals,bytes),buffer(e,alb,bytes),buffer(e,vox,80*80*80*4),buffer(e,settings,164),buffer(e,result,bytes),reset,denoise);}catch(const std::exception& ex){fail(e,ex);return 0;}}
 EXPORT void JNICALL Java_com_voxellight_adapter_OptixBridge_destroy(JNIEnv*,jclass,jlong handle){delete reinterpret_cast<Context*>(handle);}
+
+#include <algorithm>
+#include "../rt/bridge.hpp"

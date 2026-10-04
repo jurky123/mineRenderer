@@ -1,5 +1,15 @@
 # VoxelLight release history
 
+## 0.36.0 — Experimental raster-primary RTX lighting
+
+- Actual OptiX raygen/miss/closest-hit/any-hit, exact native section triangle GAS and incremental world IAS. Bounded offscreen loaded-section admission, geometry hashes, stale snapshot rejection, shared/refittable captured model GAS and retained entity/block-entity instances. Isolated triangle/custom-AABB performance and asynchronous hit-correctness benchmark.
+- UUID-matched Vulkan/CUDA external-memory and semaphore resources. Primary/atlas/signal image exchange stays on GPU; CPU staging remains only in the legacy CUDA reference and explicit benchmark diagnostics. Deferred/event retirement; no normal-frame device-idle wait.
+- Three independent diffuse/specular/transmission signals and OptiX temporal AOVs, world guide flow/trust. Persistent 1,536 world-anchored SH probes replace new-view bootstrap as RTX GI representation. Local edits invalidate local probes, rotation does not clear cache.
+- Textured linear Material2/LabPBR secondary hits, authored normal maps, matched conductor constants, GGX VNDF, Russian roulette; dielectric Fresnel/Snell/TIR/medium stacks, panes and RGB glass/water absorption. Colored directional transmittance, no duplicated local-light ownership or water absorption.
+- Quarter-resolution stepped voxel/fuzzy clouds with history and matching raster/RT cloud shadows. Three dispersive macro-wave directions plus advected micro noise/rain. Aerial default0.00035, independent volume0.001/forward0.35.
+- RTX Quality/Performance/Balanced/reference and Cinematic placeholder; debug views, independent A/B controls, memory caps, delayed CUDA/Vulkan profiling and adaptive quality integration. Keep opaque TAA when RT replaces SSR.
+- Native Windows/Linux builds and 228 tests pass; headless mixin startup reaches missing-display graphics initialization. NVIDIA image/synchronization/performance acceptance remains pending. Full primary PT, focused RT caustics, full RT water scattering and complete independent offscreen dynamic extraction are not claimed. See [complete architecture and limits](RTX-PATH-TRACING-ARCHITECTURE.md).
+
 ## 0.35.2 — Rough material reflections and world-space GI reuse
 
 - Roughness-aware environment Fresnel avoids mirror-like grazing sky reflections on diffuse blocks. Sharp screen reflections now require effective roughness below0.5, smoothly attenuated toward that threshold; rain and authored smooth/metal materials retain highlights. Direct GGX remains physically material-driven.

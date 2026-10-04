@@ -76,6 +76,7 @@ tasks.register('clientKit', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
+    from('docs/RTX-PATH-TRACING-ARCHITECTURE.md')
 }
 
 // Optional native build is explicit; the regular Java build remains usable without SDKs.

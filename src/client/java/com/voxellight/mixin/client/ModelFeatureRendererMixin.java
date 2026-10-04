@@ -18,8 +18,9 @@ abstract class ModelFeatureRendererMixin {
             Operation<Void> original,@Local(argsOnly=true) ModelFeatureRenderer.Submit<?> submit) {
         var probe=VoxelLightClient.probe();
         var tee=probe.entityMaterialConsumer(submit,consumer);
+        var rt=com.voxellight.adapter.RtDynamicStream.consumer(submit,tee);
         boolean success=false;
-        try {original.call(model,pose,tee,light,overlay,tint);success=true;}
-        finally {probe.finishEntityMaterial(tee,success);}
+        try {original.call(model,pose,rt,light,overlay,tint);success=true;}
+        finally {com.voxellight.adapter.RtDynamicStream.finish(rt,success);probe.finishEntityMaterial(tee,success);}
     }
 }

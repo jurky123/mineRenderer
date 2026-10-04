@@ -11,15 +11,19 @@
     "ShaderManagerMixin",
     "ChunkSectionsToRenderMixin",
     "ModelFeatureRendererMixin",
+    "RtEntityStateMixin",
+    "RtBlockEntityStateMixin",
     "PreparedFeatureFrameMixin",
     "NativeTerrainFormatMixin",
     "NativeTerrainBufferMixin",
     "NativeTerrainCompilerMixin",
+    "RtRegionSnapshotMixin",
     "NativeCutoutMeshMixin",
     "IndigoTerrainMaterialMixin",
     "IndigoQuadMaterialMixin",
     "IndigoQuadResetMixin",
-    "GpuDeviceMixin"
+    "GpuDeviceMixin",
+    "VulkanRtxExtensionsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

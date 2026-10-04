@@ -1,8 +1,8 @@
 # VoxelLight 实施计划
 
-Current 0.35.0 milestone: [raster review bundle](REVIEW-COMPLETION.md) implements the main visual sequence after accepted PBR/single-raster MRT: sky/cloud/weather, shared compact motion/optional opaque TAA, temporal volume, underwater/caustics/ripples/foam, material HZB SSR and optional adaptive world-region budget. Joint GPU appearance/performance acceptance is pending. Later NVIDIA RT reflection, external-memory/semaphore interop, incremental RT-core scene and Cinematic PT remain a separate track; current diffuse GI policy stays frozen. Earlier roadmap sections below are historical.
+Current milestone: **0.36.0 RTX Quality architecture**. Implemented phases A–F: exportable GPU resources and OptiX scene, specular/dielectric transmission, world-probe diffuse GI, separate temporal AOVs, voxel/fuzzy clouds and split atmosphere/waves, presets/debug/profiling/geometry benchmark. Full GPU acceptance remains pending; do not mark the success criteria accepted until measurements and visual scenes pass on NVIDIA hardware. [Architecture, constraints and acceptance methodology](RTX-PATH-TRACING-ARCHITECTURE.md).
 
-最新优先级：0.30.3先修 hybrid GI stability：persistent每像素history、reprojection/confidence/moments、深度/色彩/ownership修正、proxy hysteresis与诊断。先实机检查移动、跨section、ghosting和freeze/history A/B，再决定OptiX temporal flow、rolling clipmap、零拷贝interop或RT-core GAS。当前范围以[CURRENT](CURRENT.md)与[PT-STABILITY](PT-STABILITY.md)为准，不宣称完整PT或性能收益。
+Next gate: NVIDIA Vulkan validation and the GI/metal/glass/water/cloud acceptance suite; export true pass/world p50/p95 and triangle/AABB hit comparisons. Then prioritize measured defects/costs. Future work includes complete independent entity/model extraction, animated secondary textures, distant scene representation, reflected/refracted motion, aliasing and Cinematic primary rays. CUDA reference remains frozen for A/B. Earlier sections below are historical, not the active release state.
 
 ## 当前决策：Visual Foundation 优先（0.10.0 review 后）
 

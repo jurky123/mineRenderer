@@ -4,9 +4,13 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current client kit: [VoxelLight **0.35.2**](https://temp.sh/KjtUw/voxellight-client-kit-26.2-0.35.2.zip), roughness-aware reflections and bounded world-space GI reuse after the raster review bundle. 223 tests pass; in-game gloss/motion/FPS acceptance pending. Previously sampled faces can reuse GI when turning; completely unknown surfaces still require asynchronous tracing. [Scope, budgets and test checklist](docs/REVIEW-COMPLETION.md).
+Current release: **VoxelLight 0.36.0**, experimental raster-primary RTX lighting. Actual OptiX GAS/IAS traversal, GPU-only interop, separate diffuse/specular/transmission, world-space probes, textured LabPBR hits and dielectric glass/water; raster fallback retained. Native builds and CPU/shader tests pass; NVIDIA image/synchronization/FPS acceptance pending. [Architecture, limits and test checklist](docs/RTX-PATH-TRACING-ARCHITECTURE.md).
+
+[Download 0.36.0 native client kit](https://temp.sh/yAssS/voxellight-client-kit-26.2-0.36.0.zip).
 
 ## 文档
+
+- [RTX / path-tracing architecture](docs/RTX-PATH-TRACING-ARCHITECTURE.md)：0.36 ownership、GPU interop、GAS/IAS、world cache、BSDF/AOV、预算、诊断和验收。
 
 - [Review raster completion / joint checks](docs/REVIEW-COMPLETION.md)：0.35 visual bundle、shared temporal、water/reflections、adaptive预算与future RTX边界。
 

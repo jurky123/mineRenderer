@@ -1,8 +1,10 @@
 # VoxelLight current state
 
-Current release: **0.35.2** (`mod_version` in `gradle.properties`). This is the current implementation/acceptance summary; PLAN and versioned document sections preserve the roadmap and historical decisions.
+Current release: **0.36.0** (`mod_version` in `gradle.properties`). Experimental raster-primary RTX upgrade; the implementation and pending acceptance gates are documented in [RTX-PATH-TRACING-ARCHITECTURE](RTX-PATH-TRACING-ARCHITECTURE.md).
 
-0.35.2 addresses rough-surface gloss and new-view GI acquisition: roughness-aware environment Fresnel, smooth/wet-only sharp SSR and bounded static world-face irradiance reuse. Previously traced faces and nearby coplanar faces can display GI without waiting for the worker. Completely unobserved surfaces still require asynchronous tracing; no instantaneous-convergence claim. See CHANGELOG for costs and pending GPU acceptance.
+This release adds actual OptiX triangle GAS/IAS traversal, GPU-only Vulkan/CUDA external-buffer/semaphore exchange, separate diffuse/specular/transmission AOVs, a persistent 4/8/16-block world radiance cache, textured LabPBR secondary hits, dielectric glass/water and colored sun transmittance. Nearby captured entity/block-entity instances persist offscreen and share/refit model GAS. Performance/Balanced raster and CUDA voxel reference remain available. Quarter-resolution voxel/fuzzy clouds and macro+micro water normals are added; aerial/volume/forward controls are separated with default aerial density0.00035.
+
+**Acceptance is pending:** this Linux build host has no NVIDIA GPU or display. Native Windows/Linux compilation, CPU tests and shader contracts pass; the headless client verifies mixins then stops at missing DISPLAY. No RT image, GPU interop synchronization validation, AABB-vs-triangle result or FPS claim has been made. See the architecture document for bounded coverage, last-pose entities, low-res transmission, approximation and memory limits. Cinematic is a placeholder, not Full PT.
 
 Minecraft26.2 / Java25 / Fabric Loader0.19.5 / Fabric API0.160.0+26.2. Native Vulkan only, client only; effects off at startup. Build with `./gradlew build clientKit`; install the resulting mod from the kit and run `/voxellight mode foundation`. Detailed commands and checks: [INSTALL.md](INSTALL.md).
 

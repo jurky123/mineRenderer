@@ -280,6 +280,8 @@ vec3 srgbToLinear(vec3 c) {
     return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, lessThanEqual(c, vec3(0.04045)));
 }
 float energy(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+uniform sampler2D RtSunVisibility;
+uniform sampler2D RtCoverage;
 uniform sampler2D MaterialPbr;
 uniform sampler2D MaterialTable;
 layout(std140) uniform PbrSettings { vec4 PbrControls; };
@@ -314,8 +316,8 @@ void main() {
     float depth = texture(SceneDepth, texCoord).r;
     float capturedDepth = texture(MaterialDepth, texCoord).r;
     vec4 geometryNormal = texture(MaterialNormal, texCoord) * vec4(2,2,2,3) - vec4(1,1,1,0);
-    int difference = abs(int(floatBitsToUint(depth)) - int(floatBitsToUint(capturedDepth)));
-    if (depth <= 0.0 || capturedDepth <= 0.0 || difference > 8 || geometryNormal.a < 0.5) {
+    float difference = abs(reconstruct(texCoord,depth,InvProjection).z-reconstruct(texCoord,capturedDepth,InvProjection).z);
+    if (depth <= 0.0 || capturedDepth <= 0.0 || difference > max(.01,.001*abs(reconstruct(texCoord,depth,InvProjection).z)) || geometryNormal.a < 0.5) {
         return;
     }
     vec4 material = texture(MaterialAlbedo, texCoord);
@@ -341,6 +343,9 @@ void main() {
         albedo*=1.0-wet*porosity*.28;
         alpha=mix(alpha,max(.045,alpha*.2),wet*(1.0-porosity));
     }
+    bool rtValid=false;
+    if(PbrControls.w>0.0){vec4 cover=texture(RtCoverage,texCoord);rtValid=cover.a>.5&&texture(RtSunVisibility,texCoord).a>.5&&abs(dot(normal,cover.xyz-position))<.12+.003*distanceToCamera&&(flags&16)==0;}
+    int rtOwner=rtValid?int(PbrControls.w):0;
     vec3 viewDirection=normalize(-position);
     if(PbrControls.z>.5) {
         vec3 debugColor=PbrControls.z<1.5?vec3(alpha):PbrControls.z<2.5?(metal?vec3(1,.65,.1):vec3(.15)):shadingNormal*.5+.5;
@@ -396,9 +401,11 @@ void main() {
     vec3 ambient=vec3(0.012)+sky+blockBaseline*(1.0-replacement);
     vec3 sunSpecular=usePbr?DirectColorStrength.rgb*DirectColorStrength.a*skyAccess*ggx(shadingNormal,viewDirection,LightDirectionAndMask.xyz,f0,alpha):vec3(0);
     vec3 reflected=reflect(-viewDirection,shadingNormal);
-    vec3 environmentSpecular=usePbr?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*(f0+(max(vec3(1.0-sqrt(alpha)),f0)-f0)*pow(1.0-max(dot(shadingNormal,viewDirection),0.0),5.0))*mix(1.0,.15,alpha)*ao:vec3(0);
+    vec3 environmentSpecular=usePbr&&(rtOwner&2)==0?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*(f0+(max(vec3(1.0-sqrt(alpha)),f0)-f0)*pow(1.0-max(dot(shadingNormal,viewDirection),0.0),5.0))*mix(1.0,.15,alpha)*ao:vec3(0);
     vec3 directContribution=albedo*diffuseWeight*direct+sunSpecular;
-    vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*visibility+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
+    if((rtOwner&1)!=0)ambient=blockBaseline*(1.0-replacement); // direct local baseline stays raster; GI skips primary-to-emitter emission
+    if((rtOwner&2)!=0)selectedSpecular=vec3(0);
+    vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*((rtOwner&4)!=0?texture(RtSunVisibility,texCoord).rgb:vec3(visibility))+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
     float waterDepth=texture(WaterSurfaceDepth,texCoord).r;
     vec3 waterPosition=waterDepth>0.0?(ViewToWorld*vec4(reconstruct(texCoord,waterDepth,InvProjection),1)).xyz:vec3(0);
     bool belowWater=(waterDepth>depth&&waterPosition.y>position.y+.02)||UnderwaterControls.x>.5;

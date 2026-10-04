@@ -1,5 +1,7 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
+uniform sampler2D RtTransmissionScene;
+uniform sampler2D VoxelCloud;
 uniform sampler2D LightingHdr;
 uniform sampler2D SceneDepth;
 uniform sampler2D EmissiveBloom;
@@ -7,7 +9,7 @@ uniform sampler2D MaterialEmission;
 uniform sampler2D MaterialNormal;
 uniform sampler2D VolumetricScatter;
 layout(std140) uniform VolumetricSettings { vec4 VolumeParameters; vec4 VolumeQuality; };
-layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters; }; // density, camera above sea level, enabled, max distance
+layout(std140) uniform AtmosphereSettings { vec4 AtmosphereParameters;vec4 MediumControls; }; // density, camera above sea level, enabled, max distance
 layout(std140) uniform LightingEnvironment { vec4 DirectColorStrength; vec4 SkyColorStrength; vec4 HorizonColorLower; };
 layout(std140) uniform VisualSettings {
     vec4 ToneBloom; // exposure scale, filmic enabled, bloom strength, coverage blend enabled
@@ -90,7 +92,7 @@ vec3 aerialPerspective(vec3 radiance,vec3 position,float skyAccess) {
     // Analytic forward glow only. No claim of shadowed shafts or volumetric occlusion.
     float phase=pow(max(dot(position/max(distanceToCamera,.001),LightDirectionAndMask.xyz),0.0),12.0);
     vec3 scattered=HorizonColorLower.rgb*(.01+SkyColorStrength.a*1.5)
-        +DirectColorStrength.rgb*DirectColorStrength.a*phase*.35;
+        +DirectColorStrength.rgb*DirectColorStrength.a*phase*MediumControls.y;
     return mix(radiance,scattered,haze);
 }
 vec3 mapColor(vec3 radiance,vec3 position,vec2 uv) {
@@ -112,21 +114,25 @@ void main() {
     float sceneDepth=texture(SceneDepth,texCoord).r;
     vec4 farPoint=InvProjection*vec4(texCoord*2.0-1.0,.00001,1);
     vec3 skyRay=normalize(mat3(ViewToWorld)*(farPoint.xyz/farPoint.w));
-    if(sceneDepth<=0.0 && WeatherControls.x>.5){
+    if(sceneDepth<=0.0 && hdr.a<.5 && WeatherControls.x>.5){
         vec3 sky=environmentSky(skyRay,SkyColorStrength.rgb,HorizonColorLower.rgb,SkyColorStrength.a);
-        vec4 cloud=environmentCloud(skyRay,vec3(0),DirectColorStrength.rgb,DirectColorStrength.a,SkyColorStrength.rgb);
-        sky=mix(sky,cloud.rgb,cloud.a)*ToneBloom.x;
+        vec4 cloud=MediumControls.z>.5?texture(VoxelCloud,texCoord):environmentCloud(skyRay,vec3(0),DirectColorStrength.rgb,DirectColorStrength.a,SkyColorStrength.rgb);
+        sky=(MediumControls.z>.5?sky*(1-cloud.a)+cloud.rgb:mix(sky,cloud.rgb,cloud.a))*ToneBloom.x;
         fragColor=vec4(linearToSrgb(clamp(filmicCurve(max(sky,vec3(0)))/filmicCurve(vec3(6)),0.0,1.0)),1);return;
     }
     // Unsupported pixels keep their original native color without a SceneColor copy.
     if (hdr.a < 0.5) discard;
     if(AoFilter.w>.5) { fragColor=vec4(hdr.rgb,1.0);return; }
     float depth = texture(SceneDepth, texCoord).r;
-    vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
+    vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, max(depth,.00001), 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;
-    vec4 cloud=environmentCloud(normalize(position),position,DirectColorStrength.rgb,DirectColorStrength.a,SkyColorStrength.rgb);
-    hdr.rgb=mix(hdr.rgb,cloud.rgb,cloud.a);
-    hdr.rgb=underwaterMedium(hdr.rgb,position,SkyColorStrength.rgb,DirectColorStrength.a);
+    vec4 transmitted=texture(RtTransmissionScene,texCoord);if(MediumControls.w>.5&&transmitted.a>0&&transmitted.a<=length(position)+.02)position=normalize(position)*transmitted.a;
+    vec4 cloud=MediumControls.z>.5?texture(VoxelCloud,texCoord):environmentCloud(normalize(position),position,DirectColorStrength.rgb,DirectColorStrength.a,SkyColorStrength.rgb);
+    hdr.rgb=MediumControls.z>.5?hdr.rgb*(1-cloud.a)+cloud.rgb:mix(hdr.rgb,cloud.rgb,cloud.a);
+    if(MediumControls.w>.5&&transmitted.a>0&&UnderwaterControls.x>.5){
+        vec3 t=exp(-vec3(.16,.060,.035)*min(length(position),96.0));
+        hdr.rgb+=vec3(.025,.11,.16)*(.35+max(DirectColorStrength.a,0.0))*(1.0-t);
+    }else hdr.rgb=underwaterMedium(hdr.rgb,position,SkyColorStrength.rgb,DirectColorStrength.a);
     vec3 displayed;
     if(VolumeParameters.x>.5) {
         vec4 air=filteredVolume(texCoord,length(position));

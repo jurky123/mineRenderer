@@ -49,6 +49,7 @@ final class PbrAtlas implements AutoCloseable {
                         int s=spec==null?0:spec.getPixel(Math.min(spec.getWidth()-1,(x-x0)*spec.getWidth()/Math.max(1,x1-x0)),Math.min(spec.getHeight()-1,(y-y0)*spec.getHeight()/Math.max(1,y1-y0)));
                         int ao=n&255,packed=spec==null?fallback.packed(ao):((s>>16)&255)|(((s>>8)&255)<<8)|((s&255)<<16)|(ao<<24);
                         int offset=(y*w+x)*4;ids.putShort(offset,(short)palette.id(packed));ids.put(offset+2,(byte)(spec==null||(s>>>24)==255?0:s>>>24));
+                        ids.put(offset+3,(byte)(name.getPath().contains("glass")?1:name.getPath().startsWith("block/water_")?2:0));
                         normal.put(offset,(byte)(n>>16));normal.put(offset+1,(byte)(n>>8));normal.put(offset+2,(byte)ao);normal.put(offset+3,(byte)255);
                     }
                 }catch(Exception e){org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("PBR texture fallback: {}",name,e);}
@@ -56,7 +57,7 @@ final class PbrAtlas implements AutoCloseable {
             }
             for(int i=0;i<palette.size();i++)lut.putInt(i*4,palette.value(i));profiles=palette.size();overflows=palette.overflow();bytes=(long)w*h*8+256*256*4;
             ByteBuffer[] data={ids,normal,lut};var d=RenderSystem.getDevice();var encoder=d.createCommandEncoder();
-            for(int i=0;i<3;i++){int tw=i==2?256:w,th=i==2?256:h;textures[i]=d.createTexture("VoxelLight PBR atlas "+i,GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA8_UNORM,tw,th,1,1);views[i]=d.createTextureView(textures[i]);encoder.writeToTexture(textures[i],data[i],0,0,0,0,tw,th);}
+            for(int i=0;i<3;i++){int tw=i==2?256:w,th=i==2?256:h;textures[i]=d.createTexture("VoxelLight PBR atlas "+i,GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA8_UNORM,tw,th,1,1);views[i]=d.createTextureView(textures[i]);encoder.writeToTexture(textures[i],data[i],0,0,0,0,tw,th);}
             buildNs=System.nanoTime()-started;
         }finally{MemoryUtil.memFree(ids);MemoryUtil.memFree(normal);MemoryUtil.memFree(lut);}
     }

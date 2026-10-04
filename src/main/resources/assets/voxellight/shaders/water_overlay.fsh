@@ -1,4 +1,5 @@
 // Appended to the active native terrain fragment shader after renaming its main.
+uniform sampler2D RtTransmission;
 uniform sampler2D WaterHdr;
 uniform sampler2D WaterDepth;
 uniform sampler2D WaterHzb;
@@ -9,7 +10,7 @@ layout(std140) uniform WaterSettings {
     vec4 WaterStill;vec4 WaterFlow;vec4 WaterCamera;vec4 WaterParameters;vec4 WaterTrace;
 };
 layout(std140) uniform VisualSettings {vec4 ToneBloom;vec4 MaterialFade;};
-layout(std140) uniform AtmosphereSettings {vec4 AtmosphereParameters;};
+layout(std140) uniform AtmosphereSettings {vec4 AtmosphereParameters;vec4 MediumControls;};
 layout(std140) uniform LightingEnvironment {vec4 DirectColorStrength;vec4 SkyColorStrength;vec4 HorizonColorLower;};
 layout(std140) uniform ShadowResolveSettings {
     mat4 LightMatrix[3];mat4 ViewToWorld;vec4 LightDirectionAndMask;vec4 Coverage;vec4 CascadeRanges;
@@ -146,22 +147,17 @@ vec4 hzbReflection(vec3 surface,vec3 normal,vec3 direction) {
 vec4 screenReflection(vec3 surface,vec3 normal,vec3 direction) {
     return WaterTrace.x>.5?hzbReflection(surface,normal,direction):linearReflection(surface,normal,direction);
 }
-vec2 waveSlope(vec2 position,float phase) {
-    // Periodic, wind-biased ripples with independent harmonics; suppress unresolved wavelengths.
-    // All spatial frequencies wrap at 64 blocks; evaluate derivatives before any fragment rejection.
-    const vec2 directions[6]=vec2[6](vec2(7,3),vec2(13,5),vec2(19,-7),vec2(-9,17),vec2(31,11),vec2(-23,29));
-    const float rates[6]=float[6](2,3,5,-4,7,-9);
-    const float weights[6]=float[6](.32,.25,.18,.12,.08,.05);
-    vec2 slope=vec2(0);
-    for(int i=0;i<6;i++) {
-        vec2 k=directions[i]*.09817477042;
-        float angle=dot(position,k)+rates[i]*phase+float(i)*1.718;
-        float footprint=max(abs(dot(dFdx(position),k)),abs(dot(dFdy(position),k)));
-        float resolved=1.0-smoothstep(.5,2.5,footprint);
-        slope+=normalize(k)*cos(angle)*weights[i]*resolved;
-    }
-    return WaterParameters.z*slope;
+// Macro waves define long crests; advected noise supplies a separate micro-ripple scale.
+float waterNoise(vec2 p){return envNoise(p);}
+vec2 waterSlopeField(vec2 position,float time){
+    const vec2 k[3]=vec2[3](vec2(1.7,.51),vec2(.64,2.38),vec2(-3.14,1.07));
+    const float weight[3]=float[3](.45,.32,.23);vec2 slope=vec2(0);
+    for(int i=0;i<3;i++){float frequency=sqrt(9.81*length(k[i]));float footprint=max(abs(dot(dFdx(position),k[i])),abs(dot(dFdy(position),k[i])));slope+=normalize(k[i])*cos(dot(position,k[i])-frequency*time+float(i)*1.73)*weight[i]*(1-smoothstep(.5,2.5,footprint));}
+    vec2 q=position*6.7+vec2(time*.31,-time*.19);float delta=.13;
+    vec2 micro=vec2(waterNoise(q+vec2(delta,0))-waterNoise(q-vec2(delta,0)),waterNoise(q+vec2(0,delta))-waterNoise(q-vec2(0,delta)))/(2*delta);
+    float footprint=max(length(dFdx(position)),length(dFdy(position)));return slope+.28*micro*(1-smoothstep(.08,.5,footprint));
 }
+vec2 waveSlope(vec2 position,float time){return WaterParameters.z*waterSlopeField(position,time);}
 vec2 rainSlope(vec2 position) {
     vec2 cell=floor(position*1.3), local=fract(position*1.3)-.5;
     float phase=fract(CloudOriginTime.w*4.0+envHash(cell));
@@ -178,6 +174,7 @@ void main() {
     vec3 crossed=cross(dFdx(surface),dFdy(surface));
     vec2 slope=waveSlope(surface.xz+WaterCamera.xz,WaterCamera.w)+rainSlope(surface.xz+CloudOriginTime.xy);
     voxellightNativeMain();
+    if(WaterTrace.w>.5){vec4 rt=texture(RtTransmission,uv);if(rt.a>0&&length(surface)>rt.a+.12+.006*length(surface)){fragColor=vec4(0);return;}if(rt.a>0&&abs(rt.a-length(surface))<.12+.006*length(surface)){fragColor=vec4(displayColor(rt.rgb,surface,1.0,uv),1);return;}}
     if(!waterSprite(texCoord0,WaterStill) && !waterSprite(texCoord0,WaterFlow))return;
     vec3 base;float thickness;
     if(!background(uv,surface,base,thickness))return;

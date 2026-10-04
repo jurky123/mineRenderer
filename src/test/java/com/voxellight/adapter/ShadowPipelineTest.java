@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE", "FIRST", "REDUCE", "VOLUMETRIC", "VOLUME_FILTER", "VOLUME_TEMPORAL", "MOTION", "WATER_MASK", "SURFACE_REFLECTION", "SURFACE_COMPOSITE", "COLOR_TEMPORAL", "PT_CAPTURE", "PT_COMPOSITE")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE", "FIRST", "REDUCE", "VOLUMETRIC", "VOLUME_FILTER", "VOLUME_TEMPORAL", "MOTION", "WATER_MASK", "SURFACE_REFLECTION", "SURFACE_COMPOSITE", "COLOR_TEMPORAL", "PT_CAPTURE", "PT_COMPOSITE", "RTX_CAPTURE", "RTX_COMPOSITE", "RTX_ATLAS", "RTX_DIELECTRIC", "CLOUD")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX,pipeline.getShaderDefines());
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT,pipeline.getShaderDefines())) {
@@ -131,6 +131,7 @@ class ShadowPipelineTest {
                         assertEquals(List.of("outAlbedo", "outNormal", "outEmission", "outMaterialPbr"), names,
                                 "Native output rebinding order must match the actual MRT attachments");
                     }
+                    if(field.equals("RTX_CAPTURE")){var names=new ArrayList<String>();for(Object output:fragment.outputs()){var name=output.getClass().getDeclaredMethod("name");name.setAccessible(true);names.add((String)name.invoke(output));}assertEquals(List.of("position","normal","albedo","material"),names,"RT guide attachments must retain native Vulkan reflection order");}
                     if(field.equals("MOTION")){
                         assertEquals(3,pipeline.getColorTargetStates().length);assertEquals(GpuFormat.RG16_FLOAT,pipeline.getColorTargetStates()[0].format());assertEquals(GpuFormat.R32_FLOAT,pipeline.getColorTargetStates()[1].format());assertEquals(GpuFormat.RGBA8_UNORM,pipeline.getColorTargetStates()[2].format());
                         var names=new ArrayList<String>();for(Object output:fragment.outputs()){var name=output.getClass().getDeclaredMethod("name");name.setAccessible(true);names.add((String)name.invoke(output));}assertEquals(List.of("velocity","depthGuide","normalGuide"),names);
@@ -382,6 +383,7 @@ class ShadowPipelineTest {
     }
 
     private static RenderPipeline pipeline(ClassLoader loader, String name) throws Exception {
+        if(name.startsWith("RTX_")||name.equals("CLOUD")){var field=Class.forName("com.voxellight.adapter."+(name.equals("CLOUD")?"VoxelCloudPass":"RtxLightingPass"),true,loader).getDeclaredField(name.equals("CLOUD")?name:name.substring(4));field.setAccessible(true);return (RenderPipeline)field.get(null);}
         var field = Class.forName("com.voxellight.adapter." + (name.startsWith("PT_") ? "PathTracePass" : (name.equals("FIRST") || name.equals("REDUCE")) ? "DepthPyramid" : (name.equals("VOLUMETRIC") || name.equals("VOLUME_FILTER") || name.equals("VOLUME_TEMPORAL")) ? "VolumetricPass" : name.equals("WATER_MASK") ? "WaterSurfaceCapture" : name.equals("MOTION") ? "MotionFrame" : name.startsWith("SURFACE_") || name.equals("COLOR_TEMPORAL") ? "SurfaceEffects" : name.equals("OUTPUT") ? "VisualComposite" : name.equals("WATER_STORE") ? "WaterPass" : name.startsWith("BLOOM_") ? "EmissiveBloom" : name.equals("AO") || name.equals("AO_FILTER") ? "AmbientOcclusionPass" : name.equals("TEMPORAL") ? "TemporalShadowHistory" : name.equals("CULL") || name.equals("NO_CULL") ? "EntityMaterials" : name.equals("LIGHTING") || name.equals("LIGHTING_TEMPORAL") || name.equals("OUTPUT") ? "LightingResolvePass" : name.equals("CAPTURE") || name.equals("NATIVE_CAPTURE") || name.equals("DISPLAY") ? "MaterialCapture" : "ShadowRenderer"), true, loader).getDeclaredField(name);
         field.setAccessible(true);
         return (RenderPipeline) field.get(null);

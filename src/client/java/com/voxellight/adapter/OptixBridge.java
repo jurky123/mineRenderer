@@ -20,6 +20,7 @@ final class OptixBridge {
         }
         return resource("pathtrace.ptx");
     }
+    static byte[] loadRt() throws IOException {load();return resource("rt_program.ptx");}
     private static byte[] resource(String name) throws IOException {
         try(var input=OptixBridge.class.getResourceAsStream("/voxellight/native/"+name)) {
             if(input==null)throw new IOException("Native OptiX component missing; use the native-enabled client kit");return input.readAllBytes();
