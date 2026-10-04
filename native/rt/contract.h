@@ -1,6 +1,7 @@
 #pragma once
 #include <optix.h>
 #include "bsdf.h"
+#include "light_sampling.h"
 #include "dispatch.h"
 #ifndef __CUDACC__
 struct float3 {float x,y,z;};
@@ -24,7 +25,7 @@ struct RtParams {
  float time,waveStrength,cloudWind,cloudAltitude,rain,cloudShadows,rainRipples;unsigned options,debug;float underwater;float4 pointPosition,pointIntensity;rt::Medium cameraWater;
  RtAreaLight* lights;int lightCount;float lightPower;
  float4 *surfaceKey,*previousKey,*referenceSum,*previousSignal;unsigned referenceSpp,referenceSamples;float fireflyClamp;
- float4* caustics;float4* causticHistory;unsigned* counters;unsigned* counterTotals;unsigned launchOffset;
+ float4* caustics;float4* causticHistory;unsigned* counters;unsigned* counterTotals;unsigned launchOffset;float inverseCamera[16];float4* environmentMap;float* environmentCdf;rt::LightCluster* lightClusters;int lightClusterCount;
 };
 struct RtPayload {rt::Material bsdf;unsigned objectId,primitiveId;float3 p,n,geometryNormal,tangent,bitangent,color,emission,absorption;float roughness,f0,ior,transmission;unsigned metal,flags;float distance;int hit;};
 
@@ -33,4 +34,4 @@ static_assert(sizeof(RtVertex)==40,"RT vertex ABI");
 static_assert(sizeof(float3)==12 && alignof(float4)==16,"CUDA vector ABI");
 static_assert(sizeof(RtHitData)==16 && sizeof(RtCube)==24,"RTX host/device ABI");
 
-static_assert(sizeof(RtParams)==560 && sizeof(RtPayload)==276 && sizeof(RtAreaLight)==132 && sizeof(rt::Material)==140,"Material 3 host/device ABI");
+static_assert(sizeof(RtParams)==656 && sizeof(RtPayload)==280 && sizeof(RtAreaLight)==132 && sizeof(rt::Material)==144,"Material 3 host/device ABI");

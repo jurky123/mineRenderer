@@ -1,7 +1,9 @@
-# RT environment integration status
+# Shared HDR RT environment
 
-Current RT miss and environment NEE share `environment(direction)` in native transport, but it is still a sky-color gradient, not the raster sky/weather/voxel-cloud model. Sampling remains uniform sphere with matching density; this is **not** the requested environment importance sampler.
+The GPU renders a 256×128 RGBA32F lat-long environment using the same `environment.glsl` sky, horizon, sunset, weather, stars and voxel-cloud density functions and lighting palette as raster. Sun/moon disks are excluded: the directional light sampler owns their energy. A bounded 16-step cloud march with three sun-transmittance samples supplies environment cloud radiance. The map is copied directly to an exported interop buffer, with no CPU image readback. Realtime regenerates it with the frame's weather; reference freezes it with its guide snapshot.
 
-Opaque primary glossy NEE and BSDF miss now use complementary MIS weights. Directional sun is excluded from this primary estimator because raster owns primary sun/moon direct. Secondary paths retain sun sampling. The future shared HDR environment must exclude the separately sampled solar disk in both raster/RT reflection and environment NEE.
+RT miss, glossy/dielectric reflection, diffuse miss and probe update query this map. Environment NEE chooses rows/columns from GPU luminance-weighted CDFs. Cell weights use exact lat-long solid angle, equivalent to luminance × sin(theta) integration. Samples are uniform in cos(theta) within the chosen cell. PDF is cell probability divided by solid angle; an entirely black map falls back to uniform sphere. Environment light-selection power uses integrated map luminance. CPU tests check PDF normalization, poles, sample histograms and black-map fallback.
 
-Pending implementation: shared HDR map generation/refresh, luminance × sin(theta) discrete distribution, solid-angle-consistent map PDF, seam/pole filtering, PDF/integral regressions, weather/cloud invalidation and night-source acceptance. GPU memory/ray budgets must be measured rather than inferred from the current gradient.
+`/voxellight rt_environment on|off` compares the shared map against the legacy gradient. `rt_environment_map` and `rt_environment_distribution` are separately profiled.
+
+Limits: fixed resolution/nearest lookup, unresolved small stars, approximate cloud march, no sun disk, no full atmospheric multiple scattering. Raster clouds may still use their plane fallback rather than voxel clouds; matching the cloud renderer selection is outstanding. No screenshot/GPU timing comparison has been captured. CPU PDF tests establish proposal correctness, not environment visual calibration.

@@ -88,6 +88,8 @@ public final class RenderProbe {
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
     public void setRtOption(String option,boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtOption(option,enabled);}
+    public void fullReferenceRt(boolean value){RenderSystem.assertOnRenderThread();if(value){setMode(Mode.FOUNDATION);setPathTrace(false);}lighting.fullReference(value);}
+    public void referenceScale(int value){lighting.referenceScale(value);}
     public void referenceRt(boolean value){RenderSystem.assertOnRenderThread();if(value){setMode(Mode.FOUNDATION);setPathTrace(false);}lighting.referenceRt(value);}
     public void referenceSpp(int value){lighting.referenceSpp(value);}
     public void referenceReset(){lighting.referenceReset();}
@@ -226,6 +228,7 @@ public final class RenderProbe {
         entityMaterials.endFrame();
         lighting.endFrame();material.endFrame();
         if (mode.isMaterial()) {
+            lighting.displayFullReference(RenderSystem.getDevice().createCommandEncoder(),target);
             if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
             materialPointObserved = false;
             return;

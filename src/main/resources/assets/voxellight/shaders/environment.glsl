@@ -29,7 +29,7 @@ float cloudVisibility(vec3 position,vec3 light){
     vec2 projected=CloudOriginTime.xy+position.xz+light.xz*(height/light.y);
     float density=0;for(int i=0;i<4;i++)density+=voxelCloudDensity(vec3(projected.x,CelestialData.z+4+float(i)*8,projected.y));return exp(-density*mix(.4,.65,WeatherControls.w));
 }
-vec3 environmentSky(vec3 ray,vec3 zenith,vec3 horizon,float brightness){
+vec3 environmentSkyModel(vec3 ray,vec3 zenith,vec3 horizon,float brightness,bool discs){
     vec3 sun=vec3(-sin(CelestialData.x),cos(CelestialData.x),0);
     float day=smoothstep(-.15,.25,sun.y),rise=exp(-abs(sun.y)*8.0);
     vec3 night=vec3(.007,.014,.035);
@@ -37,10 +37,10 @@ vec3 environmentSky(vec3 ray,vec3 zenith,vec3 horizon,float brightness){
     float towardSun=pow(max(dot(ray,sun),0.0),12.0);
     sky+=vec3(1.0,.22,.045)*rise*towardSun*.65*(1.0-WeatherControls.w);
     float disc=smoothstep(cos(.014),cos(.010),dot(ray,sun));
-    sky+=vec3(8.0,6.5,4.2)*disc*day*(1.0-WeatherControls.w*.8);
+    if(discs)sky+=vec3(8.0,6.5,4.2)*disc*day*(1.0-WeatherControls.w*.8);
     vec3 moon=-sun;float moonDisc=smoothstep(cos(.016),cos(.012),dot(ray,moon));
     float phase=abs(CelestialData.y-4.0)/4.0;
-    sky+=vec3(.35,.45,.65)*moonDisc*(1.0-day)*phase;
+    if(discs)sky+=vec3(.35,.45,.65)*moonDisc*(1.0-day)*phase;
     // Sparse deterministic world-direction stars, hidden by rain/day/cloud opacity.
     vec2 starUv=vec2(atan(ray.z,ray.x),asin(clamp(ray.y,-1.0,1.0)))*180.0;
     vec2 starCell=floor(starUv);vec2 starOffset=fract(starUv)-.5;
@@ -74,3 +74,5 @@ vec3 underwaterMedium(vec3 radiance,vec3 position,vec3 sky,float sun){
     vec3 scatter=vec3(.025,.11,.16)*(.35+max(sun,0.0));
     return radiance*transmission+scatter*(1.0-transmission);
 }
+
+vec3 environmentSky(vec3 ray,vec3 zenith,vec3 horizon,float brightness){return environmentSkyModel(ray,zenith,horizon,brightness,true);}

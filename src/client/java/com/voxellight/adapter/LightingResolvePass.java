@@ -85,6 +85,7 @@ final class LightingResolvePass implements AutoCloseable {
         result=rtx.active()?rtx.composite(encoder,output,material,result):pathtrace.render(encoder,output,material,shadows,result,actualProjection,projectionObserved,pbrSettings);
         surfaces.rtReflections((rtx.ownership()&2)!=0);
         if(composite.polished()&&!ao.debug()&&pbrDebug==0)result=surfaces.render(encoder,output,material,shadows,result,environment,pbrSettings,weather,motion);
+        composite.fullReference(rtx.fullReferenceActive());
         composite.render(encoder,output,material,shadows,result,environment,ao,true,weather,motion);
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
@@ -98,7 +99,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setVolumeDensity(float density){composite.setVolumeDensity(density);}
     void setForwardStrength(float strength){composite.setForwardStrength(strength);}
     void setAtmosphereDensity(float density){composite.setAtmosphereDensity(density);}
-    void setExposure(float ev){composite.setExposure(ev);}
+    void setExposure(float ev){composite.setExposure(ev);rtx.referenceExposure(ev);}
     void setWater(boolean value){composite.setWater(value);}
     void setWaterHzb(boolean value){composite.setWaterHzb(value);}
     void setWaterReflections(boolean value){composite.setWaterReflections(value);}
@@ -113,6 +114,8 @@ final class LightingResolvePass implements AutoCloseable {
     void setQuality(com.voxellight.world.VisualQuality value){rtx.quality(value);composite.setQuality(value);surfaces.setQuality(value);pathtrace.setQuality(value);}
     void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.setRtTransmission(rtx.transmission());composite.setRtGuides(rtx.coverage(),rtx.interfaceNormal(),rtx.surfaceKey(),rtx.materialIds());composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
+    void fullReference(boolean value){rtx.fullReference(value);surfaces.reference(value);}
+    void referenceScale(int value){rtx.referenceScale(value);}
     void setPathTrace(boolean enabled){pathtrace.setEnabled(enabled);}
     void setPathTraceDenoise(boolean enabled){pathtrace.setDenoise(enabled);}
     void setPathTraceFreeze(boolean value){pathtrace.setFreeze(value);}
@@ -122,10 +125,12 @@ final class LightingResolvePass implements AutoCloseable {
     void setPathTraceDebug(boolean enabled){pathtrace.setDebug(enabled);}
     void setTemporal(boolean enabled){temporal.setEnabled(enabled);}
     void invalidateHistory(){temporal.invalidate();}
+    void displayFullReference(CommandEncoder encoder,RenderTarget output){rtx.displayFullReference(encoder,output);}
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
         entityPhase=true;
         try{renderCurrent(encoder,output,material,shadows,false);}finally{entityPhase=false;}
         var result=pathtrace.render(encoder,output,material,shadows,hdrView,actualProjection,projectionObserved,pbrSettings);
+        composite.fullReference(rtx.fullReferenceActive());
         composite.render(encoder,output,material,shadows,result,environment,ao,false,weather,motion);
     }
     void renderCurrent(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,boolean history) {

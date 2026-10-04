@@ -1,5 +1,9 @@
 ## 0.37.6 reference responsiveness
 
+## 0.38.0-alpha.2 — environment and asynchronous full reference
+
+Shared GPU HDR sky/cloud environment and exact solid-angle importance CDF; OptiX primary-camera progressive reference; nonblocking reference completion/display ownership; stale-camera rejection; coordinate-aware ray origins and shading hemisphere checks; matched GGX reflection multiple-scattering sampling; water free-flight and full-reference medium events; build-time OptiX-IR/PTX and optimization A/B. See [0.38 ledger](RTX-QUALITY-0.38.md), [environment](RT-ENVIRONMENT.md), [reference](FULL-REFERENCE.md). This is still a checkpoint: adaptive full-resolution RTX rays, canonical calibration, RT texture mips/animation, primary diffuse ownership, hierarchical lights, layered reference, caustic clipmaps and signal-guide improvements remain unfinished. NVIDIA acceptance has not been run on this host.
+
 ## 0.38.0-alpha.1 — first integration increment
 
 Primary opaque glossy NEE/MIS, RT coated-substrate semantics and UV tangent frames implemented. User confirmed 0.37.6 responsiveness; night iron/indirect quality remains unaccepted. The full 0.38 review is **not complete**. Implementation/acceptance ledger: [RTX Quality 0.38](RTX-QUALITY-0.38.md). No NVIDIA baseline available on this host.

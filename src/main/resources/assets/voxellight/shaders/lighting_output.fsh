@@ -111,6 +111,7 @@ vec3 displayColor(vec3 inputRadiance,vec3 position,float skyAccess,vec2 uv) {
 }
 void main() {
     vec4 hdr = texture(LightingHdr, texCoord);
+    if(MaterialFade.z>.5){vec3 x=max(hdr.rgb,vec3(0))*ToneBloom.x;fragColor=vec4(linearToSrgb(clamp(filmicCurve(x)/filmicCurve(vec3(6)),0.0,1.0)),1);return;}
     float sceneDepth=texture(SceneDepth,texCoord).r;
     vec4 farPoint=InvProjection*vec4(texCoord*2.0-1.0,.00001,1);
     vec3 skyRay=normalize(mat3(ViewToWorld)*(farPoint.xyz/farPoint.w));

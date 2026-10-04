@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE", "FIRST", "REDUCE", "VOLUMETRIC", "VOLUME_FILTER", "VOLUME_TEMPORAL", "MOTION", "WATER_MASK", "SURFACE_REFLECTION", "SURFACE_COMPOSITE", "COLOR_TEMPORAL", "PT_CAPTURE", "PT_COMPOSITE", "RTX_CAPTURE", "RTX_COMPOSITE", "RTX_ATLAS", "RTX_DIELECTRIC", "CLOUD")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE", "FIRST", "REDUCE", "VOLUMETRIC", "VOLUME_FILTER", "VOLUME_TEMPORAL", "MOTION", "WATER_MASK", "SURFACE_REFLECTION", "SURFACE_COMPOSITE", "COLOR_TEMPORAL", "PT_CAPTURE", "PT_COMPOSITE", "RTX_CAPTURE", "RTX_COMPOSITE", "RTX_ATLAS", "RTX_DIELECTRIC", "RTX_ENVIRONMENT", "RTX_REFERENCE_DISPLAY", "CLOUD")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX,pipeline.getShaderDefines());
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT,pipeline.getShaderDefines())) {

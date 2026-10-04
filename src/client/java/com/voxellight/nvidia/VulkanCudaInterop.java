@@ -8,7 +8,7 @@ public final class VulkanCudaInterop implements AutoCloseable {
  public final ExternalSemaphore ready,done;
  private final VulkanDevice device;
  public VulkanCudaInterop(VulkanDevice device,long context,long[] sizes){
-  long total=0;for(long bytes:sizes){if(bytes<=0)throw new IllegalArgumentException("Invalid external buffer size");total=Math.addExact(total,bytes);}if(total>256L*1024*1024)throw new IllegalStateException("RTX external allocation budget exceeds 256 MiB");
+  long total=0;for(long bytes:sizes){if(bytes<=0)throw new IllegalArgumentException("Invalid external buffer size");total=Math.addExact(total,bytes);}if(total>768L*1024*1024)throw new IllegalStateException("RTX external allocation budget exceeds 768 MiB");
   this.device=device;buffers=new ExternalBuffer[sizes.length];ExternalSemaphore a=null,b=null;
   try{for(int i=0;i<sizes.length;i++){buffers[i]=new ExternalBuffer(device,sizes[i]);OptixNative.importBuffer(context,buffers[i].exportHandle(),buffers[i].allocationSize(),sizes[i]);}
    a=new ExternalSemaphore(device);b=new ExternalSemaphore(device);OptixNative.importSemaphore(context,a.exportHandle());OptixNative.importSemaphore(context,b.exportHandle());

@@ -17,8 +17,9 @@ static __forceinline__ __device__ RtPayload* payload(){return reinterpret_cast<R
 static __forceinline__ __device__ void countOperation(int kind){unsigned i=params.launchOffset+optixGetLaunchIndex().x;if(params.counters&&i<(unsigned)(params.width*params.height))atomicAdd(params.counters+i*9+kind,1u);}
 static __forceinline__ __device__ RtPayload trace(float3 o,float3 d,float maximum=512.f){
  countOperation(0);RtPayload p={};unsigned long long address=reinterpret_cast<unsigned long long>(&p);unsigned low=(unsigned)address,high=(unsigned)(address>>32);
- optixTrace(params.scene,o,d,.015f,maximum,0,255,OPTIX_RAY_FLAG_NONE,0,1,0,low,high);return p;
+ optixTrace(params.scene,o,d,0.f,maximum,0,255,OPTIX_RAY_FLAG_NONE,0,1,0,low,high);return p;
 }
+static __forceinline__ __device__ float3 spawn(const RtPayload& hit,float3 direction){auto p=rt::offsetRayOrigin(rt::V(hit.p.x,hit.p.y,hit.p.z),rt::V(hit.geometryNormal.x,hit.geometryNormal.y,hit.geometryNormal.z),rt::V(direction.x,direction.y,direction.z));return v(p.x,p.y,p.z);}
 static __forceinline__ __device__ unsigned sample(unsigned* map,int w,int h,float2 uv){int x=max(0,min(w-1,(int)(uv.x*w))),y=max(0,min(h-1,(int)(uv.y*h)));return map[y*w+x];}
 static __forceinline__ __device__ unsigned hitTexture(const RtHitData* data,float2 uv){if(data->textureSlot<0)return sample(params.atlas,params.atlasWidth,params.atlasHeight,uv);int slot=data->textureSlot,x=(slot&7)*256+max(0,min(255,(int)(uv.x*256))),y=(slot>>3)*256+max(0,min(255,(int)(uv.y*256)));return params.entityAtlas[y*2048+x];}
 static __forceinline__ __device__ float3 cosine(float3 n,unsigned& seed){float r=sqrtf(random(seed)),a=6.283185307f*random(seed);float3 t=norm(cross3(fabsf(n.y)<.9f?v(0,1,0):v(1,0,0),n)),b=cross3(n,t);return norm(add(add(mul(t,r*cosf(a)),mul(b,r*sinf(a))),mul(n,sqrtf(fmaxf(0,1-r*r)))));}
@@ -87,6 +88,8 @@ static __forceinline__ __device__ float3 probeLight(float3 p,float3 n){
 }
 extern "C" __global__ void __raygen__lighting(){
  unsigned i=params.launchOffset+optixGetLaunchIndex().x,seed=i*9781u+params.frame*6271u+1;
+ if(params.mode==13){int row=i;if(row>=rt::EnvironmentHeight)return;float total=0;for(int x=0;x<rt::EnvironmentWidth;x++){auto c=params.environmentMap[row*rt::EnvironmentWidth+x];total+=fmaxf(0,c.x*.2126f+c.y*.7152f+c.z*.0722f)*rt::environmentSolidAngle(row);params.environmentCdf[row*rt::EnvironmentWidth+x]=total;}return;}
+ if(params.mode==14){if(i)return;float total=0;for(int y=0;y<rt::EnvironmentHeight;y++){total+=params.environmentCdf[y*rt::EnvironmentWidth+rt::EnvironmentWidth-1];params.environmentCdf[rt::EnvironmentWidth*rt::EnvironmentHeight+y]=total;}return;}
  if(params.mode==12){if(i<(unsigned)(params.width*params.height))for(int kind=0;kind<9;kind++)atomicAdd(params.counterTotals+kind,params.counters[i*9+kind]);return;}
  if(params.mode==10){float cell=.25f;int cx=(int)floorf(params.camera.x/cell)-32,cz=(int)floorf(params.camera.z/cell)-32,x=cx+(i&63),z=cz+((i>>6)&63),slot=(x&63)|((z&63)<<6);auto record=params.caustics+slot*2;record[0]=make_float4(x*cell,0,z*cell,0);record[1]=make_float4(0,0,0,0);return;}
  if(params.mode==8){causticPhoton(i,seed);return;}
@@ -107,6 +110,18 @@ extern "C" __global__ void __raygen__lighting(){
   }float alpha=same?.15f:1;a[0]=make_float4(p.x,p.y,p.z,1);for(int k=0;k<4;k++){float3 old=v(a[k+1].x,a[k+1].y,a[k+1].z),value=add(mul(old,1-alpha),mul(sh[k],alpha));a[k+1]=make_float4(value.x,value.y,value.z,0);}a[5]=make_float4(mean,second,params.frame,same?a[5].w+1:1);a[7]=make_float4(luminance,luminanceSecond,fmaxf(0,luminanceSecond-luminance*luminance),same?a[7].w:a[7].w+1);return;
  }
  int count=params.width*params.height;if(i>=count)return;
+ if(params.options&(1u<<25)){
+  if(params.mode!=0)return;
+  float x=2*((i%params.width+random(seed))/params.width)-1,y=2*((i/params.width+random(seed))/params.height)-1;
+  auto m=params.inverseCamera;float z=.00001f,w=m[3]*x+m[7]*y+m[11]*z+m[15];
+  float3 ray=norm(v((m[0]*x+m[4]*y+m[8]*z+m[12])/w,(m[1]*x+m[5]*y+m[9]*z+m[13])/w,(m[2]*x+m[6]*y+m[10]*z+m[14])/w));
+  float3 result=incoming(params.camera,ray,seed,12,false);int slot=i;
+  auto old=params.referenceSamples?params.referenceSum[slot]:make_float4(0,0,0,0);
+  float weight=params.referenceSamples+1;float3 sum=add(v(old.x,old.y,old.z),result);
+  params.referenceSum[slot]=make_float4(sum.x,sum.y,sum.z,weight);result=mul(sum,1/weight);
+  params.diffuse[i]=make_float4(result.x,result.y,result.z,1);params.specular[i]=params.transmission[i]=make_float4(0,0,0,0);return;
+ }
+
  if(params.mode==4){params.previousKey[i]=params.surfaceKey[i];params.previousSignal[i]=make_float4(params.specular[i].w,params.transmission[i].w,params.material[i].x,params.material[i].z);float4 p=params.position[i];params.previousPosition[i]=make_float4(p.x+params.camera.x,p.y+params.camera.y,p.z+params.camera.z,p.w);params.previousNormal[i]=params.normal[i];return;}float4 pp=params.position[i],nn=params.normal[i],aa=params.albedo[i],mm=params.material[i];
  if(params.mode==0){params.surfaceKey[i]=make_float4(-1,-1,0,0);params.sunVisibility[i]=make_float4(1,1,1,0);params.flow[i*2]=params.flow[i*2+1]=0;params.flowTrust[i]=0;params.diffuse[i]=params.specular[i]=params.transmission[i]=make_float4(0,0,0,0);}if(pp.w<.5f)return;float3 p=add(v(pp.x,pp.y,pp.z),params.camera),n=norm(v(nn.x,nn.y,nn.z)),view=norm(v(-pp.x,-pp.y,-pp.z));float3 color=v(aa.x,aa.y,aa.z);
  float3 sunT=v(1,1,1);bool dielectric=false;
@@ -114,7 +129,7 @@ extern "C" __global__ void __raygen__lighting(){
   if(primary.hit&&primary.transmission>0&&(params.options&4)){dielectric=true;p=primary.p;n=primary.geometryNormal;color=primary.color;float3 relative=add(p,mul(params.camera,-1));pp=make_float4(relative.x,relative.y,relative.z,1);nn=make_float4(n.x,n.y,n.z,2);params.material[i]=make_float4(primary.bsdf.microfacetAlpha,primary.f0,primary.bsdf.materialId,1);params.position[i]=pp;params.normal[i]=nn;params.albedo[i]=make_float4(color.x,color.y,color.z,1);coverage=true;}
   if(coverage){params.surfaceKey[i]=make_float4(primary.bsdf.materialId,primary.objectId,primary.distance,primary.ior);
    if(!dielectric){n=primary.geometryNormal;nn=make_float4(n.x,n.y,n.z,1);params.normal[i]=nn;params.material[i]=make_float4(primary.bsdf.microfacetAlpha,primary.f0,primary.bsdf.materialId,0);}}
-if(coverage){sunT=visibility(add(p,mul(n,.025f)),params.sun);if((params.options&33)==33&&dot3(causticIrradiance(p,n),v(1,1,1))>0)sunT=v(0,0,0);}params.sunVisibility[i]=make_float4(sunT.x,sunT.y,sunT.z,coverage?1:0);if(!coverage&&params.debug!=13&&params.debug!=7&&params.debug!=8)return;
+if(coverage){sunT=visibility(spawn(primary,params.sun),params.sun);if((params.options&33)==33&&dot3(causticIrradiance(p,n),v(1,1,1))>0)sunT=v(0,0,0);}params.sunVisibility[i]=make_float4(sunT.x,sunT.y,sunT.z,coverage?1:0);if(!coverage&&params.debug!=13&&params.debug!=7&&params.debug!=8)return;
  }
  float3 oldRelative=add(p,mul(params.previousCamera,-1));auto mat=params.previousClip;
  float ox=mat[0]*oldRelative.x+mat[4]*oldRelative.y+mat[8]*oldRelative.z+mat[12],oy=mat[1]*oldRelative.x+mat[5]*oldRelative.y+mat[9]*oldRelative.z+mat[13],ow=mat[3]*oldRelative.x+mat[7]*oldRelative.y+mat[11]*oldRelative.z+mat[15];
@@ -133,8 +148,8 @@ if(coverage){sunT=visibility(add(p,mul(n,.025f)),params.sun);if((params.options&
  }
 
  auto first=trace(params.camera,norm(v(pp.x,pp.y,pp.z)),sqrtf(dot3(v(pp.x,pp.y,pp.z),v(pp.x,pp.y,pp.z)))+.15f);if(!first.hit)return;
- if(params.debug>=32){if(params.mode!=0)return;TransportDebug info;float3 diffuse=incoming(add(first.p,mul(first.geometryNormal,.025f)),cosine(first.geometryNormal,seed),seed,8,true,0,&info);float3 out=v(0,0,0);unsigned debug=params.debug;
- if(debug==32)out=info.throughput;else if(debug==33)out=v(info.bounce/8.f,info.bounce/8.f,info.bounce/8.f);else if(debug==34)out=info.kind==0?v(1,1,0):info.kind==1?v(0,.5f,1):v(1,0,1);else if(debug==35)out=v((info.lobe&rt::DIFFUSE_LOBE)?1:0,(info.lobe&rt::GLOSSY)?1:0,(info.lobe&rt::TRANSMISSION)?1:0);else if(debug==36)out=v(info.mis,info.mis,info.mis);else if(debug==37)out=info.secondary;else if(debug==38)out=diffuse;else if(debug==39){auto bs=rt::sampleGlossy(first.bsdf,rt::Frame(rv(first.n)),rv(view),seed);if(bs.pdf>0)out=prod(cv(bs.weight),incoming(add(first.p,mul(first.geometryNormal,.025f)),cv(bs.wi),seed,8,false));}else if(debug==40)out=info.emissive;else if(debug==41)out=info.sun;else if(debug==42)out=v(info.bsdfPdf/(1+info.bsdfPdf),0,0);else if(debug==43)out=v(info.lightPdf/(1+info.lightPdf),0,0);else if(debug==44)out=params.sunVisibility[i].w>.5f?v(0,1,0):v(1,0,0);
+ if(params.debug>=32){if(params.mode!=0)return;TransportDebug info;auto debugDirection=cosine(first.geometryNormal,seed);float3 diffuse=incoming(spawn(first,debugDirection),debugDirection,seed,8,true,0,&info);float3 out=v(0,0,0);unsigned debug=params.debug;
+ if(debug==32)out=info.throughput;else if(debug==33)out=v(info.bounce/8.f,info.bounce/8.f,info.bounce/8.f);else if(debug==34)out=info.kind==0?v(1,1,0):info.kind==1?v(0,.5f,1):v(1,0,1);else if(debug==35)out=v((info.lobe&rt::DIFFUSE_LOBE)?1:0,(info.lobe&rt::GLOSSY)?1:0,(info.lobe&rt::TRANSMISSION)?1:0);else if(debug==36)out=v(info.mis,info.mis,info.mis);else if(debug==37)out=info.secondary;else if(debug==38)out=diffuse;else if(debug==39){auto bs=rt::sampleGlossy(first.bsdf,rt::Frame(rv(first.n)),rv(view),seed);if(bs.pdf>0)out=prod(cv(bs.weight),incoming(spawn(first,cv(bs.wi)),cv(bs.wi),seed,8,false));}else if(debug==40)out=info.emissive;else if(debug==41)out=info.sun;else if(debug==42)out=v(info.bsdfPdf/(1+info.bsdfPdf),0,0);else if(debug==43)out=v(info.lightPdf/(1+info.lightPdf),0,0);else if(debug==44)out=params.sunVisibility[i].w>.5f?v(0,1,0):v(1,0,0);
  params.diffuse[i]=make_float4(out.x,out.y,out.z,1);if(dielectric)params.transmission[i]=make_float4(out.x,out.y,out.z,first.distance);return;}
  unsigned batch=params.referenceSpp?rt::referenceBatch(params.referenceSpp,params.referenceSamples):1;float3 light=v(0,0,0);float signalHitDistance=0;TransportDebug diagnostic;
  for(unsigned r=0;r<batch;r++){
@@ -142,12 +157,12 @@ if(coverage){sunT=visibility(add(p,mul(n,.025f)),params.sun);if((params.options&
   if(params.mode==0&&!dielectric&&(params.options&1)&&!rt::metal(first.bsdf)){
    float3 facing=dot3(n,view)>0?n:mul(n,-1);bool thin=first.bsdf.type==rt::DIFFUSE_TRANSMISSION;float t=thin?first.bsdf.transmission:0;
    if((params.options&16)&&!params.referenceSpp){float3 irradiance=add(mul(probeLight(p,facing),1-t),t>0?mul(probeLight(p,mul(facing,-1)),t):v(0,0,0));observation=prod(cv(first.bsdf.baseColor),mul(irradiance,thin?1:1-first.bsdf.f0));}
-   else{bool back=thin&&random(seed)<t;float3 direction=cosine(back?mul(facing,-1):facing,seed);rt::Frame f(rv(facing));auto total=rt::evalBsdf(first.bsdf,f,rv(view),rv(direction)),glossy=rt::evalGlossy(first.bsdf,f,rv(view),rv(direction));rt::Vec diffuse=total.f-glossy.f;float probability=thin?(back?t:1-t):1;observation=prod(cv(diffuse*(rt::Pi/fmaxf(.001f,probability))),incoming(add(p,mul(facing,back?-.025f:.025f)),direction,seed,params.referenceSpp?8:4,true,0,&diagnostic));}
+   else{bool back=thin&&random(seed)<t;float3 direction=cosine(back?mul(facing,-1):facing,seed);rt::Frame f(rv(facing));auto total=rt::evalBsdf(first.bsdf,f,rv(view),rv(direction)),glossy=rt::evalGlossy(first.bsdf,f,rv(view),rv(direction));rt::Vec diffuse=total.f-glossy.f;float probability=thin?(back?t:1-t):1;observation=prod(cv(diffuse*(rt::Pi/fmaxf(.001f,probability))),incoming(spawn(first,direction),direction,seed,params.referenceSpp?8:4,true,0,&diagnostic));}
 
   }
   if(params.mode==5&&params.sunVisibility[i].w>.5f&&(params.options&2)){
    if(nn.w>1.5f)observation=incoming(params.camera,norm(v(pp.x,pp.y,pp.z)),seed,8,false,1,&diagnostic);
-   else{observation=(params.options&64)?primaryGlossyDirect(first,view,seed):v(0,0,0);auto glossy=first.bsdf;rt::Frame frame(rv(dot3(first.n,view)>0?first.n:mul(first.n,-1)),rv(first.tangent),rv(first.bitangent));auto bs=rt::sampleGlossy(glossy,frame,rv(view),seed);if(bs.pdf>0){auto reflectedHit=trace(add(first.p,mul(first.geometryNormal,.02f)),cv(bs.wi));signalHitDistance=reflectedHit.hit?reflectedHit.distance:512;observation=add(observation,prod(cv(bs.weight),incoming(add(first.p,mul(first.geometryNormal,.02f)),cv(bs.wi),seed,params.referenceSpp?8:4,false,0,&diagnostic,true,(params.options&64)?bs.pdf:0)));}}
+   else{observation=(params.options&64)?primaryGlossyDirect(first,view,seed):v(0,0,0);auto glossy=first.bsdf;rt::Frame frame(rv(dot3(first.n,view)>0?first.n:mul(first.n,-1)),rv(first.tangent),rv(first.bitangent));auto bs=rt::sampleGlossy(glossy,frame,rv(view),seed);if(bs.pdf>0){auto reflectedHit=trace(spawn(first,cv(bs.wi)),cv(bs.wi));signalHitDistance=reflectedHit.hit?reflectedHit.distance:512;observation=add(observation,prod(cv(bs.weight),incoming(spawn(first,cv(bs.wi)),cv(bs.wi),seed,params.referenceSpp?8:4,false,0,&diagnostic,true,(params.options&64)?bs.pdf:0)));}}
   }
   if(params.mode==6&&(params.options&4)&&(rt::dielectric(first.bsdf)||params.underwater>.5f))observation=incoming(params.camera,norm(v(pp.x,pp.y,pp.z)),seed,8,false,rt::dielectric(first.bsdf)?2:0,&diagnostic);
   light=add(light,mul(observation,1/fmaxf(1,batch)));

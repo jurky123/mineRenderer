@@ -541,3 +541,7 @@ Compare dry stone/wood with iron/gold/ice: rough surfaces should no longer recei
 ## 0.38 alpha integration
 
 See [0.38 implementation ledger](RTX-QUALITY-0.38.md), [environment status](RT-ENVIRONMENT.md) and [full-reference status](FULL-REFERENCE.md). This alpha adds opaque primary glossy NEE with independent `/voxellight rt_primary_glossy_nee on|off`; the sun remains raster-owned, while RT owns local/emissive/environment glossy transport when enabled. Coated RT diffuse substrates no longer add base plastic specular under the coat. UV tangent directions are retained for RT anisotropy. Full primary reference, environment importance sampling, async reference banks and the other ledger items remain pending; no GPU acceptance claimed.
+
+### 0.38 alpha 2 checkpoint
+
+Shared environment importance sampling, full-primary asynchronous reference, GGX reflection energy compensation and medium free-flight are now implemented. Details and limitations are recorded in [0.38 ledger](RTX-QUALITY-0.38.md), [RT environment](RT-ENVIRONMENT.md) and [full reference](FULL-REFERENCE.md). Native modules include build-time OptiX-IR plus PTX; `-Dvoxellight.rt.module=ptx` selects the comparison, `VOXELLIGHT_RT_OPTIMIZATION=0|1|2` selects compilation optimization; default uses OptiX default optimization. Native startup/runtime GPU benchmarks remain pending.

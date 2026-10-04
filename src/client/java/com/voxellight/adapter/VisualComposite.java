@@ -42,6 +42,7 @@ final class VisualComposite implements AutoCloseable {
         }
         return true;
     }
+    private boolean fullReference;void fullReference(boolean value){fullReference=value;}
     boolean polished(){return polished;}
     boolean needsMotion(){return polished&&(clouds.enabled()||volumetricEnabled&&volumetric.needsMotion());}
     void setPolished(boolean value){polished=value;}
@@ -93,7 +94,7 @@ final class VisualComposite implements AutoCloseable {
                     .putVec4(Atmosphere.weatherDensity(volumeDensity,sky.rainBrightness),forwardStrength,clouds.active()?1:0,rtTransmission==null?0:1).get());
             encoder.writeToBuffer(visualSettings.slice(),Std140Builder.onStack(stack,VisualPolish.SETTINGS_BYTES)
                     .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,coverageBlendActive?1:0)
-                    .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,0,0).get());
+                    .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,fullReference?1:0,0).get());
         }
         if(terrain)volumetric.render(encoder,output,material,shadows,atmosphereSettings,environment,weather,motion,(atmosphereActive && (atmosphereDensity>0||volumeDensity>0) || weather.submerged()) && volumetricEnabled && !ao.debug());
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);

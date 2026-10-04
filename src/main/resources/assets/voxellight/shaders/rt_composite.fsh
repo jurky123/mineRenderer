@@ -16,7 +16,7 @@ layout(std140) uniform RtFrame {mat4 RtInvProjection;mat4 RtViewToWorld;vec4 RtC
 layout(location=0) in vec2 texCoord;
 layout(location=0) out vec4 fragColor;
 void main(){
- fragColor=texture(CurrentHdr,texCoord);float d=texture(SceneDepth,texCoord).r;if(d<=0)return;
+ fragColor=texture(CurrentHdr,texCoord);if(RtControls.w>.5){vec4 result=texture(RtDiffuse,texCoord);if(result.a>.5)fragColor=vec4(result.rgb,1);return;}float d=texture(SceneDepth,texCoord).r;if(d<=0)return;
  vec4 p=RtInvProjection*vec4(texCoord*2-1,d,1);p/=p.w;vec3 world=(RtViewToWorld*vec4(p.xyz,0)).xyz;
  vec3 n=normalize(texture(MaterialNormal,texCoord).xyz*2-1);vec4 packed=texture(MaterialPbr,texCoord);ivec2 id=ivec2(round(packed.rg*255));float materialId=float(id.x+256*id.y);float perceptualRoughness=1-texelFetch(MaterialTable,id,0).r;
  ivec2 size=textureSize(RtPosition,0),base=clamp(ivec2(texCoord*vec2(size)),ivec2(0),size-1);vec3 gi=vec3(0),spec=vec3(0);float diffuseWeight=0,specWeight=0;
