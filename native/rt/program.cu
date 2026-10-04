@@ -115,7 +115,7 @@ if(coverage){sunT=visibility(add(p,mul(n,.025f)),params.sun);if((params.options&
  }
  float3 oldRelative=add(p,mul(params.previousCamera,-1));auto mat=params.previousClip;
  float ox=mat[0]*oldRelative.x+mat[4]*oldRelative.y+mat[8]*oldRelative.z+mat[12],oy=mat[1]*oldRelative.x+mat[5]*oldRelative.y+mat[9]*oldRelative.z+mat[13],ow=mat[3]*oldRelative.x+mat[7]*oldRelative.y+mat[11]*oldRelative.z+mat[15];
- if(params.mode==0&&ow>.00001f){float px=(ox/ow*.5f+.5f)*params.width-.5f,py=(oy/ow*.5f+.5f)*params.height-.5f;int x=(int)roundf(px),y=(int)roundf(py);
+ if(params.mode==0&&!params.referenceSpp&&ow>.00001f){float px=(ox/ow*.5f+.5f)*params.width-.5f,py=(oy/ow*.5f+.5f)*params.height-.5f;int x=(int)roundf(px),y=(int)roundf(py);
   if(x>=0&&x<params.width&&y>=0&&y<params.height){int j=y*params.width+x;float4 op=params.previousPosition[j],on=params.previousNormal[j];float3 delta=add(v(op.x,op.y,op.z),mul(p,-1));float tolerance=.1f+.002f*sqrtf(dot3(v(pp.x,pp.y,pp.z),v(pp.x,pp.y,pp.z)));
    auto oldKey=params.previousKey[j],key=params.surfaceKey[i];if(op.w>.5f&&oldKey.x==key.x&&oldKey.y==key.y&&fabsf(oldKey.z-key.z)<tolerance&&fabsf(dot3(delta,n))<tolerance&&dot3(n,v(on.x,on.y,on.z))>.95f){params.flow[i*2]=(int)(i%params.width)-px;params.flow[i*2+1]=(int)(i/params.width)-py;params.flowTrust[i]=1;}
   }

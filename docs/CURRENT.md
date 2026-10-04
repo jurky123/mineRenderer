@@ -1,6 +1,8 @@
 # VoxelLight current state
 
-Current release: **0.37.5 — Parallel OptiX compiler tasks**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+Current release: **0.37.6 — Reference progressive frame budget**. The 0.36 raster-primary/OptiX GAS/IAS/zero-copy/separate-AOV/world-cache architecture is retained; the user confirmed those paths run in game. This release changes material scattering and transport rather than rebuilding RTX architecture.
+
+User measured 0.37.5 compilation/linking at ~134s, then reported unusable reference frame rate. 0.37.6 replaces full-image per-frame reference work with adaptive 8–1024-pixel windows (initially 64), complete-sweep spp accounting and persistent guide snapshots. Untouched surfaces retain raster. Normal RTX Quality scheduling is unchanged. See [reference frame scheduling](REFERENCE-0.37.6.md). NVIDIA FPS/convergence acceptance is pending.
 
 0.37.4 still compiled for at least 3m51s in the supplied log. 0.37.5 uses task-based compilation on up to four workers, optimization level 0 and 15-second task/elapsed heartbeat logs. GPU execution may be slower; NVIDIA startup and runtime measurements are pending. See [compiler follow-up](REFERENCE-0.37.5.md).
 

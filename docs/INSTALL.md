@@ -1,3 +1,7 @@
+## 0.37.6 reference frame budget
+
+Install the matching native kit. Reference processes an adaptive window per display frame. Watch `rtReferenceSweepPercent` and `rtReferencePixelsPerFrame` in status; spp counts complete image sweeps. Start with 4 spp and use [REFERENCE-0.37.6.md](REFERENCE-0.37.6.md).
+
 ## 0.37.5 compiler startup update
 
 Install the complete matching native kit. Compilation now uses parallel OptiX tasks with optimization level 0; logs include progress every 15 seconds. Compare startup time and reference execution separately using [REFERENCE-0.37.5.md](REFERENCE-0.37.5.md).

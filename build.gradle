@@ -81,6 +81,7 @@ tasks.register('clientKit', Zip) {
     from('docs/REFERENCE-0.37.3.md')
     from('docs/REFERENCE-0.37.4.md')
     from('docs/REFERENCE-0.37.5.md')
+    from('docs/REFERENCE-0.37.6.md')
     from('docs/SETTINGS.md')
     from('docs/MATERIAL-3.md')
     from('docs/RT-LIGHT-TRANSPORT.md')

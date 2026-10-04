@@ -1,3 +1,7 @@
+## 0.37.6 reference responsiveness
+
+0.37.5 compiler completed in ~134s, but full-image reference frames were unusable. Implemented progressive windows, GPU-budget feedback, snapshot guides and sweep telemetry. Pending NVIDIA display responsiveness, sweep/sample/reset correctness and screenshot convergence. No normal RTX performance improvement claimed.
+
 ## 0.37.5 compiler follow-up
 
 Implemented bounded OptiX task compilation, no-optimizer startup policy and heartbeat telemetry. Pending NVIDIA first-start/cache timings, reference convergence and GPU performance cost of level 0 before selecting a production optimization policy.

@@ -1,3 +1,11 @@
+# 0.37.6 — Reference progressive frame budget
+
+- Replace three full-image reference signal dispatches with one shared 8–1024-pixel adaptive window per display frame, initially 64.
+- Count spp only after complete image sweeps; stop transport at target; reset cursor/sums on camera/configuration/scene changes.
+- Preserve guide snapshots and resolved dielectric interfaces; keep raster for untouched pixels.
+- Skip full-image reference temporal raygen; bound counter reduction to the current window.
+- Add sweep/budget progress and scheduler regression checks. NVIDIA frame-time acceptance remains pending.
+
 # 0.37.5 — Parallel OptiX compilation / fast startup policy
 
 - Use OptiX module task creation/execution with up to four background workers and safe dependency/error/lifetime handling.
