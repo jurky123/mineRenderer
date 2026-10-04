@@ -35,3 +35,20 @@ Windows/Linux native builds and all 27 RT artifacts compiled successfully. `./gr
 Replace alpha.4 with the alpha.5 candidate and keep 591.74 for the first comparison. Run only `/voxellight preset rtx_quality`; reference must show requested=false. Preserve both `latest.log` and `voxellight-optix.log`. Check module-by-module times, that resize/resource reload does not reset the compile owner/start time, and that no full-reference module starts. If the watchdog fires, preserve the last diagnostic records (bind/enter/return/task finishes/cleanup) and launcher exit code. No user is asked to wait beyond the watchdog or repeat alpha.4.
 
 If realtime starts, restart the identical build/config to measure cache behavior, then test explicit background full reference. Cold target <30 s / ideal <10 s; warm 2–5 s. Next compare strict/fast PTX/IR and a newer available notebook driver. Full GPU acceptance, cancellation response, synchronous link-time bounds and numerical/runtime A/B remain **pending**, and P1–P7 stay deferred. Alpha.5 must not be described as an accepted startup/crash fix from host builds alone.
+
+## Second user GPU result: alpha.5 failed
+
+RTX 4060 Laptop / Windows / 591.74, strict PTX/default optimization:
+
+| Stage | Observed result |
+|---|---|
+| Disk cache | Enabled, writable probe passed; 1 GiB low / 2 GiB high; cache hit not established |
+| rt_hit | 280,556 bytes, 1,143 ms complete |
+| rt_realtime (diffuse) | 916,777 bytes; task 1 completed in 535 ms, task 2 in 516 ms, task 3 did not return |
+| Watchdog | Fired at 120 s; CUDA bind and module cancellation both returned success |
+| After cancellation | Aggregate tasks remained 6/7 through 240 s; no compile finish or task drain recorded |
+| Later modules / groups / link / runtime | Not reached |
+
+Full reference did not start. Resource reload and preset replay retained the original startup timestamp. Diagnostic output is now visible in both logs. Those improvements do not satisfy P0: split diffuse compilation still stalls, and cooperative cancellation success does not establish a bounded task drain. This supplied excerpt contains no alpha.5 process crash; it ends while compilation remains pending. Do not report a hard watchdog or successful fallback cleanup.
+
+The remaining diffuse module still reaches general incoming transport through per-pixel refinement, raster-primary reference and transport debug. A signal split alone has not isolated those call graphs sufficiently. A bounded in-process wait cannot safely reclaim an OptiX module/context while a driver task still executes; abandoning or killing that thread would violate ownership. Further graph isolation and driver/math/format A/B are required. If the driver does not cooperate, a genuinely bounded compiler requires a separate process with a supported transfer/cache strategy, rather than thread termination. That architecture is not implemented.

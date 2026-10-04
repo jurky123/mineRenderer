@@ -1,8 +1,8 @@
 # VoxelLight current state
 
-## 0.38.0-alpha.5 — compiler graph/lifecycle follow-up (GPU acceptance candidate)
+## 0.38.0-alpha.5 — failed GPU compilation gate
 
-**Alpha.4 failed user GPU acceptance:** 591.74 realtime task 2 did not finish within 120 seconds; the process exited immediately after the cancellation request. Exact native fault remains unconfirmed. Alpha.5 splits realtime signal/probe raygens into separate constant-signal modules, adds non-inline glossy BSDF boundaries, retains pending compiler ownership across render resets, skips abandoned queued work, makes full reference session-only, bridges native diagnostics to latest.log plus a flushed dedicated file, and binds CUDA on the watchdog before targeting a published module. Windows/Linux and host regression verification do not establish crash recovery or startup targets. See [GPU evidence and follow-up](OPTIX-COMPILATION-0.38-ALPHA5.md). P0 remains open; P1–P7 remain deferred.
+**Alpha.5 also failed:** hit compiled in 1.143 s; diffuse task 3 stayed active beyond 240 s despite successful cancellation at 120 s. Cooperative cancellation does not enforce a hard deadline. Later modules/link/runtime were not reached. **Alpha.4 failed user GPU acceptance:** 591.74 realtime task 2 did not finish within 120 seconds; the process exited immediately after the cancellation request. Exact native fault remains unconfirmed. Alpha.5 splits realtime signal/probe raygens into separate constant-signal modules, adds non-inline glossy BSDF boundaries, retains pending compiler ownership across render resets, skips abandoned queued work, makes full reference session-only, bridges native diagnostics to latest.log plus a flushed dedicated file, and binds CUDA on the watchdog before targeting a published module. Windows/Linux and host regression verification do not establish crash recovery or startup targets. See [GPU evidence and follow-up](OPTIX-COMPILATION-0.38-ALPHA5.md). P0 remains open; P1–P7 remain deferred.
 
 ## 0.38.0-alpha.4 — OptiX Compilation Architecture (GPU acceptance candidate)
 
