@@ -1,5 +1,11 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.39.0-alpha.2
+
+- Fix Windows NVIDIA startup MemoryStack overflow: allocate driver extension properties on native heap with explicit release.
+- Move variable TLAS instance arrays off thread stack; scope temporary BLAS geometry per section.
+- Add constrained-stack regression for 512-entry extension/instance arrays; retain existing Vulkan POC/legacy migration scope.
+
 ## 0.39.0-alpha.1
 
 - Start direct Vulkan RT migration stage 1 with legacy production retained and explicit terrain normal POC.

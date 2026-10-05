@@ -1,8 +1,12 @@
-# Vulkan RT migration — 0.39.0-alpha.1
+# Vulkan RT migration — 0.39.0-alpha.2
 
 This release starts migration stage **1: legacy OptiX production + Vulkan POC**. It does not complete the renderer migration. Production RTX Quality remains legacy OptiX. The explicit Vulkan POC has no OptiX/CUDA renderer dependency, but only traces terrain camera rays and displays geometric normals. No PT/material/reconstruction parity or RTX 4060 Laptop performance gate has passed.
 
 The implementation preserves Material 3, LabPBR, physical environment/clouds/water, emission collection, radiance cache and raster fallback in the existing production renderer. It deliberately does not replace their behavior with provisional Vulkan shading.
+
+## Alpha.2 startup correction
+
+The user Windows/NVIDIA alpha.1 startup failed at `VkExtensionProperties.calloc(count, stack)`. A sufficiently large extension list exceeded LWJGL native thread stack capacity before device creation completed. Extension lists and variable-sized TLAS instance arrays now use explicitly freed native heap allocations; each BLAS geometry temporary has its own stack scope. A 512-entry regression runs with only 1 KiB stack remaining. This is an allocation bug in the mod, not evidence of insufficient Java heap. Windows startup and RT execution still need user GPU validation.
 
 ## Implemented first milestone
 
@@ -32,7 +36,7 @@ Gradle `compileVulkanRt` runs `tools/build_vulkan_rt.py`: Slang → SPIR-V 1.5, 
 
 Shader ownership is currently `common/bringup.slang`, `world/primary.slang`, `world/closest_hit.slang`, `world/sky.slang`. There is no mode-multiplexed RT shader. PT modules are added when their implementations migrate, rather than creating empty files that suggest parity.
 
-Host verification: 259 Java/native contract tests and three Python report tests pass; Gradle build/clientKit and all three Slang/SPIR-V validation/reflection checks pass. Host tests validate packaged stage execution models/nonrecursive raygen, SBT alignment/overflow, the actual MC device creation callsite, absence of OptiX/CUDA calls and per-section submit/device-idle calls in Vulkan owners, and the debug display GLSL. These checks cannot validate GPU execution or visual output.
+Host verification: 260 Java/native contract tests and three Python report tests pass; Gradle build/clientKit and all three Slang/SPIR-V validation/reflection checks pass. Host tests validate packaged stage execution models/nonrecursive raygen, SBT alignment/overflow, the actual MC device creation callsite, absence of OptiX/CUDA calls and per-section submit/device-idle calls in Vulkan owners, and the debug display GLSL. These checks cannot validate GPU execution or visual output.
 
 ## RTX 4060 Laptop bringup check
 

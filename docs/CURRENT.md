@@ -1,5 +1,9 @@
 # VoxelLight current state
 
+## 0.39.0-alpha.2 — native-stack startup allocation fix
+
+Alpha.1 crashed at extension enumeration on the Windows RTX 4060 driver: the driver-sized VkExtensionProperties array overflowed LWJGL MemoryStack during device creation. Alpha.2 uses explicitly freed native heap allocations for extension arrays and up to 512 TLAS instances, and resets temporary BLAS geometry stack allocation per section. A regression allocates both 512-entry arrays with only 1 KiB of thread stack left and verifies that neither consumes stack space. Windows startup/RT execution remain GPU acceptance items.
+
 ## 0.39.0-alpha.1 — Vulkan RT migration stage 1
 
 Legacy OptiX remains production. An explicit Vulkan terrain normal POC borrows MC device/queue, enables RT features, builds section BLAS/world TLAS, consumes independent build-time Slang/SPIR-V stages, caches pipelines and records delayed GPU timings. Static section versions skip rebuild; viewport resize preserves pipeline/scene. Build/layout/stage/lifecycle contracts are host-verified; this host has no RTX GPU. Phase A GPU acceptance is pending; full PT, Material 3 parity, compaction/entity refit, RIS, reconstruction, DLSS RR, OMM/SER and Vulkan reference are not complete. Do not resume OptiX compiler tuning as the migration objective. [Authoritative migration ledger and checks](VULKAN-RT-MIGRATION.md).

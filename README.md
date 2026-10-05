@@ -4,9 +4,9 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current development release: **VoxelLight 0.39.0-alpha.1 — Vulkan RT terrain normal POC**. Migration stage 1 retains legacy OptiX production while adding direct native Vulkan section BLAS/TLAS, build-time Slang/SPIR-V, recursion-1 debug rays and pipeline caching. `/voxellight rt_backend vulkan_poc` selects the explicit diagnostic view; PT parity, Vulkan reconstruction/DLSS RR and performance acceptance are pending. This is the first migration milestone, not a completed renderer migration. [Implementation, build tools and GPU checks](docs/VULKAN-RT-MIGRATION.md).
+Current development release: **VoxelLight 0.39.0-alpha.2 — Vulkan RT startup allocation fix**. Alpha.2 fixes oversized extension/TLAS native-stack allocations discovered on the RTX 4060 Windows startup. Migration stage 1 retains legacy OptiX production while adding direct native Vulkan section BLAS/TLAS, build-time Slang/SPIR-V, recursion-1 debug rays and pipeline caching. `/voxellight rt_backend vulkan_poc` selects the explicit diagnostic view; PT parity, Vulkan reconstruction/DLSS RR and performance acceptance are pending. This is the first migration milestone, not a completed renderer migration. [Implementation, build tools and GPU checks](docs/VULKAN-RT-MIGRATION.md).
 
-[Download 0.39.0-alpha.1 client kit](https://temp.sh/nrrcd/voxellight-client-kit-26.2-0.39.0-alpha.1.zip) (temporary link; Vulkan normal POC, legacy RTX retained).
+[Download 0.39.0-alpha.2 client kit](https://temp.sh/COmqc/voxellight-client-kit-26.2-0.39.0-alpha.2.zip) (temporary link; fixes alpha.1 startup native-stack overflow).
 
 [Download the native 0.37.6 client kit](https://temp.sh/kffQf/voxellight-client-kit-26.2-0.37.6.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
 

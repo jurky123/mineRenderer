@@ -59,8 +59,8 @@ public final class VulkanRtScene implements AutoCloseable {
                 barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
                 for(var change:accepted) {
                     var buffer=uploads.remove(change.key());
-                    try {
-                        var geometry=VulkanRtAccel.triangles(stack,buffer,change.vertices());
+                    try(var sectionStack=MemoryStack.stackPush()) {
+                        var geometry=VulkanRtAccel.triangles(sectionStack,buffer,change.vertices());
                         var blas=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,geometry,change.vertices()/3,scratchAlignment);
                         var source=ByteBuffer.wrap(change.triangles()).order(ByteOrder.nativeOrder());
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
@@ -84,8 +84,8 @@ public final class VulkanRtScene implements AutoCloseable {
         normalBuffer=new VulkanRtBuffer(device,data.remaining(),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         var encoder=device.createCommandEncoder();encoder.writeToBuffer(normalBuffer.slice(),data);
         var instances=new VulkanRtBuffer(device,(long)sections.size()*VkAccelerationStructureInstanceKHR.SIZEOF,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
-        try(var stack=MemoryStack.stackPush()) {
-            var packed=VkAccelerationStructureInstanceKHR.calloc(sections.size(),stack);int i=0,base=0;
+        try(var packed=allocateInstances(sections.size());var stack=MemoryStack.stackPush()) {
+            int i=0,base=0;
             for(var entry:sections.entrySet()) {
                 var instance=packed.get(i++);var k=entry.getKey();
                 instance.transform().matrix(0,1).matrix(5,1).matrix(10,1).matrix(3,k.x()*16f).matrix(7,k.y()*16f).matrix(11,k.z()*16f);
@@ -102,6 +102,7 @@ public final class VulkanRtScene implements AutoCloseable {
             VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);tlasBuilds++;
         } finally {instances.close();}
     }
+    static VkAccelerationStructureInstanceKHR.Buffer allocateInstances(int count) { return VkAccelerationStructureInstanceKHR.calloc(count); }
     static void barrier(VkCommandBuffer command,MemoryStack stack,int sourceStage,int sourceAccess,int destinationStage,int destinationAccess) {
         var barrier=VkMemoryBarrier.calloc(1,stack).sType$Default().srcAccessMask(sourceAccess).dstAccessMask(destinationAccess);
         vkCmdPipelineBarrier(command,sourceStage,destinationStage,0,barrier,null,null);

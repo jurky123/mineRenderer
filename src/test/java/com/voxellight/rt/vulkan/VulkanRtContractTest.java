@@ -9,6 +9,24 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void driverSizedArraysDoNotConsumeTheThreadStack() {
+        try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
+            // Leave very little stack space, as in nested Minecraft device initialization.
+            stack.nmalloc(1,stack.getPointer()-1024);
+            int available=stack.getPointer();
+            try(var extensions=VulkanRtCapabilities.allocateExtensions(512);
+                var instances=VulkanRtScene.allocateInstances(512)) {
+                assertEquals(512,extensions.capacity());assertEquals(512,instances.capacity());
+                assertEquals(available,stack.getPointer());
+                org.lwjgl.system.MemoryUtil.memPutInt(extensions.get(511).address()+org.lwjgl.vulkan.VkExtensionProperties.SPECVERSION,42);
+                instances.get(511).instanceCustomIndex(511);
+                assertEquals(42,extensions.get(511).specVersion());
+                assertEquals(511,instances.get(511).instanceCustomIndex());
+            }
+            assertEquals(available,stack.getPointer());
+        }
+    }
+
     @Test void sbtSeparatesHandleAndRegionAlignment() {
         var layout=VulkanSbt.layout(24,32,64,4096);
         assertEquals(32,layout.stride());assertEquals(64,layout.missOffset());assertEquals(128,layout.hitOffset());assertEquals(160,layout.bytes());

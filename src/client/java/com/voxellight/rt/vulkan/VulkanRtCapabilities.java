@@ -14,10 +14,13 @@ public record VulkanRtCapabilities(boolean supported, Set<String> extensions, St
         try (var stack = MemoryStack.stackPush()) {
             var count = stack.mallocInt(1);
             check(vkEnumerateDeviceExtensionProperties(physical, (String)null, count, null));
-            var properties = VkExtensionProperties.calloc(count.get(0), stack);
-            check(vkEnumerateDeviceExtensionProperties(physical, (String)null, count, properties));
             Set<String> extensions = new HashSet<>();
-            for (var property : properties) extensions.add(property.extensionNameString());
+            // Extension arrays can exceed the entire LWJGL thread stack on NVIDIA drivers.
+            try(var properties = allocateExtensions(count.get(0))) {
+                check(vkEnumerateDeviceExtensionProperties(physical, (String)null, count, properties));
+                properties.limit(count.get(0));
+                for (var property : properties) extensions.add(property.extensionNameString());
+            }
             var missing = new TreeSet<>(REQUIRED); missing.removeAll(extensions);
             if (!missing.isEmpty()) return new VulkanRtCapabilities(false, extensions, "missing " + missing);
             var address = VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default();
@@ -30,5 +33,6 @@ public record VulkanRtCapabilities(boolean supported, Set<String> extensions, St
             return new VulkanRtCapabilities(supported, extensions, supported ? "supported" : "required RT feature unavailable");
         }
     }
+    static VkExtensionProperties.Buffer allocateExtensions(int count) { return VkExtensionProperties.calloc(count); }
     public static void check(int result) { if (result != VK_SUCCESS) throw new IllegalStateException("Vulkan RT result=" + result); }
 }
