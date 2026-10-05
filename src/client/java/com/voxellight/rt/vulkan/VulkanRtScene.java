@@ -42,7 +42,8 @@ public final class VulkanRtScene implements AutoCloseable {
         }
         List<RtGeometryStream.Section> accepted=new ArrayList<>();
         var ordered=new ArrayList<>(changes);
-        ordered.sort(Comparator.comparingInt(change->sections.containsKey(change.key())?0:1));
+        ordered.sort(Comparator.<RtGeometryStream.Section>comparingInt(change->sections.containsKey(change.key())?0:1)
+            .thenComparingDouble(change->distance(change.key(),x,y,z)));
         Set<SectionKey> protectedKeys=new HashSet<>();changes.forEach(change->protectedKeys.add(change.key()));
         long plannedBytes=bytes;int plannedCount=sections.size();
         for(var change:ordered) {
@@ -54,14 +55,16 @@ public final class VulkanRtScene implements AutoCloseable {
             }
             long oldBytes=old==null?0:old.vertices.size();
             if(change.triangles().length>64L*1024*1024)continue;
-            // Existing edited sections take priority. Keep their old BLAS until replacement is built.
-            while(old!=null && !fits(plannedBytes,oldBytes,change.triangles().length,plannedCount, true)) {
-                var victim=sections.keySet().stream().filter(key->!protectedKeys.contains(key))
-                    .max(Comparator.comparingDouble(key->distance(key,x,y,z))).orElse(null);
-                if(victim==null)break;
+            // Plan the whole eviction before releasing anything. New arrivals may replace
+            // strictly farther residents; edits retain priority and their previous BLAS.
+            var sizes=new LinkedHashMap<SectionKey,Long>();
+            sections.forEach((key,value)->sizes.put(key,value.vertices.size()));
+            var victims=evictions(sizes,protectedKeys,change.key(),plannedBytes,oldBytes,
+                change.triangles().length,plannedCount,old!=null,x,y,z);
+            if(victims==null)continue;
+            for(var victim:victims) {
                 var removed=sections.remove(victim);plannedBytes-=removed.vertices.size();plannedCount--;release(removed);dirty=true;
             }
-            if(!fits(plannedBytes,oldBytes,change.triangles().length,plannedCount,old!=null))continue;
             accepted.add(change);plannedBytes=plannedBytes-oldBytes+change.triangles().length;
             if(old==null)plannedCount++;
             dirty=true;
@@ -142,6 +145,22 @@ public final class VulkanRtScene implements AutoCloseable {
     }
     static boolean fits(long residentBytes,long previousBytes,long incomingBytes,int count,boolean replacement) {
         return incomingBytes>0&&incomingBytes<=64L*1024*1024&&residentBytes-previousBytes+incomingBytes<=64L*1024*1024&&(replacement?count<=512:count<512);
+    }
+    /** Null means no feasible admission; an empty list means no eviction is necessary. */
+    static List<SectionKey> evictions(Map<SectionKey,Long> sizes,Set<SectionKey> protectedKeys,
+            SectionKey incoming,long residentBytes,long previousBytes,long incomingBytes,int count,
+            boolean replacement,double x,double y,double z) {
+        var victims=new ArrayList<SectionKey>();
+        if(incomingBytes<=0||incomingBytes>64L*1024*1024)return null;
+        var candidates=sizes.keySet().stream()
+            .filter(key->!key.equals(incoming)&&!protectedKeys.contains(key))
+            .filter(key->replacement||distance(key,x,y,z)>distance(incoming,x,y,z))
+            .sorted(Comparator.comparingDouble((SectionKey key)->distance(key,x,y,z)).reversed()).toList();
+        for(var key:candidates) {
+            if(fits(residentBytes,previousBytes,incomingBytes,count,replacement))break;
+            residentBytes-=sizes.get(key);count--;victims.add(key);
+        }
+        return fits(residentBytes,previousBytes,incomingBytes,count,replacement)?victims:null;
     }
     private static double distance(SectionKey key,double x,double y,double z) {
         double dx=key.x()*16.+8-x,dy=key.y()*16.+8-y,dz=key.z()*16.+8-z;return dx*dx+dy*dy+dz*dz;

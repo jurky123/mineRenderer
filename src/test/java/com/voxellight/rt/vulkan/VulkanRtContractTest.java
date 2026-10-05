@@ -9,6 +9,27 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void fullSceneAdmitsNearTerrainAndTracksCameraMovement() {
+        long mib=1024L*1024;
+        var near=new com.voxellight.world.SectionKey(0,0,0);
+        var far=new com.voxellight.world.SectionKey(6,0,0);
+        var incoming=new com.voxellight.world.SectionKey(1,0,0);
+        var sizes=Map.of(near,32*mib,far,32*mib);
+        assertEquals(List.of(far),VulkanRtScene.evictions(sizes,Set.of(incoming),incoming,64*mib,0,8*mib,2,false,8,8,8));
+        assertNull(VulkanRtScene.evictions(sizes,Set.of(),new com.voxellight.world.SectionKey(8,0,0),64*mib,0,8*mib,2,false,8,8,8));
+        assertEquals(List.of(near),VulkanRtScene.evictions(sizes,Set.of(),new com.voxellight.world.SectionKey(7,0,0),64*mib,0,8*mib,2,false,120,8,8));
+    }
+    @Test void admissionIsAtomicAndPreservesEditedSections() {
+        long mib=1024L*1024;
+        var edited=new com.voxellight.world.SectionKey(0,0,0);
+        var other=new com.voxellight.world.SectionKey(1,0,0);
+        var sizes=Map.of(edited,32*mib,other,32*mib);
+        assertEquals(List.of(),VulkanRtScene.evictions(sizes,Set.of(edited),edited,64*mib,32*mib,32*mib,2,true,8,8,8));
+        assertEquals(List.of(other),VulkanRtScene.evictions(sizes,Set.of(edited),edited,64*mib,32*mib,33*mib,2,true,8,8,8));
+        assertNull(VulkanRtScene.evictions(sizes,Set.of(edited,other),edited,64*mib,32*mib,33*mib,2,true,8,8,8));
+        assertEquals(2,sizes.size(),"Failed plans must not remove any resident");
+        assertNull(VulkanRtScene.evictions(sizes,Set.of(),edited,64*mib,32*mib,65*mib,2,true,8,8,8));
+    }
     @Test void backendSwitchPreservesRasterAndDebugRunsBeforeProjectionReset() throws Exception {
         for(String name:List.of("VulkanRtDebugPass","RtxLightingPass")) {
             var node=new ClassNode();new ClassReader("com.voxellight.adapter."+name).accept(node,0);

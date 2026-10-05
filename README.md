@@ -1,5 +1,14 @@
 # mineRenderer / VoxelLight
 
+## 0.39.0-alpha.11 — camera-prioritized terrain admission
+
+Build/clientKit validation passed: 267 tests, zero failures. [Download alpha.11 client kit](https://temp.sh/UyKdk/voxellight-client-kit-26.2-0.39.0-alpha.11.zip). Actual RTX coverage validation is pending.
+
+Alpha.10 user GPU logs confirm material transport produces finite radiance (cold pipeline startup 4,377 ms), but resident input geometry reaches 67,108,080 bytes and some areas never appear. New sections previously could not evict residents at the 64 MiB limit; warmup retries therefore remained rejected. Alpha.11 sorts edits first and new arrivals by camera distance, and admits nearer sections by evicting strictly farther unprotected residents. Eviction is planned atomically; infeasible admission preserves the existing scene. Existing edited BLAS remains until its replacement is built. Camera movement changes admission priority; the existing two-second warmup retry discovers nonresident loaded sections again.
+
+The 64 MiB / 512-section experiment still has finite coverage: this fixes first-arrival starvation, not unlimited world residency. Full scene paging, production environment/light sampling, reconstruction and performance gates remain pending. Validate missing nearby areas, walking/flying into new terrain, placement/destruction, and resource reload with `rt_backend vulkan_pt`.
+
+
 VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
