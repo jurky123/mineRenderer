@@ -21,6 +21,8 @@ final class VulkanRtDebugPass implements AutoCloseable {
         .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","vulkan_rt_material_display"))
         .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtNormal").build()).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withColorTargetState(ColorTargetState.DEFAULT).withCull(false).build();
     private final com.voxellight.rt.StationaryAccumulation history=new com.voxellight.rt.StationaryAccumulation();
+    private final com.voxellight.rt.RtLightingChange lightingChange=new com.voxellight.rt.RtLightingChange();
+    void accumulateFreeze(boolean value){history.frozen(value);}
     private final VulkanRtAccumulation accumulation=new VulkanRtAccumulation();
     void accumulate(boolean value){history.enabled(value);}
     void accumulateSpp(int value){history.target(value);}
@@ -68,25 +70,26 @@ final class VulkanRtDebugPass implements AutoCloseable {
             context.prepareScene(encoder,RtGeometryStream.drain(16),pos.x(),pos.y(),pos.z());
             double[] pose=new double[19];pose[0]=pos.x();pose[1]=pos.y();pose[2]=pos.z();
             float[] matrix=new float[16];inverse.get(matrix);for(int i=0;i<16;i++)pose[i+3]=matrix[i];
+            if(materials&&!history.frozen()&&lightingChange.changed(assets.lightingSignature(shadows)))history.reset("lighting");
             history.begin(pose,context.scene.generation()+com.voxellight.rt.RtInvalidationQueue.generation(),width,height);
             boolean useHistory=transport&&history.enabled();
             GpuTextureView displayed=useHistory&&history.samples()>0?accumulation.view():view;
             if(!useHistory||history.needsSample()){
                 com.voxellight.rt.vulkan.VulkanRtBuffer materialAssets=null;
-                // Freeze the shared sky, animated albedo and water parameters for this stationary snapshot.
+                // Live mode updates lights/animations every frame; explicit frozen mode snapshots them.
                 if(materials)try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_material_assets")){
-                    materialAssets=useHistory&&history.samples()>0?assets.buffer():assets.prepare(encoder,device,material,weather,shadows);
+                    materialAssets=useHistory&&history.frozen()&&history.samples()>0?assets.buffer():assets.prepare(encoder,device,material,weather,shadows,context.scene);
                 }
                 if(materials&&materialAssets==null){state="waiting for Material 3 atlases";return;}
                 if(!context.render(encoder,java.util.List.of(),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets)){state="waiting for terrain BLAS";return;}
-                displayed=useHistory?accumulation.add(encoder,view,history.samples(),width,height):view;
+                displayed=useHistory?accumulation.add(encoder,view,history.samples(),history.target(),width,height):view;
                 if(useHistory)history.accepted();
             }
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
                 pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",displayed,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
             if(++diagnosticFrames==30)diagnose(encoder,width,height);
-            state=materials?"material transport; shared environment; sun/environment/held NEE + MIS; reconstruction NONE":transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
+            state=materials?"material transport; shared environment; sun/environment/held/emissive NEE + MIS; reconstruction NONE":transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
         } catch(RuntimeException error) {
             close();failed=true;state="failed; raster retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Vulkan RT POC failed; raster remains available",error);
         }
@@ -103,7 +106,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
             finally{read.close();}
         },0,width/2,height/2,1,1);
     }
-    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtMaterialAssetBytes="+assets.bytes()+", stationaryAccumulation="+history.enabled()+", accumulatedSpp="+history.samples()+"/"+history.target()+", accumulationReset="+history.reason()+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
+    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtMaterialAssetBytes="+assets.bytes()+assets.status()+", stationaryAccumulation="+history.enabled()+", accumulationFrozen="+history.frozen()+", accumulatedSpp="+history.samples()+"/"+history.target()+", accumulationReset="+history.reason()+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
     private void releaseTexture() {if(view!=null)view.close();if(texture!=null)texture.close();view=null;texture=null;}
-    @Override public void close() {history.reset("world/resources/backend");accumulation.close();assets.close();if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnosticFrames=0;diagnostic="pending";}
+    @Override public void close() {lightingChange.reset();history.reset("world/resources/backend");accumulation.close();assets.close();if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnosticFrames=0;diagnostic="pending";}
 }

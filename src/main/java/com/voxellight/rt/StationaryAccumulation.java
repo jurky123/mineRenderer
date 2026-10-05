@@ -1,8 +1,8 @@
 package com.voxellight.rt;
 
-/** A stationary snapshot: moving or changing the scene starts a new unbiased mean. */
+/** Stationary history control; live bounded mean by default, frozen snapshots opt-in. */
 public final class StationaryAccumulation {
-    private boolean enabled=true;
+    private boolean enabled=true,frozen;
     private int samples,target=64;
     private double[] pose;
     private long scene=-1;
@@ -10,6 +10,8 @@ public final class StationaryAccumulation {
     private String reason="initial";
     public void enabled(boolean value){if(enabled!=value){enabled=value;reset("toggle");}}
     public boolean enabled(){return enabled;}
+    public boolean frozen(){return frozen;}
+    public void frozen(boolean value){if(frozen!=value){frozen=value;reset("snapshot mode");}}
     public void target(int value){if(value<4||value>4096)throw new IllegalArgumentException("Samples must be 4..4096");target=value;}
     public int target(){return target;}
     public int samples(){return samples;}
@@ -25,6 +27,6 @@ public final class StationaryAccumulation {
         for(int i=0;i<a.length;i++)if(!Double.isFinite(b[i])||Math.abs(a[i]-b[i])>1e-7)return false;
         return true;
     }
-    public boolean needsSample(){return !enabled||samples<target;}
+    public boolean needsSample(){return !enabled||!frozen||samples<target;}
     public void accepted(){if(enabled&&samples<target)samples++;}
 }

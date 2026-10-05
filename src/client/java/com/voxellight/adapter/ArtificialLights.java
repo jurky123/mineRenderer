@@ -62,7 +62,7 @@ final class ArtificialLights implements AutoCloseable {
     }
     private Held heldLight() {
         var mc=Minecraft.getInstance();var player=mc.player;
-        if(!enabled || !heldEnabled || player==null || player.isSpectator() || !player.isAlive())return null;
+        if(!heldEnabled || player==null || player.isSpectator() || !player.isAlive())return null;
         int emission=0;LightMaterials.Color color=LightMaterials.FALLBACK;
         for(var stack:List.of(player.getMainHandItem(),player.getOffhandItem())) {
             if(stack.getItem() instanceof BlockItem item) {
@@ -76,7 +76,7 @@ final class ArtificialLights implements AutoCloseable {
         return new Held(eye.x,eye.y-.25,eye.z,emission,color);
     }
 
-    float[] rtVirtualLight(){var held=heldLight();if(held==null)return new float[8];float intensity=held.emission()/15f*.7f;return new float[]{(float)held.x(),(float)held.y(),(float)held.z(),1,held.color().red()*intensity,held.color().green()*intensity,held.color().blue()*intensity,0};}
+    float[] rtVirtualLight(){var held=heldLight();if(held==null)return new float[8];float intensity=com.voxellight.world.HeldLightIntensity.intensity(held.emission());return new float[]{(float)held.x(),(float)held.y(),(float)held.z(),1,held.color().red()*intensity,held.color().green()*intensity,held.color().blue()*intensity,0};}
     void prepare(WorldSceneBridge bridge, SectionKey camera) {
         long start = System.nanoTime();
         var stats = bridge.stats();

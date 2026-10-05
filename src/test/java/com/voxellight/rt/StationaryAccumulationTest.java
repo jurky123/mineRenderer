@@ -3,11 +3,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class StationaryAccumulationTest {
     @Test void convergesAndIncreasingTargetRetainsSamples(){
-        var h=new StationaryAccumulation();double[] pose={1,2,3};h.target(4);
+        var h=new StationaryAccumulation();double[] pose={1,2,3};h.frozen(true);h.target(4);
         for(int i=0;i<4;i++){h.begin(pose,1,10,8);assertTrue(h.needsSample());h.accepted();}
         assertFalse(h.needsSample());h.target(8);assertEquals(4,h.samples());assertTrue(h.needsSample());
         h.target(4);assertFalse(h.needsSample());
     }
+    @Test void liveModeContinuesAfterTarget(){var h=new StationaryAccumulation();h.target(4);h.begin(new double[]{0},1,1,1);for(int i=0;i<10;i++)h.accepted();assertEquals(4,h.samples());assertTrue(h.needsSample());}
     @Test void cameraSceneResizeAndManualResetRejectPreviousMean(){
         var h=new StationaryAccumulation();double[] pose={1,2,3};h.begin(pose,1,10,8);h.accepted();
         h.begin(pose.clone(),1,10,8);assertEquals(1,h.samples());pose[0]+=.001;h.begin(pose,1,10,8);assertEquals(0,h.samples());

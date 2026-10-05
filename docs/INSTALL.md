@@ -1,8 +1,8 @@
-# VoxelLight 0.39.0-alpha.13 安装
+# VoxelLight 0.39.0-alpha.14 安装
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.13.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.14.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 
@@ -13,10 +13,10 @@ Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2�
 /voxellight status
 ```
 
-默认静止目标 64 spp，范围 4–4096。每帧追踪 1 spp，静止时求线性 HDR 平均；目标达到后保留画面。移动镜头、场景变化或 F3+T 会重置。提高目标保留已有样本。`rt_accumulate reset` 手动开始新快照，`off` 恢复实时 1 spp。静止期间天空、动画纹理、水波和手持灯参数冻结。
+默认目标 64 spp（4–4096）。静止时累积，达到目标后持续动态平均；太阳、水波、手持光每帧更新。手持灯切换、明显光照变化、移动镜头、地形编辑或 F3+T 会重置。`rt_accumulate freeze on` 显式冻结并在目标达到后停止，`freeze off` 返回动态模式。`reset` 清空历史，`off` 恢复每帧 1 spp。
 
 `rt_backend vulkan_poc` 查看法线，`vulkan_transport_test` 查看灰色材质输运，`raster` 返回光栅。`preset vulkan_quality` 开启 Vulkan 材质与累积，performance/balanced/quality 是光栅预设。设置界面：暂停/Options → VoxelLight 或 `/voxellight settings`。
 
 旧 OptiX/CUDA 追踪器和旧命令已删除；安装包不含 native DLL/SO/PTX，不需要 CUDA/OptiX SDK。旧保存配置自动迁移。独立 OptiX 去噪尚未接入。
 
-实机检查：先等附近地形稳定，观察 `accumulatedSpp=N/目标` 增长并停止；从 64 改为 256 应继续增长。再移动、转视角、放置/破坏方块、F3+T、缩放窗口，确认重新累积且无 miss 孔洞。切换 off 应恢复动态天空/水波。构建主机无 NVIDIA GPU，本版视觉与性能验收需要实机完成。
+实机检查：先等地形稳定，开启动态累积并观察目标计数。保持镜头静止，切换火把/空手、观察太阳随世界时间变化，状态应显示手持灯参数和太阳方向更新；在暗处放置/破坏发光方块应更新直接光照且无 miss。检查水/玻璃/掠射角区域累积没有红色坏像素，再测试冻结开关、移动镜头、F3+T 和缩放窗口。构建主机无 NVIDIA GPU，本版视觉与性能验收需要实机完成。

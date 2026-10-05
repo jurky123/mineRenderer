@@ -30,7 +30,7 @@ RT_FN float sq(float x){return x*x;}
 RT_FN float maxComponent(Vec a){return fmaxf(a.x,fmaxf(a.y,a.z));}
 RT_FN Vec expNeg(Vec a,float d){return V(expf(-a.x*d),expf(-a.y*d),expf(-a.z*d));}
 RT_FN float rng(unsigned& s){s=s*1664525u+1013904223u;return (s>>8)*0x1p-24f;}
-RT_FN float powerHeuristic(float a,float b){return a>0?sq(a)/(sq(a)+sq(b)):0;}
+RT_FN float powerHeuristic(float a,float b){if(std::isnan(a)||std::isnan(b)||a<=0)return 0;if(std::isinf(a))return std::isinf(b)?.5f:1;if(std::isinf(b))return 0;b=fmaxf(b,0);float scale=fmaxf(a,b);a/=scale;b/=scale;return sq(a)/(sq(a)+sq(b));}
 enum MaterialClass : unsigned {DIFFUSE,ROUGH_DIFFUSE,CONDUCTOR,DIELECTRIC,THIN_DIELECTRIC,COATED_DIFFUSE,COATED_CONDUCTOR,DIFFUSE_TRANSMISSION,EMISSIVE,WATER};
 enum Flags : unsigned {DIFFUSE_LOBE=1,GLOSSY=2,SPECULAR=4,REFLECTION=8,TRANSMISSION=16,DELTA=32,DISPERSIVE=64};
 struct Material {
@@ -48,7 +48,7 @@ struct Frame {Vec n,t,b;RT_METHOD explicit Frame(Vec normal):n(normalize(normal)
 };
 struct BsdfEval {Vec f;float pdf;};
 struct BsdfSample {Vec wi,weight;float pdf,eta;unsigned flags;};
-RT_FN float fresnelDielectric(float c,float eta){c=clamp(fabsf(c),0,1);float sin2=(1-c*c)/(eta*eta);if(sin2>=1)return 1;float ct=sqrtf(1-sin2);float rp=(eta*c-ct)/(eta*c+ct),rs=(c-eta*ct)/(c+eta*ct);return .5f*(rp*rp+rs*rs);}
+RT_FN float fresnelDielectric(float c,float eta){c=clamp(fabsf(c),0,1);if(fabsf(eta-1)<1e-7f)return 0;if(c==0||std::isinf(eta))return 1;float sin2=(1-c*c)/(eta*eta);if(sin2>=1)return 1;float ct=sqrtf(1-sin2);float rp=(eta*c-ct)/(eta*c+ct),rs=(c-eta*ct)/(c+eta*ct);return .5f*(rp*rp+rs*rs);}
 RT_FN float conductorChannel(float c,float eta,float k){c=clamp(fabsf(c),0,1);float c2=c*c,s2=1-c2,e2=eta*eta,k2=k*k,t0=e2-k2-s2,a2b2=sqrtf(t0*t0+4*e2*k2),a=sqrtf(.5f*(a2b2+t0)),t1=a2b2+c2,t2=2*c*a;float rs=(t1-t2)/(t1+t2);float t3=c2*a2b2+s2*s2,t4=t2*s2;return .5f*rs*(1+(t3-t4)/(t3+t4));}
 RT_FN Vec conductorFresnel(const Material& m,float c){if(m.conductorId==255){float f=powf(1-clamp(c,0,1),5);return m.baseColor+(V(1,1,1)-m.baseColor)*f;}return m.baseColor*V(conductorChannel(c,m.eta.x,m.k.x),conductorChannel(c,m.eta.y,m.k.y),conductorChannel(c,m.eta.z,m.k.z));}
 RT_FN void setConductor(Material& m,unsigned id){
@@ -97,7 +97,7 @@ RT_HEAVY BsdfEval evalLocal(const Material& m,Vec wo,Vec wi,float eta=1.5f,int f
  Vec spec=F*(D(h,ax,ay)*G(wo,wi,ax,ay)/fmaxf(1e-7f,4*wo.z*wi.z));
  if(m.type==COATED_DIFFUSE)spec=V(0,0,0);
  float q=multiscatterMix(m,wo.z);spec=spec+multiscatterF(m,wo,wi);pdfSpec=pdfSpec*(1-q)+wi.z/Pi*q;
- float p=specProbability(m);float root=sqrtf(m.f0),baseIOR=(1+root)/(1-root);Vec diffuse=m.baseColor*((1-fresnelDielectric(wo.z,baseIOR))*(1-fresnelDielectric(wi.z,baseIOR))/Pi);
+ float p=specProbability(m);float root=sqrtf(m.f0),baseIOR=root>=.999f?1000:(1+root)/(1-root);Vec diffuse=m.baseColor*((1-fresnelDielectric(wo.z,baseIOR))*(1-fresnelDielectric(wi.z,baseIOR))/Pi);
  if(m.type==COATED_DIFFUSE)diffuse=m.baseColor/Pi;
  if(m.type==ROUGH_DIFFUSE){float sigma=sqrtf(m.microfacetAlpha)*.5f,s2=sigma*sigma,A=1-.5f*s2/(s2+.33f),B=.45f*s2/(s2+.09f);float so=sqrtf(fmaxf(0,1-wo.z*wo.z)),si=sqrtf(fmaxf(0,1-wi.z*wi.z)),az=(wo.x*wi.x+wo.y*wi.y)/fmaxf(1e-7f,so*si);diffuse=diffuse*(A+B*fmaxf(0,az)*fmaxf(so,si)*fminf(so/fmaxf(wo.z,1e-5f),si/fmaxf(wi.z,1e-5f)));}
  if(m.type==DIFFUSE||m.type==EMISSIVE){result={m.baseColor/Pi,wi.z/Pi};}
@@ -110,6 +110,7 @@ RT_FN BsdfEval evalBsdf(const Material& m,const Frame& f,Vec wo,Vec wi,float eta
 RT_HEAVY BsdfSample sampleBsdf(const Material& m,const Frame& f,Vec woWorld,unsigned& seed,float eta=1.5f,int forced=0){
  Vec wo=f.local(woWorld),wi=V(0,0,0);BsdfSample s{V(0,0,0),V(0,0,0),0,1,0};if(wo.z<=0)return s;
  float ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV);unsigned flags=0;
+ if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&fabsf(eta-1)<1e-7f){if(forced==1)return s;s.wi=woWorld*-1;s.weight=V(1,1,1)*m.transmission;s.pdf=1;s.eta=1;s.flags=SPECULAR|DELTA|TRANSMISSION;return s;}
  if(m.type==THIN_DIELECTRIC){float R=fresnelDielectric(wo.z,eta);R=2*R/(1+R);bool refl=forced==1||forced!=2&&rng(seed)<R;float probability=forced?1:refl?R:1-R;s.wi=f.world(refl?V(-wo.x,-wo.y,wo.z):wo*-1);s.weight=V(1,1,1)*((refl?R:(1-R)*m.transmission)/fmaxf(probability,1e-7f));if(!refl)s.weight=s.weight*expNeg(m.sigmaA,m.thickness/fmaxf(.01f,wo.z));s.pdf=probability;s.flags=SPECULAR|DELTA|(refl?REFLECTION:TRANSMISSION);return s;}
  if(dielectric(m)){Vec h=sampleNormal(wo,ax,ay,seed);float F=fresnelDielectric(dot(wo,h),eta);bool refl=forced==1||forced!=2&&rng(seed)<F;if(refl){wi=h*(2*dot(wo,h))-wo;flags=GLOSSY|REFLECTION;if(wi.z<=0)return s;}else{float c=dot(wo,h),k=1-(1-c*c)/(eta*eta);if(k<=0)return s;wi=wo*(-1/eta)+h*(c/eta-sqrtf(k));flags=GLOSSY|TRANSMISSION;s.eta=eta;if(wi.z>=0)return s;}}
  else {float cp=m.coatWeight*.5f;float u=rng(seed);if(u<cp){Vec h=sampleNormal(wo,fmaxf(.0005f,m.coatAlpha),fmaxf(.0005f,m.coatAlpha),seed);wi=h*(2*dot(wo,h))-wo;flags=GLOSSY|REFLECTION;}
@@ -121,7 +122,7 @@ RT_HEAVY BsdfSample sampleBsdf(const Material& m,const Frame& f,Vec woWorld,unsi
 
 RT_HEAVY BsdfEval evalGlossy(const Material& m,const Frame& f,Vec woWorld,Vec wiWorld){
  if(m.type==DIFFUSE||m.type==EMISSIVE||m.type==DIFFUSE_TRANSMISSION)return {V(0,0,0),0};
- Vec wo=f.local(woWorld),wi=f.local(wiWorld);if(wo.z<=0||wi.z<=0)return {V(0,0,0),0};Vec h=normalize(wo+wi);float oh=fabsf(dot(wo,h)),ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV),ior=(1+sqrtf(m.f0))/(1-sqrtf(m.f0));
+ Vec wo=f.local(woWorld),wi=f.local(wiWorld);if(wo.z<=0||wi.z<=0)return {V(0,0,0),0};Vec h=normalize(wo+wi);float oh=fabsf(dot(wo,h)),ax=fmaxf(.0005f,m.microfacetAlpha),ay=fmaxf(.0005f,m.alphaV),ior=sqrtf(m.f0)>=.999f?1000:(1+sqrtf(m.f0))/(1-sqrtf(m.f0));
  Vec F=metal(m)?conductorFresnel(m,oh):V(1,1,1)*fresnelDielectric(oh,ior);Vec base=F*(D(h,ax,ay)*G(wo,wi,ax,ay)/(4*wo.z*wi.z));float pdf=normalPdf(wo,h,ax,ay)/fmaxf(1e-7f,4*oh);
  float q=multiscatterMix(m,wo.z);base=base+multiscatterF(m,wo,wi);pdf=pdf*(1-q)+wi.z/Pi*q;
  if(m.type==COATED_DIFFUSE){base=V(0,0,0);pdf=0;}

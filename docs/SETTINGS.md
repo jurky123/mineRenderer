@@ -1,4 +1,4 @@
-# VoxelLight 设置与静止累积（alpha.13）
+# VoxelLight 设置与静止累积（alpha.14）
 
 暂停/Options → VoxelLight 或 `/voxellight settings` 打开原版控件界面。命令树提供可搜索的选择项，`rt_accumulate spp` 有独立数字输入。界面底部显示静止累积的完成样本数和目标，每秒刷新。
 
@@ -8,10 +8,13 @@
 /voxellight rt_accumulate on
 ```
 
-默认目标 64 spp，范围 4–4096。每帧 1 个独立路径样本，线性 HDR 运行平均；达到目标后停止追踪并保留结果。提高目标保留已有样本。移动、转视角、FOV/分辨率变化、世界/地形更新、方块编辑、资源重载会重置。`rt_accumulate reset` 手动开始新快照，`off` 逐帧更新并不复用历史。
+默认目标 64 spp，范围 4–4096。默认动态模式每帧 1 个独立路径样本：逐像素线性 HDR 平均至目标，之后采用 1/目标权重的动态平均，持续追踪并更新天空、手持光、动画纹理和水波。提高目标继续增加历史计数。移动、视角、FOV/尺寸、地形/世界变化和资源重载重置历史；手持光切换/移动、太阳方向约 1°或强度约 5%、天气/入水状态显著变化也重置。`rt_accumulate reset` 手动重置，`off` 不复用历史。
 
-每次快照冻结共享天空、动画纹理、水波和手持灯参数，避免混合不同时间的场景；移动镜头或手动 reset 更新它们。它是静止多帧采样，不是 TAA/去噪或运动重投影；法线调试不累积。Vulkan PT 关闭光栅 projection jitter，防止静止镜头不断重置。
+`rt_accumulate freeze on` 开启显式静止快照：冻结光照/动画资产，达到目标后停止追踪。`freeze off` 返回默认动态模式，两种模式切换会清空历史。快照期间地形变化仍能触发重建。法线调试不累积，PT 关闭光栅 projection jitter。
 
-设置原子写入 `config/voxellight/settings.json`，进入世界时按顺序回放。选择 preset 清除此前个别覆盖值。累积开关与目标保存，reset/诊断操作不保存。全新安装没有覆盖值时仍默认 effects off。
+无效路径标记 alpha=0；平均 pass 拒绝非有限样本并恢复已损坏历史，各像素 alpha 记录有效计数。`accumulatedSpp` 是最多目标帧数的计数，无效样本对应像素可能少于该值。默认动态模式会继续补样；冻结模式按帧目标停止。状态同时提供 `accumulationFrozen`、`accumulationReset`、`vulkanRtHeldEnabled/Intensity`、`vulkanRtSunDirection` 和 `emissiveTriangles`。
+
+原生发光三角形以面积×原生发光等级建立 CDF，实际采样辐射读取 GPU Material 3/LabPBR 材质并应用 cutout/透射可见性，BSDF 命中使用对应 MIS。表最多 8192 个三角形，超限优先附近；原生等级为零但仅材质定义发光的面目前仍靠 BSDF 命中。手持 BlockItem 读取主副手较亮的原生等级，15 级映射到场景线性点光强度 20（颜色来自 light materials），独立于 local_lights 开关；强度视觉标定仍需实机。
+设置原子写入 `config/voxellight/settings.json`，进入世界时按顺序回放。选择 preset 清除此前个别覆盖值。累积开关、冻结模式与目标保存，reset/诊断操作不保存。全新安装没有覆盖值时仍默认 effects off。
 
 旧 `preset rtx_quality` 保存值迁移为 `vulkan_quality`；旧 OptiX/CUDA backend 保存值迁移为 `vulkan_pt`；旧 `rt_reference spp` 迁移为 `rt_accumulate spp`。旧参考模式/旧 pathtrace 和旧缓存、去噪开关丢弃；这些命令不再注册。OpenGL 上 Vulkan backend/preset 显示切换图形 API 的提示。

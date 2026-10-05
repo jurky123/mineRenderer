@@ -33,6 +33,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setVulkanRtPoc(){vulkanRt.enable(true);}
     void setRaster(){vulkanRt.enable(false);}
     void accumulate(boolean value){vulkanRt.accumulate(value);}
+    void accumulateFreeze(boolean value){vulkanRt.accumulateFreeze(value);}
     void accumulateSpp(int value){vulkanRt.accumulateSpp(value);}
     void accumulateReset(){vulkanRt.accumulateReset();}
     void setCloudDebug(int value){composite.setCloudDebug(value);}

@@ -1,3 +1,11 @@
+# 0.39.0-alpha.14 — live accumulation, numerical rejection and emissive NEE
+
+Default history now continues tracing at its sample target with bounded EMA and live sky/held/water/albedo assets. Lighting signatures invalidate large changes; explicit `rt_accumulate freeze on|off` preserves opt-in frozen snapshots. Held native BlockItem lights are independent of raster local-light enablement and use level/15 × 20 scene-linear point intensity.
+
+Equal-IOR dielectric transmission is a straight-through delta; grazing Fresnel and large-PDF MIS avoid 0/0 and overflow. Nonfinite path contributions flag invalid alpha; the HDR mean rejects bad samples per pixel and clears corrupt history. Filmic mapping uses stable large-HDR arithmetic; invalid display fallback no longer paints red.
+
+Native emissive triangle metadata is cached per section and rebuilt in the TLAS ordering, with nearest-first 8192 table admission, global triangle/instance IDs, world transforms and area×emission CDF. GPU Material 3 emission and cutout are evaluated at the sampled point, visibility handles transmissive interfaces, and emitter hit PDFs provide complementary surface MIS. Table uploads follow scene generation; no full geometry CPU duplicate or image readback is added. LabPBR-only emitters without native emission levels, dynamic geometry, full medium free-flight and AOV reconstruction remain pending. RTX visual acceptance is still required.
+
 # 0.39.0-alpha.13 — Vulkan-only tracing and stationary accumulation
 
 User authorized deletion of old tracing after alpha.12 acceptance. The current runtime and kit contain no OptiX/CUDA tracer, JNI tracing bridge or runtime PTX compiler. Historical legacy-removal gates below are superseded by this authorization. Canonical BSDF/material/environment mathematics remain parity fixtures; unchanged water math is extracted into `native/rt/water_surface.h`. Independent `native/denoiser/temporal_aov.h` preserves temporal diffuse/reflection/refraction AOV invocation (SDK syntax-checked), but no denoiser is connected to Vulkan output yet.

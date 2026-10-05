@@ -18,6 +18,7 @@ class RendererPreferencesTest {
         var prefs=new RendererPreferences();assertTrue(prefs.record("voxellight rt_accumulate on",true));
         assertTrue(prefs.record("voxellight rt_accumulate spp 512",true));
         assertFalse(prefs.record("voxellight rt_accumulate reset",true));
+        assertTrue(prefs.record("voxellight rt_accumulate freeze off",true));assertEquals("off",prefs.value("rt_accumulate freeze"));
         assertEquals("512",prefs.value("rt_accumulate spp"));assertEquals("on",prefs.value("rt_accumulate"));
         assertFalse(prefs.record("voxellight pathtrace on",true));assertFalse(prefs.record("voxellight rt_reference on",true));
         assertFalse(prefs.record("voxellight profile on",true));

@@ -34,6 +34,20 @@ def main():
     executable=output/'environment_parity'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_environment_parity.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    # Execute the exact GLSL mean function through Slang's CPU target.
+    glsl=(ROOT/'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh').read_text()
+    functions=glsl[glsl.index('bool finiteRgb'):glsl.index('void main()')].replace('vec3','float3').replace('vec4','float4')
+    (output/'accumulation_fixture.slang').write_text(functions)
+    source=ROOT/'shaders/rt/tests/numerical_edges.slang'
+    subprocess.run([compiler,str(source),'-I',str(output),'-target','cpp','-entry','numerical_edges','-stage','compute','-o',str(output/'numerical_edges.cpp')],check=True)
+    executable=output/'numerical_edges'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_numerical_edges.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/emitter_sampling.slang'
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','emitter_sampling','-stage','compute','-o',str(output/'emitter_sampling.cpp')],check=True)
+    executable=output/'emitter_sampling'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_emitter_sampling.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     (output/'result.txt').write_text(result);print(result,end='')
 
 if __name__=='__main__':main()

@@ -18,6 +18,15 @@ import static org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 /** Reload-owned linear GPU atlas/palette view. Never maps or downloads frame images. */
 final class VulkanRtMaterialAssets implements AutoCloseable {
     com.voxellight.rt.vulkan.VulkanRtBuffer buffer(){return buffer;}
+    float[] lightingSignature(ShadowRenderer shadows){
+        var light=shadows.light();var sun=light.direction();var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
+        var env=com.voxellight.world.LightingEnvironment.polished(light,sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);
+        float[] value=new float[16];value[0]=sun.x;value[1]=sun.y;value[2]=sun.z;
+        value[3]=env.directR()*env.directStrength();value[4]=env.directG()*env.directStrength();value[5]=env.directB()*env.directStrength();
+        var held=shadows.rtVirtualLight();System.arraycopy(held,0,value,6,8);
+        value[14]=1-sky.rainBrightness;value[15]=Minecraft.getInstance().gameRenderer.mainCamera().getFluidInCamera()==net.minecraft.world.level.material.FogType.WATER?1:0;
+        return value;
+    }
     private static final RenderPipeline COPY=RenderPipeline.builder()
         .withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/vulkan_rt_atlas"))
         .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
@@ -30,9 +39,12 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     private GpuTextureView albedoView;
     private VulkanRtBuffer buffer;
     private int[] widths,heights,offsets;
-    private int environmentOffset;
+    private int environmentOffset,emitterOffset;
+    private long emitterGeneration=-1;
+    private String lightingStatus="";
+    String status(){return lightingStatus;}
     private final VulkanRtEnvironmentAssets environment=new VulkanRtEnvironmentAssets();
-    VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows) {
+    VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows,com.voxellight.rt.vulkan.VulkanRtScene scene) {
         var atlas=Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
         var ids=material.rtAtlas(0);var normal=material.rtAtlas(1);var palette=material.rtAtlas(2);
         if(ids==null||normal==null||palette==null)return null;
@@ -43,7 +55,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             heights=new int[]{atlas.getHeight(0),ids.getHeight(0),normal.getHeight(0),palette.getHeight(0)};
             offsets=new int[4];long bytes=192;
             for(int i=0;i<4;i++){offsets[i]=Math.toIntExact(bytes);bytes=Math.addExact(bytes,Math.multiplyExact((long)widths[i]*heights[i],4));}
-            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;
+            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;
             if(bytes>256L*1024*1024)throw new IllegalStateException("Vulkan material atlas budget exceeded (256 MiB)");
             try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
                 var properties=org.lwjgl.vulkan.VkPhysicalDeviceProperties.calloc(stack);
@@ -68,8 +80,11 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         header.putFloat(env.directR()*env.directStrength()*(float)Math.PI).putFloat(env.directG()*env.directStrength()*(float)Math.PI).putFloat(env.directB()*env.directStrength()*(float)Math.PI).putFloat(0);
         for(float value:shadows.rtVirtualLight())header.putFloat(value);
         var water=material.waterMedium();header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
+        header.putInt(124,scene.emitterCount());header.putInt(156,emitterOffset);
         header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).flip();
+        lightingStatus=", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
         encoder.writeToBuffer(buffer.slice(0,192),header);
+        if(emitterGeneration!=scene.generation()){if(scene.emitterCount()>0)encoder.writeToBuffer(buffer.slice(emitterOffset,scene.emitterCount()*64L),scene.emitterData());emitterGeneration=scene.generation();}
         environment.prepare(encoder,device,buffer,environmentOffset,weather,shadows);
         try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan animated albedo copy")
             .withRenderArea(new RenderPass.RenderArea(0,0,widths[0],heights[0])).withColorAttachment(albedoView,Optional.empty()))) {
@@ -79,5 +94,5 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         return buffer;
     }
     long bytes(){return buffer==null?0:buffer.size();}
-    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;albedoView=null;albedo=null;}
+    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;emitterGeneration=-1;albedoView=null;albedo=null;}
 }

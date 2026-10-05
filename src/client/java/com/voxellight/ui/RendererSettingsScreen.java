@@ -69,7 +69,7 @@ public final class RendererSettingsScreen extends Screen {
         super.extractRenderState(graphics,mouseX,mouseY,partial);
         graphics.centeredText(font,title,width/2,12,0xffffffff);
         if(status.isEmpty())status=VoxelLightClient.probe().status();
-        java.util.regex.Matcher progress=java.util.regex.Pattern.compile("stationaryAccumulation=(true|false), accumulatedSpp=([0-9]+)/([0-9]+)").matcher(status);
+        java.util.regex.Matcher progress=java.util.regex.Pattern.compile("stationaryAccumulation=(true|false), accumulationFrozen=(?:true|false), accumulatedSpp=([0-9]+)/([0-9]+)").matcher(status);
         String line=progress.find()?"Stationary accumulation: "+(progress.group(1).equals("true")?progress.group(2)+" / "+progress.group(3)+" spp":"off"):"Select Vulkan PT to accumulate";
         if(!status.contains("vulkanRtPoc=true"))line="Select Vulkan PT to accumulate";
         if(status.contains("unsupported backend"))line="Vulkan PT requires Vulkan; change graphics API and restart.";

@@ -66,6 +66,7 @@ public final class RendererSettings {
             }
             if(!choices.isEmpty()||!range.isEmpty()||child.getCommand()!=null)entries.add(new Entry(child.getName(),List.copyOf(choices),range));
         }
+        entries.add(new Entry("rt_accumulate freeze",List.of("on","off"),""));
         entries.add(new Entry("rt_accumulate spp",List.of(),"4 .. 4096"));
         entries.sort(Comparator.comparing(Entry::key));
         commands.setConsumer((context,success,result)->{

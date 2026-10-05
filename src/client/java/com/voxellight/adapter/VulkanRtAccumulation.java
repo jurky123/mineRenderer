@@ -22,7 +22,7 @@ final class VulkanRtAccumulation implements AutoCloseable {
     private GpuBuffer settings;
     private int read,width,height;
     GpuTextureView view(){return views[read];}
-    GpuTextureView add(CommandEncoder encoder,GpuTextureView sample,int samples,int w,int h){
+    GpuTextureView add(CommandEncoder encoder,GpuTextureView sample,int samples,int target,int w,int h){
         var device=RenderSystem.getDevice();
         if(settings==null||width!=w||height!=h){
             close();width=w;height=h;
@@ -30,7 +30,7 @@ final class VulkanRtAccumulation implements AutoCloseable {
             for(int i=0;i<2;i++){textures[i]=device.createTexture("VoxelLight stationary HDR "+i,GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,w,h,1,1);views[i]=device.createTextureView(textures[i]);}
             settings=device.createBuffer(()->"VoxelLight stationary mean settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,16);
         }
-        var data=ByteBuffer.allocateDirect(16).order(ByteOrder.nativeOrder());data.putFloat(1f/(samples+1)).putFloat(samples).putFloat(0).putFloat(0).flip();encoder.writeToBuffer(settings.slice(),data);
+        var data=ByteBuffer.allocateDirect(16).order(ByteOrder.nativeOrder());data.putFloat(target).putFloat(samples).putFloat(0).putFloat(0).flip();encoder.writeToBuffer(settings.slice(),data);
         int write=1-read;
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_accumulate");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight stationary HDR mean").withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(views[write],Optional.empty()))){
             pass.setPipeline(PIPELINE);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);

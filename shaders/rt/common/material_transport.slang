@@ -3,6 +3,7 @@
 #include "medium.slang"
 #include "water_surface.slang"
 #include "environment.slang"
+#include "emissive.slang"
 struct SurfacePayload {float distance;float2 bary;uint triangle;uint instance;};
 [[vk::binding(0, 0)]] RaytracingAccelerationStructure world;
 [[vk::binding(1, 0)]] RWStructuredBuffer<float4> output;
@@ -58,8 +59,15 @@ float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum
     }
     return float3(0); // Conservative interface-limit handling.
 }
+bool finiteEnergy(float3 value){return all(isfinite(value))&&all(value>=0);}
+void addRadiance(inout PathState path,float3 contribution){
+    float3 sum=path.radiance.xyz+contribution;
+    if(!finiteEnergy(contribution)||!finiteEnergy(sum)){path.padding=1;path.origin.w=0;return;}
+    path.radiance.xyz=sum;
+}
+float4 pathOutput(PathState path){return float4(path.padding==0&&finiteEnergy(path.radiance.xyz)?path.radiance.xyz:float3(0),path.padding==0?1:0);}
 void advance(inout PathState path) {
-    if(path.origin.w==0)return;
+    if(path.origin.w==0||path.padding!=0)return;
     uint seed=asuint(path.radiance.w);MediumStack media=loadMedia(path);
     SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz);
     TerrainSurface surface=(TerrainSurface)0;bool entering=false;
@@ -76,12 +84,14 @@ void advance(inout PathState path) {
             LightSample light=sampleOneLight(event,seed);
             // This first-order segment estimator has no competing phase continuation.
             // Applying surface MIS here would remove energy rather than reduce variance.
-            if(light.pdf>0)path.radiance.xyz+=path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002));
+            if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002)));
+            LightSample emitter=sampleEmitter(event,seed);
+            if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*visibility(event,emitter.wi,media,max(.001,emitter.distance-.002)));
         }
         path.throughput.xyz*=expNeg(extinction,distance);
     }
     if(hit.distance<0) {
-        path.radiance.xyz+=path.throughput.xyz*missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0);path.origin.w=0;
+        addRadiance(path,path.throughput.xyz*missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0));path.origin.w=0;
     } else {
         Material m=surface.material;float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
         if(m.type==WATER) {
@@ -92,23 +102,38 @@ void advance(inout PathState path) {
         float3 wo=-path.direction.xyz;float3 n=dot(surface.frame.n,wo)>0?surface.frame.n:-surface.frame.n;
         Frame frame=makeFrame(n,surface.frame.t,surface.frame.b);
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
-        path.radiance.xyz+=path.throughput.xyz*m.emission;
+        float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,emitterHitPdf(hit.triangle,path.origin.xyz,point));
+        addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
         LightSample light=sampleOneLight(point,seed);
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
             MediumStack shadowMedia=media;bool visible=true;
             if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&dot(n,light.wi)<0)visible=crossMedium(shadowMedia,m,entering);
             float mis=lightMisWeight(light,direct.pdf,path.throughput.w<5);
-            if(visible)path.radiance.xyz+=path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance
-                *visibility(offsetRayOrigin(point,surface.geometryNormal,light.wi),light.wi,shadowMedia,max(.001,light.distance-.002));
+            if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance
+                *visibility(offsetRayOrigin(point,surface.geometryNormal,light.wi),light.wi,shadowMedia,max(.001,light.distance-.002)));
+        }
+        LightSample emitter=sampleEmitter(point,seed);
+        if(emitter.pdf>0){
+            BsdfEval e=evalBsdf(m,frame,wo,emitter.wi,eta);
+            MediumStack shadowMedia=media;bool visible=true;
+            if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&dot(n,emitter.wi)<0)visible=crossMedium(shadowMedia,m,entering);
+            if(visible&&e.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,emitter.wi)){
+                float mis=path.throughput.w<5?powerHeuristic(emitter.pdf,e.pdf):1;
+                float3 start=offsetRayOrigin(point,surface.geometryNormal,emitter.wi);
+                float maximum=emitter.distance-max(0,dot(start-point,emitter.wi))-.002;
+                if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum));
+            }
         }
         if(path.throughput.w>=5) {path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}
         BsdfSample sample=sampleBsdf(m,frame,wo,seed,eta);
-        bool valid=sample.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,sample.wi);
+        bool valid=isfinite(sample.pdf)&&finiteEnergy(sample.weight)&&all(isfinite(sample.wi))&&sample.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,sample.wi);
         if(valid&&(sample.flags&TRANSMISSION)!=0&&dielectric(m)&&m.type!=THIN_DIELECTRIC) {
             valid=crossMedium(media,m,entering);path.etaScale*=sample.eta*sample.eta;
         }
-        path.throughput.xyz*=sample.weight;path.throughput.w+=1;
+        if(!isfinite(sample.pdf)||!finiteEnergy(sample.weight)||!all(isfinite(sample.wi)))path.padding=1;
+        path.throughput.xyz*=sample.weight;
+        if(!finiteEnergy(path.throughput.xyz)||!isfinite(path.etaScale)){path.padding=1;valid=false;}path.throughput.w+=1;
         path.origin=float4(offsetRayOrigin(point,surface.geometryNormal,sample.wi),valid?1:0);path.direction=float4(sample.wi,sample.pdf);path.previousDelta=(sample.flags&DELTA)!=0?1:0;
         if(path.throughput.w>=3) {
             float survival=clamp(maxComponent(path.throughput.xyz)*path.etaScale,.05,.95);

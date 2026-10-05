@@ -13,7 +13,7 @@ import static org.lwjgl.vulkan.VK10.*;
 
 /** Terrain bringup. Version-identical sections do no GPU work; replacements share one frame command batch. */
 public final class VulkanRtScene implements AutoCloseable {
-    private record Section(long version, VulkanRtBuffer vertices, VulkanRtAccel blas, byte[] normals) {}
+    private record Section(long version, VulkanRtBuffer vertices, VulkanRtAccel blas, byte[] normals, List<com.voxellight.rt.RtEmitterTable.Triangle> emitters) {}
     private final VulkanDevice device;
     private final int scratchAlignment;
     private final boolean material;
@@ -21,6 +21,9 @@ public final class VulkanRtScene implements AutoCloseable {
     private final Map<SectionKey,Section> sections=new LinkedHashMap<>();
     private VulkanRtAccel tlas;
     private VulkanRtBuffer normalBuffer;
+    private ByteBuffer emitterData=ByteBuffer.allocateDirect(0);
+    public ByteBuffer emitterData(){return emitterData.asReadOnlyBuffer();}
+    public int emitterCount(){return emitterData.remaining()/64;}
     private long generation, builds, tlasBuilds, bytes;
     VulkanRtScene(VulkanDevice device,int scratchAlignment) {this(device,scratchAlignment,false);}
     VulkanRtScene(VulkanDevice device,int scratchAlignment,boolean material) { this.device=device;this.scratchAlignment=scratchAlignment;this.material=material; }
@@ -29,7 +32,7 @@ public final class VulkanRtScene implements AutoCloseable {
     long tlas() { return tlas==null?0:tlas.handle(); }
     VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+sections.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    public String status() { return "sections="+sections.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
     public void update(com.mojang.blaze3d.systems.CommandEncoder profileEncoder,List<RtGeometryStream.Section> changes,double x,double y,double z) {
         boolean dirty=false;
         var encoder=device.createCommandEncoder();
@@ -90,19 +93,20 @@ public final class VulkanRtScene implements AutoCloseable {
                         var source=ByteBuffer.wrap(change.triangles()).order(ByteOrder.nativeOrder());
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
                         for(int triangle=0;triangle<change.vertices()/3;triangle++)normals.putFloat(source.getFloat(triangle*120+20)).putFloat(source.getFloat(triangle*120+24)).putFloat(source.getFloat(triangle*120+28)).putFloat(0);
-                        var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array()));
+                        var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array(),material?com.voxellight.rt.RtEmitterTable.extract(change.triangles()):List.of()));
                         bytes+=buffer.size();if(previous!=null)release(previous);builds++;
                     } catch(RuntimeException error) { buffer.close();throw error; }
                 }
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
             }
-            try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_tlas")){rebuildTlas();}generation++;
+            try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_tlas")){rebuildTlas(x,y,z);}generation++;
         } finally { uploads.values().forEach(VulkanRtBuffer::close); }
     }
-    private void rebuildTlas() {
+    private void rebuildTlas(double x,double y,double z) {
         if(tlas!=null) {tlas.close();tlas=null;}
         if(normalBuffer!=null) {normalBuffer.close();normalBuffer=null;}
         if(geometryBuffer!=null){geometryBuffer.close();geometryBuffer=null;}
+        emitterData=ByteBuffer.allocateDirect(0);
         if(sections.isEmpty())return;
         int triangles=sections.values().stream().mapToInt(section->section.normals.length/16).sum();
         if(triangles>=0x1000000)throw new IllegalStateException("RT instance normal base exceeds 24 bits");
@@ -122,12 +126,15 @@ public final class VulkanRtScene implements AutoCloseable {
         var instances=new VulkanRtBuffer(device,(long)sections.size()*VkAccelerationStructureInstanceKHR.SIZEOF,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
         try(var packed=allocateInstances(sections.size());var stack=MemoryStack.stackPush()) {
             int i=0,base=0;
+            var emitters=new ArrayList<com.voxellight.rt.RtEmitterTable.Triangle>();
             for(var entry:sections.entrySet()) {
                 var instance=packed.get(i++);var k=entry.getKey();
+                for(var emitter:entry.getValue().emitters)emitters.add(com.voxellight.rt.RtEmitterTable.world(emitter,base,i-1,k.x(),k.y(),k.z()));
                 instance.transform().matrix(0,1).matrix(5,1).matrix(10,1).matrix(3,k.x()*16f).matrix(7,k.y()*16f).matrix(11,k.z()*16f);
                 instance.instanceCustomIndex(base).mask(255).instanceShaderBindingTableRecordOffset(0).flags(VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR).accelerationStructureReference(entry.getValue().blas.address());
                 base+=entry.getValue().normals.length/16;
             }
+            emitterData=com.voxellight.rt.RtEmitterTable.pack(emitters,x,y,z);
             encoder.writeToBuffer(instances.slice(),org.lwjgl.system.MemoryUtil.memByteBuffer(packed.address(),packed.remaining()*VkAccelerationStructureInstanceKHR.SIZEOF));
             var geometry=VkAccelerationStructureGeometryKHR.calloc(1,stack);geometry.get(0).sType$Default().geometryType(VK_GEOMETRY_TYPE_INSTANCES_KHR);
             geometry.get(0).geometry().instances().sType$Default().arrayOfPointers(false).data().deviceAddress(instances.address());
@@ -167,5 +174,5 @@ public final class VulkanRtScene implements AutoCloseable {
     }
     private static boolean admitted(SectionKey key,double x,double y,double z) {return Math.abs(key.x()*16.+8-x)<=144&&Math.abs(key.y()*16.+8-y)<=144&&Math.abs(key.z()*16.+8-z)<=144;}
     private void release(Section section) {bytes-=section.vertices.size();section.blas.close();section.vertices.close();}
-    @Override public void close() { sections.values().forEach(this::release);sections.clear();if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++; }
+    @Override public void close() { sections.values().forEach(this::release);sections.clear();emitterData=ByteBuffer.allocateDirect(0);if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++; }
 }

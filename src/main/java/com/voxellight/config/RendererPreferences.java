@@ -20,6 +20,7 @@ public final class RendererPreferences {
         if(obsolete(key))return false;
         if(key.equals("rt_accumulate")){
             if(value.startsWith("spp ")){key="rt_accumulate spp";value=value.substring(4);}
+            else if(value.startsWith("freeze ")){key="rt_accumulate freeze";value=value.substring(7);}
             else if(value.equals("reset"))return false;
         }
         if(key.equals("preset"))current.clear();
