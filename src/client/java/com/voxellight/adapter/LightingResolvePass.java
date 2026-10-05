@@ -29,6 +29,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final RtxLightingPass rtx=new RtxLightingPass();
     private final VulkanRtDebugPass vulkanRt=new VulkanRtDebugPass();
+    void setVulkanTransportTest(){referenceRt(false);rtx.enable(false);pathtrace.setEnabled(false);vulkanRt.enableTransport();}
     void setVulkanRtPoc(){referenceRt(false);rtx.enable(false);pathtrace.setEnabled(false);vulkanRt.enable(true);}
     void setRtBackend(boolean enabled){if(vulkanRt.enabled())vulkanRt.enable(false);if(!enabled)referenceRt(false);rtx.enable(enabled);}
     void setRtOption(String option,boolean value){rtx.option(option,value);}

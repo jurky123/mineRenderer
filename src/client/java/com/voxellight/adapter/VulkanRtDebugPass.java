@@ -21,14 +21,15 @@ final class VulkanRtDebugPass implements AutoCloseable {
     private VulkanRtContext context;
     private GpuTexture texture;
     private GpuTextureView view;
-    private boolean enabled,failed;
+    private boolean enabled,failed,transport;
     private int diagnosticFrames;
     private volatile String diagnostic="pending";
     private long world=-1,resources=-1,startupMs;
     private String state="off";
     void enable(boolean value) {
-        close();enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for Vulkan RT":"off";
+        close();transport=false;enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for Vulkan RT":"off";
     }
+    void enableTransport() { enable(true);transport=true; }
     boolean enabled() {return enabled;}
     void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed) {
         if(!enabled||failed)return;
@@ -39,11 +40,11 @@ final class VulkanRtDebugPass implements AutoCloseable {
             if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())) {close();RtGeometryStream.enable(true);}
             if(context==null) {
                 if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);}
-                long start=System.nanoTime();context=new VulkanRtContext(device);
+                long start=System.nanoTime();context=new VulkanRtContext(device,transport);
                 if(!RenderSystem.getDevice().precompilePipeline(DISPLAY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan RT debug display pipeline unavailable");
                 startupMs=(System.nanoTime()-start)/1_000_000;
                 world=stats.worldGeneration();resources=stats.resourceGeneration();
-                org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT normal POC pipeline ready in {} ms; no OptiX tracing",startupMs);
+                org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT {} pipeline ready in {} ms; no OptiX tracing",transport?"geometry transport test":"normal POC",startupMs);
             }
             int scale=Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360));
             int width=Math.max(1,(target.width+scale-1)/scale),height=Math.max(1,(target.height+scale-1)/scale);
@@ -58,7 +59,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
                 pass.setPipeline(DISPLAY);pass.bindTexture("RtNormal",view,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
             if(++diagnosticFrames==30)diagnose(encoder,width,height);
-            state="normal/debug only";
+            state=transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
         } catch(RuntimeException error) {
             close();failed=true;state="failed; raster retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Vulkan RT POC failed; legacy/raster remain available",error);
         }

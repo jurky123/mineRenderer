@@ -1,5 +1,17 @@
 # Vulkan RT migration — staged implementation ledger
 
+
+## 0.39.0-alpha.9 — geometry transport dispatch acceptance
+
+The alpha.8 edit fix passed user RTX 4060 validation for placement and destruction. Alpha.9 adds `/voxellight rt_backend vulkan_transport_test` without changing that scene update policy or production RTX Quality. Separate primary and indirect RT pipelines advance one bounce per dispatch through a 64-byte, GPU-only continuation record. One jittered path per pixel per frame, six-bounce limit, grey diffuse BSDF, sun visibility rays and Russian roulette exercise the runtime transport/synchronization path. Recursion remains 1; closest-hit/miss never trace rays. Normal view remains available through `vulkan_poc`.
+
+This is explicitly a geometry acceptance test, not Material 3 PT parity. It uses a fixed test sky/sun and grey material; transparent/cutout terrain is forced opaque. No reconstruction, temporal history, material/environment parity, RR/OptiX denoiser or performance gate has passed. At most 640×360 pixels: continuation costs 14.06 MiB, plus existing output buffer/texture; retired on resize/close through MC submission ownership. Profiles separate `vulkan_rt_primary` and aggregate `vulkan_rt_indirect` (five dispatches); do not add those to aggregate scene timings. Runtime performs no CPU image transfer except the existing one-time 32-byte diagnostic.
+
+Validation: Gradle build/clientKit passed, 264 tests passed, seven packaged SPIR-V execution models and reflection ABIs validated. Canonical Slang/native transport parity still passes 57,600 cases / 3,225,600 scalar components (max normalized error 0.000381917). [Alpha.9 test kit](https://temp.sh/MrRxn/voxellight-client-kit-26.2-0.39.0-alpha.9.zip).
+
+Next: bind native vertex UV/tint/flags and GPU albedo/Material 3 palette/normal/environment assets; add cutout any-hit and correct media/transmission, emission NEE/MIS, guides and independent reconstruction. This host has no RTX device; the new transport view needs GPU validation. Default switch and legacy tracing removal remain gated by visual parity and the requested RTX 4060 p50/p95 budgets.
+
+
 This release starts migration stage **1: legacy OptiX production + Vulkan POC**. It does not complete the renderer migration. Production RTX Quality remains legacy OptiX. The explicit Vulkan POC has no OptiX/CUDA renderer dependency, but only traces terrain camera rays and displays geometric normals. No PT/material/reconstruction parity or RTX 4060 Laptop performance gate has passed.
 
 The implementation preserves Material 3, LabPBR, physical environment/clouds/water, emission collection, radiance cache and raster fallback in the existing production renderer. It deliberately does not replace their behavior with provisional Vulkan shading.

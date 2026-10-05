@@ -90,7 +90,7 @@ class VulkanRtContractTest {
     }
     @Test void packagedSpirvHasIndependentNonrecursiveRtStages() throws Exception {
         try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {
-            Map<String,Integer> models=Map.of("primary",5313,"closest_hit",5316,"sky",5317);
+            Map<String,Integer> models=Map.of("primary",5313,"closest_hit",5316,"sky",5317,"transport_primary",5313,"transport_indirect",5313,"transport_closest_hit",5316,"transport_sky",5317);
             for(var entry:models.entrySet()) {
                 byte[] bytes=jar.getInputStream(jar.getEntry("assets/voxellight/rt/vulkan/"+entry.getKey()+".spv")).readAllBytes();
                 var buffer=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
@@ -102,7 +102,7 @@ class VulkanRtContractTest {
                     if(opcode==71&&buffer.get(offset+2)==34)assertEquals(0,buffer.get(offset+3),"Descriptor set ABI is set zero");
                     offset+=count;
                 }
-                assertTrue(stage);assertEquals(entry.getKey().equals("primary"),trace,"Only raygen traces rays; closest-hit is nonrecursive");
+                assertTrue(stage);assertEquals(entry.getValue()==5313,trace,"Only raygen traces rays; closest-hit is nonrecursive");
             }
         }
     }
