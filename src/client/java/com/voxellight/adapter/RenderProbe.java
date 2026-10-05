@@ -88,6 +88,7 @@ public final class RenderProbe {
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
     public void setRaster(){RenderSystem.assertOnRenderThread();lighting.setRaster();}
     public void accumulate(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulate(value);}
+    public void probeLighting(){RenderSystem.assertOnRenderThread();lighting.probeLighting();}
     public void accumulateFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulateFreeze(value);}
     public void accumulateSpp(int value){RenderSystem.assertOnRenderThread();lighting.accumulateSpp(value);}
     public void accumulateReset(){RenderSystem.assertOnRenderThread();lighting.accumulateReset();}

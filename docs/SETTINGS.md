@@ -1,4 +1,4 @@
-# VoxelLight 设置与静止累积（alpha.15）
+# VoxelLight 设置与静止累积（alpha.16）
 
 暂停/Options → VoxelLight 或 `/voxellight settings` 打开原版控件界面。命令树提供可搜索的选择项，`rt_accumulate spp` 有独立数字输入。界面底部显示静止累积的完成样本数和目标，每秒刷新。
 
@@ -22,3 +22,7 @@
 旧 `preset rtx_quality` 保存值迁移为 `vulkan_quality`；旧 OptiX/CUDA backend 保存值迁移为 `vulkan_pt`；旧 `rt_reference spp` 迁移为 `rt_accumulate spp`。旧参考模式/旧 pathtrace 和旧缓存、去噪开关丢弃；这些命令不再注册。OpenGL 上 Vulkan backend/preset 显示切换图形 API 的提示。
 
 Alpha.15 手持点光不参与天空/太阳混合随机抽样，每次有效表面着色和介质事件独立连接，保持真实遮挡和平方反比衰减，离散点光不与连续 BSDF 配对 MIS。状态新增 `vulkanRtHeldItems` 与 `vulkanRtHeldPosition` 以排查未识别物品/源位置；手持支持原生发光 BlockItem，其他物品尚无发光规则。
+
+Alpha.16 为原生火把/灵魂火把及灯笼建立独立点光提案，同一方块合并一次，采用平方反比衰减、真实遮挡和离散选择 PDF；木杆及金属模型不再整面自发光，显式 LabPBR 发光保留。其他原生发光面使用场景线性辐射标定 8，并继续面积采样及 MIS。有限距离阴影连接增加按世界坐标精度调整的接收面偏移，减少自遮挡。
+
+如手持照明仍异常，拿着火把对准附近不透明墙面运行 `/voxellight rt_lighting_probe`，等待约 30 帧，再提供 `Vulkan RT POC GPU diagnostic` 日志。`heldIncident` 为入射 RGB/距离，`heldBsdf` 为材质 RGB/PDF，`heldHemisphere` 为着色与几何法线方向余弦，`heldVisibility` 为透过率/介质允许标志。测试机没有 RTX，CPU 输运验证不能替代真实 GPU 验收。

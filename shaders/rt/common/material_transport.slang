@@ -5,7 +5,11 @@
 #include "environment.slang"
 #include "emissive.slang"
 struct SurfacePayload {float distance;float2 bary;uint triangle;uint instance;};
+#ifndef RT_CPU_FIXTURE
 [[vk::binding(0, 0)]] RaytracingAccelerationStructure world;
+#else
+SurfacePayload fixtureTrace(float3 origin,float3 direction,float maximum);
+#endif
 [[vk::binding(1, 0)]] RWStructuredBuffer<float4> output;
 [[vk::binding(2, 0)]] StructuredBuffer<float4> normals;
 struct Camera {float4 inverseClip0;float4 inverseClip1;float4 inverseClip2;float4 inverseClip3;float4 origin;uint width;uint height;uint frame;uint padding;};
@@ -18,9 +22,25 @@ struct PathState {
 };
 [[vk::binding(4, 0)]] RWStructuredBuffer<PathState> paths;
 SurfacePayload traceSurface(float3 origin,float3 direction,float maximum=4096) {
+#ifdef RT_CPU_FIXTURE
+    return fixtureTrace(origin,direction,maximum);
+#else
     RayDesc ray;ray.Origin=origin;ray.Direction=direction;ray.TMin=.001;ray.TMax=maximum;
     SurfacePayload hit;hit.distance=-1;hit.bary=0;hit.triangle=0;hit.instance=0;
     TraceRay(world,RAY_FLAG_NONE,255,0,0,0,ray,hit);return hit;
+#endif
+}
+// Guard finite light connections against rounding back onto the receiver.
+float3 connectionOrigin(float3 point,float3 normal,float3 direction){
+    float3 facing=dot(normal,direction)>=0?normal:-normal;
+    float margin=max(.002,maxComponent(abs(point))*9.5367431640625e-7);
+    return offsetRayOrigin(point+facing*margin,normal,direction);
+}
+void heldProbe(PathState path,uint slot,float4 value){
+#ifndef RT_CPU_FIXTURE
+    uint2 pixel=DispatchRaysIndex().xy;
+    if(path.throughput.w==0&&pixel.x==camera.width/2&&pixel.y==camera.height/2)output[camera.width*camera.height+slot]=value;
+#endif
 }
 MediumStack loadMedia(PathState path) {
     MediumStack media;media.count=(int)path.mediumCount;
@@ -110,12 +130,16 @@ void advance(inout PathState path) {
         for(int connection=0;connection<2;connection++){
         LightSample light=connection==0?sampleOneLight(point,seed):sampleHeldLight(point);
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
+        if(connection==1){heldProbe(path,0,float4(light.radiance,light.distance));heldProbe(path,1,float4(direct.f,direct.pdf));heldProbe(path,2,float4(dot(n,light.wi),dot(surface.geometryNormal,light.wi),dot(n,wo),dot(surface.geometryNormal,wo)));}
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
             MediumStack shadowMedia=media;bool visible=true;
             if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&dot(n,light.wi)<0)visible=crossMedium(shadowMedia,m,entering);
             float mis=lightMisWeight(light,direct.pdf,path.throughput.w<5);
-            if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance
-                *visibility(offsetRayOrigin(point,surface.geometryNormal,light.wi),light.wi,shadowMedia,max(.001,light.distance-.002)));
+            float3 start=connectionOrigin(point,surface.geometryNormal,light.wi);
+            float maximum=light.distance-max(0,dot(start-point,light.wi))-.002;
+            float3 transmittance=visible&&maximum>.001?visibility(start,light.wi,shadowMedia,maximum):float3(0);
+            if(connection==1)heldProbe(path,3,float4(transmittance,visible?1:0));
+            if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmittance);
         }
         }
         LightSample emitter=sampleEmitter(point,seed);
@@ -124,8 +148,8 @@ void advance(inout PathState path) {
             MediumStack shadowMedia=media;bool visible=true;
             if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&dot(n,emitter.wi)<0)visible=crossMedium(shadowMedia,m,entering);
             if(visible&&e.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,emitter.wi)){
-                float mis=path.throughput.w<5?powerHeuristic(emitter.pdf,e.pdf):1;
-                float3 start=offsetRayOrigin(point,surface.geometryNormal,emitter.wi);
+                float mis=emitter.kind==3||path.throughput.w>=5?1:powerHeuristic(emitter.pdf,e.pdf);
+                float3 start=connectionOrigin(point,surface.geometryNormal,emitter.wi);
                 float maximum=emitter.distance-max(0,dot(start-point,emitter.wi))-.002;
                 if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum));
             }

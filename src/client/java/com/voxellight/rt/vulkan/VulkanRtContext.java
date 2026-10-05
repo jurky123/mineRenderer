@@ -57,7 +57,7 @@ public final class VulkanRtContext implements AutoCloseable {
         if(!changes.isEmpty())prepareScene(encoder,changes,x,y,z);
         if(scene.tlas()==0)return false;
         if(this.width!=width||this.height!=height) {
-            if(output!=null)output.close();output=new VulkanRtBuffer(device,(long)width*height*16,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);this.width=width;this.height=height;
+            if(output!=null)output.close();output=new VulkanRtBuffer(device,(long)width*height*16+(material?64:0),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);this.width=width;this.height=height;
             if(paths!=null)paths.close();if(transport)paths=new VulkanRtBuffer(device,(long)width*height*(material?368:64),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         }
         var camera=new VulkanRtBuffer(device,96,VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -86,6 +86,9 @@ public final class VulkanRtContext implements AutoCloseable {
             encoder.copyBufferToTexture(output.slice(),0,0,width,height,destination,0,0,width,height,0,0);
             return true;
         } finally {camera.close();}
+    }
+    public void copyLightingDiagnostic(CommandEncoder encoder,com.mojang.blaze3d.buffers.GpuBuffer target){
+        if(material&&output!=null)encoder.copyToBuffer(output.slice((long)width*height*16,64),target.slice(32,64));
     }
     public void prepareScene(CommandEncoder encoder,List<RtGeometryStream.Section> changes,double x,double y,double z){
         if(closed)throw new IllegalStateException("Closed RT context");

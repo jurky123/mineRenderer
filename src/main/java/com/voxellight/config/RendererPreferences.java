@@ -30,7 +30,7 @@ public final class RendererPreferences {
         saved.remove(key);saved.put(key,value);return true;
     }
     private static boolean obsolete(String key){return key.startsWith("pathtrace")||key.startsWith("rt_reference")||Set.of("rt_gi","rt_reflections","rt_transmission","rt_denoiser","radiance_cache","rt_caustics","rt_primary_glossy_nee","rt_environment","rt_multiscatter","rt_firefly_clamp","rt_benchmark","rt_debug").contains(key);}
-    private static boolean persistent(String key){return !obsolete(key)&&!key.contains("debug")&&!Set.of("scene","profile","export","settings","status").contains(key);}
+    private static boolean persistent(String key){return !obsolete(key)&&!key.contains("debug")&&!Set.of("scene","profile","export","settings","status","rt_lighting_probe").contains(key);}
     public void load(Path file)throws IOException{
         if(!Files.exists(file))return;
         Map<String,String> loaded=new Gson().fromJson(Files.readString(file),new TypeToken<LinkedHashMap<String,String>>(){}.getType());

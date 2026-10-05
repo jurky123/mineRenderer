@@ -34,6 +34,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
     private boolean enabled,failed,transport,materials;
     private final VulkanRtMaterialAssets assets=new VulkanRtMaterialAssets();
     private int diagnosticFrames;
+    void probeLighting(){diagnosticFrames=0;history.reset("lighting probe");}
     private volatile String diagnostic="pending";
     private long world=-1,resources=-1,startupMs;
     private String state="off";
@@ -95,12 +96,14 @@ final class VulkanRtDebugPass implements AutoCloseable {
         }
     }
     private void diagnose(CommandEncoder encoder,int width,int height) {
-        var read=RenderSystem.getDevice().createBuffer(()->"VoxelLight POC two-pixel diagnostic",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,32);
+        var read=RenderSystem.getDevice().createBuffer(()->"VoxelLight POC two-pixel diagnostic",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,materials?96:32);
+        if(materials)context.copyLightingDiagnostic(encoder,read);
         encoder.copyTextureToBuffer(texture,read,0,()->{},0,0,0,1,1);
         encoder.copyTextureToBuffer(texture,read,16,()->{
             try(var mapped=read.map(true,false)) {
                 var b=mapped.data().order(java.nio.ByteOrder.nativeOrder());
                 diagnostic="marker="+b.getFloat(0)+"/"+b.getFloat(4)+"/"+b.getFloat(8)+"/"+b.getFloat(12)+",center="+b.getFloat(16)+"/"+b.getFloat(20)+"/"+b.getFloat(24)+"/"+b.getFloat(28);
+                if(materials){String[] fields={"heldIncident","heldBsdf","heldHemisphere","heldVisibility"};for(int i=0;i<4;i++){int o=32+i*16;diagnostic+=","+fields[i]+"="+b.getFloat(o)+"/"+b.getFloat(o+4)+"/"+b.getFloat(o+8)+"/"+b.getFloat(o+12);}}
                 org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT POC GPU diagnostic: {}",diagnostic);
             }catch(RuntimeException error){diagnostic="readback failed";org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("POC two-pixel diagnostic failed",error);}
             finally{read.close();}

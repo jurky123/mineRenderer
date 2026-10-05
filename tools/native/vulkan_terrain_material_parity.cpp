@@ -38,7 +38,7 @@ int main(){
   normal[i]=(i%2==0?140u:128u)|(128<<8)|(255u<<24);
   for(unsigned slot=0;slot<3;slot++){unsigned value=slot==0?tex[i]:slot==1?ids[i]:normal[i];assets[24+slot*w+i*2]=value;assets[24+slot*w+i*2+1]=value;}
   float u=(i*2+.5f)/w;
-  unsigned flags=1|(i%7==0?8:0)|(i==31?16:0)|(unsigned(i%16)<<16);
+  unsigned flags=1|(i%7==0?8:0)|(i==31?16:0)|(i==29?32:0)|(unsigned(i%16)<<16);
   unsigned tint=220|(180<<8)|(150<<16)|(unsigned(i%5==0?100:255)<<24);
   geometry[i*3]={{float(i*2),0,0},{u,.25f},{0,0,1},tint,flags};
   geometry[i*3+1]={{float(i*2+1),0,0},{u+.001f,.25f},{0,0,1},tint,flags};
@@ -53,7 +53,8 @@ int main(){
  float largest=0;
  for(unsigned i=0;i<cases;i++){
   const auto& a=geometry[i*3];auto color=rgb(tex[i])*rgb(a.tint);auto m=decodeMaterial(ids[i],lut[ids[i]&65535],v(color.x,color.y,color.z),a.flags);
-  m.emission=color*((ids[i]>>24&4)?(ids[i]>>16&255)/254.f:(a.flags>>16)/15.f)*2.4f;
+  m.emission=color*((ids[i]>>24&4)?(ids[i]>>16&255)/254.f:(a.flags>>16)/15.f)*8.f;
+  if((a.flags&32)&&(ids[i]>>24&4)==0)m.emission=rt::V(0,0,0);
   if((a.flags&8)&&rt::dielectric(m))m.type=rt::THIN_DIELECTRIC;
   m.mediumId=m.type==rt::WATER?0xfffffffeu:1+(i<<16)+(m.type<<8)+(unsigned)std::round(m.ior*255/3);
   float nx=(normal[i]&255)/127.5f-1,ny=(normal[i]>>8&255)/127.5f-1;auto n=rt::normalize(rt::V(nx,ny,std::sqrt(std::max(0.f,1-nx*nx-ny*ny))));

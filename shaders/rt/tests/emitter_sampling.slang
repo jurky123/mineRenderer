@@ -9,5 +9,6 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance){TerrainSu
 [shader("compute")] [numthreads(1,1,1)]
 void emitter_sampling(uint3 tid:SV_DispatchThreadID){
     uint seed=(tid.x+1)*747796405u;LightSample light=sampleEmitter(float3(0),seed);
-    result[tid.x]=float4(light.radiance.x,light.pdf,emitterHitPdf((uint)light.radiance.x-1,float3(0),light.wi*light.distance),light.distance);
+    result[tid.x*2]=float4(light.kind==3?-1:light.radiance.x,light.pdf,light.kind==3?0:emitterHitPdf((uint)light.radiance.x-1,float3(0),light.wi*light.distance),light.distance);
+    result[tid.x*2+1]=float4(light.radiance,light.kind==3?1:0);
 }

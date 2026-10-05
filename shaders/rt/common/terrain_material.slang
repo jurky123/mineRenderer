@@ -45,7 +45,10 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance) {
     if(dot(n,ng)<=0)n=ng;
     float3 color=linearRgb(atlasTexel(0,uv))*linearRgb(a.tint);
     Material material=decodeMaterial(id,profile,color,a.flags,uint4(paletteWord(id,1),paletteWord(id,2),paletteWord(id,3),0),paletteWord(id,4),true);
-    material.emission=color*((((id>>24)&4)!=0?((id>>16)&255)/254.0:(a.flags>>16)/15.0)*2.4);
+    material.emission=color*((((id>>24)&4)!=0?((id>>16)&255)/254.0:(a.flags>>16)/15.0)*8.0);
+    // Flame sources illuminate through the separate point proposal. Wood/metal is reflective.
+    // Only explicit LabPBR emission can override this native flame-body rule.
+    if((a.flags&32)!=0&&((id>>24)&4)==0)material.emission=float3(0);
     if(((id>>24)&3)==1&&maxComponent(material.sigmaA)==0)material.sigmaA=-log(max(float3(.001),color))*.7;
     if((a.flags&8)!=0&&dielectric(material))material.type=THIN_DIELECTRIC;
     // Minecraft water is continuous across section BLAS boundaries. Its entry and exit

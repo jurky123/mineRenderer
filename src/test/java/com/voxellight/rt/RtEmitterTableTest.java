@@ -12,6 +12,14 @@ class RtEmitterTableTest {
         var packed=RtEmitterTable.pack(List.of(world),0,0,0);assertEquals(64,packed.remaining());assertEquals(-32,packed.getFloat(0));assertEquals(48,packed.getFloat(4));assertEquals(64,packed.getFloat(8));
         assertEquals(30,packed.getFloat(12));assertEquals(2,packed.getFloat(28));assertEquals(47,packed.getInt(48));assertEquals(5,packed.getInt(52));
     }
+    @Test void flameTrianglesBecomeOneSourceAndColorSurvivesWorldTranslation(){
+        var b=ByteBuffer.allocate(240).order(ByteOrder.LITTLE_ENDIAN);
+        for(int t=0;t<2;t++){b.putFloat(t*120+40,.2f);b.putFloat(t*120+84,.2f);b.putInt(t*120+36,(10<<16)|32|64);}
+        var sources=RtEmitterTable.extract(b.array());assertEquals(1,sources.size());assertEquals(1,sources.getFirst().kind());
+        var source=RtEmitterTable.world(sources.getFirst(),90,7,3,-1,2);var packed=RtEmitterTable.pack(List.of(source),0,0,0);
+        assertEquals(48.5f,packed.getFloat(0));assertEquals(-15.05f,packed.getFloat(4),1e-5);assertEquals(32.5f,packed.getFloat(8));
+        assertEquals(2.6666667f,packed.getFloat(16),1e-5);assertEquals(13.333334f,packed.getFloat(24),1e-5);assertEquals(1,packed.getInt(56));
+    }
     @Test void boundedTableChoosesNearestButKeepsSortedIdsAndCumulativeMass(){
         var triangles=new ArrayList<RtEmitterTable.Triangle>();for(int i=0;i<RtEmitterTable.LIMIT+1;i++)triangles.add(new RtEmitterTable.Triangle(i,0,new float[]{i,0,0,i,1,0,i,0,1},.5f,1));
         var b=RtEmitterTable.pack(triangles,0,0,0);assertEquals(RtEmitterTable.LIMIT*64,b.remaining());assertEquals(RtEmitterTable.LIMIT,b.getFloat(b.limit()-52));assertEquals(RtEmitterTable.LIMIT-1,b.getInt(b.limit()-16));
