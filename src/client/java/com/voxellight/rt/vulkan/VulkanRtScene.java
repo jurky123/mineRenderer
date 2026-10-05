@@ -21,6 +21,9 @@ public final class VulkanRtScene implements AutoCloseable {
     private final Map<SectionKey,Section> sections=new LinkedHashMap<>();
     private VulkanRtAccel tlas;
     private VulkanRtBuffer normalBuffer;
+    private ByteBuffer flameData=ByteBuffer.allocateDirect(0);
+    public ByteBuffer flameData(){return flameData.asReadOnlyBuffer();}
+    public int flameCount(){return flameData.remaining()/64;}
     private ByteBuffer emitterData=ByteBuffer.allocateDirect(0);
     public ByteBuffer emitterData(){return emitterData.asReadOnlyBuffer();}
     public int emitterCount(){return emitterData.remaining()/64;}
@@ -32,7 +35,7 @@ public final class VulkanRtScene implements AutoCloseable {
     long tlas() { return tlas==null?0:tlas.handle(); }
     VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+sections.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    public String status() { return "sections="+sections.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
     public void update(com.mojang.blaze3d.systems.CommandEncoder profileEncoder,List<RtGeometryStream.Section> changes,double x,double y,double z) {
         boolean dirty=false;
         var encoder=device.createCommandEncoder();
@@ -106,7 +109,7 @@ public final class VulkanRtScene implements AutoCloseable {
         if(tlas!=null) {tlas.close();tlas=null;}
         if(normalBuffer!=null) {normalBuffer.close();normalBuffer=null;}
         if(geometryBuffer!=null){geometryBuffer.close();geometryBuffer=null;}
-        emitterData=ByteBuffer.allocateDirect(0);
+        emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);
         if(sections.isEmpty())return;
         int triangles=sections.values().stream().mapToInt(section->section.normals.length/16).sum();
         if(triangles>=0x1000000)throw new IllegalStateException("RT instance normal base exceeds 24 bits");
@@ -134,7 +137,7 @@ public final class VulkanRtScene implements AutoCloseable {
                 instance.instanceCustomIndex(base).mask(255).instanceShaderBindingTableRecordOffset(0).flags(VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR).accelerationStructureReference(entry.getValue().blas.address());
                 base+=entry.getValue().normals.length/16;
             }
-            emitterData=com.voxellight.rt.RtEmitterTable.pack(emitters,x,y,z);
+            var proposals=com.voxellight.rt.RtEmitterTable.proposals(emitters,x,y,z);emitterData=proposals.stochastic();flameData=proposals.flames();
             encoder.writeToBuffer(instances.slice(),org.lwjgl.system.MemoryUtil.memByteBuffer(packed.address(),packed.remaining()*VkAccelerationStructureInstanceKHR.SIZEOF));
             var geometry=VkAccelerationStructureGeometryKHR.calloc(1,stack);geometry.get(0).sType$Default().geometryType(VK_GEOMETRY_TYPE_INSTANCES_KHR);
             geometry.get(0).geometry().instances().sType$Default().arrayOfPointers(false).data().deviceAddress(instances.address());
@@ -174,5 +177,5 @@ public final class VulkanRtScene implements AutoCloseable {
     }
     private static boolean admitted(SectionKey key,double x,double y,double z) {return Math.abs(key.x()*16.+8-x)<=144&&Math.abs(key.y()*16.+8-y)<=144&&Math.abs(key.z()*16.+8-z)<=144;}
     private void release(Section section) {bytes-=section.vertices.size();section.blas.close();section.vertices.close();}
-    @Override public void close() { sections.values().forEach(this::release);sections.clear();emitterData=ByteBuffer.allocateDirect(0);if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++; }
+    @Override public void close() { sections.values().forEach(this::release);sections.clear();emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++; }
 }

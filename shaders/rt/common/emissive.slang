@@ -28,3 +28,11 @@ float emitterHitPdf(uint triangle,float3 point,float3 target){
     uint lo=0,hi=emitterCount();while(lo<hi){uint mid=(lo+hi)/2;uint id=assets.Load(emitterAddress(mid)+48);if(id<triangle)lo=mid+1;else hi=mid;}
     return lo<emitterCount()&&assets.Load(emitterAddress(lo)+48)==triangle&&assets.Load(emitterAddress(lo)+56)==0?emitterPdf(emitterAddress(lo),point,target):0;
 }
+
+uint flameCount(){return min(16u,assets.Load(192));}
+LightSample sampleFlame(float3 point,uint index){
+    LightSample light=(LightSample)0;uint address=assets.Load(196)+index*64;
+    float3 delta=asfloat(readWords3(assets,address))-point;light.distance=length(delta);
+    if(light.distance<.025)return light;
+    light.wi=delta/light.distance;light.radiance=asfloat(readWords3(assets,address+16))/(light.distance*light.distance);light.pdf=1;light.kind=3;return light;
+}

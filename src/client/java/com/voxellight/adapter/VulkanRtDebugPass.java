@@ -25,6 +25,8 @@ final class VulkanRtDebugPass implements AutoCloseable {
     void accumulateFreeze(boolean value){history.frozen(value);}
     private final VulkanRtAccumulation accumulation=new VulkanRtAccumulation();
     void accumulate(boolean value){history.enabled(value);}
+    private int samplesPerFrame=1;
+    void samplesPerFrame(int value){if(value<1||value>8)throw new IllegalArgumentException("Samples per frame must be 1..8");samplesPerFrame=value;}
     void accumulateSpp(int value){history.target(value);}
     void accumulateReset(){history.reset("manual");}
     private final RtTerrainWarmup warmup=new RtTerrainWarmup();
@@ -82,9 +84,12 @@ final class VulkanRtDebugPass implements AutoCloseable {
                     materialAssets=useHistory&&history.frozen()&&history.samples()>0?assets.buffer():assets.prepare(encoder,device,material,weather,shadows,context.scene);
                 }
                 if(materials&&materialAssets==null){state="waiting for Material 3 atlases";return;}
-                if(!context.render(encoder,java.util.List.of(),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets)){state="waiting for terrain BLAS";return;}
-                displayed=useHistory?accumulation.add(encoder,view,history.samples(),history.target(),width,height):view;
-                if(useHistory)history.accepted();
+                int budget=transport?samplesPerFrame:1;
+                for(int sample=0;sample<budget&&(!useHistory||history.needsSample());sample++){
+                    if(!context.render(encoder,java.util.List.of(),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets)){state="waiting for terrain BLAS";return;}
+                    displayed=useHistory?accumulation.add(encoder,view,history.samples(),history.target(),width,height):budget>1?accumulation.add(encoder,view,sample,budget,width,height):view;
+                    if(useHistory)history.accepted();
+                }
             }
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
                 pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",displayed,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
@@ -109,7 +114,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
             finally{read.close();}
         },0,width/2,height/2,1,1);
     }
-    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtMaterialAssetBytes="+assets.bytes()+assets.status()+", stationaryAccumulation="+history.enabled()+", accumulationFrozen="+history.frozen()+", accumulatedSpp="+history.samples()+"/"+history.target()+", accumulationReset="+history.reason()+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
+    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtMaterialAssetBytes="+assets.bytes()+assets.status()+", requestedSppPerFrame="+samplesPerFrame+", stationaryAccumulation="+history.enabled()+", accumulationFrozen="+history.frozen()+", accumulatedSpp="+history.samples()+"/"+history.target()+", accumulationReset="+history.reason()+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
     private void releaseTexture() {if(view!=null)view.close();if(texture!=null)texture.close();view=null;texture=null;}
     @Override public void close() {lightingChange.reset();history.reset("world/resources/backend");accumulation.close();assets.close();if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnosticFrames=0;diagnostic="pending";}
 }

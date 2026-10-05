@@ -20,6 +20,15 @@ class RtEmitterTableTest {
         assertEquals(48.5f,packed.getFloat(0));assertEquals(-15.05f,packed.getFloat(4),1e-5);assertEquals(32.5f,packed.getFloat(8));
         assertEquals(2.6666667f,packed.getFloat(16),1e-5);assertEquals(13.333334f,packed.getFloat(24),1e-5);assertEquals(1,packed.getInt(56));
     }
+    @Test void independentFlamesKeepHeldIntensityWithoutDoubleCountingOrDroppingDistantSources(){
+        var sources=new ArrayList<RtEmitterTable.Triangle>();
+        for(int i=0;i<20;i++)sources.add(new RtEmitterTable.Triangle(i,0,new float[]{i,0,2,20,12.4f,4.8f,0,0,0},0,1,1));
+        sources.add(new RtEmitterTable.Triangle(20,0,new float[]{0,0,0,1,0,0,0,1,0},.5f,2));
+        var proposals=RtEmitterTable.proposals(sources,0,0,0);assertEquals(16*64,proposals.flames().remaining());assertEquals(5*64,proposals.stochastic().remaining());
+        var ids=new HashSet<Integer>();for(var table:List.of(proposals.flames(),proposals.stochastic()))for(int offset=0;offset<table.remaining();offset+=64)assertTrue(ids.add(table.getInt(offset+48)));
+        assertEquals(21,ids.size());assertEquals(com.voxellight.world.HeldLightIntensity.intensity(15),proposals.flames().getFloat(16));
+        assertEquals(15,proposals.flames().getInt(15*64+48));assertEquals(16,proposals.stochastic().getInt(48));
+    }
     @Test void boundedTableChoosesNearestButKeepsSortedIdsAndCumulativeMass(){
         var triangles=new ArrayList<RtEmitterTable.Triangle>();for(int i=0;i<RtEmitterTable.LIMIT+1;i++)triangles.add(new RtEmitterTable.Triangle(i,0,new float[]{i,0,0,i,1,0,i,0,1},.5f,1));
         var b=RtEmitterTable.pack(triangles,0,0,0);assertEquals(RtEmitterTable.LIMIT*64,b.remaining());assertEquals(RtEmitterTable.LIMIT,b.getFloat(b.limit()-52));assertEquals(RtEmitterTable.LIMIT-1,b.getInt(b.limit()-16));

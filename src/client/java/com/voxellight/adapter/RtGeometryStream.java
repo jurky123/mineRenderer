@@ -32,9 +32,11 @@ public final class RtGeometryStream {
    var mesh=entry.getValue();if(mesh.drawState().format()!=NativeTerrainAttributes.FORMAT)continue;
    var in=mesh.vertexBuffer().duplicate().order(ByteOrder.nativeOrder());int quads=in.remaining()/144;
    for(int q=0;q<quads;q++){
-    int thin=0;if(region!=null){float px=0,py=0,pz=0;for(int v=0;v<4;v++){int offset=in.position()+(q*4+v)*36;px+=in.getFloat(offset)*.25f;py+=in.getFloat(offset+4)*.25f;pz+=in.getFloat(offset+8)*.25f;}var block=region.getBlockState(net.minecraft.core.BlockPos.containing(x*16.+px,y*16.+py,z*16.+pz)).getBlock();
+    int thin=0;if(region!=null){float px=0,py=0,pz=0;for(int v=0;v<4;v++){int offset=in.position()+(q*4+v)*36;px+=in.getFloat(offset)*.25f;py+=in.getFloat(offset+4)*.25f;pz+=in.getFloat(offset+8)*.25f;}int normalOffset=in.position()+q*144+32;
+    // Query inside the emitting surface, never the adjacent block at an integer boundary.
+    var block=region.getBlockState(net.minecraft.core.BlockPos.containing(x*16.+px-in.get(normalOffset)/127.0*.001,y*16.+py-in.get(normalOffset+1)/127.0*.001,z*16.+pz-in.get(normalOffset+2)/127.0*.001)).getBlock();
     String name=net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
-    if(name.contains("torch")||name.contains("lantern")&&!name.equals("sea_lantern"))thin|=32|(name.startsWith("soul_")?64:0);if(block==net.minecraft.world.level.block.Blocks.GLASS_PANE||block instanceof net.minecraft.world.level.block.StainedGlassPaneBlock)thin|=8;}
+    if(com.voxellight.world.HeldLightIntensity.flame(name))thin|=32|(name.startsWith("soul_")?64:0);if(block==net.minecraft.world.level.block.Blocks.GLASS_PANE||block instanceof net.minecraft.world.level.block.StainedGlassPaneBlock)thin|=8;}
     for(int vertex:new int[]{0,1,2,2,3,0}){
     int offset=in.position()+(q*4+vertex)*36;for(int f=0;f<3;f++)out.putFloat(in.getFloat(offset+f*4));
     out.putFloat(in.getFloat(offset+16)).putFloat(in.getFloat(offset+20));

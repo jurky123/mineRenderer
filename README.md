@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.17**：修正 SPIR-V 三分量读取错位，恢复光源强度的正确字节地址，并保留 GPU 光照诊断。全新安装默认不启用效果。
+VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.18**：修正邻接火把误标发光面、附近放置灯独立连接，并增加每帧 1–8 spp。全新安装默认不启用效果。
 
-[下载 alpha.17 安装包](https://temp.sh/KACeQ/voxellight-client-kit-26.2-0.39.0-alpha.17.zip)（临时链接）。替换旧 jar 后，进入世界执行：
+[下载 alpha.18 安装包](https://temp.sh/QpfKf/voxellight-client-kit-26.2-0.39.0-alpha.18.zip)（临时链接）。替换旧 jar 后，进入世界执行：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -40,8 +40,10 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，�
 - [环境采样](docs/RT-ENVIRONMENT.md)
 - [版本历史](docs/CHANGELOG.md)
 
-旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.17。
+旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.18。
 
 Alpha.15 validation: 246 Java tests passed; 12 shipped SPIR-V stages validated; actual Minecraft GLSL pipelines linked. Material/terrain/environment parity passed (57,600 cases / 32 cases / 400,000 samples), along with actual shader numerical boundary checks and 100,000 emitter CDF/solid-angle PDF samples. RTX visual and performance acceptance remains pending.
 
-手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。alpha.17 已通过 CPU 实际表面输运和遮挡测试，RTX 游戏画面尚待实机验收。
+手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。alpha.18 已通过 CPU 实际表面输运和遮挡测试，RTX 游戏画面尚待实机验收。
+
+使用 `/voxellight rt_spp 2` 增加每帧采样（1–8）。近期原生火把/灯笼光源最多 16 个独立连接；其他光源继续随机 NEE。

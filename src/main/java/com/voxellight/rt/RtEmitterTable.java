@@ -36,6 +36,12 @@ public final class RtEmitterTable {
         for(var t:selected){cdf+=t.mass;for(int i=0;i<3;i++){for(int j=0;j<3;j++)data.putFloat(t.vertices[i*3+j]);data.putFloat(i==0?cdf:i==1?t.area:t.mass);}data.putInt(t.index).putInt(t.instance).putInt(t.kind).putInt(0);}
         return data.flip();
     }
+    public record Proposals(ByteBuffer stochastic,ByteBuffer flames) {}
+    public static Proposals proposals(List<Triangle> source,double x,double y,double z){
+        var flames=source.stream().filter(t->t.kind==1).sorted(Comparator.comparingDouble(t->distance(t,x,y,z))).limit(16).toList();
+        var ids=new HashSet<Integer>();for(var flame:flames)ids.add(flame.index);
+        return new Proposals(pack(source.stream().filter(t->!ids.contains(t.index)).toList(),x,y,z),pack(flames,x,y,z));
+    }
     private static double distance(Triangle t,double x,double y,double z){double a=t.vertices[0]-x,b=t.vertices[1]-y,c=t.vertices[2]-z;return a*a+b*b+c*c;}
     private RtEmitterTable(){}
 }

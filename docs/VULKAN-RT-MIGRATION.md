@@ -1,3 +1,11 @@
+# 0.39.0-alpha.18 — adjacent emitter ownership, independent flames and per-frame samples
+
+Alpha.17 received user RTX acceptance: held and placed light transport is now working. The confirmed fault was Slang SPIR-V Load3 byte-address aliasing: a 12-byte indexed uint3 array acquired a 16-byte std430 stride. Scalar word loads replaced all such reads, with final SPIR-V layout rejection in the build. Earlier sky-starvation/self-shadow hypotheses were insufficient to explain the observed zero GPU incident RGB.
+
+This version queries mesh ownership inside the surface normal to avoid tagging glowstone faces as neighboring torch bodies. The nearest 16 flame sources have deterministic surface/medium connections with the same intensity as held flames; they are excluded from stochastic emitter proposals, while other sources remain stochastic. Full-block held point intensity is reduced to radiance scale 8, while flames retain 20; point/area spatial distributions remain different. Jack-o-lantern and sea lantern retain area emission.
+
+`rt_spp 1..8` controls independent full paths per frame, with distinct seeds, linear HDR averaging, bounded frozen accumulation and within-frame averaging when history is disabled. Default remains one. More samples and independent flame shadow connections cost GPU time. No AOV denoiser/reprojection is claimed; those remain separate migration work. RTX visual/performance acceptance of these changes is pending.
+
 # 0.39.0-alpha.15 — independent held-light connection
 
 Alpha.14 held lighting still failed user visual acceptance. Its delta point light shared stochastic selection with sun/sky, allowing high environment power to starve held connections. It now has a separate deterministic inverse-square connection at eligible surfaces and medium events; sky/sun distribution and complementary miss MIS exclude the delta source. Visibility and material shading remain intact; no light leaks or unconditional full-screen brightness are substituted. Status adds main/offhand item IDs and virtual source position to distinguish recognition from transport failures. Visual acceptance remains pending; no RTX GPU is available on the build host.

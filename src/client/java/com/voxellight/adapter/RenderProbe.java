@@ -90,6 +90,7 @@ public final class RenderProbe {
     public void accumulate(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulate(value);}
     public void probeLighting(){RenderSystem.assertOnRenderThread();lighting.probeLighting();}
     public void accumulateFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulateFreeze(value);}
+    public void samplesPerFrame(int value){RenderSystem.assertOnRenderThread();lighting.samplesPerFrame(value);}
     public void accumulateSpp(int value){RenderSystem.assertOnRenderThread();lighting.accumulateSpp(value);}
     public void accumulateReset(){RenderSystem.assertOnRenderThread();lighting.accumulateReset();}
     public void setVulkanMaterials(){RenderSystem.assertOnRenderThread();lighting.setVulkanMaterials();}

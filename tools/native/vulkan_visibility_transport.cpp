@@ -8,11 +8,11 @@ struct Vertex {float p[3],uv[2],n[3];unsigned tint,flags;};
 int main(){
  std::vector<Vertex> geometry;
  for(float z:{0.f,1.f}){geometry.push_back({{-4,-4,z},{0,0},{0,0,1},0xffffffff,0});geometry.push_back({{4,-4,z},{0,0},{0,0,1},0xffffffff,0});geometry.push_back({{0,4,z},{0,0},{0,0,1},0xffffffff,0});}
- constexpr unsigned palette=204, environment=palette+5*65536*4, emitter=environment+48;
+ constexpr unsigned palette=220, environment=palette+5*65536*4, emitter=environment+48;
  std::vector<unsigned> assets((emitter+64)/4);
  auto put=[&](unsigned offset,float value){std::memcpy(reinterpret_cast<char*>(assets.data())+offset,&value,4);};
- for(unsigned slot=0;slot<4;slot++){assets[slot*4]=slot==3?256:1;assets[slot*4+1]=slot==3?1280:1;assets[slot*4+2]=slot==3?palette:192+slot*4;}
- assets[192/4]=0xffffffff;assets[200/4]=128|(128<<8);assets[palette/4]=10<<8;assets[palette/4+65536]=(128<<8)|(20u<<24);
+ for(unsigned slot=0;slot<4;slot++){assets[slot*4]=slot==3?256:1;assets[slot*4+1]=slot==3?1280:1;assets[slot*4+2]=slot==3?palette:208+slot*4;}
+ assets[208/4]=0xffffffff;assets[216/4]=128|(128<<8);assets[palette/4]=10<<8;assets[palette/4+65536]=(128<<8)|(20u<<24);
  assets[12/4]=environment;assets[28/4]=environment+16;assets[44/4]=environment+32;assets[84/4]=assets[88/4]=1;
  put(108,.00006793f);put(128,0);put(132,0);put(136,2);put(140,1);put(144,20);put(148,12.4f);put(152,4.8f);
  Camera_0 camera{};camera.width_0=camera.height_0=1;camera.origin_1={0,0,.5f,1};
@@ -23,5 +23,7 @@ int main(){
  put(140,0);if(!run(1,false,"disabled held"))return 1;
  assets[124/4]=1;assets[156/4]=emitter;put(emitter+8,2);put(emitter+12,1);put(emitter+16,20);put(emitter+20,12.4f);put(emitter+24,4.8f);put(emitter+44,1);assets[(emitter+56)/4]=1;
  if(!run(1,true,"clear placed flame")||!run(2,false,"occluded placed flame"))return 1;
+ assets[124/4]=0;assets[192/4]=1;assets[196/4]=emitter;
+ if(!run(1,true,"independent placed flame")||!run(2,false,"independent placed flame occlusion"))return 1;
  std::puts("Production Slang surface transport: held and placed flame irradiance, opaque occlusion and disabled held light passed");
 }

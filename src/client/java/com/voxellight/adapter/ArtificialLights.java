@@ -50,7 +50,7 @@ final class ArtificialLights implements AutoCloseable {
     private int heldCount;
     private LightMaterials materials=LightMaterials.defaults();
     private String materialState="bundled";
-    private record Held(double x,double y,double z,int emission,LightMaterials.Color color) { }
+    private record Held(double x,double y,double z,int emission,LightMaterials.Color color,boolean flame) { }
     private void loadMaterials() {
         materials=LightMaterials.defaults();materialState="bundled";
         try(var reader=Minecraft.getInstance().getResourceManager().getResource(Identifier.fromNamespaceAndPath("voxellight","light_materials.json")).orElseThrow().openAsReader()) {
@@ -63,20 +63,20 @@ final class ArtificialLights implements AutoCloseable {
     private Held heldLight() {
         var mc=Minecraft.getInstance();var player=mc.player;
         if(!heldEnabled || player==null || player.isSpectator() || !player.isAlive())return null;
-        int emission=0;LightMaterials.Color color=LightMaterials.FALLBACK;
+        int emission=0;boolean flame=false;LightMaterials.Color color=LightMaterials.FALLBACK;
         for(var stack:List.of(player.getMainHandItem(),player.getOffhandItem())) {
             if(stack.getItem() instanceof BlockItem item) {
                 int value=item.getBlock().defaultBlockState().getLightEmission();
-                if(value>emission) {emission=value;color=materials.color(BuiltInRegistries.BLOCK.getKey(item.getBlock()).toString());}
+                if(value>emission) {emission=value;var id=BuiltInRegistries.BLOCK.getKey(item.getBlock());color=materials.color(id.toString());String name=id.getPath();flame=com.voxellight.world.HeldLightIntensity.flame(name);}
             }
         }
         if(emission==0)return null;
         var eye=player.getEyePosition(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false));
         // Virtual source near the body, not attached to the camera in third person.
-        return new Held(eye.x,eye.y-.25,eye.z,emission,color);
+        return new Held(eye.x,eye.y-.25,eye.z,emission,color,flame);
     }
 
-    float[] rtVirtualLight(){var held=heldLight();if(held==null)return new float[8];float intensity=com.voxellight.world.HeldLightIntensity.intensity(held.emission());return new float[]{(float)held.x(),(float)held.y(),(float)held.z(),1,held.color().red()*intensity,held.color().green()*intensity,held.color().blue()*intensity,0};}
+    float[] rtVirtualLight(){var held=heldLight();if(held==null)return new float[8];float intensity=com.voxellight.world.HeldLightIntensity.intensity(held.emission(),held.flame());return new float[]{(float)held.x(),(float)held.y(),(float)held.z(),1,held.color().red()*intensity,held.color().green()*intensity,held.color().blue()*intensity,0};}
     void prepare(WorldSceneBridge bridge, SectionKey camera) {
         long start = System.nanoTime();
         var stats = bridge.stats();

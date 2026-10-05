@@ -107,6 +107,10 @@ void advance(inout PathState path) {
             if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002)));
             LightSample held=sampleHeldLight(event);
             if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*visibility(event,held.wi,media,max(.001,held.distance-.002)));
+            for(uint index=0;index<flameCount();index++){
+                LightSample flame=sampleFlame(event,index);
+                if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*visibility(event,flame.wi,media,max(.001,flame.distance-.002)));
+            }
             LightSample emitter=sampleEmitter(event,seed);
             if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*visibility(event,emitter.wi,media,max(.001,emitter.distance-.002)));
         }
@@ -127,8 +131,8 @@ void advance(inout PathState path) {
         float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,emitterHitPdf(hit.triangle,path.origin.xyz,point));
         addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
         // One stochastic sky/sun sample plus an independent held delta connection.
-        for(int connection=0;connection<2;connection++){
-        LightSample light=connection==0?sampleOneLight(point,seed):sampleHeldLight(point);
+        for(int connection=0;connection<2+int(flameCount());connection++){
+        LightSample light=connection==0?sampleOneLight(point,seed):connection==1?sampleHeldLight(point):sampleFlame(point,uint(connection-2));
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
         if(connection==1){heldProbe(path,0,float4(light.radiance,light.distance));heldProbe(path,1,float4(direct.f,direct.pdf));heldProbe(path,2,float4(dot(n,light.wi),dot(surface.geometryNormal,light.wi),dot(n,wo),dot(surface.geometryNormal,wo)));}
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
