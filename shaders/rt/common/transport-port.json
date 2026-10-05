@@ -1,0 +1,6 @@
+{
+  "native/rt/bsdf.h": "ef42c14e231482b971ca095d40e39b0949c2d47edf5fc043c0034bd7b54942e6",
+  "native/rt/ggx_energy.h": "e1f96917d7fb7029e376d25bbc0ecbc3be1d232593440f17b7c0e09f86a9467a",
+  "native/rt/material.cuh": "8d6c990a55783165d36ea2c442b06ed5cad014b9f576f815ac6317e29880ddda",
+  "native/rt/surface.h": "575d1bcfe8583003eb95710f60fed0fcb6c4cbbe1f31fa0bd1d0c3753ab90c30"
+}

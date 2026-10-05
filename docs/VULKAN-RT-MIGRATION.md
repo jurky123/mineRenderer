@@ -1,4 +1,4 @@
-# Vulkan RT migration — 0.39.0-alpha.2
+# Vulkan RT migration — staged implementation ledger
 
 This release starts migration stage **1: legacy OptiX production + Vulkan POC**. It does not complete the renderer migration. Production RTX Quality remains legacy OptiX. The explicit Vulkan POC has no OptiX/CUDA renderer dependency, but only traces terrain camera rays and displays geometric normals. No PT/material/reconstruction parity or RTX 4060 Laptop performance gate has passed.
 
@@ -62,10 +62,10 @@ Use `python3 tools/benchmark_summary.py <export>.passes.csv` for per-pass p50/p9
 
 | Phase | Required implementation/evidence | State |
 | --- | --- | --- |
-| A/B | Terrain ray/normal bringup, enabled features, build-time SPIR-V, validation/layout/cache | Implemented; GPU bringup pending |
+| A/B | Terrain ray/normal bringup, enabled features, build-time SPIR-V, validation/layout/cache | Terrain normals and block edits accepted by user; static/resize/performance checks pending |
 | C | Batched BLAS builds, async compaction, entity topology/refit and transform-only updates; static zero rebuild | Terrain subset implemented; compaction/entities pending |
 | D | Primary guide/material/continuation writer + independent indirect wavefront passes, recursion 1, bounded queue ownership | Pending |
-| E | Port `native/rt/bsdf.h` + material decode/hit tangent basis without changing Material 3 semantics; fixed Cornell/gold/copper/glass/water/roughness/foliage A/B | Pending |
+| E | Port `native/rt/bsdf.h` + material decode/hit tangent basis without changing Material 3 semantics; fixed Cornell/gold/copper/glass/water/roughness/foliage A/B | Slang numeric kernels ported and CPU parity verified; hit binding and rendered A/B pending |
 | F | Existing sun/moon NEE and emissive metadata → section hierarchy/alias grid/single-frame RIS; independent primary/secondary/depth budgets | Pending |
 | G | One path per pixel/frame; optional second samples admitted by signal variance/disocclusion, measured average ≤1.5 | POC one ray only; PT/adaptive pending |
 | H | Reconstruction interface consuming GPU signals/guides with explicit availability/history/resize contracts | Selection IDs declared only; interface/implementations pending |
@@ -118,4 +118,12 @@ Alpha.6 GPU telemetry verified the raygen marker (1, .2, .8, 2), finite directio
 
 ## 0.39.0-alpha.8 — retain edited sections under the scene budget
 
-User confirmed alpha.7 terrain normals and center hit alpha=1. The scene had reached 67,108,800 bytes of its 64 MiB vertex budget. Previously replacing an edited section removed its old BLAS before rejecting a slightly larger replacement, leaving a permanent miss hole. Alpha.8 prioritizes existing-section changes, accounts their net size, evicts distant unaffected resident sections when necessary to fit an edit, and replaces/releases the old BLAS only after building its successor. Oversized/unadmitted updates retain the prior geometry. New admissions do not consume edited-section reservation; unchanged versions still skip builds. The budget counts vertex storage, not total AS/scratch allocations. Tests cover full byte/section limits and replacement net-size behavior; GPU edit acceptance remains pending.
+User confirmed alpha.7 terrain normals and center hit alpha=1. The scene had reached 67,108,800 bytes of its 64 MiB vertex budget. Previously replacing an edited section removed its old BLAS before rejecting a slightly larger replacement, leaving a permanent miss hole. Alpha.8 prioritizes existing-section changes, accounts their net size, evicts distant unaffected resident sections when necessary to fit an edit, and replaces/releases the old BLAS only after building its successor. Oversized/unadmitted updates retain the prior geometry. New admissions do not consume edited-section reservation; unchanged versions still skip builds. The budget counts vertex storage, not total AS/scratch allocations. Tests cover full byte/section limits and replacement net-size behavior; User subsequently confirmed alpha.8 placement and destruction are normal; the supplied records include both edits. Static zero-rebuild is not inferred from those editing records.
+
+## Portable transport library — unreleased
+
+`common/math`, `material`, `bsdf`, `ggx_energy`, `medium` and `surface` retain the native formulas and the exact 1,024-entry energy table. Slang has explicit initialization, mutating medium-stack methods and guarded vector normalization. Small-argument log1p/expm1 use series to preserve the native stable medium proposal in binary32. No native source, production integrator or reconstruction path is changed.
+
+`./gradlew verifyVulkanTransport` builds/validates the exercised functions as SPIR-V and compiles the same Slang into its CPU target, then compares against the existing C++ implementation. The 57,600 cases include 10 material classes, all eight LabPBR conductor presets, generic conductor, nine roughness levels, five angles and 64 seed sweeps. Evaluation/PDF, sampled direction/throughput/eta/flags, Fresnel, HG sampling, medium sampling and stack mutation, palette decoding, cutout boundaries and ray-origin offsets cover 3,225,600 scalar components. Maximum normalized error is 0.000381917, below the 0.003 gate. The test also requires finite output. Native source provenance hashes are checked before compilation, so upstream semantics cannot silently leave a stale Vulkan port. A C++17 compiler is now required for `check`; runtime requires no compiler.
+
+These are kernel tests, not Cornell images or GPU BSDF execution. The runtime Vulkan POC remains a normal view. Material hit/atlas binding, primary/indirect queues and guide generation are the next integration work; DLSS RR and the isolated denoiser are not implemented by this library.

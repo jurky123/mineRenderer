@@ -1,8 +1,12 @@
 # 0.37.6 — Reference progressive frame budget
 
+## Unreleased — Slang Material 3 transport kernels
+
+Port the existing native BSDF/GGX/VNDF/Fresnel/conductor/coating/dielectric/thin/water and medium semantics into modular Slang libraries, including five-plane decoding, exact energy table, cutout boundaries and stable ray-origin offsets. `check` validates exercised SPIR-V and executes the Slang CPU target against native code: 57,600 cases / 3,225,600 components, max normalized error 0.000381917. Native provenance hashes prevent silent drift. Runtime Vulkan remains the accepted alpha.8 terrain-normal POC; wavefront integration, rendered parity, reconstruction and default-switch performance gates are still pending.
+
 ## 0.39.0-alpha.8 — retain edited sections under the scene budget
 
-User confirmed alpha.7 terrain normals and center hit alpha=1. The scene had reached 67,108,800 bytes of its 64 MiB vertex budget. Previously replacing an edited section removed its old BLAS before rejecting a slightly larger replacement, leaving a permanent miss hole. Alpha.8 prioritizes existing-section changes, accounts their net size, evicts distant unaffected resident sections when necessary to fit an edit, and replaces/releases the old BLAS only after building its successor. Oversized/unadmitted updates retain the prior geometry. New admissions do not consume edited-section reservation; unchanged versions still skip builds. The budget counts vertex storage, not total AS/scratch allocations. Tests cover full byte/section limits and replacement net-size behavior; GPU edit acceptance remains pending.
+User confirmed alpha.7 terrain normals and center hit alpha=1. The scene had reached 67,108,800 bytes of its 64 MiB vertex budget. Previously replacing an edited section removed its old BLAS before rejecting a slightly larger replacement, leaving a permanent miss hole. Alpha.8 prioritizes existing-section changes, accounts their net size, evicts distant unaffected resident sections when necessary to fit an edit, and replaces/releases the old BLAS only after building its successor. Oversized/unadmitted updates retain the prior geometry. New admissions do not consume edited-section reservation; unchanged versions still skip builds. The budget counts vertex storage, not total AS/scratch allocations. Tests cover full byte/section limits and replacement net-size behavior; User confirmed alpha.8 placement and destruction remain visible without section-wide misses.
 
 
 ## 0.39.0-alpha.7 — nonempty AS geometry builds
