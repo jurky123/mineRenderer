@@ -87,7 +87,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             VulkanRtBuffer[] buffers={output,normals,camera};
             for(int i=0;i<3;i++) {
                 var buffer=VkDescriptorBufferInfo.calloc(1,stack).buffer(buffers[i].vkBuffer()).offset(0).range(buffers[i].size());
-                writes.get(i+1).sType$Default().dstSet(set).dstBinding(i+1).descriptorType(i==2?VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:VK_DESCRIPTOR_TYPE_STORAGE_BUFFER).pBufferInfo(buffer);
+                bufferWrite(writes.get(i+1),set,i+1,i==2?VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,buffer);
             }
             vkUpdateDescriptorSets(device.vkDevice(),writes,null);
             vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,pipeline);
@@ -95,6 +95,9 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             var raygen=region(stack,packing.raygenOffset());var miss=region(stack,packing.missOffset());var hit=region(stack,packing.hitOffset());
             vkCmdTraceRaysKHR(command,raygen,miss,hit,VkStridedDeviceAddressRegionKHR.calloc(stack),width,height,1);
         }
+    }
+    static void bufferWrite(VkWriteDescriptorSet write,long set,int binding,int type,VkDescriptorBufferInfo.Buffer info) {
+        write.sType$Default().dstSet(set).dstBinding(binding).descriptorType(type).descriptorCount(info.remaining()).pBufferInfo(info);
     }
     private VkStridedDeviceAddressRegionKHR region(MemoryStack stack,long offset) {return VkStridedDeviceAddressRegionKHR.calloc(stack).deviceAddress(sbtBase+offset).stride(packing.stride()).size(packing.stride());}
     private static byte[] load(String stage) {

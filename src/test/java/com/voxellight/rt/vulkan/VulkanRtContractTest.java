@@ -24,6 +24,19 @@ class VulkanRtContractTest {
         assertTrue(calls.indexOf("displayVulkanRt")<calls.indexOf("endFrame"),"Debug view requires the current camera projection");
     }
 
+    @Test void rtBufferDescriptorsActuallyWriteOneBinding() {
+        try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
+            for(int binding=1;binding<=3;binding++) {
+                var info=org.lwjgl.vulkan.VkDescriptorBufferInfo.calloc(1,stack).buffer(123).offset(0).range(binding==3?96:4096);
+                var write=org.lwjgl.vulkan.VkWriteDescriptorSet.calloc(stack);
+                int type=binding==3?org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                VulkanRtPipeline.bufferWrite(write,456,binding,type,info);
+                assertEquals(1,write.descriptorCount());assertEquals(binding,write.dstBinding());assertEquals(type,write.descriptorType());
+                assertEquals(123,write.pBufferInfo().get(0).buffer());assertEquals(info.get(0).range(),write.pBufferInfo().get(0).range());
+            }
+        }
+    }
+
     @Test void driverSizedArraysDoNotConsumeTheThreadStack() {
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
             // Leave very little stack space, as in nested Minecraft device initialization.
