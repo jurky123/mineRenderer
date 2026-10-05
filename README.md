@@ -12,6 +12,8 @@ Reference now processes small adaptive windows per display frame instead of subm
 
 Open **Pause/Options → VoxelLight** or `/voxellight settings` for searchable vanilla controls and saved preferences. Reference mode now enables RTX automatically and shows convergence progress. [Settings guide](docs/SETTINGS.md).
 
+Alpha.7 follows the alpha.6 ~16 s user GPU cold startup with viewport context reuse and reference convergence fixes. `/voxellight rt_reference spp N` sets a cumulative reference target; enable it with `/voxellight rt_reference on`. Realtime remains 1 spp/frame. Visual and warm-cache acceptance remain open. [Follow-up and test steps](docs/REFERENCE-0.38-ALPHA7.md).
+
 ## 文档
 
 - [Material 3](docs/MATERIAL-3.md)：material classes、LabPBR、coating、Vanilla presets、override API。

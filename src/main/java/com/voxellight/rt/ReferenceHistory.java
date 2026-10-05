@@ -3,6 +3,8 @@ import com.voxellight.world.VisualQuality;
 /** Reference accumulation is reset by changes, never by unchanged per-frame configuration. */
 public final class ReferenceHistory {
     private boolean dirty=true;
+    private long resets;
+    public long resets(){return resets;}
     private VisualQuality quality=VisualQuality.BALANCED;
     private float[] camera;
     public static boolean samePose(float[] a,float[] b){if(a==null||b==null||a.length!=16||b.length!=16)return false;for(int i=0;i<16;i++)if(!Float.isFinite(a[i])||!Float.isFinite(b[i])||Math.abs(a[i]-b[i])>.0001f)return false;return true;}
@@ -16,6 +18,6 @@ public final class ReferenceHistory {
             // Compare with the accumulated pose so sub-threshold motion cannot drift indefinitely.
             if(dirty)camera=pose.clone();
         }else camera=null;
-        boolean reset=dirty;dirty=false;return reset;
+        boolean reset=dirty;dirty=false;if(reset)resets++;return reset;
     }
 }

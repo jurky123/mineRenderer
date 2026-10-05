@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class ReferenceHistoryTest {
     @Test void unchangedPerFrameQualityDoesNotResetConvergence(){
         var history=new ReferenceHistory();float[] pose=new float[16];
-        assertTrue(history.consume(pose,true));
+        assertTrue(history.consume(pose,true));assertEquals(1,history.resets());
         for(int frame=0;frame<300;frame++){history.quality(VisualQuality.BALANCED);assertFalse(history.consume(pose,true));}
-        history.quality(VisualQuality.HIGH);assertTrue(history.consume(pose,true));assertFalse(history.consume(pose,true));
+        assertEquals(1,history.resets());history.quality(VisualQuality.HIGH);assertTrue(history.consume(pose,true));assertFalse(history.consume(pose,true));
     }
     @Test void motionResetsOnceAndTinyDriftCannotAccumulateUnchecked(){
         var history=new ReferenceHistory();float[] pose=new float[16];history.consume(pose,true);

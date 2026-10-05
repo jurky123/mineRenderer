@@ -1,5 +1,9 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.38.0-alpha.7
+
+Retain compiled OptiX pipelines and world geometry on viewport resize; rebuild only frame imports/denoiser resources. Preserve reference sums on positive SPP target changes, report command semantics, expose reference reset count, and let measured reference windows grow to 8192 pixels. Alpha.6 user GPU cold startup ~16 s; cache persistence and rendering correctness remain open. See [follow-up](REFERENCE-0.38-ALPHA7.md).
+
 ## 0.38.0-alpha.6 — callable compiler boundaries (acceptance candidate)
 
 Alpha.5 diffuse compiled to 62,994 instructions and canceled after 267.3 s. Move the existing integrator/visibility out of raygens into continuation callable modules; move BSDF evaluation/sampling to direct callable programs. Add callable groups/SBT, depth-aware stack sizing, strict lazy reference transport and NVRTC export validation. Log successful driver graph/cache feedback and explicit timeout/fallback/cleanup state. Windows/Linux builds and 253 host tests pass; real GPU startup/cache/correctness/runtime gates remain pending. [Architecture and limitations](OPTIX-COMPILATION-0.38-ALPHA6.md).

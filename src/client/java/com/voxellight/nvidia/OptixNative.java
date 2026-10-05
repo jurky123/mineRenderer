@@ -20,5 +20,6 @@ public final class OptixNative {
  public static native void benchmark(long context);
  public static native long[] stats(long context);
  public static native long[] timings(long context);
+ public static native void releaseFrame(long context);
  public static native void destroy(long context);
 }
