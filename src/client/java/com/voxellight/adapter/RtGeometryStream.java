@@ -8,13 +8,6 @@ import java.util.*;
 public final class RtGeometryStream {
  public record Section(SectionKey key,long version,byte[] triangles){public int vertices(){return triangles.length/40;}}
  private static boolean enabled;
- private record EmissionAtlas(int[] prefix,int width,int height){boolean emits(float u0,float v0,float u1,float v1){int x0=Math.clamp((int)(u0*width),0,width),x1=Math.clamp((int)(u1*width)+1,0,width),y0=Math.clamp((int)(v0*height),0,height),y1=Math.clamp((int)(v1*height)+1,0,height),stride=width+1;return prefix[y1*stride+x1]-prefix[y0*stride+x1]-prefix[y1*stride+x0]+prefix[y0*stride+x0]>0;}}
-
- private static volatile EmissionAtlas emissionAtlas;
- static void emissionAtlas(ByteBuffer ids,int width,int height){int[] prefix=new int[(width+1)*(height+1)];for(int y=0;y<height;y++){int row=0;for(int x=0;x<width;x++){row+=ids.get((y*width+x)*4+2)!=0?1:0;prefix[(y+1)*(width+1)+x+1]=prefix[y*(width+1)+x+1]+row;}}emissionAtlas=new EmissionAtlas(prefix,width,height);}
-
- static void clearEmissionAtlas(){emissionAtlas=null;}
- private static byte[] withEmissionHints(byte[] triangles){var atlas=emissionAtlas;if(atlas==null)return triangles;byte[] result=triangles.clone();var b=ByteBuffer.wrap(result).order(ByteOrder.nativeOrder());for(int t=0;t+120<=result.length;t+=120){float u0=1,v0=1,u1=0,v1=0;for(int j=0;j<3;j++){float a=b.getFloat(t+j*40+12),c=b.getFloat(t+j*40+16);u0=Math.min(u0,a);u1=Math.max(u1,a);v0=Math.min(v0,c);v1=Math.max(v1,c);}boolean emits=atlas.emits(u0,v0,u1,v1);if(emits)for(int j=0;j<3;j++){int offset=t+j*40+36;b.putInt(offset,b.getInt(offset)|32);}}return result;}
 
  private record Snapshot(SectionKey key,long revision,long generation){}
  private static final Map<RenderSectionRegion,Snapshot> snapshots=Collections.synchronizedMap(new WeakHashMap<>());
@@ -28,7 +21,7 @@ public final class RtGeometryStream {
  private static final LinkedHashMap<SectionKey,Section> pending=new LinkedHashMap<>();
  private RtGeometryStream(){}
  public static synchronized long epoch(){return epoch;}
- public static synchronized void enable(boolean value){enabled=value;com.voxellight.rt.RtInvalidationQueue.enabled(value);pending.clear();snapshots.clear();bytes=0;epoch++;RtDynamicStream.clear();}
+ public static synchronized void enable(boolean value){enabled=value;com.voxellight.rt.RtInvalidationQueue.enabled(value);pending.clear();snapshots.clear();bytes=0;epoch++;}
  public static synchronized boolean enabled(){return enabled;}
  public static void compiled(int x,int y,int z,SectionCompiler.Results results,long generation,RenderSectionRegion region){
   synchronized(RtGeometryStream.class){if(!enabled||generation!=epoch||!current(region))return;}
@@ -57,6 +50,5 @@ public final class RtGeometryStream {
  }
  private static long geometryVersion(byte[] bytes){long hash=0xcbf29ce484222325L;for(byte b:bytes){hash^=b&255;hash*=0x100000001b3L;}return hash;}
  public static synchronized List<Section> drain(int limit){var result=new ArrayList<Section>();var i=pending.values().iterator();while(i.hasNext()&&result.size()<limit){var section=i.next();result.add(section);bytes-=section.triangles.length;i.remove();}return result;}
- public static ByteBuffer batch(List<Section> sections){int size=0;for(var section:sections)size=Math.addExact(size,32+section.triangles.length);var out=ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder());for(var section:sections){byte[] triangles=withEmissionHints(section.triangles);var k=section.key;long id=((long)(k.x()&0x3fffff)<<42)|((long)(k.z()&0x3fffff)<<20)|(k.y()&0xfffff);out.putLong(id).putInt(k.x()).putInt(k.y()).putInt(k.z()).putInt(section.vertices()).putLong(geometryVersion(triangles)).put(triangles);}return out.flip();}
  public static synchronized int pending(){return pending.size();}
 }

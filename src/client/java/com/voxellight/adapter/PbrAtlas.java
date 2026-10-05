@@ -75,7 +75,6 @@ final class PbrAtlas implements AutoCloseable {
                 finally{if(spec!=null)spec.close();if(norm!=null)norm.close();}
             }
             for(int i=0;i<values.size();i++)for(int plane=0;plane<5;plane++)lut.putInt((plane*65536+i)*4,values.get(i)[plane]);profiles=values.size();bytes=(long)w*h*8+256*1280*4;
-            RtGeometryStream.emissionAtlas(ids,w,h);
             ByteBuffer[] data={ids,normal,lut};var d=RenderSystem.getDevice();var encoder=d.createCommandEncoder();
             for(int i=0;i<3;i++){int tw=i==2?256:w,th=i==2?1280:h;textures[i]=d.createTexture("VoxelLight PBR atlas "+i,GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA8_UNORM,tw,th,1,1);views[i]=d.createTextureView(textures[i]);encoder.writeToTexture(textures[i],data[i],0,0,0,0,tw,th);}
             buildNs=System.nanoTime()-started;
@@ -84,5 +83,5 @@ final class PbrAtlas implements AutoCloseable {
     float[] waterMedium(){return waterMedium.mediumTable();}
     GpuTextureView view(int i){return views[i];}
     String status(){return ", pbrProfiles="+profiles+", labPbrSprites="+maps+", pbrPaletteOverflow="+overflows+", pbrAtlasBytes="+bytes+", pbrAtlasBuildNs="+buildNs;}
-    @Override public void close(){RtGeometryStream.clearEmissionAtlas();for(int i=0;i<3;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(textures[i]!=null){textures[i].close();textures[i]=null;}}maps=profiles=overflows=0;bytes=0;}
+    @Override public void close(){for(int i=0;i<3;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(textures[i]!=null){textures[i].close();textures[i]=null;}}maps=profiles=overflows=0;bytes=0;}
 }

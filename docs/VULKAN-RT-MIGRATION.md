@@ -1,3 +1,11 @@
+# 0.39.0-alpha.13 — Vulkan-only tracing and stationary accumulation
+
+User authorized deletion of old tracing after alpha.12 acceptance. The current runtime and kit contain no OptiX/CUDA tracer, JNI tracing bridge or runtime PTX compiler. Historical legacy-removal gates below are superseded by this authorization. Canonical BSDF/material/environment mathematics remain parity fixtures; unchanged water math is extracted into `native/rt/water_surface.h`. Independent `native/denoiser/temporal_aov.h` preserves temporal diffuse/reflection/refraction AOV invocation (SDK syntax-checked), but no denoiser is connected to Vulkan output yet.
+
+Stationary linear HDR averaging defaults to 64 spp, configurable 4–4096 with `rt_accumulate spp`; `on/off/reset` control history. Moving/rotating, projection/size changes, scene generation/block invalidations and resource/world/backend resets reject history. Increasing target retains samples. Two RGBA32F ping-pong attachments keep history entirely on GPU; sample zero never reads stale history. Sky/light/animated albedo/water assets freeze for each snapshot. Scene updates/warmup continue after convergence, and accepted changes restart tracing. Normal view bypasses accumulation; no motion reprojection/denoising is claimed. Old preferences migrate, UI progress and kit instructions reflect the new path.
+
+Check stationary convergence, raising target, movement, edits, F3+T, resize, disable/re-enable on RTX. Remaining emitter NEE, dynamic geometry, reconstruction and performance gates still apply.
+
 # Vulkan RT migration — staged implementation ledger
 
 ## 0.39.0-alpha.12 — shared environment and direct-light transport
@@ -190,3 +198,5 @@ User confirmed alpha.7 terrain normals and center hit alpha=1. The scene had rea
 `./gradlew verifyVulkanTransport` builds/validates the exercised functions as SPIR-V and compiles the same Slang into its CPU target, then compares against the existing C++ implementation. The 57,600 cases include 10 material classes, all eight LabPBR conductor presets, generic conductor, nine roughness levels, five angles and 64 seed sweeps. Evaluation/PDF, sampled direction/throughput/eta/flags, Fresnel, HG sampling, medium sampling and stack mutation, palette decoding, cutout boundaries and ray-origin offsets cover 3,225,600 scalar components. Maximum normalized error is 0.000381917, below the 0.003 gate. The test also requires finite output. Native source provenance hashes are checked before compilation, so upstream semantics cannot silently leave a stale Vulkan port. A C++17 compiler is now required for `check`; runtime requires no compiler.
 
 These are kernel tests, not Cornell images or GPU BSDF execution. The runtime Vulkan POC remains a normal view. Material hit/atlas binding, primary/indirect queues and guide generation are the next integration work; DLSS RR and the isolated denoiser are not implemented by this library.
+
+Alpha.13 validation: build/clientKit passed, 241 tests with zero failures; actual accumulation GLSL links against Minecraft bindings, packaged-artifact regression rejects legacy tracer/native compiler payloads. Material/terrain/environment Slang-native parity remains unchanged (57,600 cases / 32 cases / 300,000 samples). Independent temporal AOV header syntax-check passed against the installed OptiX/CUDA SDK. RTX visual acceptance remains pending.

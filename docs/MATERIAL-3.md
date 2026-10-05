@@ -1,3 +1,5 @@
+> alpha.13 runtime update: legacy tracing and commands below are historical. Current commands and stationary accumulation are documented in [SETTINGS.md](SETTINGS.md). Vulkan owns tracing; OptiX denoising is not connected yet.
+
 # Material 3.0 — VoxelLight 0.37
 
 Material data selects a scattering model. The native BSDF owns evaluation, sampling and probability density; the integrator owns light transport. Raster primary visibility, single-raster MRT, incremental OptiX GAS/IAS and the existing Performance fallback remain in place.

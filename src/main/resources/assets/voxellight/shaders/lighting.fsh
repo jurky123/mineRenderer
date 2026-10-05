@@ -280,10 +280,6 @@ vec3 srgbToLinear(vec3 c) {
     return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, lessThanEqual(c, vec3(0.04045)));
 }
 float energy(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-uniform sampler2D RtSunVisibility;
-uniform sampler2D RtCoverage;
-uniform sampler2D RtGeometryNormal;
-uniform sampler2D RtSurfaceKey;
 uniform sampler2D MaterialPbr;
 uniform sampler2D MaterialTable;
 layout(std140) uniform PbrSettings { vec4 PbrControls; };
@@ -350,9 +346,6 @@ void main() {
         albedo*=1.0-wet*porosity*.18;
         coatWeight=max(coatWeight,wet*(1.0-porosity)*.6);if(wet>0.0){coatIor=1.333;coatAlpha=.025;}
     }
-    bool rtValid=false;
-    if(PbrControls.w>0.0){vec4 cover=texture(RtCoverage,texCoord);rtValid=cover.a>.5&&texture(RtSunVisibility,texCoord).a>.5&&texture(RtSurfaceKey,texCoord).x==float(idBytes.x+256*idBytes.y)&&abs(dot(normal,cover.xyz-position))<max(.025,.0008*distanceToCamera)&&dot(normal,texture(RtGeometryNormal,texCoord).xyz)>.95&&length(cover.xyz-position)<max(.15,8.0*max(length(dFdx(position)),length(dFdy(position))))&&(flags&16)==0;}
-    int rtOwner=rtValid?int(PbrControls.w):0;
     vec3 viewDirection=normalize(-position);
     if(PbrControls.z>.5) {
         vec3 debugColor=PbrControls.z<1.5?vec3(alpha):PbrControls.z<2.5?(metal?vec3(1,.65,.1):vec3(.15)):shadingNormal*.5+.5;
@@ -408,14 +401,12 @@ void main() {
     vec3 ambient=vec3(0.012)+sky+blockBaseline*(1.0-replacement);
     vec3 sunSpecular=usePbr&&hasGloss?DirectColorStrength.rgb*DirectColorStrength.a*skyAccess*ggx(shadingNormal,viewDirection,LightDirectionAndMask.xyz,f0,alpha):vec3(0);
     vec3 reflected=reflect(-viewDirection,shadingNormal);
-    vec3 environmentSpecular=usePbr&&hasGloss&&(rtOwner&2)==0?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*(f0+(max(vec3(1.0-sqrt(alpha)),f0)-f0)*pow(1.0-max(dot(shadingNormal,viewDirection),0.0),5.0))*mix(1.0,.15,alpha)*ao:vec3(0);
+    vec3 environmentSpecular=usePbr&&hasGloss?mix(HorizonColorLower.rgb,SkyColorStrength.rgb,max(reflected.y,0.0))*SkyColorStrength.a*skyAccess*(f0+(max(vec3(1.0-sqrt(alpha)),f0)-f0)*pow(1.0-max(dot(shadingNormal,viewDirection),0.0),5.0))*mix(1.0,.15,alpha)*ao:vec3(0);
     float coatF0=pow((coatIor-1.0)/(coatIor+1.0),2.0);float coatAttenuation=1.0-coatWeight+coatWeight*(1.0-fresnel(vec3(coatF0),max(dot(shadingNormal,viewDirection),0.0)).r)*(1.0-fresnel(vec3(coatF0),max(directFacing,0.0)).r);
     conductorType=0;vec3 coatSpecular=usePbr?DirectColorStrength.rgb*DirectColorStrength.a*skyAccess*coatWeight*ggx(shadingNormal,viewDirection,LightDirectionAndMask.xyz,vec3(coatF0),coatAlpha):vec3(0);
     vec3 directContribution=(albedo*diffuseWeight*direct+sunSpecular)*coatAttenuation+coatSpecular;
-    if((rtOwner&1)!=0)ambient=blockBaseline*(1.0-replacement); // direct local baseline stays raster; GI skips primary-to-emitter emission
     // RT primary glossy NEE owns both block emitters and the held point source.
-    if((rtOwner&2)!=0){selectedSpecular=vec3(0);if((rtOwner&64)!=0)heldSpecular=vec3(0);}
-    vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*((rtOwner&4)!=0?texture(RtSunVisibility,texCoord).rgb:vec3(visibility))+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
+    vec3 radiance=albedo*diffuseWeight*(ambient*ao*(usePbr?pbr.a:1.0)+selectedLocal*replacement+heldLocal)+directContribution*vec3(visibility)+selectedSpecular*replacement+heldSpecular+environmentSpecular+emission;
     float waterDepth=texture(WaterSurfaceDepth,texCoord).r;
     vec3 waterPosition=waterDepth>0.0?(ViewToWorld*vec4(reconstruct(texCoord,waterDepth,InvProjection),1)).xyz:vec3(0);
     bool belowWater=(waterDepth>depth&&waterPosition.y>position.y+.02)||UnderwaterControls.x>.5;
@@ -423,7 +414,7 @@ void main() {
     if(belowWater && UnderwaterControls.y>.5 && position.y<waterTop && normal.y>.0) {
         float depthBelow=waterTop-position.y;
         float caustic=causticPattern(position)*exp(-depthBelow*.18)*max(normal.y,0.0)*skyAccess;
-        if(rtOwner==0)radiance+=albedo*DirectColorStrength.rgb*DirectColorStrength.a*visibility*caustic*.7;
+        radiance+=albedo*DirectColorStrength.rgb*DirectColorStrength.a*visibility*caustic*.7;
     }
     fragColor = vec4(radiance, 1.0);
 #ifdef TEMPORAL_SHADOW

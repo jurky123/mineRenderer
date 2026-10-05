@@ -1,3 +1,5 @@
+> alpha.13 runtime update: legacy tracing and commands below are historical. Current commands and stationary accumulation are documented in [SETTINGS.md](SETTINGS.md). Vulkan owns tracing; OptiX denoising is not connected yet.
+
 # Shared HDR RT environment
 
 Vulkan migration alpha.12 also uses this exact shared HDR shader and palette. Its independent GPU fragment reductions construct cell/row CDFs in a packed Vulkan storage buffer; the Slang sampler uses the same cell solid angles and conditional proposal as `native/rt/environment.h`. Sun/moon/environment/held-light NEE and complementary miss MIS are now connected in `vulkan_pt`. This is still an experimental unreconstructed material path; runtime OptiX environment generation is not used by it. Actual cloud shadow transmittance at each surface, emitter NEE and performance gates remain pending.

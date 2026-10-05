@@ -17,22 +17,29 @@ public final class RendererPreferences {
         String[] parts=input.substring(11).trim().split(" +",2);
         if(parts.length!=2)return false;
         String key=parts[0],value=parts[1];
-        if(key.equals("rt_reference")){
-            if(value.startsWith("spp ")){key="rt_reference spp";value=value.substring(4);}
+        if(obsolete(key))return false;
+        if(key.equals("rt_accumulate")){
+            if(value.startsWith("spp ")){key="rt_accumulate spp";value=value.substring(4);}
             else if(value.equals("reset"))return false;
         }
-        if(key.equals("rt_reference_full")&&value.startsWith("scale ")){key="rt_reference_full scale";value=value.substring(6);}
         if(key.equals("preset"))current.clear();
         current.put(key,value);
         if(!persist||!persistent(key))return false;
         if(key.equals("preset"))saved.clear();
         saved.remove(key);saved.put(key,value);return true;
     }
-    private static boolean persistent(String key){return key.equals("rt_reference spp")||(!key.contains("debug")&&!key.equals("rt_reference")&&!key.equals("rt_reference_full")&&!Set.of("scene","profile","export","settings","status","rt_benchmark","pathtrace_freeze").contains(key));}
+    private static boolean obsolete(String key){return key.startsWith("pathtrace")||key.startsWith("rt_reference")||Set.of("rt_gi","rt_reflections","rt_transmission","rt_denoiser","radiance_cache","rt_caustics","rt_primary_glossy_nee","rt_environment","rt_multiscatter","rt_firefly_clamp","rt_benchmark","rt_debug").contains(key);}
+    private static boolean persistent(String key){return !obsolete(key)&&!key.contains("debug")&&!Set.of("scene","profile","export","settings","status").contains(key);}
     public void load(Path file)throws IOException{
         if(!Files.exists(file))return;
         Map<String,String> loaded=new Gson().fromJson(Files.readString(file),new TypeToken<LinkedHashMap<String,String>>(){}.getType());
-        if(loaded!=null)for(var entry:loaded.entrySet())if(entry.getKey()!=null&&entry.getValue()!=null&&persistent(entry.getKey()))saved.put(entry.getKey(),entry.getValue());
+        if(loaded!=null)for(var entry:loaded.entrySet()){
+            String key=entry.getKey(),value=entry.getValue();if(key==null||value==null)continue;
+            if(key.equals("rt_reference spp"))key="rt_accumulate spp";
+            if(key.equals("preset")&&value.equals("rtx_quality"))value="vulkan_quality";
+            if(key.equals("rt_backend")&&(value.equals("optix_rt")||value.equals("cuda_voxel_reference")))value="vulkan_pt";
+            if(persistent(key))saved.put(key,value);
+        }
     }
     public void save(Path file)throws IOException{
         Files.createDirectories(file.getParent());Path temporary=Files.createTempFile(file.getParent(),"settings-",".json");

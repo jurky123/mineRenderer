@@ -18,9 +18,7 @@ def main():
     executable=output/'transport_parity'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_transport_parity.cpp'),'-o',str(executable)],check=True)
     result=subprocess.check_output([str(executable)],text=True)
-    native=(ROOT/'native/rt/device.cuh').read_text()
-    start=native.index('static __forceinline__ __device__ float hash2(');end=native.index('static __forceinline__ __device__ float smooth(',start)
-    (output/'water_fixture_native.h').write_text(native[start:end])
+    (output/'water_fixture_native.h').write_text((ROOT/'native/rt/water_surface.h').read_text())
     source=ROOT/'shaders/rt/tests/terrain_material_parity.slang'
     spv=output/'terrain_material_parity.spv'
     subprocess.run([compiler,str(source),'-target','spirv','-profile','spirv_1_5','-entry','terrain_material_parity','-stage','compute','-o',str(spv)],check=True)

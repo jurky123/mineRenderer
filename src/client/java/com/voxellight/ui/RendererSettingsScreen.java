@@ -69,10 +69,10 @@ public final class RendererSettingsScreen extends Screen {
         super.extractRenderState(graphics,mouseX,mouseY,partial);
         graphics.centeredText(font,title,width/2,12,0xffffffff);
         if(status.isEmpty())status=VoxelLightClient.probe().status();
-        java.util.regex.Matcher progress=java.util.regex.Pattern.compile("rtReferenceSamples=([0-9]+).*?rtReference=(true|false), rtReferenceTargetSpp=([0-9]+)").matcher(status);
-        String line=progress.find()?"Reference: "+(progress.group(2).equals("true")?progress.group(1)+" / "+progress.group(3)+" spp":"off"):"RTX inactive — select RTX Quality or Reference on";
-        if(status.contains("unsupported backend"))line="RTX requires Vulkan; change Minecraft graphics backend and restart.";
-        var failure=java.util.regex.Pattern.compile("rt=(RTX unavailable[^,]*)").matcher(status);if(failure.find())line=font.plainSubstrByWidth(failure.group(1),width-16);
+        java.util.regex.Matcher progress=java.util.regex.Pattern.compile("stationaryAccumulation=(true|false), accumulatedSpp=([0-9]+)/([0-9]+)").matcher(status);
+        String line=progress.find()?"Stationary accumulation: "+(progress.group(1).equals("true")?progress.group(2)+" / "+progress.group(3)+" spp":"off"):"Select Vulkan PT to accumulate";
+        if(!status.contains("vulkanRtPoc=true"))line="Select Vulkan PT to accumulate";
+        if(status.contains("unsupported backend"))line="Vulkan PT requires Vulkan; change graphics API and restart.";
         graphics.centeredText(font,RendererSettings.error().isEmpty()?line:font.plainSubstrByWidth(RendererSettings.error(),width-16),width/2,height-28,RendererSettings.error().isEmpty()?0xffcccccc:0xffff7777);
     }
     @Override public void tick(){super.tick();if(++statusTicks%20==0)status=VoxelLightClient.probe().status();}

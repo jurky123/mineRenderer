@@ -3,18 +3,11 @@
 #include "../environment.h"
 #include "../light_sampling.h"
 #include <vector>
-#include "../dispatch.h"
 #include <cassert>
 #include <iostream>
 using namespace rt;
 static bool finite(Vec a){return std::isfinite(a.x)&&std::isfinite(a.y)&&std::isfinite(a.z);}
 int main(){
- for(unsigned pixels:{1u,65u,8193u,640u*338u}){ReferenceSweep sweep;unsigned total=0;while(sweep.samples<4){unsigned count=sweep.count(pixels,4,64);assert(count>0&&count<=64);total+=count;sweep.advance(pixels,count);}assert(total==pixels*4&&sweep.offset==0&&sweep.count(pixels,4,64)==0);sweep.reset();assert(sweep.offset==0&&sweep.samples==0);}
- assert(referenceBudget(64,20000000)==32&&referenceBudget(8,99999999)==8&&referenceBudget(64,1000000)==128&&referenceBudget(1024,1)==2048&&referenceBudget(8192,1)==8192&&referenceBudget(64,10000000)==64);
-
- for(unsigned target:{4u,256u,4096u}){unsigned samples=0;while(samples<target){assert(referenceBatch(target,samples)==1);samples+=referenceBatch(target,samples);}assert(samples==target&&referenceBatch(target,samples)==0);assert(referenceBatch(target,target+1)==0);}
- for(unsigned pixels:{1u,8192u,8193u,640u*360u}){unsigned covered=0;while(covered<pixels){auto chunk=referenceChunk(pixels,covered);assert(chunk>0&&chunk<=8192&&covered+chunk<=pixels);covered+=chunk;}assert(covered==pixels&&referenceChunk(pixels,covered)==0);}
-
  assert(!cutoutVisible(127,255,0)&&cutoutVisible(128,255,0));assert(!cutoutVisible(25,255,16)&&cutoutVisible(26,255,16));assert(!cutoutVisible(255,127,0));assert(cutoutVisible(200,163,0));
  // UV-derived frames preserve material U/V axes, including mirrored UV handedness.
  {Frame f(V(0,0,1),V(0,1,0),V(1,0,0));assert(dot(f.t,V(0,1,0))>.999f&&dot(f.b,V(1,0,0))>.999f);

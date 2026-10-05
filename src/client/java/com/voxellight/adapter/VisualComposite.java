@@ -42,7 +42,6 @@ final class VisualComposite implements AutoCloseable {
         }
         return true;
     }
-    private boolean fullReference;void fullReference(boolean value){fullReference=value;}
     boolean polished(){return polished;}
     boolean needsMotion(){return polished&&(clouds.enabled()||volumetricEnabled&&volumetric.needsMotion());}
     void setPolished(boolean value){polished=value;}
@@ -66,14 +65,11 @@ final class VisualComposite implements AutoCloseable {
 
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuTextureView source,GpuBuffer environment,AmbientOcclusionPass ao,boolean terrain,EnvironmentPass weather,MotionFrame motion) {
         if(terrain)bloom.render(encoder,output,material,polished && bloomEnabled);
-        water.capture(encoder,output,source,shadows,terrain,polished && (waterEnabled||rtTransmission!=null) && !ao.debug());
+        water.capture(encoder,output,source,shadows,terrain,polished && waterEnabled && !ao.debug());
         display(encoder,output,shadows,material,source,environment,ao,weather,motion,terrain);
     }
-    private GpuTextureView rtTransmission;
-    void setRtGuides(GpuTextureView p,GpuTextureView n,GpuTextureView key,GpuTextureView ids){water.setRtGuides(p,n,key,ids);}
-    void setRtTransmission(GpuTextureView view){rtTransmission=view;water.setRtTransmission(view);}
     void prepareWater(RenderTarget target,ShadowRenderer shadows,GpuBuffer environment,AmbientOcclusionPass ao,EnvironmentPass weather) {
-        water.prepareTranslucent(target,shadows,visualSettings,atmosphereSettings,environment,weather.settings(),bloom,polished && (waterEnabled||rtTransmission!=null) && !ao.debug());
+        water.prepareTranslucent(target,shadows,visualSettings,atmosphereSettings,environment,weather.settings(),bloom,polished && waterEnabled && !ao.debug());
     }
     void usePyramid(DepthPyramid shared){water.usePyramid(shared);}
     boolean bindWater(RenderPass pass){return water.bind(pass);}
@@ -91,16 +87,16 @@ final class VisualComposite implements AutoCloseable {
             encoder.writeToBuffer(atmosphereSettings.slice(),Std140Builder.onStack(stack,Atmosphere.SETTINGS_BYTES)
                     .putVec4(Atmosphere.weatherDensity(atmosphereDensity,sky.rainBrightness),
                             mc.level==null?0:(float)(mc.gameRenderer.mainCamera().position().y-mc.level.getSeaLevel()),atmosphereActive?1:0,Atmosphere.MAX_DISTANCE)
-                    .putVec4(Atmosphere.weatherDensity(volumeDensity,sky.rainBrightness),forwardStrength,clouds.active()?1:0,rtTransmission==null?0:1).get());
+                    .putVec4(Atmosphere.weatherDensity(volumeDensity,sky.rainBrightness),forwardStrength,clouds.active()?1:0,0).get());
             encoder.writeToBuffer(visualSettings.slice(),Std140Builder.onStack(stack,VisualPolish.SETTINGS_BYTES)
                     .putVec4(polished?VisualPolish.exposure(exposureEv):1,polished?1:0,polished && bloomEnabled?VisualPolish.BLOOM_STRENGTH:0,coverageBlendActive?1:0)
-                    .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,fullReference?1:0,0).get());
+                    .putVec4(VisualPolish.FADE_START,VisualPolish.FADE_END,0,0).get());
         }
         if(terrain)volumetric.render(encoder,output,material,shadows,atmosphereSettings,environment,weather,motion,(atmosphereActive && (atmosphereDensity>0||volumeDensity>0) || weather.submerged()) && volumetricEnabled && !ao.debug());
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         try (var profile = RenderPassProfile.begin(encoder,"tone_composite"); var pass = encoder.createRenderPass(() -> "VoxelLight tone mapping and native fog",output.getColorTextureView(),Optional.empty())) {
             pass.setPipeline(OUTPUT);
-            pass.bindTexture("LightingHdr",source,nearest);clouds.bind(pass,source);pass.bindTexture("RtTransmissionScene",rtTransmission==null?source:rtTransmission,nearest);
+            pass.bindTexture("LightingHdr",source,nearest);clouds.bind(pass,source);
             bloom.bind(pass);
             volumetric.bind(pass);
             pass.setUniform("VisualSettings",visualSettings);
@@ -119,7 +115,7 @@ final class VisualComposite implements AutoCloseable {
         return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/lighting_output"))
                 .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))
                 .withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","lighting_output"))
-                .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtTransmissionScene").withSampler("VoxelCloud").withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withSampler("MaterialNormal").withSampler("VolumetricScatter").withUniform("VolumetricSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
+                .withBindGroupLayout(BindGroupLayout.builder().withSampler("VoxelCloud").withSampler("LightingHdr").withSampler("SceneDepth").withSampler("EmissiveBloom").withSampler("MaterialEmission").withSampler("MaterialNormal").withSampler("VolumetricScatter").withUniform("VolumetricSettings",UniformType.UNIFORM_BUFFER).withUniform("VisualSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("AtmosphereSettings",UniformType.UNIFORM_BUFFER).withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("LightingEnvironment",UniformType.UNIFORM_BUFFER)
                         .withUniform("Projection",UniformType.UNIFORM_BUFFER).withUniform("ShadowResolveSettings",UniformType.UNIFORM_BUFFER)
                         .withUniform("Fog",UniformType.UNIFORM_BUFFER).withUniform("AoSettings",UniformType.UNIFORM_BUFFER).build())

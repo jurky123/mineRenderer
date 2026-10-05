@@ -86,20 +86,14 @@ public final class RenderProbe {
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
+    public void setRaster(){RenderSystem.assertOnRenderThread();lighting.setRaster();}
+    public void accumulate(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulate(value);}
+    public void accumulateSpp(int value){RenderSystem.assertOnRenderThread();lighting.accumulateSpp(value);}
+    public void accumulateReset(){RenderSystem.assertOnRenderThread();lighting.accumulateReset();}
     public void setVulkanMaterials(){RenderSystem.assertOnRenderThread();lighting.setVulkanMaterials();}
     public void setVulkanTransportTest(){RenderSystem.assertOnRenderThread();lighting.setVulkanTransportTest();}
     public void setVulkanRtPoc(){RenderSystem.assertOnRenderThread();lighting.setVulkanRtPoc();}
-    public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
-    public void setRtOption(String option,boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtOption(option,enabled);}
-    public void fullReferenceRt(boolean value){RenderSystem.assertOnRenderThread();if(value){setMode(Mode.FOUNDATION);setPathTrace(false);}lighting.fullReference(value);}
-    public void referenceScale(int value){lighting.referenceScale(value);}
-    public void referenceRt(boolean value){RenderSystem.assertOnRenderThread();if(value){setMode(Mode.FOUNDATION);setPathTrace(false);}lighting.referenceRt(value);}
-    public void referenceSpp(int value){lighting.referenceSpp(value);}
-    public void referenceReset(){lighting.referenceReset();}
-    public void fireflyClamp(boolean value){lighting.fireflyClamp(value);}
-    public void benchmarkRt(){RenderSystem.assertOnRenderThread();lighting.benchmarkRt();}
     public void setCloudDebug(int value){RenderSystem.assertOnRenderThread();lighting.setCloudDebug(value);}
-    public void setRtDebug(int debug){RenderSystem.assertOnRenderThread();lighting.setRtDebug(debug);}
     public void setVolumeDensity(float density){RenderSystem.assertOnRenderThread();lighting.setVolumeDensity(density);}
     public void setForwardStrength(float strength){RenderSystem.assertOnRenderThread();lighting.setForwardStrength(strength);}
     public void setAtmosphereDensity(float density){RenderSystem.assertOnRenderThread();lighting.setAtmosphereDensity(density);}
@@ -117,7 +111,7 @@ public final class RenderProbe {
     public void setAdaptiveQuality(boolean enabled){adaptive.enabled(enabled);}
     public void setGpuWorldTarget(float value){adaptive.target(value);}
     public void beginWorldBudget(){if("Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()))adaptive.begin(mode.name());}
-    public void endWorldBudget(RenderTarget target){var budget=adaptive.end(target.width,target.height);if(!lighting.referenceActive())lighting.setQuality(budget);}
+    public void endWorldBudget(RenderTarget target){var budget=adaptive.end(target.width,target.height);lighting.setQuality(budget);}
     public void exportWorldBudget(java.nio.file.Path path)throws java.io.IOException{adaptive.export(path);}
     public void setVolumeFilter(boolean value){RenderSystem.assertOnRenderThread();lighting.setVolumeFilter(value);}
     public void setQuality(com.voxellight.world.VisualQuality value){RenderSystem.assertOnRenderThread();adaptive.ceiling(value);lighting.setQuality(value);}
@@ -128,13 +122,6 @@ public final class RenderProbe {
     public void setPbr(boolean value){RenderSystem.assertOnRenderThread();lighting.setPbr(value);}
     public void setWetness(boolean value){RenderSystem.assertOnRenderThread();lighting.setWetness(value);}
     public void setPbrDebug(int value){RenderSystem.assertOnRenderThread();lighting.setPbrDebug(value);if(value>0)setMode(Mode.FOUNDATION);}
-    public void setPathTrace(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTrace(value);if(value)setMode(Mode.FOUNDATION);}
-    public void setPathTraceDenoise(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceDenoise(value);}
-    public void setPathTraceFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceFreeze(value);}
-    public void setPathTraceHistory(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceHistory(value);}
-    public void setPathTraceRejection(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceRejection(value);}
-    public void setPathTraceUploadDelay(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceUploadDelay(value);}
-    public void setPathTraceDebug(boolean value){RenderSystem.assertOnRenderThread();lighting.setPathTraceDebug(value);}
     public void setTemporalShadows(boolean enabled) { RenderSystem.assertOnRenderThread(); lighting.setTemporal(enabled); resetTiming(); }
 
     public void setEntityMaterials(boolean value) { RenderSystem.assertOnRenderThread(); entityMaterials.setEnabled(value); resetTiming(); }
@@ -232,7 +219,6 @@ public final class RenderProbe {
         if(mode==Mode.FOUNDATION)lighting.displayVulkanRt(target,material,shadows);
         lighting.endFrame();material.endFrame();
         if (mode.isMaterial()) {
-            lighting.displayFullReference(RenderSystem.getDevice().createCommandEncoder(),target);
             if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
             materialPointObserved = false;
             return;
@@ -385,7 +371,7 @@ public final class RenderProbe {
         }
     }
 
-    /** Size-dependent pass owners reallocate during their next prepare; preserve OptiX pipelines. */
+    /** Size-dependent pass owners reallocate during their next prepare; preserve Vulkan RT pipelines. */
     public void resize() {
         RenderSystem.assertOnRenderThread();
         releaseScratch();

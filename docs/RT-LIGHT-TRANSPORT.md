@@ -1,3 +1,5 @@
+> alpha.13 runtime update: legacy tracing and commands below are historical. Current commands and stationary accumulation are documented in [SETTINGS.md](SETTINGS.md). Vulkan owns tracing; OptiX denoising is not connected yet.
+
 # Physically based RT light transport — 0.37
 
 Vulkan alpha.12 milestone: `vulkan_pt` has full-path ownership of its primary and indirect emission/lighting, shared HDR environment sampling, finite sun/moon and held-point NEE, complementary power-heuristic MIS and camera water initialization. Its final depth uses unit NEE weights; its first-order segment-scattering estimator has no phase continuation/MIS. The legacy ownership split described below still applies to production RTX Quality, not to this explicit full-frame Vulkan experiment. Emissive geometry remains BSDF-hit-only on Vulkan; entities/cache/reconstruction and gates have not migrated yet.

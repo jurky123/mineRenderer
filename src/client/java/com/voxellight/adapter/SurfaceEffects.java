@@ -22,9 +22,7 @@ final class SurfaceEffects implements AutoCloseable {
     private final GpuTextureView[] resolvedViews=new GpuTextureView[2];
     private GpuBuffer settings;
     private int width,height,read;
-    private boolean reflections=true,taa,historyValid,activeTaa,rtReflections,reference;
-    void reference(boolean value){if(reference!=value)historyValid=false;reference=value;}
-    void rtReflections(boolean value){rtReflections=value;}
+    private boolean reflections=true,taa,historyValid,activeTaa;
     private long frames;
     private VisualQuality quality=VisualQuality.BALANCED;
     DepthPyramid pyramid(){return reflections?pyramid:null;}
@@ -43,7 +41,7 @@ final class SurfaceEffects implements AutoCloseable {
         quality=value;
     }
     boolean jitter(Matrix4f projection,RenderTarget target) {
-        if(reference||!taa||(long)target.width*target.height*16>96L*1024*1024)return false;
+        if(!taa||(long)target.width*target.height*16>96L*1024*1024)return false;
         var device=RenderSystem.getDevice();
         if(!device.precompilePipeline(COLOR_TEMPORAL,RenderProbe.SHADERS).isValid()||!device.precompilePipeline(MotionFrame.MOTION,RenderProbe.SHADERS).isValid())return false;
         int sample=(int)(frames%8)+1;
@@ -63,9 +61,9 @@ final class SurfaceEffects implements AutoCloseable {
     }
     GpuTextureView render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuTextureView input,GpuBuffer environment,GpuBuffer pbr,EnvironmentPass weather,MotionFrame motion) {
         activeTaa=false;
-        if(!motion.ready()||((!taa||reference)&&(!reflections||rtReflections))){close();return input;}
+        if(!motion.ready()||(!taa&&!reflections)){close();return input;}
         var device=RenderSystem.getDevice();
-        boolean useTaa=taa&&!reference&&(long)output.width*output.height*16<=96L*1024*1024;
+        boolean useTaa=taa&&(long)output.width*output.height*16<=96L*1024*1024;
         var pipeline=useTaa?COLOR_TEMPORAL:SURFACE_COMPOSITE;
         if(!device.precompilePipeline(pipeline,RenderProbe.SHADERS).isValid())return input;
         int w=output.width,h=output.height;
@@ -88,7 +86,7 @@ final class SurfaceEffects implements AutoCloseable {
             read=0;
             historyValid=false;
         }
-        boolean reflect=reflections&&!rtReflections&&(long)((w+1)/2)*((h+1)/2)*8<=32L*1024*1024&&device.precompilePipeline(SURFACE_REFLECTION,RenderProbe.SHADERS).isValid();
+        boolean reflect=reflections&&(long)((w+1)/2)*((h+1)/2)*8<=32L*1024*1024&&device.precompilePipeline(SURFACE_REFLECTION,RenderProbe.SHADERS).isValid();
         int rw=reflect?(w+1)/2:1,rh=reflect?(h+1)/2:1;
         if(reflection!=null&&(reflection.getWidth(0)!=rw||reflection.getHeight(0)!=rh)){reflectionView.close();reflection.close();reflectionView=null;reflection=null;}
         if(reflection==null) {

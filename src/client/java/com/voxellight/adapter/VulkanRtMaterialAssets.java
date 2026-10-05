@@ -17,6 +17,7 @@ import static org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
 /** Reload-owned linear GPU atlas/palette view. Never maps or downloads frame images. */
 final class VulkanRtMaterialAssets implements AutoCloseable {
+    com.voxellight.rt.vulkan.VulkanRtBuffer buffer(){return buffer;}
     private static final RenderPipeline COPY=RenderPipeline.builder()
         .withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/vulkan_rt_atlas"))
         .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe"))

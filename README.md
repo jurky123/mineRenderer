@@ -1,135 +1,43 @@
 # mineRenderer / VoxelLight
 
-## 0.39.0-alpha.12 — shared environment and direct-light transport
+VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.13**：Vulkan Material 3 路径输运与静止累积。全新安装默认不启用效果。
 
-[Download alpha.12 client kit](https://temp.sh/porVb/voxellight-client-kit-26.2-0.39.0-alpha.12.zip) (temporary link; select `rt_backend vulkan_pt` on Vulkan).
+[下载 alpha.13 安装包](https://temp.sh/lqfww/voxellight-client-kit-26.2-0.39.0-alpha.13.zip)（临时链接）。替换旧 jar 后，进入世界执行：
 
-Alpha.11 terrain admission passed user acceptance, including previously missing coverage. Alpha.12 advances the explicit `rt_backend vulkan_pt` experiment; production RTX Quality still uses the accepted legacy path.
+```text
+/voxellight rt_backend vulkan_pt
+/voxellight rt_accumulate spp 256
+/voxellight rt_accumulate on
+/voxellight status
+```
 
-- Shared 256×128 RGBA32F HDR sky: the existing `rt_environment` shader and `LightingEnvironment.polished` palette supply world time, sky/horizon/sunset, weather, stars and bounded cloud radiance. The fixed test sky/sun is removed from the material path. Geometry-only `vulkan_transport_test` retains its intentional test environment.
-- GPU luminance × exact lat-long solid-angle CDFs, with conditional row/column binary sampling and uniform-cos(theta) cell sampling. Black maps fall back to uniform sphere. All map/CDF generation and transfer remain on GPU; no new frame-image readback or OptiX/CUDA call. Two bounded fragment reduction passes rebuild the distribution each frame; profile `vulkan_rt_environment_map` and `vulkan_rt_environment_distribution` separately.
-- One power-weighted direct-light choice per nonsingular surface: current sun/moon finite cone (6.793e-5 sr), importance-sampled HDR environment, or enabled held virtual point light with inverse-square intensity. RGB visibility retains cutout/transmissive interfaces and now stops at finite point-light distance. Power-heuristic MIS pairs environment/sun NEE with BSDF misses; delta events and discrete points retain unit weights. The terminal sixth vertex uses unit NEE weight because there is no competing BSDF continuation. Emissive terrain is still BSDF-hit-only and is not counted by this light distribution.
-- Camera-underwater transport initializes the same quantized water absorption/scattering/IOR/phase coefficients and section-independent identity as water surfaces. Finite-segment first-order scattering samples the same sun/environment/held distribution; it uses no phase MIS because this estimator has no competing phase continuation. An unbounded medium miss is limited to the existing reference policy of 128 blocks. Eight-medium stack and six-bounce/1 spp/recursion-1 contracts remain.
+静止时每帧增加一个样本，默认目标 64 spp，允许 4–4096；达到目标后保留结果，提高目标后继续累积。移动、转视角、FOV/分辨率变化、场景更新、方块编辑和资源重载会重新开始。`rt_accumulate reset` 手动重置，`rt_accumulate off` 恢复每帧 1 spp。累积在色调映射前对线性 HDR 求平均，不是时间重投影或去噪。每次静止快照冻结天空、手持灯参数、动画纹理和水波；需要更新时移动镜头或手动重置。
 
-The CPU asset header grows from 96 to 192 bytes; camera and continuation ABIs stay 96/368 bytes. Environment map/cell/row data occupy 1,050,624 bytes in the existing descriptor-6 storage buffer, plus 1,050,624 bytes of GPU textures and a 64-byte palette uniform. No new RT descriptor binding. The overall packed asset cap remains 256 MiB/device storage-buffer range. Scene budgeting/admission is unchanged from accepted alpha.11.
+按用户授权，旧 OptiX/CUDA **追踪**实现、JNI 桥、运行时 PTX/OptiX 编译器、旧动态捕获、旧命令和混合渲染分支已经删除，安装包不包含旧 native DLL/SO/PTX。旧配置中的 RTX preset/backend/sample target 自动迁移，旧路径独有开关丢弃。材质/BSDF/环境/水面的原始数学基准继续用于 Slang 数值校验。独立 OptiX temporal AOV 去噪接口与 GPU export 基础保留，尚未接入 Vulkan 输出。
 
-Build/clientKit passed with 267 tests and no failures. Numerical validation runs the actual Slang CPU target against canonical native `environment.h`: 300,000 samples (max normalized native/Slang error 2.31713e-06) cover PDF normalization/poles, conditional histograms, black fallback, finite sun cone, held-light discrete PDF/inverse-square falloff, complementary miss MIS, paired white furnace, terminal-depth furnace and camera-water initialization. The existing Material 3/terrain parity suites remain required. Shipped GLSL environment/CDF pipelines are compiled and linked against Minecraft's actual bind-group contract; twelve SPIR-V stages and descriptor/continuation reflection are validated. RTX visual and performance acceptance for this version is pending.
+当前 Vulkan 路径包含原生地形 BLAS/TLAS、Material 3/LabPBR、cutout、介质栈、最多 6 次反弹、共享 HDR 天空、太阳/月亮/环境/手持光 NEE 与 MIS。预编译 Slang/SPIR-V 随 jar 发布，游戏内不编译 PT 程序。`rt_backend vulkan_poc` 为法线调试；`vulkan_transport_test` 为灰色材质输运对照；`raster` 恢复光栅。`preset vulkan_quality` 开启 Vulkan 材质路径和累积；performance/balanced/quality 是光栅预设。
 
-Test `/voxellight rt_backend vulkan_pt` and `/voxellight stats`: day/night/rain transitions, indoor environment shadowing, metal/glass sky reflections, held torch moving near surfaces, entering/exiting water, terrain edits, F3+T and window resize. Reconstruction remains NONE and 1 spp is noisy. Remaining: emissive-triangle NEE/MIS, exact local cloud shadow transmittance, radiance/caustic caches, dynamic entities, temporal AOV/reconstruction/OptiX-denoiser/DLSS RR, full reference and RTX 4060 timing gates. Shared sky is the existing approximate model, not full atmospheric multiple scattering. No default switch or legacy tracing removal is authorized by this milestone.
+仍有边界：64 MiB/512 section 地形预算、最高 640×360 追踪分辨率，实体尚未进入 RT；发光三角形 NEE、完整环境一致性、AOV 重建/去噪/DLSS RR 和性能验收仍待完成。静止累积版本需要 RTX 实机验收。
 
-
-## 0.39.0-alpha.11 — camera-prioritized terrain admission
-
-Build/clientKit validation passed: 267 tests, zero failures. [Download alpha.11 client kit](https://temp.sh/UyKdk/voxellight-client-kit-26.2-0.39.0-alpha.11.zip). User RTX coverage acceptance passed (alpha.11).
-
-Alpha.10 user GPU logs confirm material transport produces finite radiance (cold pipeline startup 4,377 ms), but resident input geometry reaches 67,108,080 bytes and some areas never appear. New sections previously could not evict residents at the 64 MiB limit; warmup retries therefore remained rejected. Alpha.11 sorts edits first and new arrivals by camera distance, and admits nearer sections by evicting strictly farther unprotected residents. Eviction is planned atomically; infeasible admission preserves the existing scene. Existing edited BLAS remains until its replacement is built. Camera movement changes admission priority; the existing two-second warmup retry discovers nonresident loaded sections again.
-
-The 64 MiB / 512-section experiment still has finite coverage: this fixes first-arrival starvation, not unlimited world residency. Full scene paging, production environment/light sampling, reconstruction and performance gates remain pending. Validate missing nearby areas, walking/flying into new terrain, placement/destruction, and resource reload with `rt_backend vulkan_pt`.
-
-
-VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲染器，以缓存阴影、统一体素场景和渐进更新 GI 改善方块世界光照。
-
-当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
-
-Current development release: **VoxelLight 0.39.0-alpha.10 — native terrain Material 3 binding**. Alpha.8 prioritizes section replacements and prevents edit-induced miss holes at the vertex memory limit. Alpha.7 fixes zero geometryCount in the shared BLAS/TLAS build info after GPU diagnostics confirmed all-miss output. Alpha.6 is a diagnostic candidate with ray-miss colors, a display border and one-time two-pixel GPU telemetry; black-screen cause remains unconfirmed. Alpha.5 fixes zero-count writes for the RT output, normals and camera descriptors following the alpha.4 black-screen report. Alpha.4 fixes the missing viewport in the diagnostic display pass, which caused raster fallback after successful Vulkan pipeline creation. Alpha.3 rejects the POC command on OpenGL, preserves loaded raster terrain and displays the diagnostic view after world rendering. Alpha.2 fixes oversized extension/TLAS native-stack allocations discovered on the RTX 4060 Windows startup. Migration stage 1 retains legacy OptiX production while adding direct native Vulkan section BLAS/TLAS, build-time Slang/SPIR-V, recursion-1 debug rays and pipeline caching. `/voxellight rt_backend vulkan_poc` selects the explicit diagnostic view; PT parity, Vulkan reconstruction/DLSS RR and performance acceptance are pending. This is the first migration milestone, not a completed renderer migration. [Implementation, build tools and GPU checks](docs/VULKAN-RT-MIGRATION.md).
-
-Alpha.10 adds `/voxellight rt_backend vulkan_pt`: native UV/tint, animated GPU albedo, LabPBR/Material 3 palette and normal maps, cutout any-hit, dielectric/media transport and animated water normals. One spp, six-bounce limit, reconstruction NONE. The fixed test sky/sun and BSDF-only emissive sampling are temporary acceptance-stage behavior; production environment/light distributions, reconstruction and performance gates remain pending. Alpha.9's geometry transport passed user GPU testing; its grey test and the normal view remain selectable. [Scope and GPU test cases](docs/VULKAN-RT-MIGRATION.md).
-
-Alpha.9 adds an explicit **geometry transport test**: `/voxellight rt_backend vulkan_transport_test`. It runs separate primary and indirect Vulkan pipelines, one path per pixel per frame, up to six bounces, sun visibility and Russian roulette, with a 64-byte GPU continuation per pixel. It intentionally uses grey diffuse material and a test sky; Material 3 atlas binding, production environment, transparent geometry and reconstruction are still pending. `/voxellight rt_backend vulkan_poc` retains the accepted normal view. No default backend change or performance acceptance is implied.
-
-Slang Material 3 / BSDF / medium kernels have numerical parity checks against the canonical native implementation (`./gradlew verifyVulkanTransport`: 57,600 cases, 3,225,600 components). The material experiment now consumes those kernels; an additional 32-case raw terrain/atlas/native water comparison validates binding and shading formulas. [Migration ledger](docs/VULKAN-RT-MIGRATION.md).
-
-[Download 0.39.0-alpha.10 client kit](https://temp.sh/vKVnP/voxellight-client-kit-26.2-0.39.0-alpha.10.zip) (temporary link; experimental terrain materials; select `vulkan_pt` on Vulkan).
-
-[Download 0.39.0-alpha.9 client kit](https://temp.sh/MrRxn/voxellight-client-kit-26.2-0.39.0-alpha.9.zip) (temporary link; grey diffuse geometry transport test; Vulkan API required).
-
-[Download 0.39.0-alpha.8 client kit](https://temp.sh/ZqlCt/voxellight-client-kit-26.2-0.39.0-alpha.8.zip) (temporary link; retains edited sections at the scene budget; Vulkan API required).
-
-[Download the native 0.37.6 client kit](https://temp.sh/kffQf/voxellight-client-kit-26.2-0.37.6.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
-
-Reference now processes small adaptive windows per display frame instead of submitting all pixels, with sweep/pixel-budget status and preserved guide snapshots. [Reference responsiveness](docs/REFERENCE-0.37.6.md). Alpha.4 uses split modules and default release optimization, with per-task diagnostics and creation cancellation watchdogs; development O0 is an explicit profile. [Compiler follow-up](docs/REFERENCE-0.37.5.md). RT signal copies use the correct MC 26.2 dimensions/mip arguments, and heavy CUDA transport functions avoid forced inlining. [Reference follow-up](docs/REFERENCE-0.37.4.md). OptiX native startup runs in the background with phase/elapsed diagnostics while raster continues. [Startup freeze follow-up](docs/REFERENCE-0.37.3.md). Reference uses bounded one-spp launches, and GUI telemetry performs no CUDA work. The rectangular depth-pyramid `1x0` error is fixed. [Crash diagnostics and test instructions](docs/REFERENCE-0.37.2.md).
-
-Open **Pause/Options → VoxelLight** or `/voxellight settings` for searchable vanilla controls and saved preferences. Reference mode now enables RTX automatically and shows convergence progress. [Settings guide](docs/SETTINGS.md).
-
-Alpha.7 follows the alpha.6 ~16 s user GPU cold startup with viewport context reuse and reference convergence fixes. `/voxellight rt_reference spp N` sets a cumulative reference target; enable it with `/voxellight rt_reference on`. Realtime remains 1 spp/frame. Visual and warm-cache acceptance remain open. [Follow-up and test steps](docs/REFERENCE-0.38-ALPHA7.md).
-
-Alpha.8 fixes the GameRenderer resize callback that bypassed alpha.7 context reuse; world/data reset still fully releases resources. [Evidence and checks](docs/REFERENCE-0.38-ALPHA8.md).
-
-## 文档
-
-- [Material 3](docs/MATERIAL-3.md)：material classes、LabPBR、coating、Vanilla presets、override API。
-- [RT light transport](docs/RT-LIGHT-TRANSPORT.md)：BSDF/NEE/MIS、edge reconstruction、media/caustics、reference与验收。
-
-- [RTX / path-tracing architecture](docs/RTX-PATH-TRACING-ARCHITECTURE.md)：0.36 ownership、GPU interop、GAS/IAS、world cache、BSDF/AOV、预算、诊断和验收。
-
-- [Review raster completion / joint checks](docs/REVIEW-COMPLETION.md)：0.35 visual bundle、shared temporal、water/reflections、adaptive预算与future RTX边界。
-
-- [Single-raster native MRT](docs/SINGLE-RASTER.md)：一次terrain raster、shared filtering、reference开关与FPS对比。
-
-- [Material 2.0](docs/MATERIAL-2.md)：PBR/GGX、LabPBR静态贴图、rain wetness与预算/实机对比。
-
-- [Hybrid GI stability](docs/PT-STABILITY.md)：persistent EMA/confidence、depth/color/ownership修正与freeze/rejection诊断。
-
-- [Experimental hybrid path tracing](docs/PATH-TRACING.md)：CUDA secondary paths、OptiX去噪、native build与实机验收。
-
-- [HZB water reflections](docs/HZB.md)：保守depth pyramid、hierarchical SSR与线性trace比较。
-
-- [Shadow filter budgets](docs/SHADOW-FILTERS.md)：4/16/36采样、balanced默认与实机比较。
-
-- [0.27 packed material / profiling](docs/PERFORMANCE-0.27.md)：材质带宽、temporal默认关闭与实机验收。
-
-- [Native terrain coverage](docs/NATIVE-COVERAGE.md)：0.22原生几何复用、inline attributes与实机检查。
-- [Smooth celestial shadow cache](docs/SHADOW-EPOCHS.md)：0.26双角度terrain epoch、static foliage cache、reference比较与性能验收。
-- [0.25.1 review fixes / benchmark](docs/TEST-0.25.1.md)：natural ripple follow-up、fast vertex writer、cached caster admission与per-pass profiling。
-- [0.25 three-phase test bundle](docs/TEST-0.25.md)：water SSR、volume spatial filter、animated normal waves/quality presets与统一实机测试。
-- [Shadowed volumetric light](docs/VOLUMETRIC.md)：quarter-resolution sun/moon shafts、HDR medium composition与比较命令。
-- [128-block directional shadows](docs/EXTENDED-SHADOWS.md)：近场detail保留、远场借用native offscreen geometry、预算与验收。
-- [Range and quality plan](docs/RANGE.md)：native material stream、独立效果距离与测量门槛；下一优先任务。
-- [Water Foundation](docs/WATER.md)：native-stream HDR水面、reflection/refraction与composition边界。
-- [Atmosphere prototype](docs/ATMOSPHERE.md)：局部高度/距离haze、analytic forward glow、比较与边界。
-- [局部灯/手持光](docs/LOCAL-LIGHTS.md)：resource-pack颜色和16源预算内的动态手持灯。
-- [色彩/光照polish](docs/POLISH.md)：filmic、手动曝光、天空半球色、emission bloom与reference比较。
-- [AO说明](docs/AO.md)：terrain horizon AO、ambient composition与验收。
-- [当前状态](docs/CURRENT.md)：唯一的当前阶段/验收/下一步记录。
-- [版本历史](docs/CHANGELOG.md)：历史实现与评审决定。
-- [原始 v0.2 设计文档](VoxelLight_Design_v0.2_Native_Vulkan.docx)：保留原件。
-- [v0.2 可搜索文本](docs/DESIGN-v0.2.md)：按段落提取，表格布局请看 DOCX。
-- [设计评审](docs/REVIEW.md)：已核验依据、工程缺口和建议决策。
-- [0.10.0 评审决策](docs/REVIEW-0.10.0.md)：已核验限制与 Visual Foundation 优先级。
-- [Visual Foundation contract](docs/VISUAL-FOUNDATION.md)：material capture、分离 lighting 与 geometry/caster 的实施门槛。
-- [实施计划](docs/PLAN.md)：修订后的依赖顺序、实验和验收标准；后续实施按此计划推进。
-- [26.2 接入能力与验证记录](docs/INTEGRATION.md)：实际 API、资源生命周期和尚未通过的实机门槛。
-- [参考阴影与资源预算](docs/SHADOWS.md)：固定光源、独立 caster、回退与当前画质边界。
-- [客户端安装与诊断](docs/INSTALL.md)：安装前置、命令和 smoke checklist。
-
-## 边界与开发约定
-
-按用户要求，当前开发基线改为 Minecraft **26.2** / Java **25** / Fabric Loader **0.19.5** / Fabric API **0.160.0+26.2** / Loom **1.17.21** / Gradle **9.5.1**。使用 26.2 官方未混淆类名，无额外 mappings。26.3/26.4 不属于当前支持范围；原始设计文档作为历史保留。
-
-本项目独立实现客户端世界光照，不属于 MineUI 界面 API、MineAudio 音频 API 或 MineDisplay 展示业务，无须服务端插件。需要其他项目新增能力时先提出需求。
-
-采用单个 Fabric 构建工程和功能包，版本相关 hook 集中在 `com.voxellight.adapter`，可独立测试的采样数据在 `com.voxellight.debug`。出现真实复用需求后再拆模块。
-
-## 构建与使用
-
-Vulkan RT shaders now require build-time Slang and `spirv-val`; run `python3 tools/bootstrap_vulkan_rt.py` on Linux x86_64 and install `spirv-tools`, or configure `SLANGC`/`SPIRV_VAL`. See [build instructions](docs/VULKAN-RT-MIGRATION.md).
+## 构建与验证
 
 ```sh
 ./gradlew build clientKit
 ```
 
-mod：`build/libs/voxellight-client-26.2-<version>.jar`；安装包：`build/distributions/voxellight-client-kit-26.2-<version>.zip`。`<version>`取自`gradle.properties`的`mod_version`，见[当前状态](docs/CURRENT.md)。安装包只含本 mod 和安装说明；Fabric Loader/API 按安装文档配置。
+构建工具需要 Slang 和 SPIR-V 验证工具，详见 [Vulkan 迁移记录](docs/VULKAN-RT-MIGRATION.md)。构建执行 Java 回归、真实 Minecraft GLSL pipeline 链接、12 个 RT SPIR-V stage 验证，以及实际 Slang CPU target 对原始 BSDF/材质/环境的数值校验。无需旧 CUDA/OptiX native build。产物位于 `build/libs/` 和 `build/distributions/`；client kit 只含本 mod 和当前操作文档。
 
-进入世界后使用 `/voxellight mode foundation` 开启材质分离光照；使用 `/voxellight mode color` 检查原画面复制，`/voxellight mode depth` 查看世界深度，`/voxellight mode off` 恢复原画面。`/voxellight status` 查看状态，`/voxellight export` 导出最近最多 14,400 个 pass 样本。仅 Vulkan 执行诊断，OpenGL 保留 vanilla。所有命令均在本地执行，无服务端要求。
+## 文档
 
-新增 `/voxellight mode normal`：深度重建的视空间表面方向着色，不是模型/PBR 法线。`/voxellight scene on` 启用 CPU 场景跟踪，`/voxellight scene` 查看队列与版本统计，`/voxellight scene inspect` 查看准星方块的快照材质，`/voxellight scene off` 关闭并清空快照。场景默认关闭，与视觉 mode 独立。
+- [安装与命令](docs/INSTALL.md)
+- [设置与静止累积](docs/SETTINGS.md)
+- [当前阶段](docs/CURRENT.md)
+- [Vulkan 迁移与验收](docs/VULKAN-RT-MIGRATION.md)
+- [Material 3](docs/MATERIAL-3.md)
+- [输运数学](docs/RT-LIGHT-TRANSPORT.md)
+- [环境采样](docs/RT-ENVIRONMENT.md)
+- [版本历史](docs/CHANGELOG.md)
 
-场景仅跟踪light-aware volume 内最多384个已加载section（cube比较为7×7×7=343）；人工灯另限定为近处 125 section/80³。客户端线程每 tick 最多复制两份 palette、以 2 ms 作为软预算；单 worker 编码，最多两个提交任务。变化合并成有界 marker，拒绝旧 generation/version 的结果；离开局部窗口的 section 立即撤销。详见 [场景设计与预算](docs/SCENE.md)。
+旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.13。
 
-新增 `/voxellight mode shadow`：自动启用 scene，在主世界附近生成随原生 sun/moon angle 变化的地形阴影，并在已加载世界添加发光方块的局部灯。暖机后生效；32 MiB geometry 压力下优先保留近处 caster，status 会显示 budgetDeferred，而非要求永远 N/N；`mode shadow_mask` 查看白=无遮挡/黑=遮挡，`mode shadow_map` 查看光相机深度。默认复用有效 map；`/voxellight shadow_cache off` 用同一投影/过滤每帧重绘作为参考，`on` 恢复缓存。cutout 所覆盖的 tile 每帧重绘，其他有效 tile 可复用。模型沿用 vanilla，包含 slab/fence/cutout；不依赖主相机可见集合。方向阴影/月光默认接收 48 格内、40–48 格淡出，12–16 与 26–32 格重叠混合；人工灯仍为 24 格内、16–24 淡出；重建期间保留当前有效 caster 已确认的阴影，缺失 caster 仍可能造成局部漏影；无 skylight 维度只运行局部灯；资源超预算时保留原画面。详见 [参考阴影](docs/SHADOWS.md)。
-
-`build` 包含阴影投影/偏置、实际 pipeline shader 绑定与 stage IO、队列/快照正确性、最终 JAR mixin 包与目标契约、非零 draw、采样数据和 Vulkan GLSL→SPIR-V 测试。本机没有 GPU/显示环境；新增功能的构建通过不替代实机验证。
-
-性能预算是实验目标，尚无跑分。先验证 renderer 接入和缓存阴影，达到阶段门槛后再进入 GI。提交源码时同步记录构建、相关测试和游戏内验证结果。
-
-独立 Git 仓库使用 `main` 分支；不改汇总仓库子模块指针。运行世界、日志、构建产物和本地代理配置不进入版本控制。已配置 origin：`https://github.com/jurky123/mineRenderer.git`。构建与验证记录见接入文档。
+Alpha.13 validation: build/clientKit passed, 241 tests with zero failures; actual accumulation GLSL links against Minecraft bindings, packaged-artifact regression rejects legacy tracer/native compiler payloads. Material/terrain/environment Slang-native parity remains unchanged (57,600 cases / 32 cases / 300,000 samples). Independent temporal AOV header syntax-check passed against the installed OptiX/CUDA SDK. RTX visual acceptance remains pending.

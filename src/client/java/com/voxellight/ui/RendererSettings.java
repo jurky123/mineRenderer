@@ -25,7 +25,7 @@ public final class RendererSettings {
             if(key.startsWith("rt_")||key.equals("radiance_cache"))return "RTX";
             if(key.startsWith("water")||key.equals("underwater")||key.equals("caustics")||key.equals("rain_ripples"))return "Water";
             if(key.contains("cloud")||key.contains("atmosphere")||key.contains("volum")||key.equals("sky")||key.equals("forward_scatter"))return "Environment";
-            if(key.startsWith("pathtrace")||key.contains("debug")||Set.of("status","profile","export","scene").contains(key))return "Diagnostics";
+            if(key.contains("debug")||Set.of("status","profile","export","scene").contains(key))return "Diagnostics";
             return "Rendering";
         }
     }
@@ -66,7 +66,7 @@ public final class RendererSettings {
             }
             if(!choices.isEmpty()||!range.isEmpty()||child.getCommand()!=null)entries.add(new Entry(child.getName(),List.copyOf(choices),range));
         }
-        entries.add(new Entry("rt_reference spp",List.of(),"4 .. 4096"));
+        entries.add(new Entry("rt_accumulate spp",List.of(),"4 .. 4096"));
         entries.sort(Comparator.comparing(Entry::key));
         commands.setConsumer((context,success,result)->{
             if(!success||result<=0)return;

@@ -9,6 +9,17 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void shippedArtifactContainsNoLegacyTracerOrNativeCompiler()throws Exception{
+        try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))){
+            for(var entry:Collections.list(jar.entries())){
+                String name=entry.getName();
+                for(String removed:List.of("voxellight/native/","RtxLightingPass.class","PathTracePass.class","OptixBridge.class","OptixNative.class","VulkanCudaInterop.class","pathtrace_capture.fsh","rt_composite.fsh",".ptx",".optixir"))assertFalse(name.contains(removed),name);
+            }
+            assertNotNull(jar.getEntry("com/voxellight/adapter/VulkanRtAccumulation.class"));
+            assertNotNull(jar.getEntry("assets/voxellight/shaders/vulkan_rt_accumulate.fsh"));
+        }
+    }
+
     @Test void fullSceneAdmitsNearTerrainAndTracksCameraMovement() {
         long mib=1024L*1024;
         var near=new com.voxellight.world.SectionKey(0,0,0);
@@ -31,7 +42,7 @@ class VulkanRtContractTest {
         assertNull(VulkanRtScene.evictions(sizes,Set.of(),edited,64*mib,32*mib,65*mib,2,true,8,8,8));
     }
     @Test void backendSwitchPreservesRasterAndDebugRunsBeforeProjectionReset() throws Exception {
-        for(String name:List.of("VulkanRtDebugPass","RtxLightingPass")) {
+        for(String name:List.of("VulkanRtDebugPass")) {
             var node=new ClassNode();new ClassReader("com.voxellight.adapter."+name).accept(node,0);
             for(var method:node.methods)for(var instruction:method.instructions)
                 if(instruction instanceof MethodInsnNode call)

@@ -1,3 +1,11 @@
+# 0.39.0-alpha.13 — Vulkan-only tracing and stationary accumulation
+
+User authorized deletion of old tracing after alpha.12 acceptance. The current runtime and kit contain no OptiX/CUDA tracer, JNI tracing bridge or runtime PTX compiler. Historical legacy-removal gates below are superseded by this authorization. Canonical BSDF/material/environment mathematics remain parity fixtures; unchanged water math is extracted into `native/rt/water_surface.h`. Independent `native/denoiser/temporal_aov.h` preserves temporal diffuse/reflection/refraction AOV invocation (SDK syntax-checked), but no denoiser is connected to Vulkan output yet.
+
+Stationary linear HDR averaging defaults to 64 spp, configurable 4–4096 with `rt_accumulate spp`; `on/off/reset` control history. Moving/rotating, projection/size changes, scene generation/block invalidations and resource/world/backend resets reject history. Increasing target retains samples. Two RGBA32F ping-pong attachments keep history entirely on GPU; sample zero never reads stale history. Sky/light/animated albedo/water assets freeze for each snapshot. Scene updates/warmup continue after convergence, and accepted changes restart tracing. Normal view bypasses accumulation; no motion reprojection/denoising is claimed. Old preferences migrate, UI progress and kit instructions reflect the new path.
+
+Check stationary convergence, raising target, movement, edits, F3+T, resize, disable/re-enable on RTX. Remaining emitter NEE, dynamic geometry, reconstruction and performance gates still apply.
+
 # VoxelLight current state
 
 ## 0.39.0-alpha.12 — shared environment and direct-light transport
@@ -222,3 +230,5 @@ Review decision: preserve the accepted material/lighting architecture; material 
 0.30.7: user confirms 0.30.6 no flicker on Vulkan, but new-view buildup remains. Remove new-only zero-to-full fade; bootstrap missing-history surfaces with 32 samples, keep established surfaces at eight; overlap next-job compute with display transition while deferring slot replacement until safe. No new images. 212 Java tests and native bootstrap regressions pass; GPU latency/quality acceptance pending.
 
 0.31.0: prioritize Material 2.0 per the latest review. Keep current diffuse GI behavior; the user still sees new-view refinement after 0.30.7. Implement static-map LabPBR/PBR/wetness with bounded lookup storage; future environment/temporal/RTX tracks remain planned. See [material contract](MATERIAL-2.md).
+
+Alpha.13 validation: build/clientKit passed, 241 tests with zero failures; actual accumulation GLSL links against Minecraft bindings, packaged-artifact regression rejects legacy tracer/native compiler payloads. Material/terrain/environment Slang-native parity remains unchanged (57,600 cases / 32 cases / 300,000 samples). Independent temporal AOV header syntax-check passed against the installed OptiX/CUDA SDK. RTX visual acceptance remains pending.

@@ -76,38 +76,15 @@ tasks.register('clientKit', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
-    from('docs/RTX-PATH-TRACING-ARCHITECTURE.md')
-    from('docs/REFERENCE-0.37.2.md')
-    from('docs/REFERENCE-0.37.3.md')
-    from('docs/REFERENCE-0.37.4.md')
-    from('docs/REFERENCE-0.37.5.md')
-    from('docs/REFERENCE-0.37.6.md')
-    from('docs/RTX-QUALITY-0.38.md')
     from('docs/RT-ENVIRONMENT.md')
-    from('docs/FULL-REFERENCE.md')
     from('docs/SETTINGS.md')
     from('docs/MATERIAL-3.md')
     from('docs/RT-LIGHT-TRANSPORT.md')
-    from('docs/OPTIX-COMPILATION-0.38-ALPHA6.md')
-    from('docs/REFERENCE-0.38-ALPHA7.md')
-    from('docs/REFERENCE-0.38-ALPHA8.md')
     from('docs/VULKAN-RT-MIGRATION.md')
 }
 
-// Optional native build is explicit; the regular Java build remains usable without SDKs.
-jar {
-    from('build/optix-native') { into 'voxellight/native' }
-    doFirst {
-        def manifest=file('build/optix-native/build.json')
-        if (manifest.exists()) {
-            def built=new groovy.json.JsonSlurper().parse(manifest)
-            built.sources.each { name, expected ->
-                def actual=java.security.MessageDigest.getInstance('SHA-256').digest(file(name).bytes).encodeHex().toString()
-                if(actual!=expected)throw new GradleException("Native source changed: ${name}; run tools/build_optix.py before packaging")
-            }
-        } else if(project.hasProperty('nativeKit'))throw new GradleException('Build the native component before -PnativeKit')
-    }
-}
+// Legacy CUDA/OptiX tracing artifacts must never leak from a previous local build.
+jar { exclude 'voxellight/native/**' }
 
 // Vulkan RT stage binaries are produced/validated before packaging, never compiled in game.
 tasks.register('compileVulkanRt', Exec) {
@@ -126,7 +103,7 @@ processResources {
 tasks.register('verifyVulkanTransport', Exec) {
     inputs.dir('shaders/rt/common')
     inputs.dir('shaders/rt/tests')
-    inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/hit.cu', 'native/rt/device.cuh', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py')
+    inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/water_surface.h', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py')
     outputs.file(layout.buildDirectory.file('vulkan-transport-parity/result.txt'))
     commandLine 'python3', 'tools/verify_vulkan_transport.py'
 }

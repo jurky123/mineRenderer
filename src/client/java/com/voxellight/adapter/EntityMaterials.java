@@ -34,7 +34,7 @@ final class EntityMaterials implements AutoCloseable {
     private long captureNanos,start;
     private boolean enabled=true,unsafeOverlay;
 
-    void begin(){RtDynamicStream.begin();draws.clear();attempts=skipped=failures=bytes=maxIndices=models=uploadedBytes=0;captureNanos=0;unsafeOverlay=false;if(frame!=null)frame.clear();}
+    void begin(){draws.clear();attempts=skipped=failures=bytes=maxIndices=models=uploadedBytes=0;captureNanos=0;unsafeOverlay=false;if(frame!=null)frame.clear();}
     static int style(RenderPipeline pipeline) {
         if(pipeline==RenderPipelines.ENTITY_SOLID)return 0;
         if(pipeline==RenderPipelines.ENTITY_CUTOUT || pipeline==RenderPipelines.ENTITY_CUTOUT_CULL)return 1;

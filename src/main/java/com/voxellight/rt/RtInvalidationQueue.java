@@ -7,6 +7,7 @@ public final class RtInvalidationQueue {
  private record Change(Region region,long revision){}
  private static final ArrayDeque<Change> changes=new ArrayDeque<>();
  private static long revision,floor;
+ public static synchronized long generation(){return revision;}
  public static synchronized long revision(int x,int y,int z){long value=floor;for(var change:changes){var r=change.region;if(x>=r.minX&&x<=r.maxX&&y>=r.minY&&y<=r.maxY&&z>=r.minZ&&z<=r.maxZ)value=change.revision;}return value;}
 
  private static final LinkedHashSet<Region> pending=new LinkedHashSet<>();

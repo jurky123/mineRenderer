@@ -1,0 +1,8 @@
+static __forceinline__ __device__ float hash2(float x,float y){x=x-floorf(x/128)*128;y=y-floorf(y/128)*128;float t=sinf(x*127.1f+y*311.7f)*43758.5453f;return t-floorf(t);}
+static __forceinline__ __device__ float noise2(float x,float y){float ix=floorf(x),iy=floorf(y),fx=x-ix,fy=y-iy;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);float a=hash2(ix,iy)*(1-fx)+hash2(ix+1,iy)*fx,b=hash2(ix,iy+1)*(1-fx)+hash2(ix+1,iy+1)*fx;return a*(1-fy)+b*fy;}
+static __forceinline__ __device__ float3 waterNormal(float3 normal,float3 p){if(fabsf(normal.y)<.8f)return normal;float x=fmodf(p.x,16384.f),z=fmodf(p.z,16384.f),sx=0,sz=0;const float kx[3]={1.7f,.64f,-3.14f},kz[3]={.51f,2.38f,1.07f},weights[3]={.45f,.32f,.23f};
+ for(int i=0;i<3;i++){float len=sqrtf(kx[i]*kx[i]+kz[i]*kz[i]),angle=x*kx[i]+z*kz[i]-sqrtf(9.81f*len)*params.time+i*1.73f,amplitude=cosf(angle)*weights[i]/len;sx+=kx[i]*amplitude;sz+=kz[i]*amplitude;}
+ float qx=x*6.7f+params.time*.31f,qz=z*6.7f-params.time*.19f,e=.13f;sx+=.28f*(noise2(qx+e,qz)-noise2(qx-e,qz))/(2*e);sz+=.28f*(noise2(qx,qz+e)-noise2(qx,qz-e))/(2*e);float rx=x*1.3f,rz=z*1.3f,cx=floorf(rx),cz=floorf(rz),lx=rx-cx-.5f,lz=rz-cz-.5f,radius=sqrtf(lx*lx+lz*lz),phase=params.cloudWind*4+hash2(cx,cz);phase-=floorf(phase);float ring=radius-phase*.65f,amplitude=expf(-ring*ring*220)*(1-phase)*.045f*params.rain*params.rainRipples;
+ float distance=sqrtf(dot3(add(p,mul(params.camera,-1)),add(p,mul(params.camera,-1)))),microFade=fmaxf(0,1-distance/96);
+ sx=sx*params.waveStrength+(radius>.001f?lx/radius*amplitude:0)*microFade;sz=sz*params.waveStrength+(radius>.001f?lz/radius*amplitude:0)*microFade;return norm(add(normal,v(sx,0,sz)));
+}

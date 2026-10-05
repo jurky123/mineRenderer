@@ -1,6 +1,5 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
-uniform sampler2D RtTransmissionScene;
 uniform sampler2D VoxelCloud;
 uniform sampler2D LightingHdr;
 uniform sampler2D SceneDepth;
@@ -111,7 +110,6 @@ vec3 displayColor(vec3 inputRadiance,vec3 position,float skyAccess,vec2 uv) {
 }
 void main() {
     vec4 hdr = texture(LightingHdr, texCoord);
-    if(MaterialFade.z>.5){vec3 x=max(hdr.rgb,vec3(0))*ToneBloom.x;fragColor=vec4(linearToSrgb(clamp(filmicCurve(x)/filmicCurve(vec3(6)),0.0,1.0)),1);return;}
     float sceneDepth=texture(SceneDepth,texCoord).r;
     vec4 farPoint=InvProjection*vec4(texCoord*2.0-1.0,.00001,1);
     vec3 skyRay=normalize(mat3(ViewToWorld)*(farPoint.xyz/farPoint.w));
@@ -127,13 +125,9 @@ void main() {
     float depth = texture(SceneDepth, texCoord).r;
     vec4 view = InvProjection * vec4(texCoord * 2.0 - 1.0, max(depth,.00001), 1.0);
     vec3 position = (ViewToWorld * vec4(view.xyz / view.w, 1.0)).xyz;
-    vec4 transmitted=texture(RtTransmissionScene,texCoord);if(MediumControls.w>.5&&transmitted.a>0&&transmitted.a<=length(position)+.02)position=normalize(position)*transmitted.a;
     vec4 cloud=MediumControls.z>.5?texture(VoxelCloud,texCoord):environmentCloud(normalize(position),position,DirectColorStrength.rgb,DirectColorStrength.a,SkyColorStrength.rgb);
     hdr.rgb=MediumControls.z>.5?hdr.rgb*(1-cloud.a)+cloud.rgb:mix(hdr.rgb,cloud.rgb,cloud.a);
-    if(MediumControls.w>.5&&transmitted.a>0&&UnderwaterControls.x>.5){
-        vec3 t=exp(-vec3(.16,.060,.035)*min(length(position),96.0));
-        // RTX owns participating water extinction and in-scattering; no additional blue overlay.
-    }else hdr.rgb=underwaterMedium(hdr.rgb,position,SkyColorStrength.rgb,DirectColorStrength.a);
+    hdr.rgb=underwaterMedium(hdr.rgb,position,SkyColorStrength.rgb,DirectColorStrength.a);
     vec3 displayed;
     if(VolumeParameters.x>.5) {
         vec4 air=filteredVolume(texCoord,length(position));

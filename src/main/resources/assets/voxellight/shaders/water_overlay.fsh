@@ -1,9 +1,4 @@
 // Appended to the active native terrain fragment shader after renaming its main.
-uniform sampler2D RtTransmission;
-uniform sampler2D RtInterfacePosition;
-uniform sampler2D RtInterfaceNormal;
-uniform sampler2D RtSurfaceKey;
-uniform sampler2D RtMaterialIds;
 uniform sampler2D WaterHdr;
 uniform sampler2D WaterDepth;
 uniform sampler2D WaterHzb;
@@ -178,9 +173,6 @@ void main() {
     vec3 crossed=cross(dFdx(surface),dFdy(surface));
     vec2 slope=waveSlope(surface.xz+WaterCamera.xz,WaterCamera.w)+rainSlope(surface.xz+CloudOriginTime.xy);
     voxellightNativeMain();
-    if(WaterTrace.w>.5){ivec2 rtSize=textureSize(RtTransmission,0),q=clamp(ivec2(uv*vec2(rtSize)),ivec2(0),rtSize-1);vec4 rt=texelFetch(RtTransmission,q,0),guide=texelFetch(RtInterfacePosition,q,0),normal=texelFetch(RtInterfaceNormal,q,0);float tolerance=max(.025,.0008*length(surface));vec3 geometryNormal=normalize(crossed);vec4 key=texelFetch(RtSurfaceKey,q,0),id=texture(RtMaterialIds,texCoord0);float materialId=round(id.r*255.0)+256.0*round(id.g*255.0);bool same=key.x==materialId&&rt.a>0&&normal.a>1.5&&abs(dot(normal.xyz,surface-guide.xyz))<tolerance&&abs(dot(normal.xyz,geometryNormal))>.95;
-     if(same&&abs(rt.a-length(surface))<max(.04,2*max(length(dFdx(surface)),length(dFdy(surface))))){fragColor=vec4(displayColor(rt.rgb,surface,1.0,uv),1);return;}}
-
     if(!waterSprite(texCoord0,WaterStill) && !waterSprite(texCoord0,WaterFlow))return;
     vec3 base;float thickness;
     if(!background(uv,surface,base,thickness))return;

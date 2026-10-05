@@ -1,3 +1,11 @@
+# 0.39.0-alpha.13 — Vulkan-only tracing and stationary accumulation
+
+User authorized deletion of old tracing after alpha.12 acceptance. The current runtime and kit contain no OptiX/CUDA tracer, JNI tracing bridge or runtime PTX compiler. Historical legacy-removal gates below are superseded by this authorization. Canonical BSDF/material/environment mathematics remain parity fixtures; unchanged water math is extracted into `native/rt/water_surface.h`. Independent `native/denoiser/temporal_aov.h` preserves temporal diffuse/reflection/refraction AOV invocation (SDK syntax-checked), but no denoiser is connected to Vulkan output yet.
+
+Stationary linear HDR averaging defaults to 64 spp, configurable 4–4096 with `rt_accumulate spp`; `on/off/reset` control history. Moving/rotating, projection/size changes, scene generation/block invalidations and resource/world/backend resets reject history. Increasing target retains samples. Two RGBA32F ping-pong attachments keep history entirely on GPU; sample zero never reads stale history. Sky/light/animated albedo/water assets freeze for each snapshot. Scene updates/warmup continue after convergence, and accepted changes restart tracing. Normal view bypasses accumulation; no motion reprojection/denoising is claimed. Old preferences migrate, UI progress and kit instructions reflect the new path.
+
+Check stationary convergence, raising target, movement, edits, F3+T, resize, disable/re-enable on RTX. Remaining emitter NEE, dynamic geometry, reconstruction and performance gates still apply.
+
 # 0.37.6 — Reference progressive frame budget
 
 ## 0.39.0-alpha.12 — shared environment and direct-light transport
@@ -474,3 +482,5 @@ Direct36-byte BLOCK writer preserves vanilla reservation and packing; spatial na
 ## 0.16.0 D1 temporal shadow stability
 
 `foundation` 默认对静态terrain太阳/月亮阴影visibility做camera reprojection与depth/normal rejection，保留当前texture/emission/local lighting；动态阴影区域不进入history。`/voxellight temporal_shadows off` / `on`比较小幅shadow crawl。新增32 bytes/pixel、128 MiB cap，1440p支持，4K回退当前阴影。编辑/reload/camera cut重置history；不是full TAA。详细验收见[安装说明](INSTALL.md)。
+
+Alpha.13 validation: build/clientKit passed, 241 tests with zero failures; actual accumulation GLSL links against Minecraft bindings, packaged-artifact regression rejects legacy tracer/native compiler payloads. Material/terrain/environment Slang-native parity remains unchanged (57,600 cases / 32 cases / 300,000 samples). Independent temporal AOV header syntax-check passed against the installed OptiX/CUDA SDK. RTX visual acceptance remains pending.

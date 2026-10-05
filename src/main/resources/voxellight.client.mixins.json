@@ -11,8 +11,6 @@
     "ShaderManagerMixin",
     "ChunkSectionsToRenderMixin",
     "ModelFeatureRendererMixin",
-    "RtEntityStateMixin",
-    "RtBlockEntityStateMixin",
     "PreparedFeatureFrameMixin",
     "NativeTerrainFormatMixin",
     "NativeTerrainBufferMixin",
