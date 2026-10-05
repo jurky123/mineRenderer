@@ -17,21 +17,26 @@ final class VulkanRtDebugPass implements AutoCloseable {
     private static final RenderPipeline DISPLAY=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/vulkan_rt_debug"))
         .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","vulkan_rt_debug"))
         .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtNormal").build()).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withColorTargetState(ColorTargetState.DEFAULT).withCull(false).build();
+    private static final RenderPipeline MATERIAL_DISPLAY=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/vulkan_rt_material_display"))
+        .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight","vulkan_rt_material_display"))
+        .withBindGroupLayout(BindGroupLayout.builder().withSampler("RtNormal").build()).withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withColorTargetState(ColorTargetState.DEFAULT).withCull(false).build();
     private final RtTerrainWarmup warmup=new RtTerrainWarmup();
     private VulkanRtContext context;
     private GpuTexture texture;
     private GpuTextureView view;
-    private boolean enabled,failed,transport;
+    private boolean enabled,failed,transport,materials;
+    private final VulkanRtMaterialAssets assets=new VulkanRtMaterialAssets();
     private int diagnosticFrames;
     private volatile String diagnostic="pending";
     private long world=-1,resources=-1,startupMs;
     private String state="off";
     void enable(boolean value) {
-        close();transport=false;enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for Vulkan RT":"off";
+        close();transport=false;materials=false;enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for Vulkan RT":"off";
     }
     void enableTransport() { enable(true);transport=true; }
+    void enableMaterials(){enableTransport();materials=true;}
     boolean enabled() {return enabled;}
-    void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed) {
+    void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed,MaterialCapture material,EnvironmentPass weather) {
         if(!enabled||failed)return;
         if(!(((GpuBackendAccess)RenderSystem.getDevice()).voxellight$backend() instanceof VulkanDevice device)) {state="Vulkan unavailable; raster retained";return;}
         if(!observed){state="waiting for camera projection";return;}
@@ -40,11 +45,11 @@ final class VulkanRtDebugPass implements AutoCloseable {
             if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())) {close();RtGeometryStream.enable(true);}
             if(context==null) {
                 if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);}
-                long start=System.nanoTime();context=new VulkanRtContext(device,transport);
-                if(!RenderSystem.getDevice().precompilePipeline(DISPLAY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan RT debug display pipeline unavailable");
+                long start=System.nanoTime();context=new VulkanRtContext(device,transport,materials);
+                if(!RenderSystem.getDevice().precompilePipeline(materials?MATERIAL_DISPLAY:DISPLAY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan RT debug display pipeline unavailable");
                 startupMs=(System.nanoTime()-start)/1_000_000;
                 world=stats.worldGeneration();resources=stats.resourceGeneration();
-                org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT {} pipeline ready in {} ms; no OptiX tracing",transport?"geometry transport test":"normal POC",startupMs);
+                org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT {} pipeline ready in {} ms; no OptiX tracing",materials?"material transport":transport?"geometry transport test":"normal POC",startupMs);
             }
             int scale=Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360));
             int width=Math.max(1,(target.width+scale-1)/scale),height=Math.max(1,(target.height+scale-1)/scale);
@@ -54,12 +59,15 @@ final class VulkanRtDebugPass implements AutoCloseable {
             var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;var pos=camera.pos;
             warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
             var inverse=new Matrix4f(projection).mul(camera.viewRotationMatrix).invert();
-            if(!context.render(encoder,RtGeometryStream.drain(16),inverse,pos.x(),pos.y(),pos.z(),texture,width,height)) {state="waiting for terrain BLAS";return;}
+            com.voxellight.rt.vulkan.VulkanRtBuffer materialAssets=null;
+            if(materials)try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_material_assets")) {materialAssets=assets.prepare(encoder,device,material,weather);}
+            if(materials&&materialAssets==null){state="waiting for Material 3 atlases";return;}
+            if(!context.render(encoder,RtGeometryStream.drain(16),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets)) {state="waiting for terrain BLAS";return;}
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
-                pass.setPipeline(DISPLAY);pass.bindTexture("RtNormal",view,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
+                pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",view,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
             if(++diagnosticFrames==30)diagnose(encoder,width,height);
-            state=transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
+            state=materials?"material transport; reconstruction NONE; test environment":transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
         } catch(RuntimeException error) {
             close();failed=true;state="failed; raster retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Vulkan RT POC failed; legacy/raster remain available",error);
         }
@@ -76,7 +84,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
             finally{read.close();}
         },0,width/2,height/2,1,1);
     }
-    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
+    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtMaterialAssetBytes="+assets.bytes()+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
     private void releaseTexture() {if(view!=null)view.close();if(texture!=null)texture.close();view=null;texture=null;}
-    @Override public void close() {if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnosticFrames=0;diagnostic="pending";}
+    @Override public void close() {assets.close();if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnosticFrames=0;diagnostic="pending";}
 }

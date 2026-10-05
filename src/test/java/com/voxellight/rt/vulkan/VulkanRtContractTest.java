@@ -26,7 +26,7 @@ class VulkanRtContractTest {
 
     @Test void rtBufferDescriptorsActuallyWriteOneBinding() {
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
-            for(int binding=1;binding<=3;binding++) {
+            for(int binding=1;binding<=6;binding++) {
                 var info=org.lwjgl.vulkan.VkDescriptorBufferInfo.calloc(1,stack).buffer(123).offset(0).range(binding==3?96:4096);
                 var write=org.lwjgl.vulkan.VkWriteDescriptorSet.calloc(stack);
                 int type=binding==3?org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -90,7 +90,7 @@ class VulkanRtContractTest {
     }
     @Test void packagedSpirvHasIndependentNonrecursiveRtStages() throws Exception {
         try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {
-            Map<String,Integer> models=Map.of("primary",5313,"closest_hit",5316,"sky",5317,"transport_primary",5313,"transport_indirect",5313,"transport_closest_hit",5316,"transport_sky",5317);
+            Map<String,Integer> models=Map.ofEntries(Map.entry("primary",5313),Map.entry("closest_hit",5316),Map.entry("sky",5317),Map.entry("transport_primary",5313),Map.entry("transport_indirect",5313),Map.entry("transport_closest_hit",5316),Map.entry("transport_sky",5317),Map.entry("material_primary",5313),Map.entry("material_indirect",5313),Map.entry("material_closest_hit",5316),Map.entry("material_sky",5317),Map.entry("material_cutout",5315));
             for(var entry:models.entrySet()) {
                 byte[] bytes=jar.getInputStream(jar.getEntry("assets/voxellight/rt/vulkan/"+entry.getKey()+".spv")).readAllBytes();
                 var buffer=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
@@ -106,6 +106,18 @@ class VulkanRtContractTest {
             }
         }
     }
+    @Test void materialAtlasTransferRemainsGpuOnlyAndEveryCopyHasAnOwner() throws Exception {
+        var node=new ClassNode();new ClassReader("com.voxellight.adapter.VulkanRtMaterialAssets").accept(node,0);
+        boolean transfer=false,animated=false;
+        for(var method:node.methods)for(var instruction:method.instructions)if(instruction instanceof MethodInsnNode call) {
+            assertFalse(call.owner.startsWith("com/voxellight/nvidia"));
+            assertNotEquals("map",call.name,"Material frame pixels must not return to CPU");
+            if(call.name.equals("copyTextureToBuffer"))transfer=true;
+            if(call.name.equals("createRenderPass"))animated=true;
+        }
+        assertTrue(transfer);assertTrue(animated,"Animated albedo must be refreshed on GPU");
+    }
+
     @Test void deviceCreateHookStillMatchesMinecraftCallSite() throws Exception {
         var backend=new ClassNode();new ClassReader("com.mojang.blaze3d.vulkan.VulkanBackend").accept(backend,0);
         String descriptor="(Lorg/lwjgl/vulkan/VkPhysicalDevice;Lorg/lwjgl/vulkan/VkDeviceCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Lorg/lwjgl/PointerBuffer;)I";

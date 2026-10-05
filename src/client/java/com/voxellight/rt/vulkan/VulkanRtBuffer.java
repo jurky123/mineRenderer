@@ -8,12 +8,12 @@ import static org.lwjgl.vulkan.VK10.*;
 import static com.voxellight.rt.vulkan.VulkanRtCapabilities.check;
 
 /** Device-local addressable allocation. MC's submission-index destruction queue protects in-flight work. */
-final class VulkanRtBuffer extends VulkanGpuBuffer {
+public final class VulkanRtBuffer extends VulkanGpuBuffer {
     private final VulkanDevice device;
     private final long memory, address;
     private boolean closed;
     private record Allocation(long buffer, long memory, long address) {}
-    VulkanRtBuffer(VulkanDevice device, long bytes, int usage) { this(device, bytes, allocate(device, bytes, usage)); }
+    public VulkanRtBuffer(VulkanDevice device, long bytes, int usage) { this(device, bytes, allocate(device, bytes, usage)); }
     private VulkanRtBuffer(VulkanDevice device, long bytes, Allocation allocation) {
         super(allocation.buffer, USAGE_COPY_SRC | USAGE_COPY_DST, bytes);
         this.device = device; memory = allocation.memory; address = allocation.address;

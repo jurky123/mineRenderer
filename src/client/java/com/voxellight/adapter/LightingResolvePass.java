@@ -29,6 +29,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final RtxLightingPass rtx=new RtxLightingPass();
     private final VulkanRtDebugPass vulkanRt=new VulkanRtDebugPass();
+    void setVulkanMaterials(){referenceRt(false);rtx.enable(false);pathtrace.setEnabled(false);vulkanRt.enableMaterials();}
     void setVulkanTransportTest(){referenceRt(false);rtx.enable(false);pathtrace.setEnabled(false);vulkanRt.enableTransport();}
     void setVulkanRtPoc(){referenceRt(false);rtx.enable(false);pathtrace.setEnabled(false);vulkanRt.enable(true);}
     void setRtBackend(boolean enabled){if(vulkanRt.enabled())vulkanRt.enable(false);if(!enabled)referenceRt(false);rtx.enable(enabled);}
@@ -92,7 +93,7 @@ final class LightingResolvePass implements AutoCloseable {
         composite.render(encoder,output,material,shadows,result,environment,ao,true,weather,motion);
 
     }
-    void displayVulkanRt(RenderTarget output){if(vulkanRt.enabled())vulkanRt.render(RenderSystem.getDevice().createCommandEncoder(),output,actualProjection,projectionObserved);}
+    void displayVulkanRt(RenderTarget output,MaterialCapture material){if(vulkanRt.enabled())vulkanRt.render(RenderSystem.getDevice().createCommandEncoder(),output,actualProjection,projectionObserved,material,weather);}
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
     void endFrame(){pathtrace.endFrame();motion.endFrame();weather.endFrame();projectionObserved=false;composite.endFrame();}
     void setAmbientOcclusion(boolean enabled,boolean debug){ao.setEnabled(enabled,debug);}

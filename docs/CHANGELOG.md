@@ -1,6 +1,30 @@
 # 0.37.6 — Reference progressive frame budget
 
 
+## 0.39.0-alpha.10 — native terrain Material 3 binding
+
+Alpha.9 primary/indirect geometry transport passed user GPU testing. Alpha.10 adds `/voxellight rt_backend vulkan_pt`, an explicit material transport experiment. `vulkan_poc` (accepted normals) and `vulkan_transport_test` (accepted grey geometry) remain available; production RTX Quality stays legacy OptiX.
+
+- Reuses the 40-byte compiled terrain vertex snapshot: positions, barycentric UV, interpolated normal, tint and flags. Instance custom indices and packed shader geometry share the exact resident-section order. A separate device-local shader-geometry buffer is concatenated with GPU copies on scene changes; static sections still do no AS builds. Edit replacement admission remains the alpha.8 policy.
+- GPU albedo, existing PbrAtlas IDs/normals and the exact five-plane Material 3 palette feed the canonical Slang decoder. IDs/palette/normals copy once per resource generation; native albedo animations are copied each frame entirely on GPU. No image is downloaded or mapped. The 96-byte atlas/weather header is CPU control data. Both resource reload and world change release old owners through MC submission retirement.
+- Independent nonrecursive closest-hit and cutout any-hit. Closest-hit only reports distance, barycentrics, triangle and instance identity. Any-hit matches native cutout/tint-alpha thresholds and preserves glass/water transmission alpha. GGX/conductor/coating/dielectric/thin-sheet/diffuse-transmission sampling, tangent-space normals, linear albedo/emission, wet coating and original animated water normals run in raygen transport.
+- Eight nested media persist across primary/indirect dispatches. Continuous Minecraft water uses a section-independent medium ID so crossing a BLAS boundary does not invalidate an exit. RGB extinction, eta-aware entry/exit, TIR, Russian roulette eta scaling, finite-segment first-order HG sun scattering and bounded 24-interface shadow transmission are active. Environment and emissive surfaces remain BSDF-sampled only, so they are not double counted. Fixed test sky/sun are still explicit; their production distributions/NEE/MIS are the next stage.
+- Linear HDR radiance uses the existing reference filmic/sRGB curve at fixed 0.75 EV. One path per pixel/frame, six-bounce limit, at most 640×360; no temporal accumulation or reconstruction. Noise at 1 spp is expected. This is experimental transport, not completed PT parity.
+
+Budgets: shader geometry adds at most 64 MiB to the existing 64 MiB AS inputs; geometry is copied across resident sections on an edit, not rebuilt as extra BLAS. The 368-byte continuation costs at most 80.86 MiB; radiance buffer/texture add 7.04 MiB. Packed atlas limit is 256 MiB and also checked against the device's maxStorageBufferRange, with a native-resolution RGBA8 albedo-copy texture. Profile `vulkan_rt_material_assets`, primary and indirect separately; existing scene/BLAS/TLAS timings remain. These are acceptance-stage budgets; memory/bandwidth optimization and RTX 4060 p50/p95 gates are pending.
+
+Host validation executes the actual Slang CPU target against canonical native Material 3 formulas: existing 57,600 BSDF/medium cases and 32 new raw terrain/atlas cases (1,408 components), including high palette IDs, tint, normal mapping, cutout/transmission exemptions, emission, conductor data and original native water-wave functions. Shader build validates twelve SPIR-V stages, descriptor bindings, the 96-byte camera and both 64/368-byte continuation layouts. GLSL tests link the actual albedo-copy and material-display pipelines. Gradle build/clientKit passed; 265 Java/native contract tests passed. Terrain/water binding comparison max normalized error is 2.98023e-08; BSDF/medium max remains 0.000381917. Actual Vulkan material rendering requires user RTX validation.
+
+[Download alpha.10 kit](https://temp.sh/vKVnP/voxellight-client-kit-26.2-0.39.0-alpha.10.zip). Test after installing on Vulkan:
+
+```text
+/voxellight rt_backend vulkan_pt
+/voxellight stats
+```
+
+Check textures/tints, leaf holes, glass blocks, metal profiles, water reflections/transmission and emissive blocks; place/break terrain and try F3+T/resource reload and window resize. Return to `vulkan_poc` for geometry comparison or `rt_backend raster` for raster. Remaining migration: actual sky/sun/cloud environment distributions, emissive/point/held-light NEE/MIS/RIS, cross-section volume identity validation, radiance/caustic cache, entities, motion/AOV guides, denoising/RR, full reference, optional acceleration features and performance gates. Default switch and legacy trace removal remain gated by parity and RTX 4060 performance acceptance.
+
+
 ## 0.39.0-alpha.9 — geometry transport dispatch acceptance
 
 The alpha.8 edit fix passed user RTX 4060 validation for placement and destruction. Alpha.9 adds `/voxellight rt_backend vulkan_transport_test` without changing that scene update policy or production RTX Quality. Separate primary and indirect RT pipelines advance one bounce per dispatch through a 64-byte, GPU-only continuation record. One jittered path per pixel per frame, six-bounce limit, grey diffuse BSDF, sun visibility rays and Russian roulette exercise the runtime transport/synchronization path. Recursion remains 1; closest-hit/miss never trace rays. Normal view remains available through `vulkan_poc`.

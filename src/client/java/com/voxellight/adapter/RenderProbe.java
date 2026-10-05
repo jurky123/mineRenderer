@@ -86,6 +86,7 @@ public final class RenderProbe {
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
+    public void setVulkanMaterials(){RenderSystem.assertOnRenderThread();lighting.setVulkanMaterials();}
     public void setVulkanTransportTest(){RenderSystem.assertOnRenderThread();lighting.setVulkanTransportTest();}
     public void setVulkanRtPoc(){RenderSystem.assertOnRenderThread();lighting.setVulkanRtPoc();}
     public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
@@ -228,7 +229,7 @@ public final class RenderProbe {
         RenderPassProfile.nextFrame();
         entityCaptureScope=false;
         entityMaterials.endFrame();
-        if(mode==Mode.FOUNDATION)lighting.displayVulkanRt(target);
+        if(mode==Mode.FOUNDATION)lighting.displayVulkanRt(target,material);
         lighting.endFrame();material.endFrame();
         if (mode.isMaterial()) {
             lighting.displayFullReference(RenderSystem.getDevice().createCommandEncoder(),target);

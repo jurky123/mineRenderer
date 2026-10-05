@@ -16,16 +16,20 @@ public final class VulkanRtScene implements AutoCloseable {
     private record Section(long version, VulkanRtBuffer vertices, VulkanRtAccel blas, byte[] normals) {}
     private final VulkanDevice device;
     private final int scratchAlignment;
+    private final boolean material;
+    private VulkanRtBuffer geometryBuffer;
     private final Map<SectionKey,Section> sections=new LinkedHashMap<>();
     private VulkanRtAccel tlas;
     private VulkanRtBuffer normalBuffer;
     private long generation, builds, tlasBuilds, bytes;
-    VulkanRtScene(VulkanDevice device,int scratchAlignment) { this.device=device;this.scratchAlignment=scratchAlignment; }
+    VulkanRtScene(VulkanDevice device,int scratchAlignment) {this(device,scratchAlignment,false);}
+    VulkanRtScene(VulkanDevice device,int scratchAlignment,boolean material) { this.device=device;this.scratchAlignment=scratchAlignment;this.material=material; }
     public Set<SectionKey> resident() { return Set.copyOf(sections.keySet()); }
     public long generation() { return generation; }
     long tlas() { return tlas==null?0:tlas.handle(); }
+    VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+sections.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes; }
+    public String status() { return "sections="+sections.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
     public void update(com.mojang.blaze3d.systems.CommandEncoder profileEncoder,List<RtGeometryStream.Section> changes,double x,double y,double z) {
         boolean dirty=false;
         var encoder=device.createCommandEncoder();
@@ -78,6 +82,7 @@ public final class VulkanRtScene implements AutoCloseable {
                     var buffer=uploads.remove(change.key());
                     try(var sectionStack=MemoryStack.stackPush()) {
                         var geometry=VulkanRtAccel.triangles(sectionStack,buffer,change.vertices());
+                        if(material)geometry.get(0).flags(0); // Let any-hit reject cutout texels.
                         var blas=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,geometry,change.vertices()/3,scratchAlignment);
                         var source=ByteBuffer.wrap(change.triangles()).order(ByteOrder.nativeOrder());
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
@@ -94,6 +99,7 @@ public final class VulkanRtScene implements AutoCloseable {
     private void rebuildTlas() {
         if(tlas!=null) {tlas.close();tlas=null;}
         if(normalBuffer!=null) {normalBuffer.close();normalBuffer=null;}
+        if(geometryBuffer!=null){geometryBuffer.close();geometryBuffer=null;}
         if(sections.isEmpty())return;
         int triangles=sections.values().stream().mapToInt(section->section.normals.length/16).sum();
         if(triangles>=0x1000000)throw new IllegalStateException("RT instance normal base exceeds 24 bits");
@@ -101,6 +107,15 @@ public final class VulkanRtScene implements AutoCloseable {
         sections.values().forEach(section->data.put(section.normals));data.flip();
         normalBuffer=new VulkanRtBuffer(device,data.remaining(),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         var encoder=device.createCommandEncoder();encoder.writeToBuffer(normalBuffer.slice(),data);
+        if(material) {
+            geometryBuffer=new VulkanRtBuffer(device,bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            long offset=0;
+            // Same LinkedHashMap order as InstanceCustomIndex and normal bases; GPU-to-GPU only.
+            for(var section:sections.values()) {
+                encoder.copyToBuffer(section.vertices.slice(),geometryBuffer.slice(offset,section.vertices.size()));
+                offset+=section.vertices.size();
+            }
+        }
         var instances=new VulkanRtBuffer(device,(long)sections.size()*VkAccelerationStructureInstanceKHR.SIZEOF,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
         try(var packed=allocateInstances(sections.size());var stack=MemoryStack.stackPush()) {
             int i=0,base=0;
@@ -133,5 +148,5 @@ public final class VulkanRtScene implements AutoCloseable {
     }
     private static boolean admitted(SectionKey key,double x,double y,double z) {return Math.abs(key.x()*16.+8-x)<=144&&Math.abs(key.y()*16.+8-y)<=144&&Math.abs(key.z()*16.+8-z)<=144;}
     private void release(Section section) {bytes-=section.vertices.size();section.blas.close();section.vertices.close();}
-    @Override public void close() { sections.values().forEach(this::release);sections.clear();if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();tlas=null;normalBuffer=null;generation++; }
+    @Override public void close() { sections.values().forEach(this::release);sections.clear();if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++; }
 }

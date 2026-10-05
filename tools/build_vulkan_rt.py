@@ -2,7 +2,7 @@
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
 import argparse, hashlib, json, os, pathlib, shutil, subprocess
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss'}
+STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit'}
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)
     if not found and name == 'slangc':
@@ -12,20 +12,25 @@ def tool(name, variable):
         raise SystemExit(f'{name} required at build time; set {variable}. See docs/VULKAN-RT-MIGRATION.md')
     return found
 
-def validate_layout(reflection, transport=False):
+def validate_layout(reflection, transport=False, material=False):
     parameters = {p['name']: p for p in reflection['parameters']}
     for name, index in {'world': 0, 'output': 1, 'normals': 2, 'camera': 3}.items():
         if parameters[name]['binding']['index'] != index:
             raise ValueError(f'descriptor ABI mismatch: {name}')
     if transport and parameters['paths']['binding']['index'] != 4:
         raise ValueError('continuation descriptor ABI mismatch')
+    if material:
+        for name,index in dict(geometry=5,assets=6).items():
+            if parameters[name]['binding']['index']!=index: raise ValueError('material descriptor ABI mismatch: '+name)
     camera = parameters['camera']['type']['elementType']
     offsets = {f['name']: f['binding']['offset'] for f in camera['fields']}
     expected = {'inverseClip0': 0, 'inverseClip1': 16, 'inverseClip2': 32, 'inverseClip3': 48, 'origin': 64, 'width': 80, 'height': 84, 'padding': 88}
     if transport:
         expected.pop('padding'); expected.update(frame=88, padding=92)
         path = parameters['paths']['type']['resultType']
-        if path['sizes'][0]['value'] != 64 or {f['name']: f['binding']['offset'] for f in path['fields']} != dict(origin=0, direction=16, throughput=32, radiance=48):
+        expected_path=dict(origin=0,direction=16,throughput=32,radiance=48)
+        if material: expected_path.update(absorptionIor=64,scatteringPhase=192,mediumIds=320,mediumCount=352,etaScale=356,previousDelta=360,padding=364)
+        if path['sizes'][0]['value'] != (368 if material else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
             raise ValueError('continuation ABI mismatch')
     if offsets != expected:
         raise ValueError(f'camera ABI mismatch: {offsets}')
@@ -45,8 +50,8 @@ def main():
         subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', entry,
                         '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
-        validate_layout(json.loads(reflection.read_text()), entry.startswith("transport_"))
+        validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
         manifest['shaders'][entry] = {'stage': stage, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABI=64 bytes')
+    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64/368 bytes')
 if __name__ == '__main__': main()
