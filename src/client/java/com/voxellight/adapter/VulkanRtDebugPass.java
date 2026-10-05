@@ -36,10 +36,11 @@ final class VulkanRtDebugPass implements AutoCloseable {
     void enableTransport() { enable(true);transport=true; }
     void enableMaterials(){enableTransport();materials=true;}
     boolean enabled() {return enabled;}
-    void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed,MaterialCapture material,EnvironmentPass weather) {
+    void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows) {
         if(!enabled||failed)return;
         if(!(((GpuBackendAccess)RenderSystem.getDevice()).voxellight$backend() instanceof VulkanDevice device)) {state="Vulkan unavailable; raster retained";return;}
         if(!observed){state="waiting for camera projection";return;}
+        if(materials&&weather.settings()==null){state="waiting for shared environment settings";return;}
         try {
             var stats=com.voxellight.VoxelLightClient.scene().bridge().stats();
             if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())) {close();RtGeometryStream.enable(true);}
@@ -60,14 +61,14 @@ final class VulkanRtDebugPass implements AutoCloseable {
             warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
             var inverse=new Matrix4f(projection).mul(camera.viewRotationMatrix).invert();
             com.voxellight.rt.vulkan.VulkanRtBuffer materialAssets=null;
-            if(materials)try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_material_assets")) {materialAssets=assets.prepare(encoder,device,material,weather);}
+            if(materials)try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_material_assets")) {materialAssets=assets.prepare(encoder,device,material,weather,shadows);}
             if(materials&&materialAssets==null){state="waiting for Material 3 atlases";return;}
             if(!context.render(encoder,RtGeometryStream.drain(16),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets)) {state="waiting for terrain BLAS";return;}
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
                 pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",view,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
             if(++diagnosticFrames==30)diagnose(encoder,width,height);
-            state=materials?"material transport; reconstruction NONE; test environment":transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
+            state=materials?"material transport; shared environment; sun/environment/held NEE + MIS; reconstruction NONE":transport?"geometry transport test; grey diffuse; no reconstruction":"normal/debug only";
         } catch(RuntimeException error) {
             close();failed=true;state="failed; raster retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Vulkan RT POC failed; legacy/raster remain available",error);
         }

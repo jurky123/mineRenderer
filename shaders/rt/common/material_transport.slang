@@ -2,6 +2,7 @@
 #include "terrain_material.slang"
 #include "medium.slang"
 #include "water_surface.slang"
+#include "environment.slang"
 struct SurfacePayload {float distance;float2 bary;uint triangle;uint instance;};
 [[vk::binding(0, 0)]] RaytracingAccelerationStructure world;
 [[vk::binding(1, 0)]] RWStructuredBuffer<float4> output;
@@ -15,7 +16,6 @@ struct PathState {
     uint mediumCount;float etaScale;uint previousDelta;uint padding;
 };
 [[vk::binding(4, 0)]] RWStructuredBuffer<PathState> paths;
-float3 testSky(float3 direction){return lerp(float3(.08,.10,.14),float3(.55,.72,1),saturate(direction.y*.5+.5));}
 SurfacePayload traceSurface(float3 origin,float3 direction,float maximum=4096) {
     RayDesc ray;ray.Origin=origin;ray.Direction=direction;ray.TMin=.001;ray.TMax=maximum;
     SurfacePayload hit;hit.distance=-1;hit.bary=0;hit.triangle=0;hit.instance=0;
@@ -38,10 +38,10 @@ Medium materialMedium(Material m){Medium medium={m.sigmaA,m.sigmaS,m.phaseG,m.io
 bool crossMedium(inout MediumStack media,Material m,bool entering){return entering?media.enter(materialMedium(m)):media.exit(m.mediumId);}
 // Straight shadow visibility through bounded interfaces, with Fresnel and RGB extinction.
 // No secondary TraceRay call in any-hit/closest-hit; recursion remains one.
-float3 visibility(float3 origin,float3 direction,MediumStack media) {
+float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum=4096) {
     float3 value=float3(1);
     for(int boundary=0;boundary<24;boundary++) {
-        SurfacePayload hit=traceSurface(origin,direction);float distance=hit.distance>=0?hit.distance:4096;
+        SurfacePayload hit=traceSurface(origin,direction,max(.001,maximum));float distance=hit.distance>=0?hit.distance:maximum;
         if(media.count>0){Medium m=media.entries[media.count-1];value*=expNeg(m.sigmaA+m.sigmaS,distance);}
         if(hit.distance<0)return value;
         TerrainSurface surface=terrainSurface(hit.triangle,hit.bary,hit.instance);Material m=surface.material;
@@ -53,7 +53,8 @@ float3 visibility(float3 origin,float3 direction,MediumStack media) {
         value*=m.type==DIFFUSE_TRANSMISSION?m.baseColor*m.transmission:float3((1-F)*m.transmission);
         if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&!crossMedium(media,m,entering))return float3(0);
         if(maxComponent(value)<1e-6)return float3(0);
-        origin=offsetRayOrigin(origin+direction*hit.distance,surface.geometryNormal,direction);
+        float3 point=origin+direction*hit.distance;float3 next=offsetRayOrigin(point,surface.geometryNormal,direction);
+        maximum-=hit.distance+max(0,dot(next-point,direction));if(maximum<=.001)return value;origin=next;
     }
     return float3(0); // Conservative interface-limit handling.
 }
@@ -66,20 +67,21 @@ void advance(inout PathState path) {
         surface=terrainSurface(hit.triangle,hit.bary,hit.instance);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
         if(!entering&&dielectric(surface.material)&&surface.material.type!=THIN_DIELECTRIC&&media.count==0)media.enter(materialMedium(surface.material));
     }
-    float distance=hit.distance>=0?hit.distance:4096;
-    float3 sun=normalize(float3(.4,.8,.25)),sunRadiance=float3(2.5,2.2,1.8);
+    float distance=hit.distance>=0?hit.distance:128;
     if(media.count>0) {
         Medium m=media.entries[media.count-1];float3 extinction=m.sigmaA+m.sigmaS;
         // Realtime finite-segment first-order scattering; full free-flight reference remains pending.
         if(maxComponent(m.sigmaS)>0) {
             MediumDistanceSample sample=sampleMediumDistance(extinction,distance,seed);float3 event=path.origin.xyz+path.direction.xyz*sample.distance;
-            path.radiance.xyz+=path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,sun),m.g)/sample.pdf)*sunRadiance*visibility(event,sun,media);
+            LightSample light=sampleOneLight(event,seed);
+            // This first-order segment estimator has no competing phase continuation.
+            // Applying surface MIS here would remove energy rather than reduce variance.
+            if(light.pdf>0)path.radiance.xyz+=path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002));
         }
         path.throughput.xyz*=expNeg(extinction,distance);
     }
     if(hit.distance<0) {
-        // Environment and emissive geometry are BSDF-sampled only until their NEE distributions migrate.
-        path.radiance.xyz+=path.throughput.xyz*testSky(path.direction.xyz);path.origin.w=0;
+        path.radiance.xyz+=path.throughput.xyz*missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0);path.origin.w=0;
     } else {
         Material m=surface.material;float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
         if(m.type==WATER) {
@@ -91,12 +93,16 @@ void advance(inout PathState path) {
         Frame frame=makeFrame(n,surface.frame.t,surface.frame.b);
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
         path.radiance.xyz+=path.throughput.xyz*m.emission;
-        BsdfEval direct=evalBsdf(m,frame,wo,sun,eta);
-        if(direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,sun)) {
+        LightSample light=sampleOneLight(point,seed);
+        BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
+        if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
             MediumStack shadowMedia=media;bool visible=true;
-            if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&dot(n,sun)<0)visible=crossMedium(shadowMedia,m,entering);
-            if(visible)path.radiance.xyz+=path.throughput.xyz*direct.f*abs(dot(n,sun))*sunRadiance*visibility(offsetRayOrigin(point,surface.geometryNormal,sun),sun,shadowMedia);
+            if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&dot(n,light.wi)<0)visible=crossMedium(shadowMedia,m,entering);
+            float mis=lightMisWeight(light,direct.pdf,path.throughput.w<5);
+            if(visible)path.radiance.xyz+=path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance
+                *visibility(offsetRayOrigin(point,surface.geometryNormal,light.wi),light.wi,shadowMedia,max(.001,light.distance-.002));
         }
+        if(path.throughput.w>=5) {path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}
         BsdfSample sample=sampleBsdf(m,frame,wo,seed,eta);
         bool valid=sample.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,sample.wi);
         if(valid&&(sample.flags&TRANSMISSION)!=0&&dielectric(m)&&m.type!=THIN_DIELECTRIC) {

@@ -4,5 +4,6 @@
   "native/rt/material.cuh": "8d6c990a55783165d36ea2c442b06ed5cad014b9f576f815ac6317e29880ddda",
   "native/rt/surface.h": "575d1bcfe8583003eb95710f60fed0fcb6c4cbbe1f31fa0bd1d0c3753ab90c30",
   "native/rt/hit.cu": "ca6b3160e6cda111bd10a2f3d5aa754c380cfba75eca4be5f86c296bec7aa2cc",
-  "native/rt/device.cuh": "043fd96f04dbc319f239d5b0f157b4845ae5168756b2a29190e4c62214180f13"
+  "native/rt/device.cuh": "043fd96f04dbc319f239d5b0f157b4845ae5168756b2a29190e4c62214180f13",
+  "native/rt/environment.h": "9bafb26e7412e3bb6d9037f71aa5b5e8776db67d61ba3dfbabee16bee70bbc8f"
 }

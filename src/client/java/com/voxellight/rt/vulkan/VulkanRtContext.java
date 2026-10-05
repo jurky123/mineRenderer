@@ -87,6 +87,6 @@ public final class VulkanRtContext implements AutoCloseable {
             return true;
         } finally {camera.close();}
     }
-    public String status() { return (material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=NONE, recursion=1, spp=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size())+", "+scene.status(); }
+    public String status() { return (material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, environment=shared HDR 256x128, environmentSampling=GPU solid-angle CDF, lightNee=sun/moon+environment+held, lightMis=power heuristic, cameraWater=initialized, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=NONE, recursion=1, spp=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size())+", "+scene.status(); }
     @Override public void close() {if(!closed){closed=true;scene.close();pipeline.close();if(indirect!=null)indirect.close();if(paths!=null)paths.close();if(output!=null)output.close();}}
 }

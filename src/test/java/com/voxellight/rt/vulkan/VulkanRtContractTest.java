@@ -128,15 +128,17 @@ class VulkanRtContractTest {
         }
     }
     @Test void materialAtlasTransferRemainsGpuOnlyAndEveryCopyHasAnOwner() throws Exception {
-        var node=new ClassNode();new ClassReader("com.voxellight.adapter.VulkanRtMaterialAssets").accept(node,0);
-        boolean transfer=false,animated=false;
-        for(var method:node.methods)for(var instruction:method.instructions)if(instruction instanceof MethodInsnNode call) {
-            assertFalse(call.owner.startsWith("com/voxellight/nvidia"));
-            assertNotEquals("map",call.name,"Material frame pixels must not return to CPU");
-            if(call.name.equals("copyTextureToBuffer"))transfer=true;
-            if(call.name.equals("createRenderPass"))animated=true;
+        for(String owner:List.of("VulkanRtMaterialAssets","VulkanRtEnvironmentAssets")) {
+            var node=new ClassNode();new ClassReader("com.voxellight.adapter."+owner).accept(node,0);
+            boolean transfer=false,animated=false;
+            for(var method:node.methods)for(var instruction:method.instructions)if(instruction instanceof MethodInsnNode call) {
+                assertFalse(call.owner.startsWith("com/voxellight/nvidia"));
+                assertNotEquals("map",call.name,"Material frame pixels must not return to CPU");
+                if(call.name.equals("copyTextureToBuffer"))transfer=true;
+                if(call.name.equals("createRenderPass"))animated=true;
+            }
+            assertTrue(transfer);assertTrue(animated,"Animated albedo and environment must be refreshed on GPU");
         }
-        assertTrue(transfer);assertTrue(animated,"Animated albedo must be refreshed on GPU");
     }
 
     @Test void deviceCreateHookStillMatchesMinecraftCallSite() throws Exception {

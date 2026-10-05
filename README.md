@@ -1,8 +1,26 @@
 # mineRenderer / VoxelLight
 
+## 0.39.0-alpha.12 — shared environment and direct-light transport
+
+[Download alpha.12 client kit](https://temp.sh/porVb/voxellight-client-kit-26.2-0.39.0-alpha.12.zip) (temporary link; select `rt_backend vulkan_pt` on Vulkan).
+
+Alpha.11 terrain admission passed user acceptance, including previously missing coverage. Alpha.12 advances the explicit `rt_backend vulkan_pt` experiment; production RTX Quality still uses the accepted legacy path.
+
+- Shared 256×128 RGBA32F HDR sky: the existing `rt_environment` shader and `LightingEnvironment.polished` palette supply world time, sky/horizon/sunset, weather, stars and bounded cloud radiance. The fixed test sky/sun is removed from the material path. Geometry-only `vulkan_transport_test` retains its intentional test environment.
+- GPU luminance × exact lat-long solid-angle CDFs, with conditional row/column binary sampling and uniform-cos(theta) cell sampling. Black maps fall back to uniform sphere. All map/CDF generation and transfer remain on GPU; no new frame-image readback or OptiX/CUDA call. Two bounded fragment reduction passes rebuild the distribution each frame; profile `vulkan_rt_environment_map` and `vulkan_rt_environment_distribution` separately.
+- One power-weighted direct-light choice per nonsingular surface: current sun/moon finite cone (6.793e-5 sr), importance-sampled HDR environment, or enabled held virtual point light with inverse-square intensity. RGB visibility retains cutout/transmissive interfaces and now stops at finite point-light distance. Power-heuristic MIS pairs environment/sun NEE with BSDF misses; delta events and discrete points retain unit weights. The terminal sixth vertex uses unit NEE weight because there is no competing BSDF continuation. Emissive terrain is still BSDF-hit-only and is not counted by this light distribution.
+- Camera-underwater transport initializes the same quantized water absorption/scattering/IOR/phase coefficients and section-independent identity as water surfaces. Finite-segment first-order scattering samples the same sun/environment/held distribution; it uses no phase MIS because this estimator has no competing phase continuation. An unbounded medium miss is limited to the existing reference policy of 128 blocks. Eight-medium stack and six-bounce/1 spp/recursion-1 contracts remain.
+
+The CPU asset header grows from 96 to 192 bytes; camera and continuation ABIs stay 96/368 bytes. Environment map/cell/row data occupy 1,050,624 bytes in the existing descriptor-6 storage buffer, plus 1,050,624 bytes of GPU textures and a 64-byte palette uniform. No new RT descriptor binding. The overall packed asset cap remains 256 MiB/device storage-buffer range. Scene budgeting/admission is unchanged from accepted alpha.11.
+
+Build/clientKit passed with 267 tests and no failures. Numerical validation runs the actual Slang CPU target against canonical native `environment.h`: 300,000 samples (max normalized native/Slang error 2.31713e-06) cover PDF normalization/poles, conditional histograms, black fallback, finite sun cone, held-light discrete PDF/inverse-square falloff, complementary miss MIS, paired white furnace, terminal-depth furnace and camera-water initialization. The existing Material 3/terrain parity suites remain required. Shipped GLSL environment/CDF pipelines are compiled and linked against Minecraft's actual bind-group contract; twelve SPIR-V stages and descriptor/continuation reflection are validated. RTX visual and performance acceptance for this version is pending.
+
+Test `/voxellight rt_backend vulkan_pt` and `/voxellight stats`: day/night/rain transitions, indoor environment shadowing, metal/glass sky reflections, held torch moving near surfaces, entering/exiting water, terrain edits, F3+T and window resize. Reconstruction remains NONE and 1 spp is noisy. Remaining: emissive-triangle NEE/MIS, exact local cloud shadow transmittance, radiance/caustic caches, dynamic entities, temporal AOV/reconstruction/OptiX-denoiser/DLSS RR, full reference and RTX 4060 timing gates. Shared sky is the existing approximate model, not full atmospheric multiple scattering. No default switch or legacy tracing removal is authorized by this milestone.
+
+
 ## 0.39.0-alpha.11 — camera-prioritized terrain admission
 
-Build/clientKit validation passed: 267 tests, zero failures. [Download alpha.11 client kit](https://temp.sh/UyKdk/voxellight-client-kit-26.2-0.39.0-alpha.11.zip). Actual RTX coverage validation is pending.
+Build/clientKit validation passed: 267 tests, zero failures. [Download alpha.11 client kit](https://temp.sh/UyKdk/voxellight-client-kit-26.2-0.39.0-alpha.11.zip). User RTX coverage acceptance passed (alpha.11).
 
 Alpha.10 user GPU logs confirm material transport produces finite radiance (cold pipeline startup 4,377 ms), but resident input geometry reaches 67,108,080 bytes and some areas never appear. New sections previously could not evict residents at the 64 MiB limit; warmup retries therefore remained rejected. Alpha.11 sorts edits first and new arrivals by camera distance, and admits nearer sections by evicting strictly farther unprotected residents. Eviction is planned atomically; infeasible admission preserves the existing scene. Existing edited BLAS remains until its replacement is built. Camera movement changes admission priority; the existing two-second warmup retry discovers nonresident loaded sections again.
 

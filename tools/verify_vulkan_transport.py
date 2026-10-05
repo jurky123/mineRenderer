@@ -29,6 +29,13 @@ def main():
     executable=output/'terrain_material_parity'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_terrain_material_parity.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/environment_parity.slang';spv=output/'environment_parity.spv'
+    subprocess.run([compiler,str(source),'-target','spirv','-profile','spirv_1_5','-entry','environment_parity','-stage','compute','-o',str(spv)],check=True)
+    subprocess.run([tool('spirv-val','SPIRV_VAL'),'--target-env','vulkan1.2',str(spv)],check=True)
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','environment_parity','-stage','compute','-o',str(output/'environment_parity.cpp')],check=True)
+    executable=output/'environment_parity'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_environment_parity.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     (output/'result.txt').write_text(result);print(result,end='')
 
 if __name__=='__main__':main()

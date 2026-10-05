@@ -29,7 +29,9 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     private GpuTextureView albedoView;
     private VulkanRtBuffer buffer;
     private int[] widths,heights,offsets;
-    VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather) {
+    private int environmentOffset;
+    private final VulkanRtEnvironmentAssets environment=new VulkanRtEnvironmentAssets();
+    VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows) {
         var atlas=Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
         var ids=material.rtAtlas(0);var normal=material.rtAtlas(1);var palette=material.rtAtlas(2);
         if(ids==null||normal==null||palette==null)return null;
@@ -38,8 +40,9 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             // Keep the native albedo resolution; IDs and normals have their existing PbrAtlas dimensions.
             widths=new int[]{atlas.getWidth(0),ids.getWidth(0),normal.getWidth(0),palette.getWidth(0)};
             heights=new int[]{atlas.getHeight(0),ids.getHeight(0),normal.getHeight(0),palette.getHeight(0)};
-            offsets=new int[4];long bytes=96;
+            offsets=new int[4];long bytes=192;
             for(int i=0;i<4;i++){offsets[i]=Math.toIntExact(bytes);bytes=Math.addExact(bytes,Math.multiplyExact((long)widths[i]*heights[i],4));}
+            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;
             if(bytes>256L*1024*1024)throw new IllegalStateException("Vulkan material atlas budget exceeded (256 MiB)");
             try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
                 var properties=org.lwjgl.vulkan.VkPhysicalDeviceProperties.calloc(stack);
@@ -53,10 +56,20 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             encoder.copyTextureToBuffer(palette.texture(),buffer,offsets[3],()->{},0);
         }
         // Metadata is small CPU control data; all atlas pixels stay on the GPU.
-        var header=ByteBuffer.allocateDirect(96).order(ByteOrder.LITTLE_ENDIAN);
-        for(int i=0;i<4;i++)header.putInt(widths[i]).putInt(heights[i]).putInt(offsets[i]).putInt(0);
-        var controls=weather.rtSettings();header.putFloat(WaterSurface.clock()).putFloat(controls[2]).putFloat(WaterSurface.waveStrength()).putFloat(controls[4]).putFloat(controls[0]).putFloat(0).putFloat(0).putFloat(0).flip();
-        encoder.writeToBuffer(buffer.slice(0,96),header);
+        var header=ByteBuffer.allocateDirect(192).order(ByteOrder.LITTLE_ENDIAN);
+        int[] extra={environmentOffset,environmentOffset+256*128*16,environmentOffset+256*128*32,96};
+        for(int i=0;i<4;i++)header.putInt(widths[i]).putInt(heights[i]).putInt(offsets[i]).putInt(extra[i]);
+        var controls=weather.rtSettings();header.putFloat(WaterSurface.clock()).putFloat(controls[2]).putFloat(WaterSurface.waveStrength()).putFloat(controls[4])
+            .putFloat(controls[0]).putInt(256).putInt(128).putInt(Minecraft.getInstance().gameRenderer.mainCamera().getFluidInCamera()==net.minecraft.world.level.material.FogType.WATER?1:0);
+        var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;var light=shadows.light();
+        var env=com.voxellight.world.LightingEnvironment.polished(light,sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);var sun=light.direction();
+        header.putFloat(sun.x).putFloat(sun.y).putFloat(sun.z).putFloat(6.793e-5f);
+        header.putFloat(env.directR()*env.directStrength()*(float)Math.PI).putFloat(env.directG()*env.directStrength()*(float)Math.PI).putFloat(env.directB()*env.directStrength()*(float)Math.PI).putFloat(0);
+        for(float value:shadows.rtVirtualLight())header.putFloat(value);
+        var water=material.waterMedium();header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
+        header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).flip();
+        encoder.writeToBuffer(buffer.slice(0,192),header);
+        environment.prepare(encoder,device,buffer,environmentOffset,weather,shadows);
         try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan animated albedo copy")
             .withRenderArea(new RenderPass.RenderArea(0,0,widths[0],heights[0])).withColorAttachment(albedoView,Optional.empty()))) {
             pass.setPipeline(COPY);pass.bindTexture("Sampler0",atlas,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
@@ -65,5 +78,5 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         return buffer;
     }
     long bytes(){return buffer==null?0:buffer.size();}
-    @Override public void close(){if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;albedoView=null;albedo=null;}
+    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;albedoView=null;albedo=null;}
 }
