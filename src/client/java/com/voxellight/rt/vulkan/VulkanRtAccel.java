@@ -27,10 +27,14 @@ public final class VulkanRtAccel implements AutoCloseable, Destroyable {
         geometry.get(0).geometry().triangles().sType$Default().vertexFormat(VK10.VK_FORMAT_R32G32B32_SFLOAT).vertexStride(40).maxVertex(count-1).indexType(VK_INDEX_TYPE_NONE_KHR).vertexData().deviceAddress(vertices.address());
         return geometry;
     }
+    static void buildInfo(VkAccelerationStructureBuildGeometryInfoKHR info,int type,VkAccelerationStructureGeometryKHR.Buffer geometry) {
+        info.sType$Default().type(type).flags(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR)
+            .mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR).geometryCount(geometry.remaining()).pGeometries(geometry);
+    }
     static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,int scratchAlignment) {
         try(var stack=MemoryStack.stackPush()) {
             var info=VkAccelerationStructureBuildGeometryInfoKHR.calloc(1,stack);
-            info.get(0).sType$Default().type(type).flags(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR).mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR).pGeometries(geometry);
+            buildInfo(info.get(0),type,geometry);
             var sizes=VkAccelerationStructureBuildSizesInfoKHR.calloc(stack).sType$Default();
             vkGetAccelerationStructureBuildSizesKHR(device.vkDevice(),VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,info.get(0),stack.ints(primitives),sizes);
             var result=new VulkanRtAccel(device,type,sizes.accelerationStructureSize());

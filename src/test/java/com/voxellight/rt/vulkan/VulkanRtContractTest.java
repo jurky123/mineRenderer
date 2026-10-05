@@ -37,6 +37,21 @@ class VulkanRtContractTest {
         }
     }
 
+    @Test void blasAndTlasBuildsIncludeTheirGeometry() {
+        try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
+            for(int type:new int[]{org.lwjgl.vulkan.KHRAccelerationStructure.VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,org.lwjgl.vulkan.KHRAccelerationStructure.VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR}) {
+                var geometry=org.lwjgl.vulkan.VkAccelerationStructureGeometryKHR.calloc(1,stack);
+                int kind=type==org.lwjgl.vulkan.KHRAccelerationStructure.VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR?org.lwjgl.vulkan.KHRAccelerationStructure.VK_GEOMETRY_TYPE_TRIANGLES_KHR:org.lwjgl.vulkan.KHRAccelerationStructure.VK_GEOMETRY_TYPE_INSTANCES_KHR;
+                geometry.get(0).sType$Default().geometryType(kind);
+                var info=org.lwjgl.vulkan.VkAccelerationStructureBuildGeometryInfoKHR.calloc(stack);
+                VulkanRtAccel.buildInfo(info,type,geometry);
+                assertEquals(1,info.geometryCount());assertEquals(type,info.type());
+                assertEquals(geometry.address(),info.pGeometries().address());assertEquals(kind,info.pGeometries().get(0).geometryType());
+                assertEquals(org.lwjgl.vulkan.KHRAccelerationStructure.VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,info.mode());
+            }
+        }
+    }
+
     @Test void driverSizedArraysDoNotConsumeTheThreadStack() {
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
             // Leave very little stack space, as in nested Minecraft device initialization.

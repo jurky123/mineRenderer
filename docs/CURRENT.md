@@ -1,5 +1,10 @@
 # VoxelLight current state
 
+## 0.39.0-alpha.7 — nonempty AS geometry builds
+
+Alpha.6 GPU telemetry verified the raygen marker (1, .2, .8, 2), finite direction colors, and center alpha 0; the user saw only miss background. BLAS/TLAS build geometryCount was zero because LWJGL pGeometries sets only its pointer (it shares the count with alternative ppGeometries). Alpha.7 explicitly sets the geometry count before both size queries and build recording. A regression invokes the production build-info builder for triangle BLAS and instance TLAS and verifies count, type, geometry pointer/type and BUILD mode. The GPU diagnostics remain until actual terrain hits and static/edit behavior are accepted.
+
+
 ## 0.39.0-alpha.6 — diagnose black Vulkan RT output
 
 Alpha.5 still showed black despite status reporting 183 section BLAS builds and a completed debug display path. The cause remains unconfirmed. This diagnostic candidate makes ray misses a direction gradient, adds a known magenta raygen output marker and an independent cyan fullscreen border, and logs a one-time asynchronous readback of only two RGBA32F pixels (32 bytes per context, no wait). The marker verifies dispatch/output copying; center alpha distinguishes hit (1) from miss (0); red denotes nonfinite sampled output. This is POC-only diagnostic telemetry, not a reconstruction readback or performance acceptance. No denoising path is changed. Request screenshot plus `Vulkan RT POC GPU diagnostic` log before further conclusions.
