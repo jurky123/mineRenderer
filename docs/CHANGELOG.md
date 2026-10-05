@@ -1,5 +1,11 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.39.0-alpha.3 — preserve terrain on backend switch
+
+The alpha.2 user log confirms Minecraft reset the graphics API after the previous crash and selected OpenGL; Vulkan RT never initialized. The Vulkan POC command now rejects OpenGL with an explicit switch-API-and-restart message before changing mode or geometry admission. Both RT backends stop calling LevelRenderer.invalidateCompiledGeometry (which releases native terrain buffers); independent RT warmup admits already loaded sections without discarding raster geometry. The diagnostic view runs once after world rendering and before camera projection reset, independently of foundation material/shadow readiness. Host regression/build checks cover call placement and absence of terrain invalidation; RTX rendering remains unverified on this host.
+
+
+
 ## 0.39.0-alpha.2
 
 - Fix Windows NVIDIA startup MemoryStack overflow: allocate driver extension properties on native heap with explicit release.

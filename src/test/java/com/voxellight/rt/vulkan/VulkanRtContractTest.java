@@ -9,6 +9,21 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void backendSwitchPreservesRasterAndDebugRunsBeforeProjectionReset() throws Exception {
+        for(String name:List.of("VulkanRtDebugPass","RtxLightingPass")) {
+            var node=new ClassNode();new ClassReader("com.voxellight.adapter."+name).accept(node,0);
+            for(var method:node.methods)for(var instruction:method.instructions)
+                if(instruction instanceof MethodInsnNode call)
+                    assertNotEquals("invalidateCompiledGeometry",call.name,"RT admission must preserve native raster buffers");
+        }
+        var probe=new ClassNode();new ClassReader("com.voxellight.adapter.RenderProbe").accept(probe,0);
+        var render=probe.methods.stream().filter(m->m.name.equals("render")).findFirst().orElseThrow();
+        var calls=Arrays.stream(render.instructions.toArray()).filter(i->i instanceof MethodInsnNode call&&call.owner.equals("com/voxellight/adapter/LightingResolvePass"))
+            .map(i->((MethodInsnNode)i).name).toList();
+        assertTrue(calls.indexOf("displayVulkanRt")>=0);
+        assertTrue(calls.indexOf("displayVulkanRt")<calls.indexOf("endFrame"),"Debug view requires the current camera projection");
+    }
+
     @Test void driverSizedArraysDoNotConsumeTheThreadStack() {
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
             // Leave very little stack space, as in nested Minecraft device initialization.

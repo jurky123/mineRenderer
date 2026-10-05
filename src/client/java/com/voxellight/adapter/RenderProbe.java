@@ -227,6 +227,7 @@ public final class RenderProbe {
         RenderPassProfile.nextFrame();
         entityCaptureScope=false;
         entityMaterials.endFrame();
+        if(mode==Mode.FOUNDATION)lighting.displayVulkanRt(target);
         lighting.endFrame();material.endFrame();
         if (mode.isMaterial()) {
             lighting.displayFullReference(RenderSystem.getDevice().createCommandEncoder(),target);

@@ -26,18 +26,17 @@ final class VulkanRtDebugPass implements AutoCloseable {
     private String state="off";
     void enable(boolean value) {
         close();enabled=value;failed=false;RtGeometryStream.enable(value);state=value?"waiting for Vulkan RT":"off";
-        recompile();
     }
-    private static void recompile() {var mc=Minecraft.getInstance();if(mc.level!=null)mc.levelRenderer.invalidateCompiledGeometry(mc.level,mc.options,mc.gameRenderer.mainCamera(),mc.getBlockColors());}
     boolean enabled() {return enabled;}
     void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed) {
-        if(!enabled||failed||!observed)return;
+        if(!enabled||failed)return;
         if(!(((GpuBackendAccess)RenderSystem.getDevice()).voxellight$backend() instanceof VulkanDevice device)) {state="Vulkan unavailable; raster retained";return;}
+        if(!observed){state="waiting for camera projection";return;}
         try {
             var stats=com.voxellight.VoxelLightClient.scene().bridge().stats();
-            if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())) {close();RtGeometryStream.enable(true);recompile();}
+            if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())) {close();RtGeometryStream.enable(true);}
             if(context==null) {
-                if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);recompile();}
+                if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);}
                 long start=System.nanoTime();context=new VulkanRtContext(device);
                 if(!RenderSystem.getDevice().precompilePipeline(DISPLAY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan RT debug display pipeline unavailable");
                 startupMs=(System.nanoTime()-start)/1_000_000;

@@ -89,8 +89,9 @@ final class LightingResolvePass implements AutoCloseable {
         if(composite.polished()&&!ao.debug()&&pbrDebug==0)result=surfaces.render(encoder,output,material,shadows,result,environment,pbrSettings,weather,motion);
         composite.fullReference(rtx.fullReferenceActive());
         composite.render(encoder,output,material,shadows,result,environment,ao,true,weather,motion);
-        vulkanRt.render(encoder,output,actualProjection,projectionObserved);
+
     }
+    void displayVulkanRt(RenderTarget output){if(vulkanRt.enabled())vulkanRt.render(RenderSystem.getDevice().createCommandEncoder(),output,actualProjection,projectionObserved);}
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
     void endFrame(){pathtrace.endFrame();motion.endFrame();weather.endFrame();projectionObserved=false;composite.endFrame();}
     void setAmbientOcclusion(boolean enabled,boolean debug){ao.setEnabled(enabled,debug);}

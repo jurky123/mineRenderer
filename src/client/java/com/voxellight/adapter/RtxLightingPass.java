@@ -56,8 +56,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
  private boolean enabled,active,failed,assetsUploaded,sceneReady;
  private String state="off";
  private final Map<SectionKey,Long> resident=new HashMap<>();
- private static void recompile(){var mc=Minecraft.getInstance();if(mc.level!=null)mc.levelRenderer.invalidateCompiledGeometry(mc.level,mc.options,mc.gameRenderer.mainCamera(),mc.getBlockColors());}
- void enable(boolean value){if(enabled==value&&!failed)return;enabled=value;if(!value)discardStartup();close();failed=false;RtGeometryStream.enable(value);state=value?"waiting for compiled RT scene":"off";if(Minecraft.getInstance().level!=null)recompile();}
+ void enable(boolean value){if(enabled==value&&!failed)return;enabled=value;if(!value)discardStartup();close();failed=false;RtGeometryStream.enable(value);state=value?"waiting for compiled RT scene":"off";}
  void option(String option,boolean value){int bit=switch(option){case "rt_gi"->1;case "rt_reflections"->2;case "rt_transmission"->4;case "rt_denoiser"->8;case "radiance_cache"->16;case "rt_caustics"->32;case "rt_primary_glossy_nee"->64;case "rt_environment"->128;case "rt_multiscatter"->256;default->throw new IllegalArgumentException(option);};options=value?options|bit:options&~bit;referenceHistory.invalidate();}
  void benchmark(){if(context==0)throw new IllegalStateException("Enable RTX and wait for RT scene before benchmarking");OptixNative.benchmark(context);}
  void debug(int value){if(debug!=value)referenceHistory.invalidate();debug=value;}
@@ -74,7 +73,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
   String stage="Vulkan/CUDA device checks";
   try{
    var stats=com.voxellight.VoxelLightClient.scene().bridge().stats();
-   if(context!=0&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())){close();RtGeometryStream.enable(true);recompile();}
+   if(context!=0&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())){close();RtGeometryStream.enable(true);}
    var backend=((GpuBackendAccess)RenderSystem.getDevice()).voxellight$backend();if(!(backend instanceof VulkanDevice vk))throw new IllegalStateException("RTX requires Vulkan");
    boolean win=System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");if(win?!vk.vkDevice().getCapabilities().VK_KHR_external_memory_win32||!vk.vkDevice().getCapabilities().VK_KHR_external_semaphore_win32:!vk.vkDevice().getCapabilities().VK_KHR_external_memory_fd||!vk.vkDevice().getCapabilities().VK_KHR_external_semaphore_fd)throw new IllegalStateException("Vulkan export extensions unavailable");
    if(fullReferenceRequested&&!fullReference&&context!=0){
@@ -86,7 +85,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
      long prepared=0;
      try{prepared=referenceStartup.take();}catch(RuntimeException error){referenceStartup.close();fullReferenceRequested=false;referenceCompileState="failed; realtime retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Full reference compile failed; realtime retained",error);}
      referenceStartup=null;
-     if(prepared!=0){closeResources();fullReference=true;reference=true;referenceAnnouncement=true;context=prepared;referenceCompileState="ready";referenceHistory.invalidate();RtGeometryStream.enable(true);recompile();
+     if(prepared!=0){closeResources();fullReference=true;reference=true;referenceAnnouncement=true;context=prepared;referenceCompileState="ready";referenceHistory.invalidate();RtGeometryStream.enable(true);
       int rw=(target.width+referenceScale-1)/referenceScale,rh=(target.height+referenceScale-1)/referenceScale;
       try{init(vk,encoder,target,material,rw,rh);world=stats.worldGeneration();resources=stats.resourceGeneration();}catch(Exception error){closeResources();fullReference=reference=fullReferenceRequested=false;referenceCompileState="resource failure; restarting realtime";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Full reference resource import failed",error);return;}
      }
@@ -99,7 +98,7 @@ final class RtxLightingPass implements com.voxellight.rt.RtBackend {
     init(vk,encoder,target,material,w,h);org.slf4j.LoggerFactory.getLogger("VoxelLight").info("RTX viewport resized to {}x{}; compiled OptiX pipelines retained",w,h);
    }
    if(context==0){
-    if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);recompile();}
+    if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);}
     stage="OptiX background initialization";
     if(startup!=null&&startupFull!=fullReference)discardStartup();
     if(startup==null){

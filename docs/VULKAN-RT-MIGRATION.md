@@ -92,3 +92,10 @@ DLSS RR needs separate diffuse/specular reflectance, normals/roughness, noisy co
 Progress: (1) legacy production + Vulkan POC → (2) OptiX/Vulkan A/B → (3) Vulkan experimental RTX → (4) Vulkan default RTX → (5) OptiX tracing deprecated → (6) tracing deleted → (7) denoiser retained.
 
 Before step 4, require RTX 4060 Laptop cold startup <10 s, warm <2 s, zero runtime OptiX PT compilation on the Vulkan path, true 1-spp baseline/RTX Quality average ≤1.5, fixed-scene Material 3/reference acceptance and full Vulkan RT frame time ≤1.05× legacy. SDK backend availability and raster fallback must remain functional. **Normal bringup alone does not satisfy these gates.**
+
+## 0.39.0-alpha.3 — preserve terrain on backend switch
+
+The alpha.2 user log confirms Minecraft reset the graphics API after the previous crash and selected OpenGL; Vulkan RT never initialized. The Vulkan POC command now rejects OpenGL with an explicit switch-API-and-restart message before changing mode or geometry admission. Both RT backends stop calling LevelRenderer.invalidateCompiledGeometry (which releases native terrain buffers); independent RT warmup admits already loaded sections without discarding raster geometry. The diagnostic view runs once after world rendering and before camera projection reset, independently of foundation material/shadow readiness. Host regression/build checks cover call placement and absence of terrain invalidation; RTX rendering remains unverified on this host.
+
+
+After a startup crash, explicitly select Vulkan in Minecraft video settings and restart. Confirm `backend=Vulkan` in `/voxellight status` before testing `/voxellight rt_backend vulkan_poc`. F3+T is not a graphics API switch.
