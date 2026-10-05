@@ -22,6 +22,8 @@ final class VulkanRtDebugPass implements AutoCloseable {
     private GpuTexture texture;
     private GpuTextureView view;
     private boolean enabled,failed;
+    private int diagnosticFrames;
+    private volatile String diagnostic="pending";
     private long world=-1,resources=-1,startupMs;
     private String state="off";
     void enable(boolean value) {
@@ -46,7 +48,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
             int scale=Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360));
             int width=Math.max(1,(target.width+scale-1)/scale),height=Math.max(1,(target.height+scale-1)/scale);
             if(texture==null||texture.getWidth(0)!=width||texture.getHeight(0)!=height) {
-                releaseTexture();texture=device.createTexture("VoxelLight Vulkan RT normal",GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,width,height,1,1);view=device.createTextureView(texture);
+                releaseTexture();texture=device.createTexture("VoxelLight Vulkan RT normal",GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,width,height,1,1);view=device.createTextureView(texture);
             }
             var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;var pos=camera.pos;
             warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
@@ -55,12 +57,25 @@ final class VulkanRtDebugPass implements AutoCloseable {
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
                 pass.setPipeline(DISPLAY);pass.bindTexture("RtNormal",view,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
+            if(++diagnosticFrames==30)diagnose(encoder,width,height);
             state="normal/debug only";
         } catch(RuntimeException error) {
             close();failed=true;state="failed; raster retained";org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Vulkan RT POC failed; legacy/raster remain available",error);
         }
     }
-    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
+    private void diagnose(CommandEncoder encoder,int width,int height) {
+        var read=RenderSystem.getDevice().createBuffer(()->"VoxelLight POC two-pixel diagnostic",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,32);
+        encoder.copyTextureToBuffer(texture,read,0,()->{},0,0,0,1,1);
+        encoder.copyTextureToBuffer(texture,read,16,()->{
+            try(var mapped=read.map(true,false)) {
+                var b=mapped.data().order(java.nio.ByteOrder.nativeOrder());
+                diagnostic="marker="+b.getFloat(0)+"/"+b.getFloat(4)+"/"+b.getFloat(8)+"/"+b.getFloat(12)+",center="+b.getFloat(16)+"/"+b.getFloat(20)+"/"+b.getFloat(24)+"/"+b.getFloat(28);
+                org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT POC GPU diagnostic: {}",diagnostic);
+            }catch(RuntimeException error){diagnostic="readback failed";org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("POC two-pixel diagnostic failed",error);}
+            finally{read.close();}
+        },0,width/2,height/2,1,1);
+    }
+    String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostic+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
     private void releaseTexture() {if(view!=null)view.close();if(texture!=null)texture.close();view=null;texture=null;}
-    @Override public void close() {if(context!=null)context.close();context=null;releaseTexture();warmup.close();}
+    @Override public void close() {if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnosticFrames=0;diagnostic="pending";}
 }

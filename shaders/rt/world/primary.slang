@@ -10,5 +10,11 @@ void primary() {
     ray.TMin = 0.001; ray.TMax = 4096.0;
     SurfacePayload payload = {float3(0.0), -1.0};
     TraceRay(world, RAY_FLAG_FORCE_OPAQUE, 255, 0, 0, 0, ray, payload);
-    output[pixel.y * camera.width + pixel.x] = float4(payload.normal * 0.5 + 0.5, payload.distance >= 0.0 ? 1.0 : 0.0);
+    bool hit = payload.distance >= 0.0;
+    // Diagnostic miss colors expose camera rays instead of hiding misses as black.
+    float3 color = hit ? payload.normal * 0.5 + 0.5 : 0.15 + 0.7 * (ray.Direction * 0.5 + 0.5);
+    float4 signal = float4(color, hit ? 1.0 : 0.0);
+    // A known dispatch marker separates tracing/output-copy faults from display faults.
+    if (pixel.x < 4 && pixel.y < 4) signal = float4(1.0, 0.2, 0.8, 2.0);
+    output[pixel.y * camera.width + pixel.x] = signal;
 }
