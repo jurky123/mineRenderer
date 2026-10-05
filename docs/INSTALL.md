@@ -1,13 +1,15 @@
-# VoxelLight 0.39.0-alpha.14 安装
+# VoxelLight 0.39.0-alpha.15 安装
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.14.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.15.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 
 ```text
 /voxellight rt_backend vulkan_pt
+/voxellight held_lights on
+/voxellight rt_accumulate freeze off
 /voxellight rt_accumulate spp 256
 /voxellight rt_accumulate on
 /voxellight status

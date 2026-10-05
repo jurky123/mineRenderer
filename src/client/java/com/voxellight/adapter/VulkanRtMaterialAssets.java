@@ -82,7 +82,9 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         var water=material.waterMedium();header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
         header.putInt(124,scene.emitterCount());header.putInt(156,emitterOffset);
         header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).flip();
-        lightingStatus=", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
+        var player=Minecraft.getInstance().player;
+        String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
+        lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
         encoder.writeToBuffer(buffer.slice(0,192),header);
         if(emitterGeneration!=scene.generation()){if(scene.emitterCount()>0)encoder.writeToBuffer(buffer.slice(emitterOffset,scene.emitterCount()*64L),scene.emitterData());emitterGeneration=scene.generation();}
         environment.prepare(encoder,device,buffer,environmentOffset,weather,shadows);

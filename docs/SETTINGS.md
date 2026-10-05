@@ -1,9 +1,11 @@
-# VoxelLight 设置与静止累积（alpha.14）
+# VoxelLight 设置与静止累积（alpha.15）
 
 暂停/Options → VoxelLight 或 `/voxellight settings` 打开原版控件界面。命令树提供可搜索的选择项，`rt_accumulate spp` 有独立数字输入。界面底部显示静止累积的完成样本数和目标，每秒刷新。
 
 ```text
 /voxellight rt_backend vulkan_pt
+/voxellight held_lights on
+/voxellight rt_accumulate freeze off
 /voxellight rt_accumulate spp 256
 /voxellight rt_accumulate on
 ```
@@ -18,3 +20,5 @@
 设置原子写入 `config/voxellight/settings.json`，进入世界时按顺序回放。选择 preset 清除此前个别覆盖值。累积开关、冻结模式与目标保存，reset/诊断操作不保存。全新安装没有覆盖值时仍默认 effects off。
 
 旧 `preset rtx_quality` 保存值迁移为 `vulkan_quality`；旧 OptiX/CUDA backend 保存值迁移为 `vulkan_pt`；旧 `rt_reference spp` 迁移为 `rt_accumulate spp`。旧参考模式/旧 pathtrace 和旧缓存、去噪开关丢弃；这些命令不再注册。OpenGL 上 Vulkan backend/preset 显示切换图形 API 的提示。
+
+Alpha.15 手持点光不参与天空/太阳混合随机抽样，每次有效表面着色和介质事件独立连接，保持真实遮挡和平方反比衰减，离散点光不与连续 BSDF 配对 MIS。状态新增 `vulkanRtHeldItems` 与 `vulkanRtHeldPosition` 以排查未识别物品/源位置；手持支持原生发光 BlockItem，其他物品尚无发光规则。

@@ -85,6 +85,8 @@ void advance(inout PathState path) {
             // This first-order segment estimator has no competing phase continuation.
             // Applying surface MIS here would remove energy rather than reduce variance.
             if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002)));
+            LightSample held=sampleHeldLight(event);
+            if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*visibility(event,held.wi,media,max(.001,held.distance-.002)));
             LightSample emitter=sampleEmitter(event,seed);
             if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*visibility(event,emitter.wi,media,max(.001,emitter.distance-.002)));
         }
@@ -104,7 +106,9 @@ void advance(inout PathState path) {
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
         float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,emitterHitPdf(hit.triangle,path.origin.xyz,point));
         addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
-        LightSample light=sampleOneLight(point,seed);
+        // One stochastic sky/sun sample plus an independent held delta connection.
+        for(int connection=0;connection<2;connection++){
+        LightSample light=connection==0?sampleOneLight(point,seed):sampleHeldLight(point);
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
             MediumStack shadowMedia=media;bool visible=true;
@@ -112,6 +116,7 @@ void advance(inout PathState path) {
             float mis=lightMisWeight(light,direct.pdf,path.throughput.w<5);
             if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance
                 *visibility(offsetRayOrigin(point,surface.geometryNormal,light.wi),light.wi,shadowMedia,max(.001,light.distance-.002)));
+        }
         }
         LightSample emitter=sampleEmitter(point,seed);
         if(emitter.pdf>0){

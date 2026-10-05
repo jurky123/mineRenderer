@@ -1,3 +1,9 @@
+# 0.39.0-alpha.15 — independent held-light connection
+
+Alpha.14 held lighting still failed user visual acceptance. Its delta point light shared stochastic selection with sun/sky, allowing high environment power to starve held connections. It now has a separate deterministic inverse-square connection at eligible surfaces and medium events; sky/sun distribution and complementary miss MIS exclude the delta source. Visibility and material shading remain intact; no light leaks or unconditional full-screen brightness are substituted. Status adds main/offhand item IDs and virtual source position to distinguish recognition from transport failures. Visual acceptance remains pending; no RTX GPU is available on the build host.
+
+Regression executes actual Slang with held on/off, black and million-unit sky maps and verifies discrete PDF=1 and analytic Lambertian held irradiance independent of sky power. Existing Material 3, terrain, environment MIS, invalid accumulation and emitter sampling checks remain required.
+
 # 0.39.0-alpha.14 — live accumulation, numerical rejection and emissive NEE
 
 Default history now continues tracing at its sample target with bounded EMA and live sky/held/water/albedo assets. Lighting signatures invalidate large changes; explicit `rt_accumulate freeze on|off` preserves opt-in frozen snapshots. Held native BlockItem lights are independent of raster local-light enablement and use level/15 × 20 scene-linear point intensity.

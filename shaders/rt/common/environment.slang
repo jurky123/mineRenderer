@@ -31,8 +31,8 @@ float4 directionalLight(){return asfloat(assets.Load4(96));}
 float3 directionalIrradiance(){return asfloat(assets.Load3(112));}
 float3 lightProbabilities() {
     float sun=luminance(directionalIrradiance()),env=max(.001,environmentPower());
-    float point=asfloat(assets.Load(140))>0?luminance(asfloat(assets.Load3(144)))*4*Pi:0;
-    return float3(sun,env,point)/(sun+env+point);
+    // Held delta light has its own deterministic connection; sky power cannot starve it.
+    return float3(sun,env,0)/(sun+env);
 }
 float3 sampleCone(float3 axis,float omega,inout uint seed) {
     float c=1-rng(seed)*omega/(2*Pi),r=sqrt(max(0,1-c*c)),a=2*Pi*rng(seed);Frame frame=makeFrame(axis);return frame.world(float3(r*cos(a),r*sin(a),c));
@@ -42,13 +42,19 @@ LightSample sampleOneLight(float3 point,inout uint seed) {
     float3 probabilities=lightProbabilities();float choice=rng(seed);LightSample light=(LightSample)0;light.distance=4096;
     if(choice<probabilities.x) {
         float4 sun=directionalLight();light.kind=0;light.wi=sampleCone(sun.xyz,sun.w,seed);light.pdf=probabilities.x/sun.w;light.radiance=directionalIrradiance()/sun.w;
-    } else if(choice<probabilities.x+probabilities.y) {
-        light.kind=1;light.wi=sampleEnvironment(seed);light.pdf=probabilities.y*environmentDensity(light.wi);light.radiance=environmentRadiance(light.wi);
     } else {
-        light.kind=3;float3 delta=asfloat(assets.Load3(128))-point;light.distance=length(delta);if(light.distance<.025)return light;
-        light.wi=delta/light.distance;light.pdf=probabilities.z;light.radiance=asfloat(assets.Load3(144))/(light.distance*light.distance);
+        light.kind=1;light.wi=sampleEnvironment(seed);light.pdf=probabilities.y*environmentDensity(light.wi);light.radiance=environmentRadiance(light.wi);
     }
+
     return light;
+}
+LightSample sampleHeldLight(float3 point) {
+    LightSample light=(LightSample)0;light.kind=3;
+    if(asfloat(assets.Load(140))<=0)return light;
+    float3 delta=asfloat(assets.Load3(128))-point;light.distance=length(delta);
+    if(light.distance<.025)return light;
+    light.wi=delta/light.distance;light.pdf=1;
+    light.radiance=asfloat(assets.Load3(144))/(light.distance*light.distance);return light;
 }
 float3 missRadiance(float3 direction,float previousPdf,bool previousDelta) {
     float3 probabilities=lightProbabilities();float envPdf=probabilities.y*environmentDensity(direction);
