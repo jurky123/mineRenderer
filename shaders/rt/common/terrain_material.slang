@@ -8,7 +8,7 @@ struct TerrainVertex {float3 p;float2 uv;float3 n;uint tint;uint flags;};
 TerrainVertex terrainVertex(uint triangle,uint vertex) {
     uint offset=triangle*120+vertex*40;
     TerrainVertex v;
-    v.p=asfloat(geometry.Load3(offset));v.uv=asfloat(geometry.Load2(offset+12));v.n=asfloat(geometry.Load3(offset+20));
+    v.p=asfloat(readWords3(geometry,offset));v.uv=asfloat(geometry.Load2(offset+12));v.n=asfloat(readWords3(geometry,offset+20));
     v.tint=geometry.Load(offset+32);v.flags=geometry.Load(offset+36);return v;
 }
 uint atlasTexel(uint slot,float2 uv) {

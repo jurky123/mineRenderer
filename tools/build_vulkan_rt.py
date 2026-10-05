@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
-import argparse, hashlib, json, os, pathlib, shutil, subprocess
+import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit'}
 def tool(name, variable):
@@ -11,6 +11,21 @@ def tool(name, variable):
     if not found:
         raise SystemExit(f'{name} required at build time; set {variable}. See docs/VULKAN-RT-MIGRATION.md')
     return found
+
+def validate_byte_address_layout(binary):
+    """Reject padded vec3 runtime aliases that corrupt ByteAddressBuffer.Load3 offsets."""
+    words=struct.unpack('<'+'I'*(len(binary)//4),binary)
+    vectors={};arrays={};strides={};i=5
+    while i<len(words):
+        count=words[i]>>16;opcode=words[i]&65535;args=words[i+1:i+count]
+        if opcode==23:vectors[args[0]]=args[2] # OpTypeVector
+        elif opcode==29:arrays[args[0]]=args[1] # OpTypeRuntimeArray
+        elif opcode==71 and args[1]==6:strides[args[0]]=args[2] # ArrayStride
+        if count==0:raise ValueError('invalid SPIR-V instruction')
+        i+=count
+    for array,element in arrays.items():
+        if vectors.get(element)==3 and strides.get(array)!=12:
+            raise ValueError('padded vec3 ByteAddressBuffer alias: 12-byte indexing with '+str(strides.get(array))+'-byte ArrayStride; use scalar word loads')
 
 def validate_layout(reflection, transport=False, material=False):
     parameters = {p['name']: p for p in reflection['parameters']}
@@ -50,6 +65,7 @@ def main():
         subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', entry,
                         '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
+        validate_byte_address_layout(spv.read_bytes())
         validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
         manifest['shaders'][entry] = {'stage': stage, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')

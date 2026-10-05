@@ -1,4 +1,4 @@
-# VoxelLight 设置与静止累积（alpha.16）
+# VoxelLight 设置与静止累积（alpha.17）
 
 暂停/Options → VoxelLight 或 `/voxellight settings` 打开原版控件界面。命令树提供可搜索的选择项，`rt_accumulate spp` 有独立数字输入。界面底部显示静止累积的完成样本数和目标，每秒刷新。
 
@@ -26,3 +26,5 @@ Alpha.15 手持点光不参与天空/太阳混合随机抽样，每次有效表�
 Alpha.16 为原生火把/灵魂火把及灯笼建立独立点光提案，同一方块合并一次，采用平方反比衰减、真实遮挡和离散选择 PDF；木杆及金属模型不再整面自发光，显式 LabPBR 发光保留。其他原生发光面使用场景线性辐射标定 8，并继续面积采样及 MIS。有限距离阴影连接增加按世界坐标精度调整的接收面偏移，减少自遮挡。
 
 如手持照明仍异常，拿着火把对准附近不透明墙面运行 `/voxellight rt_lighting_probe`，等待约 30 帧，再提供 `Vulkan RT POC GPU diagnostic` 日志。`heldIncident` 为入射 RGB/距离，`heldBsdf` 为材质 RGB/PDF，`heldHemisphere` 为着色与几何法线方向余弦，`heldVisibility` 为透过率/介质允许标志。测试机没有 RTX，CPU 输运验证不能替代真实 GPU 验收。
+
+Alpha.17 修正 SPIR-V 原始字节地址读取：Slang 对部分 12 字节对齐的 `Load3` 生成 uint3 数组，但 std430 ArrayStride 为 16，造成手持强度 144 字节被读作 192 字节。所有地形/天空/光源三分量字节读取改为三个标量 Load；构建直接检查最终 SPIR-V，拒绝此类填充数组别名。旧 alpha.16 二进制触发检查，新二进制通过；仍保留 GPU lighting probe 供实机确认。

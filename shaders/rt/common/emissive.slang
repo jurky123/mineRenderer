@@ -13,12 +13,12 @@ LightSample sampleEmitter(float3 point,inout uint seed){
     float mass=rng(seed)*emitterTotal();uint lo=0,hi=count-1;
     while(lo<hi){uint mid=(lo+hi)/2;if(asfloat(assets.Load(emitterAddress(mid)+12))<mass)lo=mid+1;else hi=mid;}
     uint address=emitterAddress(lo);if(assets.Load(address+56)==1){
-        float3 source=asfloat(assets.Load3(address));float3 delta=source-point;light.distance=length(delta);
+        float3 source=asfloat(readWords3(assets,address));float3 delta=source-point;light.distance=length(delta);
         if(light.distance<.025)return light;light.wi=delta/light.distance;light.pdf=asfloat(assets.Load(address+44))/emitterTotal();
-        light.radiance=asfloat(assets.Load3(address+16))/(light.distance*light.distance);light.kind=3;return light;
+        light.radiance=asfloat(readWords3(assets,address+16))/(light.distance*light.distance);light.kind=3;return light;
     }
     float root=sqrt(rng(seed));float2 bary=float2(root*(1-rng(seed)),0);bary.y=root-bary.x;
-    float3 a=asfloat(assets.Load3(address)),b=asfloat(assets.Load3(address+16)),c=asfloat(assets.Load3(address+32));
+    float3 a=asfloat(readWords3(assets,address)),b=asfloat(readWords3(assets,address+16)),c=asfloat(readWords3(assets,address+32));
     float3 target=a*(1-root)+b*bary.x+c*bary.y;uint2 ids=assets.Load2(address+48);
     if(!visibleTexel(ids.x,bary))return light;
     light.distance=length(target-point);light.wi=safeNormalize(target-point);light.pdf=emitterPdf(address,point,target);

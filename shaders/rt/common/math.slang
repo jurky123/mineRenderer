@@ -17,3 +17,6 @@ float powerHeuristic(float a,float b){
 
 // Native normalize clamps its squared length before division, including degenerate vectors.
 float3 safeNormalize(float3 v) { return v/sqrt(max(1e-20,dot(v,v))); }
+
+// Avoid Slang Load3 SPIR-V vector alias: std430 uint3 array stride is 16, not 12.
+uint3 readWords3(ByteAddressBuffer data,uint offset){return uint3(data.Load(offset),data.Load(offset+4),data.Load(offset+8));}
