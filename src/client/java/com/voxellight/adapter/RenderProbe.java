@@ -381,7 +381,18 @@ public final class RenderProbe {
         }
     }
 
-    /** Called on resize, world reset and shutdown. Backend close methods defer GPU destruction. */
+    /** Size-dependent pass owners reallocate during their next prepare; preserve OptiX pipelines. */
+    public void resize() {
+        RenderSystem.assertOnRenderThread();
+        releaseScratch();
+        entityCaptureScope = materialFrameReady = false;
+        materialPointObserved = false;
+        adaptive.close();
+        resetTiming();
+        state = "waiting for resized world render";
+    }
+
+    /** Called on world reset and shutdown. Backend close methods defer GPU destruction. */
     public void reset() {
         RenderSystem.assertOnRenderThread();
         releaseScratch();

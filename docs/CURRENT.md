@@ -1,5 +1,9 @@
 # VoxelLight current state
 
+## 0.38.0-alpha.8 — resize callback correction (GPU candidate)
+
+Alpha.7 user correctly enabled reference, but 214×120 → 640×338 still destroyed the native context and recompiled. The common GameRenderer resize/reset hook bypassed alpha.7 viewport reuse. Alpha.8 splits resize from world/data/shutdown reset and adds a bytecode lifecycle regression test. Alpha.7 initialization took ~13 s; cache remained zero/missing. Visual correctness, reference convergence and warm cache remain unaccepted. [Evidence and checks](REFERENCE-0.38-ALPHA8.md).
+
 ## 0.38.0-alpha.7 — convergence / viewport follow-up (GPU candidate)
 
 Alpha.6 user GPU cold startup completed in ~16 s, but resizing recompiled and identical keys missed a zero-sized disk cache. Alpha.7 retains compiled pipelines/world geometry on viewport resize, preserves reference accumulation when changing positive target SPP, explains reference versus realtime SPP in command feedback/status, exposes reset count and raises the adaptive reference ceiling to 8192 pixels. Native/Java host verification does not establish visual correctness. SDK disk-cache persistence, warm startup and the reported noisy/incorrect image remain GPU acceptance items. P0 stays open. [Changes and GPU checks](REFERENCE-0.38-ALPHA7.md).

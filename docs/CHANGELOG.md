@@ -1,5 +1,9 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.38.0-alpha.8
+
+Separate GameRenderer resize from full world/data reset, allowing alpha.7 viewport-only RTX reallocation to run. Guard callback ownership with a bytecode test. Reference and warm-cache GPU acceptance remain open. [Follow-up](REFERENCE-0.38-ALPHA8.md).
+
 ## 0.38.0-alpha.7
 
 Retain compiled OptiX pipelines and world geometry on viewport resize; rebuild only frame imports/denoiser resources. Preserve reference sums on positive SPP target changes, report command semantics, expose reference reset count, and let measured reference windows grow to 8192 pixels. Alpha.6 user GPU cold startup ~16 s; cache persistence and rendering correctness remain open. See [follow-up](REFERENCE-0.38-ALPHA7.md).

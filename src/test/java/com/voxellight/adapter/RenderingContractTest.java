@@ -23,6 +23,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RenderingContractTest {
     @Test
+    void resizeHookPreservesRtContextWhileWorldResetReleasesIt() throws Exception {
+        var hooks=new ClassNode(Opcodes.ASM9);
+        new ClassReader("com.voxellight.mixin.client.GameRendererMixin").accept(hooks,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+        for(var name:List.of("voxellight$resizeResources","voxellight$releaseResources")){
+            var method=hooks.methods.stream().filter(m->m.name.equals(name)).findFirst().orElseThrow();
+            var calls=new ArrayList<String>();
+            for(var instruction:method.instructions)if(instruction instanceof MethodInsnNode call&&call.owner.equals("com/voxellight/adapter/RenderProbe"))calls.add(call.name);
+            assertEquals(List.of(name.equals("voxellight$resizeResources")?"resize":"reset"),calls);
+        }
+        var probe=new ClassNode(Opcodes.ASM9);
+        new ClassReader("com.voxellight.adapter.RenderProbe").accept(probe,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+        var resize=probe.methods.stream().filter(m->m.name.equals("resize")).findFirst().orElseThrow();
+        for(var instruction:resize.instructions)if(instruction instanceof MethodInsnNode call)assertFalse(call.owner.equals("com/voxellight/adapter/LightingResolvePass")&&call.name.equals("close"));
+    }
+
+    @Test
     void partialRenderAreaDoesNotRescaleTheMinecraftVulkanViewport() throws Exception {
         var node = new ClassNode(Opcodes.ASM9);
         new ClassReader("com.mojang.blaze3d.vulkan.VulkanRenderPass").accept(node, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);

@@ -14,6 +14,8 @@ Open **Pause/Options → VoxelLight** or `/voxellight settings` for searchable v
 
 Alpha.7 follows the alpha.6 ~16 s user GPU cold startup with viewport context reuse and reference convergence fixes. `/voxellight rt_reference spp N` sets a cumulative reference target; enable it with `/voxellight rt_reference on`. Realtime remains 1 spp/frame. Visual and warm-cache acceptance remain open. [Follow-up and test steps](docs/REFERENCE-0.38-ALPHA7.md).
 
+Alpha.8 fixes the GameRenderer resize callback that bypassed alpha.7 context reuse; world/data reset still fully releases resources. [Evidence and checks](docs/REFERENCE-0.38-ALPHA8.md).
+
 ## 文档
 
 - [Material 3](docs/MATERIAL-3.md)：material classes、LabPBR、coating、Vanilla presets、override API。

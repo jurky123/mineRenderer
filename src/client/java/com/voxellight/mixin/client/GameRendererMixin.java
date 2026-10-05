@@ -35,7 +35,12 @@ abstract class GameRendererMixin {
         VoxelLightClient.probe().endWorldBudget(target);
     }
 
-    @Inject(method = {"resize", "resetData", "setLevel", "close"}, at = @At("HEAD"))
+    @Inject(method = "resize", at = @At("HEAD"))
+    private void voxellight$resizeResources(CallbackInfo ci) {
+        VoxelLightClient.probe().resize();
+    }
+
+    @Inject(method = {"resetData", "setLevel", "close"}, at = @At("HEAD"))
     private void voxellight$releaseResources(CallbackInfo ci) {
         VoxelLightClient.probe().reset();
     }
