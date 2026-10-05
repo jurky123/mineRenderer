@@ -37,13 +37,30 @@ public final class VulkanRtScene implements AutoCloseable {
             }
         }
         List<RtGeometryStream.Section> accepted=new ArrayList<>();
-        for(var change:changes) {
+        var ordered=new ArrayList<>(changes);
+        ordered.sort(Comparator.comparingInt(change->sections.containsKey(change.key())?0:1));
+        Set<SectionKey> protectedKeys=new HashSet<>();changes.forEach(change->protectedKeys.add(change.key()));
+        long plannedBytes=bytes;int plannedCount=sections.size();
+        for(var change:ordered) {
             if(!admitted(change.key(),x,y,z))continue;
             var old=sections.get(change.key());if(old!=null&&old.version==change.version())continue;
-            if(old!=null) { sections.remove(change.key());release(old);dirty=true; }
-            if(change.vertices()==0)continue;
-            if(bytes+change.triangles().length>64L*1024*1024 || sections.size()+accepted.size()>=512)continue;
-            accepted.add(change);bytes+=change.triangles().length;dirty=true;
+            if(change.vertices()==0) {
+                if(old!=null){sections.remove(change.key());plannedBytes-=old.vertices.size();plannedCount--;release(old);dirty=true;}
+                continue;
+            }
+            long oldBytes=old==null?0:old.vertices.size();
+            if(change.triangles().length>64L*1024*1024)continue;
+            // Existing edited sections take priority. Keep their old BLAS until replacement is built.
+            while(old!=null && !fits(plannedBytes,oldBytes,change.triangles().length,plannedCount, true)) {
+                var victim=sections.keySet().stream().filter(key->!protectedKeys.contains(key))
+                    .max(Comparator.comparingDouble(key->distance(key,x,y,z))).orElse(null);
+                if(victim==null)break;
+                var removed=sections.remove(victim);plannedBytes-=removed.vertices.size();plannedCount--;release(removed);dirty=true;
+            }
+            if(!fits(plannedBytes,oldBytes,change.triangles().length,plannedCount,old!=null))continue;
+            accepted.add(change);plannedBytes=plannedBytes-oldBytes+change.triangles().length;
+            if(old==null)plannedCount++;
+            dirty=true;
         }
         if(!dirty)return;
         // Upload commands precede build commands through MC's encoder.execute ordering.
@@ -65,7 +82,8 @@ public final class VulkanRtScene implements AutoCloseable {
                         var source=ByteBuffer.wrap(change.triangles()).order(ByteOrder.nativeOrder());
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
                         for(int triangle=0;triangle<change.vertices()/3;triangle++)normals.putFloat(source.getFloat(triangle*120+20)).putFloat(source.getFloat(triangle*120+24)).putFloat(source.getFloat(triangle*120+28)).putFloat(0);
-                        sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array()));builds++;
+                        var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array()));
+                        bytes+=buffer.size();if(previous!=null)release(previous);builds++;
                     } catch(RuntimeException error) { buffer.close();throw error; }
                 }
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
@@ -106,6 +124,12 @@ public final class VulkanRtScene implements AutoCloseable {
     static void barrier(VkCommandBuffer command,MemoryStack stack,int sourceStage,int sourceAccess,int destinationStage,int destinationAccess) {
         var barrier=VkMemoryBarrier.calloc(1,stack).sType$Default().srcAccessMask(sourceAccess).dstAccessMask(destinationAccess);
         vkCmdPipelineBarrier(command,sourceStage,destinationStage,0,barrier,null,null);
+    }
+    static boolean fits(long residentBytes,long previousBytes,long incomingBytes,int count,boolean replacement) {
+        return incomingBytes>0&&incomingBytes<=64L*1024*1024&&residentBytes-previousBytes+incomingBytes<=64L*1024*1024&&(replacement?count<=512:count<512);
+    }
+    private static double distance(SectionKey key,double x,double y,double z) {
+        double dx=key.x()*16.+8-x,dy=key.y()*16.+8-y,dz=key.z()*16.+8-z;return dx*dx+dy*dy+dz*dz;
     }
     private static boolean admitted(SectionKey key,double x,double y,double z) {return Math.abs(key.x()*16.+8-x)<=144&&Math.abs(key.y()*16.+8-y)<=144&&Math.abs(key.z()*16.+8-z)<=144;}
     private void release(Section section) {bytes-=section.vertices.size();section.blas.close();section.vertices.close();}

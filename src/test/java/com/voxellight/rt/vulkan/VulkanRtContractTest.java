@@ -52,6 +52,16 @@ class VulkanRtContractTest {
         }
     }
 
+    @Test void sectionReplacementBudgetUsesNetSizeAndKeepsExistingSlots() {
+        long limit=64L*1024*1024;
+        assertTrue(VulkanRtScene.fits(limit,4096,4096,512,true));
+        assertFalse(VulkanRtScene.fits(limit,4096,4216,512,true));
+        assertTrue(VulkanRtScene.fits(limit-1024,4096,4216,511,true));
+        assertFalse(VulkanRtScene.fits(limit,0,120,511,false));
+        assertFalse(VulkanRtScene.fits(limit-1024,0,120,512,false));
+        assertFalse(VulkanRtScene.fits(limit,4096,limit+120,512,true));
+    }
+
     @Test void driverSizedArraysDoNotConsumeTheThreadStack() {
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
             // Leave very little stack space, as in nested Minecraft device initialization.
