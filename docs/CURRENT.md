@@ -1,5 +1,9 @@
 # VoxelLight current state
 
+## 0.39.0-alpha.1 — Vulkan RT migration stage 1
+
+Legacy OptiX remains production. An explicit Vulkan terrain normal POC borrows MC device/queue, enables RT features, builds section BLAS/world TLAS, consumes independent build-time Slang/SPIR-V stages, caches pipelines and records delayed GPU timings. Static section versions skip rebuild; viewport resize preserves pipeline/scene. Build/layout/stage/lifecycle contracts are host-verified; this host has no RTX GPU. Phase A GPU acceptance is pending; full PT, Material 3 parity, compaction/entity refit, RIS, reconstruction, DLSS RR, OMM/SER and Vulkan reference are not complete. Do not resume OptiX compiler tuning as the migration objective. [Authoritative migration ledger and checks](VULKAN-RT-MIGRATION.md).
+
 ## 0.38.0-alpha.8 — resize callback correction (GPU candidate)
 
 Alpha.7 user correctly enabled reference, but 214×120 → 640×338 still destroyed the native context and recompiled. The common GameRenderer resize/reset hook bypassed alpha.7 viewport reuse. Alpha.8 splits resize from world/data/shutdown reset and adds a bytecode lifecycle regression test. Alpha.7 initialization took ~13 s; cache remained zero/missing. Visual correctness, reference convergence and warm cache remain unaccepted. [Evidence and checks](REFERENCE-0.38-ALPHA8.md).

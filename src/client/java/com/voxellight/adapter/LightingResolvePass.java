@@ -28,9 +28,11 @@ final class LightingResolvePass implements AutoCloseable {
     boolean replacesClouds(){return weather.replacesClouds();}
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final RtxLightingPass rtx=new RtxLightingPass();
-    void setRtBackend(boolean enabled){if(!enabled)referenceRt(false);rtx.enable(enabled);}
+    private final VulkanRtDebugPass vulkanRt=new VulkanRtDebugPass();
+    void setVulkanRtPoc(){referenceRt(false);rtx.enable(false);pathtrace.setEnabled(false);vulkanRt.enable(true);}
+    void setRtBackend(boolean enabled){if(vulkanRt.enabled())vulkanRt.enable(false);if(!enabled)referenceRt(false);rtx.enable(enabled);}
     void setRtOption(String option,boolean value){rtx.option(option,value);}
-    void referenceRt(boolean value){rtx.reference(value);surfaces.reference(value);}
+    void referenceRt(boolean value){if(value&&vulkanRt.enabled())vulkanRt.enable(false);rtx.reference(value);surfaces.reference(value);}
     boolean referenceActive(){return rtx.referenceEnabled();}
     void referenceSpp(int value){rtx.referenceSpp(value);}
     void referenceReset(){rtx.referenceReset();}
@@ -87,6 +89,7 @@ final class LightingResolvePass implements AutoCloseable {
         if(composite.polished()&&!ao.debug()&&pbrDebug==0)result=surfaces.render(encoder,output,material,shadows,result,environment,pbrSettings,weather,motion);
         composite.fullReference(rtx.fullReferenceActive());
         composite.render(encoder,output,material,shadows,result,environment,ao,true,weather,motion);
+        vulkanRt.render(encoder,output,actualProjection,projectionObserved);
     }
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
     void endFrame(){pathtrace.endFrame();motion.endFrame();weather.endFrame();projectionObserved=false;composite.endFrame();}
@@ -114,7 +117,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setQuality(com.voxellight.world.VisualQuality value){rtx.quality(value);composite.setQuality(value);surfaces.setQuality(value);pathtrace.setQuality(value);}
     void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.setRtTransmission(rtx.transmission());composite.setRtGuides(rtx.coverage(),rtx.interfaceNormal(),rtx.surfaceKey(),rtx.materialIds());composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
     boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
-    void fullReference(boolean value){rtx.fullReference(value);surfaces.reference(value);}
+    void fullReference(boolean value){if(value&&vulkanRt.enabled())vulkanRt.enable(false);rtx.fullReference(value);surfaces.reference(value);}
     void referenceScale(int value){rtx.referenceScale(value);}
     void setPathTrace(boolean enabled){pathtrace.setEnabled(enabled);}
     void setPathTraceDenoise(boolean enabled){pathtrace.setDenoise(enabled);}
@@ -127,6 +130,7 @@ final class LightingResolvePass implements AutoCloseable {
     void invalidateHistory(){temporal.invalidate();}
     void displayFullReference(CommandEncoder encoder,RenderTarget output){rtx.displayFullReference(encoder,output);}
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
+        if(vulkanRt.enabled())return;
         entityPhase=true;
         try{renderCurrent(encoder,output,material,shadows,false);}finally{entityPhase=false;}
         var result=pathtrace.render(encoder,output,material,shadows,hdrView,actualProjection,projectionObserved,pbrSettings);
@@ -170,8 +174,8 @@ final class LightingResolvePass implements AutoCloseable {
                 .withRenderArea(new RenderPass.RenderArea(0,0,width,height))
                 .withColorAttachment(hdr,Optional.of(new Vector4f(0))).withColorAttachment(shadow,Optional.of(new Vector4f(1,0,0,0)));
     }
-    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + ", pbr="+pbrEnabled+", wetness="+wetnessEnabled+", pbrDebug="+pbrDebug + temporal.status() + ao.status() +composite.status()+weather.status()+motion.status()+surfaces.status()+waterMask.status()+pathtrace.status()+rtx.status(); }
-    @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();motion.close();surfaces.close();waterMask.close();weather.close();pathtrace.close();rtx.close();projectionObserved=false;}
+    String status() { return "lighting=separated linear HDR; native block-light baseline, hdrBytes=" + (hdr == null ? 0 : (long)hdr.getWidth(0)*hdr.getHeight(0)*8) + ", pbr="+pbrEnabled+", wetness="+wetnessEnabled+", pbrDebug="+pbrDebug + temporal.status() + ao.status() +composite.status()+weather.status()+motion.status()+surfaces.status()+waterMask.status()+pathtrace.status()+rtx.status()+vulkanRt.status(); }
+    @Override public void close() {releaseBuffers();temporal.close();ao.close();composite.close();motion.close();surfaces.close();waterMask.close();weather.close();pathtrace.close();rtx.close();vulkanRt.close();projectionObserved=false;}
     private void releaseBuffers() {
         if (hdrView != null) { hdrView.close(); hdrView=null; }
         if (hdr != null) { hdr.close(); hdr=null; }

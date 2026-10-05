@@ -1,5 +1,12 @@
 # 0.37.6 — Reference progressive frame budget
 
+## 0.39.0-alpha.1
+
+- Start direct Vulkan RT migration stage 1 with legacy production retained and explicit terrain normal POC.
+- Enable actual native device RT/BDA features; section BLAS/TLAS, aligned SBT, GPU-only debug output, frame-safe resource retirement and pipeline cache.
+- Gradle Slang/SPIR-V compilation, spirv-val and descriptor/camera reflection ABI validation.
+- Separate Vulkan scene/BLAS/TLAS/primary/composite profiling and host contract tests. Full PT/reconstruction/performance migration remains pending.
+
 ## 0.38.0-alpha.8
 
 Separate GameRenderer resize from full world/data reset, allowing alpha.7 viewport-only RTX reallocation to run. Guard callback ownership with a bytecode test. Reference and warm-cache GPU acceptance remain open. [Follow-up](REFERENCE-0.38-ALPHA8.md).

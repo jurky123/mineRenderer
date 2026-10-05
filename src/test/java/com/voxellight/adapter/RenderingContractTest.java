@@ -126,7 +126,7 @@ class RenderingContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"RenderProbe", "ShadowRenderer", "MaterialCapture", "LightingResolvePass"})
+    @ValueSource(strings = {"RenderProbe", "ShadowRenderer", "MaterialCapture", "LightingResolvePass", "VulkanRtDebugPass"})
     void packagedDiagnosticDrawSubmitsGeometry(String className) throws Exception {
         // Check the shipped call, not a separately constructed test triangle.
         try (var jar = new ZipFile(System.getProperty("voxellight.modJar"));
@@ -235,7 +235,7 @@ class RenderingContractTest {
     @Test
     void packagedShadersCompileWithMinecraftVulkanCompiler() throws Exception {
         try (var compiler = new GlslCompiler()) {
-            for (String name : List.of("probe.vsh", "color.fsh", "depth.fsh", "normal.fsh", "shadow_caster.vsh", "shadow_caster.fsh", "shadow.fsh", "shadow_map.fsh")) {
+            for (String name : List.of("probe.vsh", "color.fsh", "depth.fsh", "normal.fsh", "shadow_caster.vsh", "shadow_caster.fsh", "shadow.fsh", "shadow_map.fsh", "vulkan_rt_debug.fsh")) {
                 try (var stream = getClass().getResourceAsStream("/assets/voxellight/shaders/" + name)) {
                     assertNotNull(stream, name);
                     var module = compiler.createIntermediary(name, new String(stream.readAllBytes(), StandardCharsets.UTF_8),

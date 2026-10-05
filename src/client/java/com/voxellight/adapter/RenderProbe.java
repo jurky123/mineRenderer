@@ -86,6 +86,7 @@ public final class RenderProbe {
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
+    public void setVulkanRtPoc(){RenderSystem.assertOnRenderThread();lighting.setVulkanRtPoc();}
     public void setRtBackend(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtBackend(enabled);}
     public void setRtOption(String option,boolean enabled){RenderSystem.assertOnRenderThread();lighting.setRtOption(option,enabled);}
     public void fullReferenceRt(boolean value){RenderSystem.assertOnRenderThread();if(value){setMode(Mode.FOUNDATION);setPathTrace(false);}lighting.fullReference(value);}

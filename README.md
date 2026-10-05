@@ -4,7 +4,9 @@ VoxelLight 是纯客户端 Fabric 光照引擎 mod：复用 Minecraft 原生渲�
 
 当前是 **Minecraft 26.2 的局部光照 renderer prototype**：真实材质/法线、分离HDR lighting、三层太阳/月亮阴影、形状人工灯、有界动态caster、半分辨率terrain AO、色彩/天空光与emissive bloom。仅支持原生Vulkan，默认关闭；`foundation`是主效果，`shadow`为旧LDR比较路径。当前版本、已确认阶段、预算与下一步统一记录于[CURRENT.md](docs/CURRENT.md)。目录名为mineRenderer，功能名为VoxelLight，mod ID为`voxellight`。
 
-Current development release: **VoxelLight 0.38.0-alpha.6 — OptiX callable compiler boundaries (GPU acceptance candidate)**. Alpha.4/alpha.5 failed the 591.74 startup gate. Alpha.6 separates transport/visibility and BSDFs with explicit OptiX callable programs and logs successful graph/cache feedback. Startup, runtime and cancellation acceptance remain pending. [Evidence and required GPU checks](docs/OPTIX-COMPILATION-0.38-ALPHA6.md). Splits OptiX compiler graphs, lazily compiles full reference, moves non-tracing utilities to CUDA, and adds task/cache/watchdog diagnostics. [Compilation architecture and required GPU checks](docs/OPTIX-COMPILATION-0.38.md). Retains the GPU HDR sky/cloud environment with importance sampling, OptiX primary-camera reference, nonblocking reference display, GGX reflection energy compensation, robust ray origins and water free-flight transport. The full 0.38 review remains **in progress**; GPU baseline and visual acceptance are pending. [Implementation ledger](docs/RTX-QUALITY-0.38.md), [environment](docs/RT-ENVIRONMENT.md), [full reference](docs/FULL-REFERENCE.md). Previous stable: 0.37.6.
+Current development release: **VoxelLight 0.39.0-alpha.1 — Vulkan RT terrain normal POC**. Migration stage 1 retains legacy OptiX production while adding direct native Vulkan section BLAS/TLAS, build-time Slang/SPIR-V, recursion-1 debug rays and pipeline caching. `/voxellight rt_backend vulkan_poc` selects the explicit diagnostic view; PT parity, Vulkan reconstruction/DLSS RR and performance acceptance are pending. This is the first migration milestone, not a completed renderer migration. [Implementation, build tools and GPU checks](docs/VULKAN-RT-MIGRATION.md).
+
+[Download 0.39.0-alpha.1 client kit](https://temp.sh/nrrcd/voxellight-client-kit-26.2-0.39.0-alpha.1.zip) (temporary link; Vulkan normal POC, legacy RTX retained).
 
 [Download the native 0.37.6 client kit](https://temp.sh/kffQf/voxellight-client-kit-26.2-0.37.6.zip) (temporary link). Build locally with `./gradlew build clientKit -PnativeKit` after the native build.
 
@@ -72,6 +74,8 @@ Alpha.8 fixes the GameRenderer resize callback that bypassed alpha.7 context reu
 采用单个 Fabric 构建工程和功能包，版本相关 hook 集中在 `com.voxellight.adapter`，可独立测试的采样数据在 `com.voxellight.debug`。出现真实复用需求后再拆模块。
 
 ## 构建与使用
+
+Vulkan RT shaders now require build-time Slang and `spirv-val`; run `python3 tools/bootstrap_vulkan_rt.py` on Linux x86_64 and install `spirv-tools`, or configure `SLANGC`/`SPIRV_VAL`. See [build instructions](docs/VULKAN-RT-MIGRATION.md).
 
 ```sh
 ./gradlew build clientKit

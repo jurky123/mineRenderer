@@ -91,6 +91,7 @@ tasks.register('clientKit', Zip) {
     from('docs/OPTIX-COMPILATION-0.38-ALPHA6.md')
     from('docs/REFERENCE-0.38-ALPHA7.md')
     from('docs/REFERENCE-0.38-ALPHA8.md')
+    from('docs/VULKAN-RT-MIGRATION.md')
 }
 
 // Optional native build is explicit; the regular Java build remains usable without SDKs.
@@ -106,4 +107,17 @@ jar {
             }
         } else if(project.hasProperty('nativeKit'))throw new GradleException('Build the native component before -PnativeKit')
     }
+}
+
+// Vulkan RT stage binaries are produced/validated before packaging, never compiled in game.
+tasks.register('compileVulkanRt', Exec) {
+    inputs.dir('shaders/rt')
+    inputs.file('tools/build_vulkan_rt.py')
+    inputs.property('slangc', System.getenv('SLANGC') ?: 'slangc')
+    outputs.dir(layout.buildDirectory.dir('vulkan-rt'))
+    commandLine 'python3', 'tools/build_vulkan_rt.py'
+}
+processResources {
+    dependsOn tasks.named('compileVulkanRt')
+    from(layout.buildDirectory.dir('vulkan-rt')) { into 'assets/voxellight/rt/vulkan' }
 }
