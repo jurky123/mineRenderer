@@ -99,3 +99,7 @@ The alpha.2 user log confirms Minecraft reset the graphics API after the previou
 
 
 After a startup crash, explicitly select Vulkan in Minecraft video settings and restart. Confirm `backend=Vulkan` in `/voxellight status` before testing `/voxellight rt_backend vulkan_poc`. F3+T is not a graphics API switch.
+
+## 0.39.0-alpha.4 — Vulkan normal display render area
+
+The alpha.3 RTX 4060 log confirms mandatory Vulkan RT extensions enabled and POC pipeline creation in 39 ms, then 6 ms on retry. Display failed with `RenderPassDescriptor.renderArea must be provided`, causing raster fallback. Alpha.4 supplies the full destination viewport to the debug composite descriptor. These pipeline timings are not full renderer startup or PT performance acceptance. Terrain normal output and static/edit BLAS behavior still require GPU confirmation.

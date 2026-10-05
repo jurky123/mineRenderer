@@ -52,7 +52,7 @@ final class VulkanRtDebugPass implements AutoCloseable {
             warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
             var inverse=new Matrix4f(projection).mul(camera.viewRotationMatrix).invert();
             if(!context.render(encoder,RtGeometryStream.drain(16),inverse,pos.x(),pos.y(),pos.z(),texture,width,height)) {state="waiting for terrain BLAS";return;}
-            try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
+            try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_debug_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan RT normal bringup").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
                 pass.setPipeline(DISPLAY);pass.bindTexture("RtNormal",view,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
             state="normal/debug only";
