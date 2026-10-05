@@ -59,13 +59,22 @@ Medium materialMedium(Material m){Medium medium={m.sigmaA,m.sigmaS,m.phaseG,m.io
 bool crossMedium(inout MediumStack media,Material m,bool entering){return entering?media.enter(materialMedium(m)):media.exit(m.mediumId);}
 // Straight shadow visibility through bounded interfaces, with Fresnel and RGB extinction.
 // No secondary TraceRay call in any-hit/closest-hit; recursion remains one.
-float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum=4096) {
+float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum=4096,bool flameSource=false) {
+    float3 sourceBlock=floor(origin+direction*maximum);
     float3 value=float3(1);
     for(int boundary=0;boundary<24;boundary++) {
         SurfacePayload hit=traceSurface(origin,direction,max(.001,maximum));float distance=hit.distance>=0?hit.distance:maximum;
         if(media.count>0){Medium m=media.entries[media.count-1];value*=expNeg(m.sigmaA+m.sigmaS,distance);}
         if(hit.distance<0)return value;
         TerrainSurface surface=terrainSurface(hit.triangle,hit.bary,hit.instance);Material m=surface.material;
+        // The virtual flame point represents the entire source model. Its own stem
+        // must not stamp a square umbra; other blocks and other torch bodies still occlude.
+        float3 point=origin+direction*hit.distance;
+        float3 owner=floor(point-terrainVertex(hit.triangle,0).n*.001);
+        if(flameSource&&(surface.flags&32)!=0&&all(owner==sourceBlock)){
+            float advanceDistance=hit.distance+.002;origin+=direction*advanceDistance;maximum-=advanceDistance;
+            if(maximum<=.001)return value;continue;
+        }
         if(!dielectric(m)&&m.type!=DIFFUSE_TRANSMISSION)return float3(0);
         bool entering=dot(surface.geometryNormal,direction)<0;
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
@@ -74,7 +83,7 @@ float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum
         value*=m.type==DIFFUSE_TRANSMISSION?m.baseColor*m.transmission:float3((1-F)*m.transmission);
         if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&!crossMedium(media,m,entering))return float3(0);
         if(maxComponent(value)<1e-6)return float3(0);
-        float3 point=origin+direction*hit.distance;float3 next=offsetRayOrigin(point,surface.geometryNormal,direction);
+        float3 next=offsetRayOrigin(point,surface.geometryNormal,direction);
         maximum-=hit.distance+max(0,dot(next-point,direction));if(maximum<=.001)return value;origin=next;
     }
     return float3(0); // Conservative interface-limit handling.
@@ -109,10 +118,10 @@ void advance(inout PathState path) {
             if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*visibility(event,held.wi,media,max(.001,held.distance-.002)));
             for(uint index=0;index<flameCount();index++){
                 LightSample flame=sampleFlame(event,index);
-                if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*visibility(event,flame.wi,media,max(.001,flame.distance-.002)));
+                if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*visibility(event,flame.wi,media,max(.001,flame.distance-.002),true));
             }
             LightSample emitter=sampleEmitter(event,seed);
-            if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*visibility(event,emitter.wi,media,max(.001,emitter.distance-.002)));
+            if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*visibility(event,emitter.wi,media,max(.001,emitter.distance-.002),emitter.kind==3));
         }
         path.throughput.xyz*=expNeg(extinction,distance);
     }
@@ -141,7 +150,7 @@ void advance(inout PathState path) {
             float mis=lightMisWeight(light,direct.pdf,path.throughput.w<5);
             float3 start=connectionOrigin(point,surface.geometryNormal,light.wi);
             float maximum=light.distance-max(0,dot(start-point,light.wi))-.002;
-            float3 transmittance=visible&&maximum>.001?visibility(start,light.wi,shadowMedia,maximum):float3(0);
+            float3 transmittance=visible&&maximum>.001?visibility(start,light.wi,shadowMedia,maximum,connection>=2):float3(0);
             if(connection==1)heldProbe(path,3,float4(transmittance,visible?1:0));
             if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmittance);
         }
@@ -155,7 +164,7 @@ void advance(inout PathState path) {
                 float mis=emitter.kind==3||path.throughput.w>=5?1:powerHeuristic(emitter.pdf,e.pdf);
                 float3 start=connectionOrigin(point,surface.geometryNormal,emitter.wi);
                 float maximum=emitter.distance-max(0,dot(start-point,emitter.wi))-.002;
-                if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum));
+                if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3));
             }
         }
         if(path.throughput.w>=5) {path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}

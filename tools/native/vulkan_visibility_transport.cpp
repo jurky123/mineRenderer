@@ -18,12 +18,21 @@ int main(){
  Camera_0 camera{};camera.width_0=camera.height_0=1;camera.origin_1={0,0,.5f,1};
  Vector<float,4> result{};GlobalParams_0 globals{};globals.geometry_0={reinterpret_cast<unsigned*>(geometry.data()),geometry.size()*40};globals.assets_0={assets.data(),assets.size()*4};globals.output_0={&result,1};globals.camera_0=&camera;
  ComputeVaryingInput varying{};varying.endGroupID={1,1,1};
- auto run=[&](unsigned triangles,bool lit,const char* label){camera.padding_1=triangles;visibility_transport(&varying,nullptr,&globals);float expected=lit?20.f/(4*3.14159265358979323846f):0; if(!std::isfinite(result.x)||std::abs(result.x-expected)>.0001f){std::fprintf(stderr,"%s: RGB=%g/%g/%g expected red=%g\n",label,result.x,result.y,result.z,expected);return false;}return true;};
+ float sourceDistance=2;
+ auto run=[&](unsigned triangles,bool lit,const char* label){camera.padding_1=triangles;visibility_transport(&varying,nullptr,&globals);float expected=lit?20.f/(sourceDistance*sourceDistance*3.14159265358979323846f):0; if(!std::isfinite(result.x)||std::abs(result.x-expected)>.0001f){std::fprintf(stderr,"%s: RGB=%g/%g/%g expected red=%g\n",label,result.x,result.y,result.z,expected);return false;}return true;};
  if(!run(1,true,"clear held")||!run(2,false,"occluded held"))return 1;
  put(140,0);if(!run(1,false,"disabled held"))return 1;
  assets[124/4]=1;assets[156/4]=emitter;put(emitter+8,2);put(emitter+12,1);put(emitter+16,20);put(emitter+20,12.4f);put(emitter+24,4.8f);put(emitter+44,1);assets[(emitter+56)/4]=1;
  if(!run(1,true,"clear placed flame")||!run(2,false,"occluded placed flame"))return 1;
  assets[124/4]=0;assets[192/4]=1;assets[196/4]=emitter;
  if(!run(1,true,"independent placed flame")||!run(2,false,"independent placed flame occlusion"))return 1;
+ // Source and own stem share block z=1, while the other stem lies in block z=0.
+ put(emitter+8,1.5f);sourceDistance=1.5f;
+ for(unsigned i=3;i<6;i++){geometry[i].p[2]=.8f;geometry[i].flags=32;}
+ if(!run(2,false,"other flame body must occlude"))return 1;
+ for(unsigned i=3;i<6;i++)geometry[i].p[2]=1.2f;
+ if(!run(2,true,"own flame body does not self-shadow"))return 1;
+ for(unsigned i=3;i<6;i++)geometry[i].flags=0;
+ if(!run(2,false,"solid wall in emitter cell must still occlude"))return 1;
  std::puts("Production Slang surface transport: held and placed flame irradiance, opaque occlusion and disabled held light passed");
 }

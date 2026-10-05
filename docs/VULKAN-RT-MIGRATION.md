@@ -1,3 +1,7 @@
+# 0.39.0-alpha.19 — source-local flame self-shadow
+
+Alpha.18 received user acceptance. Virtual placed flame shadow connections skip only flagged flame-body surfaces owned by the source block. Camera/BSDF visibility and unrelated occluders remain unchanged. The production Slang transport fixture checks own stem exemption, other stem occlusion and solid wall occlusion even in the emitter cell. RTX visual acceptance of the square-umbra correction remains pending.
+
 # 0.39.0-alpha.18 — adjacent emitter ownership, independent flames and per-frame samples
 
 Alpha.17 received user RTX acceptance: held and placed light transport is now working. The confirmed fault was Slang SPIR-V Load3 byte-address aliasing: a 12-byte indexed uint3 array acquired a 16-byte std430 stride. Scalar word loads replaced all such reads, with final SPIR-V layout rejection in the build. Earlier sky-starvation/self-shadow hypotheses were insufficient to explain the observed zero GPU incident RGB.
