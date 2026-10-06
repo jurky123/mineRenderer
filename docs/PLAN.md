@@ -1,3 +1,9 @@
+## alpha.23 后的系统架构调整（设计提案）
+
+当前 PT 路线的整体调整见 [系统架构设计](architecture/README.md)，细节覆盖持久场景与稳定实例、Minecraft 特性、路径追踪与光源/介质、运动信号与重建/放大，以及按代码文件拆分的迁移任务。
+
+实施顺序为可靠测量 → 单次 scene commit → 持久 GPU 资源 → 稳定实例/对象运动 → transport 调度与光源增量 → 分信号重建/时域放大；ReSTIR、缓存、焦散、OMM/SER 等分别通过实测门槛后再接入。下一轮可执行范围是 [M0 + M1](architecture/MIGRATION-AND-VALIDATION.md)。本轮仅文档设计，未修改运行路径或发布版本；下文保留历史计划。
+
 ## 0.37.6 reference responsiveness
 
 ## 0.38.0-alpha.2 — environment and asynchronous full reference
