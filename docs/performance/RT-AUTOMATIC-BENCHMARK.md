@@ -1,4 +1,4 @@
-# 自动 Vulkan PT 执行层 A/B 测试（alpha.29）
+# 自动 Vulkan PT 执行层 A/B 测试（alpha.30）
 
 进入已正常运行的 Vulkan PT 世界，等区块加载稳定，站定并关闭菜单，执行：
 
@@ -6,7 +6,7 @@
 /voxellight rt_benchmark start
 ```
 
-不需要逐项手动切换。默认每段采样 6 秒，至少预热 4 秒，随后留 2 秒接收延迟 GPU 数据。根据硬件支持运行 8–40 段，通常约 2–8 分钟；地形持续加载时会更久。也可 `start 15` 延长每段采样（允许 4–30 秒）。`/voxellight rt_benchmark` 等同默认 start。
+不需要逐项手动切换。默认每段采样 6 秒，至少预热 4 秒，随后留 2 秒接收延迟 GPU 数据。根据硬件支持运行 8–48 段，通常约 2–10 分钟，另加驱动管线初始化耗时；SER 首次创建在用户实测中约 52 秒，期间渲染线程可能暂停。也可 `start 15` 延长每段采样（允许 4–30 秒）。`/voxellight rt_benchmark` 等同默认 start。
 
 ```text
 /voxellight rt_benchmark status
@@ -23,6 +23,7 @@
 |---|---|---|
 | visibility | legacy visibility | opaque TraceRay fast path |
 | ray_query | opaque TraceRay | opaque Vulkan Ray Query |
+| query_vs_legacy | legacy visibility | opaque Vulkan Ray Query |
 | queue | fixed continuation | compact continuation |
 | omm | OMM off | 保守 triangle OMM on |
 | ser | SER off | SER on |
@@ -31,7 +32,7 @@
 
 启动时保存当前 GPU 驻留地形的精确版本和原始几何（额外 CPU 内存最多约 64 MiB），整轮各段从同一快照初始化；不再用实时 miss 换页扩充地形，也不允许动态模型扩容挤掉固定地形。动态模型、粒子、材质动画和光照仍正常更新；快照不追随世界地形编辑，因此请勿在测试中修改世界。测试结束恢复正常实时地形更新。快照取不到精确版本会明确拒绝启动，避免静默混用其他版本。
 
-开始采样前仍要求地形工作集至少 1 秒稳定，预热最多等待 30 秒。记录 GPU scope 的提交帧范围，仅收集属于该范围的延迟时间戳和 ray counters；预热、前一段及排空阶段的新帧不会混入当前段。默认诊断的 visibility replay 位于 transport batch 之外，仍有额外 GPU 负载，因此这是受诊断条件下的执行层比较。
+配置切换先进入 INITIALIZING，旧执行 revision 的 context 不视为当前配置可用。实际管线、分辨率与 opaque 场景就绪后才进入 WARMUP，至少运行 4 秒且地形工作集至少 1 秒稳定；初始化等待不计入这两个时钟。未就绪等待上限为 180 秒，地形持续变化的预热上限为就绪后 30 秒。同步驱动管线创建期间渲染线程暂停，诊断和停止命令要等调用返回才能执行，180 秒不是可中断驱动调用的硬期限。记录 GPU scope 的提交帧范围，仅收集属于该范围的延迟时间戳和 ray counters；预热、前一段及排空阶段的新帧不会混入当前段。默认诊断的 visibility replay 位于 transport batch 之外，仍有额外 GPU 负载，因此这是受诊断条件下的执行层比较。
 
 结束、停止、切换世界、资源重载、相机移动或窗口失焦会恢复测试前 visibility/queue/OMM/SER 和 profiling 设置。临时控制不写入用户偏好。中断仍导出已有完整段和当前已采样的部分段；部分段标为无效。
 
@@ -45,7 +46,7 @@ benchmark-results/voxellight/rt-suite-<时间戳>.zip
 
 同名目录保留原始文件。把 ZIP 发回来即可。无需另外执行 Python 或手工收集 stats。
 
-- `warmup.json`：逐秒记录各段请求配置、实际状态、稳定等待时间及完整 renderer 状态。超时分别注明 renderer 不可用、控制不匹配、累积冻结或固定地形未稳定。
+- `warmup.json`：每个可执行渲染帧按秒记录各段请求配置、实际状态、readiness、就绪后预热秒数、稳定等待时间及完整 renderer 状态。同步管线创建期间没有渲染帧，记录会有时间空档。超时分别注明初始化未就绪或就绪后地形持续变化。
 - `summary.txt`：每组 verdict、transport batch 时间改善百分比、重复段波动。
 - `summary.json`：设备、版本、跳过原因、原控制、实际工作集、两轮改善及有效性检查。
 - 每段 `.passes.csv`：GPU scope 原始样本；包括 batch、primary、各 continuation、visibility replay。

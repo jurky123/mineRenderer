@@ -14,7 +14,7 @@ import java.util.zip.*;
 
 /** Render-thread benchmark controller. Submission frame ranges own delayed GPU/readback results. */
 public final class RtBenchmarkRunner {
-    private enum Phase {WARMUP,SAMPLE,DRAIN}
+    private enum Phase {INITIALIZING,WARMUP,SAMPLE,DRAIN}
     private static RtBenchmarkRunner running;
     private final RtBenchmarkPlan.Config original=RtBenchmarkPlan.Config.current();
     private final boolean originalProfile=RenderPassProfile.enabled();
@@ -36,7 +36,8 @@ public final class RtBenchmarkRunner {
     private final long start=System.nanoTime();
     private int index;
     private Phase phase=Phase.WARMUP;
-    private long phaseStart,stableSince,terrainSignature;
+    private long phaseStart;
+    private RtBenchmarkWarmup warmup;
     private long first=Long.MAX_VALUE,last=Long.MAX_VALUE,querySkips;
     private RtBenchmarkState measuredState;
     private String startStatus;
@@ -61,7 +62,7 @@ public final class RtBenchmarkRunner {
         try{
             var suite=new RtBenchmarkRunner(seconds,feedback);running=suite;
             RenderPassProfile.observe(suite.gpuObserver);RenderPassProfile.observeWork(suite.workObserver);RenderPassProfile.setEnabled(true);
-            suite.begin();feedback.accept("VoxelLight: automatic RT A/B started; stay still and close menus. "+suite.plan.blocks().size()+" blocks, about "+Math.ceil(suite.plan.blocks().size()*(seconds+6)/60.0)+" minutes; stop restores settings");return true;
+            suite.begin();feedback.accept("VoxelLight: automatic RT A/B started; stay still and close menus. "+suite.plan.blocks().size()+" blocks, about "+Math.ceil(suite.plan.blocks().size()*(seconds+6)/60.0)+" minutes plus driver pipeline initialization; SER initialization may pause rendering; stop restores settings");return true;
         }catch(IOException|RuntimeException error){if(running!=null)running.finish("start failed: "+error.getMessage());else feedback.accept("VoxelLight: benchmark start failed: "+error.getMessage());return false;}
     }
     public static String status(){return running==null?"VoxelLight: no RT benchmark running":running.progress();}
@@ -71,7 +72,7 @@ public final class RtBenchmarkRunner {
     private static double[] pose(){var client=Minecraft.getInstance();if(client.player==null)return null;var p=client.gameRenderer.mainCamera().position();return new double[]{p.x,p.y,p.z,client.player.getXRot(),client.player.getYRot()};}
     private boolean moved(){var p=pose();if(p==null||pose==null)return true;for(int i=0;i<5;i++)if(Math.abs(p[i]-pose[i])>(i<3?.03:.1))return true;return false;}
     private void begin(){
-        plan.blocks().get(index).config().apply();phase=Phase.WARMUP;phaseStart=stableSince=System.nanoTime();terrainSignature=Long.MIN_VALUE;first=last=Long.MAX_VALUE;measuredState=null;blockExported=false;invalid.clear();
+        plan.blocks().get(index).config().apply();phase=Phase.INITIALIZING;phaseStart=System.nanoTime();warmup=new RtBenchmarkWarmup(phaseStart);lastDiagnostic=0;first=last=Long.MAX_VALUE;measuredState=null;blockExported=false;invalid.clear();
         metrics=new PassMetrics(32000);rays=new RtWorkMetrics();Arrays.fill(alive,0);shadow=anyHit=opaque=replay=mismatches=scopeCount=0;
         feedback.accept(progress());
     }
@@ -81,16 +82,19 @@ public final class RtBenchmarkRunner {
         if(now-start>2_000_000_000L&&(moved()||!client.isWindowActive())){finish("camera moved or window lost focus; stationary comparison interrupted");return;}
         var state=VoxelLightClient.probe().benchmarkState();var block=plan.blocks().get(index);
         if(!RtBenchmarkPlan.Config.current().equals(block.config())||!RenderPassProfile.enabled()){finish("execution controls/profiling changed manually");return;}
-        if(phase==Phase.WARMUP){
+        if(phase==Phase.INITIALIZING||phase==Phase.WARMUP){
+            boolean available=state!=null&&state.matches(block.config())&&!state.frozen()&&state.hasOpaque();
+            var readiness=warmup.observe(now,available,state==null?0:state.terrainSignature());
             if(now-lastDiagnostic>=1_000_000_000L){
-                var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("block",index+1);diagnostic.put("elapsedSeconds",(now-phaseStart)/1e9);diagnostic.put("actual",state);diagnostic.put("requested",block.config());diagnostic.put("stableSeconds",(now-stableSince)/1e9);diagnostic.put("renderer",VoxelLightClient.probe().status());warmupDiagnostics.add(diagnostic);lastDiagnostic=now;
+                var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("block",index+1);diagnostic.put("elapsedSeconds",(now-phaseStart)/1e9);diagnostic.put("actual",state);diagnostic.put("requested",block.config());diagnostic.put("readySeconds",warmup.readySeconds(now));diagnostic.put("stableSeconds",warmup.stableSeconds(now));diagnostic.put("readiness",readiness);diagnostic.put("renderer",VoxelLightClient.probe().status());warmupDiagnostics.add(diagnostic);lastDiagnostic=now;
             }
 
-            if(now-phaseStart>30_000_000_000L){finish(state==null?"warmup: renderer unavailable; see warmup.json":!state.matches(block.config())?"warmup: requested controls not active; see warmup.json":state.frozen()?"warmup: accumulation frozen":"warmup: pinned terrain did not settle; see warmup.json");return;}
-            if(state==null||!state.matches(block.config())||state.frozen())return;
+            if(readiness==RtBenchmarkWarmup.Status.INITIALIZATION_TIMEOUT){finish("initialization: renderer/configuration unavailable for 180 seconds; see warmup.json");return;}
+            if(readiness==RtBenchmarkWarmup.Status.STABILITY_TIMEOUT){finish("warmup: pinned terrain changed continuously for 30 seconds after initialization; see warmup.json");return;}
+            if(readiness==RtBenchmarkWarmup.Status.INITIALIZING)return;
+            if(phase==Phase.INITIALIZING){phase=Phase.WARMUP;feedback.accept(progress());}
             if(state.width()!=initial.width()||state.height()!=initial.height()||state.spp()!=initial.spp()||state.realtime()!=initial.realtime()){finish("resolution/spp/render mode changed");return;}
-            if(terrainSignature!=state.terrainSignature()){terrainSignature=state.terrainSignature();stableSince=now;}
-            if(now-phaseStart<4_000_000_000L||now-stableSince<1_000_000_000L)return;
+            if(readiness!=RtBenchmarkWarmup.Status.READY)return;
             measuredState=state;startStatus=VoxelLightClient.probe().status();first=frame;querySkips=RenderPassProfile.skippedQueries();phase=Phase.SAMPLE;phaseStart=now;feedback.accept(progress());return;
         }
         if(phase==Phase.SAMPLE){
@@ -136,7 +140,7 @@ public final class RtBenchmarkRunner {
         try{
             if(reason!=null&&!blockExported&&first!=Long.MAX_VALUE){invalid.add("interrupted: "+reason);if(last==Long.MAX_VALUE)last=Math.max(first,currentFrame-1);completeBlock();}
             var comparisons=new ArrayList<RtBenchmarkResults.Comparison>();for(String name:plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().toList())comparisons.add(RtBenchmarkResults.compare(name,results));
-            var report=new LinkedHashMap<String,Object>();report.put("schema",2);report.put("terrainPolicy","fixed resident terrain snapshot; dynamic models and lighting remain live");report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);
+            var report=new LinkedHashMap<String,Object>();report.put("schema",3);report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy","fixed resident terrain snapshot; dynamic models and lighting remain live");report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);
             report.put("device",com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().toString());report.put("version",FabricLoader.getInstance().getModContainer("voxellight").orElseThrow().getMetadata().getVersion().getFriendlyString());
             report.put("limitations",List.of("current-version execution controls only; not alpha.26 vs alpha.28 speedup","completed GPU timestamps; replay benchmarks outside transport batch","two ABBA rounds are descriptive, not a statistical confidence interval","alive drift threshold 5 percentage points; dynamic geometry/light changes may remain","no automatic image correctness, L1/L2 traffic or runtime spill validation"));
             Files.writeString(directory.resolve("warmup.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(warmupDiagnostics));

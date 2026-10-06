@@ -24,7 +24,7 @@ public final class RtBenchmarkResults {
         if(blocks.stream().anyMatch(b->b.mismatches>0))return new Comparison(name,"correctness_failed",null,null,List.of(),List.of("TraceRay / Ray Query replay mismatches"));
         if(blocks.size()!=8)return new Comparison(name,"incomplete",null,null,List.of(),List.of("requires two complete ABBA rounds"));
         for(int i=0;i<8;i++){var b=blocks.get(i).plan;if(b.round()!=i/4||b.position()!=i%4||b.candidate()!=(i%4==1||i%4==2))reasons.add("invalid ABBA order");}
-        if(name.equals("ray_query")&&blocks.stream().anyMatch(b->b.replaySamples==0))reasons.add("missing visibility correctness replay");
+        if((name.equals("ray_query")||name.equals("query_vs_legacy"))&&blocks.stream().anyMatch(b->b.plan.config().visibility()!=RtExecutionOptions.Visibility.LEGACY&&b.replaySamples==0))reasons.add("missing visibility correctness replay");
         var reference=blocks.getFirst().state;
         for(var block:blocks){
             reasons.addAll(block.reasons);

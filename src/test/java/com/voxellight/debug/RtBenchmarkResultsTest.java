@@ -50,9 +50,9 @@ class RtBenchmarkResultsTest {
         assertNull(RtBenchmarkResults.timing(List.of(0L)).medianMs());
     }
     @Test void PlanUsesIndependentABBAControlsAndSkipsUnsupportedFeatures(){
-        var minimal=RtBenchmarkPlan.create(false,false,false,false);assertEquals(8,minimal.blocks().size());assertEquals(4,minimal.skipped().size());
-        var full=RtBenchmarkPlan.create(true,true,true,true);assertEquals(40,full.blocks().size());
-        for(int i=0;i<40;i++){var p=full.blocks().get(i);assertEquals(i%8/4,p.round());assertEquals(i%4,p.position());assertEquals(i%4==1||i%4==2,p.candidate());}
+        var minimal=RtBenchmarkPlan.create(false,false,false,false);assertEquals(8,minimal.blocks().size());assertEquals(5,minimal.skipped().size());
+        var full=RtBenchmarkPlan.create(true,true,true,true);assertEquals(48,full.blocks().size());
+        for(int i=0;i<48;i++){var p=full.blocks().get(i);assertEquals(i%8/4,p.round());assertEquals(i%4,p.position());assertEquals(i%4==1||i%4==2,p.candidate());}
         assertThrows(UnsupportedOperationException.class,()->full.blocks().clear());
     }
     @Test void DelayedFramesBelongOnlyToTheirSubmissionWindow(){
@@ -66,5 +66,17 @@ class RtBenchmarkResultsTest {
         var original=RtBenchmarkPlan.Config.current();
         try{for(var block:RtBenchmarkPlan.create(true,true,true,true).blocks()){block.config().apply();assertEquals(block.config(),RtBenchmarkPlan.Config.current());}}
         finally{original.apply();}assertEquals(original,RtBenchmarkPlan.Config.current());
+    }
+    @Test void QueryVersusLegacyRequiresReplayOnlyForQueryVariant(){
+        var source=blocks(10,8,8,10,10,8,8,10);var output=new ArrayList<RtBenchmarkResults.Block>();
+        var plan=RtBenchmarkPlan.create(true,false,false,false).blocks().stream().filter(b->b.comparison().equals("query_vs_legacy")).toList();
+        for(int i=0;i<8;i++){
+            var old=source.get(i);var p=plan.get(i);var c=p.config();
+            var state=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),false,false,true,true,12,50+i,20,1000);
+            output.add(new RtBenchmarkResults.Block(p,old.firstFrame(),old.lastFrame(),state,true,List.of(),old.timings(),old.aliveFraction(),.1,p.candidate()?256:0,0,0));
+        }
+        assertEquals("candidate_faster",RtBenchmarkResults.compare("query_vs_legacy",output).verdict());
+        var old=output.get(1);output.set(1,new RtBenchmarkResults.Block(old.plan(),old.firstFrame(),old.lastFrame(),old.state(),true,List.of(),old.timings(),old.aliveFraction(),.1,0,0,0));
+        assertEquals("not_comparable",RtBenchmarkResults.compare("query_vs_legacy",output).verdict());
     }
 }
