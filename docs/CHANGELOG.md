@@ -1,3 +1,13 @@
+## 0.39.0-alpha.27
+
+- Material section BLAS split into opaque/cutout/transmission ranges and corresponding SBT records; opaque bypasses any-hit.
+- Separate opaque visibility first-hit TraceRay (uint payload) / Ray Query A/B; exact interface/flame fallback retained.
+- PathHot 144→64B; radiance and AOV accumulators leave continuation, with eight-medium/RNG/sample-bank roundtrip regression.
+- Scene-owned shared AS scratch, delayed retirement, range-sensitive refit signatures and conservative OMM triangle special indices; animated/mixed alpha remains any-hit.
+- Real alive-curve/GPU-time queue calibration with fixed/compact controls; default-off feature-gated SER variants.
+- Bounded visibility replay, alternating order/result comparison, driver compiler-statistics export and documented external spill/cache acceptance.
+- GPU speedup and execution-layer freeze remain subject to RTX measurements.
+
 # 0.39.0-alpha.26 — recover fragmented scene geometry ranges
 
 Alpha.25 cleared output history successfully in the reported run, then fell back to raster when allocating shader geometry ranges. Allocation now releases all deleted and resized ranges before allocating any incoming/replacement range, preventing a growing mesh from exhausting capacity while later shrinking meshes still occupy their old ranges. If final geometry fits the admitted budget but holes cannot fit an incoming range, the attribute arena is repacked under the existing GPU read-to-write dependency. This exceptional path recopies attributes/normals, updates TLAS custom indices, rebuilds emitter proposals and invalidates reconstruction/previous-pose history. Ordinary updates retain stable offsets; surviving surface identities are preserved. Stats exposes geometryCompactions.

@@ -2,7 +2,10 @@
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
 import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration'}
+STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss'}
+VARIANTS={name+suffix:(name,defines) for suffix,defines in [("_query",["RT_RAY_QUERY"]),("_ser",["RT_SER"]),("_query_ser",["RT_RAY_QUERY","RT_SER"])] for name in ["material_primary","material_indirect"]}
+VARIANTS.update(material_visibility_trace=('material_visibility_benchmark',['RT_VIS_BENCH']),material_visibility_query=('material_visibility_benchmark',['RT_VIS_BENCH','RT_RAY_QUERY']))
+STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)
     if not found and name == 'slangc':
@@ -45,10 +48,12 @@ def validate_layout(reflection, transport=False, material=False):
         path = parameters['paths']['type']['resultType']
         expected_path=dict(origin=0,direction=16,throughput=32,radiance=48)
         if material:
-            expected_path.update(mediumCount=64,etaScale=68,previousDelta=72,padding=76,diffuse=80,reflection=96,refraction=112,channel=128,reserved0=132,reserved1=136,reserved2=140)
+            expected_path=dict(origin=0,direction=16,throughput=32,state=48,etaScale=52,seed=56,reserved=60)
+            aov=parameters['pathAovs']['type']['resultType']
+            if parameters['pathAovs']['binding']['index']!=16 or aov['sizes'][0]['value']!=48:raise ValueError('AOV accumulation ABI mismatch')
             medium=parameters['pathMedia']['type']['resultType']
             if parameters['pathMedia']['binding']['index']!=15 or medium['sizes'][0]['value']!=288 or {f['name']:f['binding']['offset'] for f in medium['fields']}!=dict(absorptionIor=0,scatteringPhase=128,mediumIds=256):raise ValueError('medium cold ABI mismatch')
-        if path['sizes'][0]['value'] != (144 if material else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
+        if path['sizes'][0]['value'] != 64 or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
             raise ValueError('continuation ABI mismatch')
     if offsets != expected:
         raise ValueError(f'camera ABI mismatch: {offsets}')
@@ -64,13 +69,14 @@ def main():
     for source in sorted((ROOT/'shaders/rt').rglob('*.slang')):
         manifest['sources'][str(source.relative_to(ROOT))] = hashlib.sha256(source.read_bytes()).hexdigest()
     for entry, stage in STAGES.items():
-        source = ROOT / f'shaders/rt/world/{entry}.slang'; spv = output / f'{entry}.spv'; reflection = output / f'{entry}.json'
-        subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', entry,
-                        '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)
+        base,defines=VARIANTS.get(entry,(entry,[]))
+        source = ROOT / f'shaders/rt/world/{base}.slang'; spv = output / f'{entry}.spv'; reflection = output / f'{entry}.json'
+        subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', base, *['-D'+define+'=1' for define in defines],
+                        *(['-capability','spvShaderInvocationReorderNV'] if 'RT_SER' in defines else []), *(['-capability','spvRayQueryKHR'] if 'RT_RAY_QUERY' in defines else []), '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
         validate_byte_address_layout(spv.read_bytes())
-        validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
+        if entry != "material_visibility_miss":validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
         manifest['shaders'][entry] = {'stage': stage, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64/144 bytes + 288-byte cold media')
+    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64 bytes + 288-byte cold media + 48-byte AOV accumulator')
 if __name__ == '__main__': main()

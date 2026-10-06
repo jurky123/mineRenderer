@@ -81,6 +81,7 @@ tasks.register('clientKit', Zip) {
     from('docs/MATERIAL-3.md')
     from('docs/RT-LIGHT-TRANSPORT.md')
     from('docs/VULKAN-RT-MIGRATION.md')
+    from('docs/performance/RT-EXECUTION-ROUND-1.md')
 }
 
 // Legacy CUDA/OptiX tracing artifacts must never leak from a previous local build.
@@ -103,7 +104,7 @@ processResources {
 tasks.register('verifyVulkanTransport', Exec) {
     inputs.dir('shaders/rt/common')
     inputs.dir('shaders/rt/tests')
-    inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/water_surface.h', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py', 'tools/native/vulkan_visibility_transport.cpp', 'tools/native/vulkan_numerical_edges.cpp', 'tools/native/vulkan_emitter_sampling.cpp', 'tools/native/vulkan_flame_sampling.cpp', 'tools/native/vulkan_reconstruction_fixture.cpp', 'src/main/resources/assets/voxellight/shaders/rt_denoiser_guides.fsh', 'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh', 'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh')
+    inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/water_surface.h', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py', 'tools/native/vulkan_visibility_transport.cpp', 'tools/native/vulkan_path_storage.cpp', 'tools/native/vulkan_numerical_edges.cpp', 'tools/native/vulkan_emitter_sampling.cpp', 'tools/native/vulkan_flame_sampling.cpp', 'tools/native/vulkan_reconstruction_fixture.cpp', 'src/main/resources/assets/voxellight/shaders/rt_denoiser_guides.fsh', 'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh', 'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh')
     outputs.file(layout.buildDirectory.file('vulkan-transport-parity/result.txt'))
     commandLine 'python3', 'tools/verify_vulkan_transport.py'
 }

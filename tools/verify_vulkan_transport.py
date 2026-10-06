@@ -70,6 +70,11 @@ def main():
     executable=output/'visibility_transport'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_visibility_transport.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/path_storage.slang'
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','path_storage','-stage','compute','-o',str(output/'path_storage.cpp')],check=True)
+    executable=output/'path_storage'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_path_storage.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     (output/'result.txt').write_text(result);print(result,end='')
 
 if __name__=='__main__':main()

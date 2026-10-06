@@ -38,6 +38,7 @@ final class VulkanPathTracer implements AutoCloseable {
     private final RtDynamicScene dynamic=new RtDynamicScene();
     private final RtTerrainWarmup warmup=new RtTerrainWarmup();
     private VulkanRtContext context;
+    private long executionRevision;
     private GpuTexture texture;
     private GpuTextureView view;
     private boolean enabled,failed,transport,materials,displayedThisFrame;
@@ -62,10 +63,10 @@ final class VulkanPathTracer implements AutoCloseable {
         if(materials&&weather.settings()==null){state="waiting for shared environment settings";return;}
         try {
             var stats=com.voxellight.VoxelLightClient.scene().bridge().stats();
-            if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())) {close();RtGeometryStream.enable(true);}
+            if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration()||executionRevision!=com.voxellight.rt.RtExecutionOptions.revision())) {close();RtGeometryStream.enable(true);}
             if(context==null) {
                 if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);}
-                long start=System.nanoTime();context=new VulkanRtContext(device,transport,materials);
+                long start=System.nanoTime();context=new VulkanRtContext(device,transport,materials);executionRevision=com.voxellight.rt.RtExecutionOptions.revision();
                 if(!RenderSystem.getDevice().precompilePipeline(materials?MATERIAL_DISPLAY:DISPLAY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan RT debug display pipeline unavailable");
                 startupMs=(System.nanoTime()-start)/1_000_000;
                 world=stats.worldGeneration();resources=stats.resourceGeneration();

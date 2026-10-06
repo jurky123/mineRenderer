@@ -9,6 +9,22 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void multiGeometryRefitSignatureIncludesPerRangeCountsFlagsAndLayout(){
+        try(var stack=org.lwjgl.system.MemoryStack.stackPush()){
+            var g=org.lwjgl.vulkan.VkAccelerationStructureGeometryKHR.calloc(3,stack);
+            for(int i=0;i<3;i++){g.get(i).sType$Default().geometryType(0).flags(i==0?1:0);g.get(i).geometry().triangles().sType$Default().vertexStride(40).vertexFormat(106).maxVertex(29).indexType(1000165000);}
+            int type=org.lwjgl.vulkan.KHRAccelerationStructure.VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+            String initial=VulkanRtAccel.signature(type,g,new int[]{10,20,30},1);
+            assertNotEquals(initial,VulkanRtAccel.signature(type,g,new int[]{11,19,30},1));
+            g.get(1).flags(1);assertNotEquals(initial,VulkanRtAccel.signature(type,g,new int[]{10,20,30},1));g.get(1).flags(0);
+            g.get(2).geometry().triangles().vertexData().deviceAddress(777);assertEquals(initial,VulkanRtAccel.signature(type,g,new int[]{10,20,30},1));
+        }
+    }
+    @Test void visibilitySbtKeepsBothMissesAndAllFourHitRecordsAligned(){
+        var layout=VulkanSbt.layout(32,32,64,4096,2,4);
+        assertEquals(0,layout.missOffset()%64);assertEquals(0,layout.hitOffset()%64);
+        assertTrue(layout.hitOffset()>=layout.missOffset()+2*layout.stride());assertEquals(layout.hitOffset()+4*layout.stride(),layout.bytes());
+    }
     @Test void allResizedRangesAreReleasedBeforeGrowingReplacements(){
         var allocator=new com.voxellight.rt.RtGeometryAllocator(100);
         var a=new com.voxellight.world.SectionKey(0,0,0);var b=new com.voxellight.world.SectionKey(1,0,0);
@@ -162,6 +178,16 @@ class VulkanRtContractTest {
         assertThrows(IllegalArgumentException.class,()->VulkanSbt.layout(32,32,64,16));
         assertThrows(IllegalArgumentException.class,()->VulkanSbt.align(12,3));
         assertThrows(ArithmeticException.class,()->VulkanSbt.align(Long.MAX_VALUE,64));
+    }
+    @Test void optionalVariantsContainRealInstructionsWithoutLeakingOptionalCapabilitiesIntoBaseline()throws Exception{
+        try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))){
+            for(String stage:List.of("material_primary","material_primary_query","material_primary_ser","material_primary_query_ser","material_indirect_query_ser","material_visibility_trace","material_visibility_query")){
+                var b=ByteBuffer.wrap(jar.getInputStream(jar.getEntry("assets/voxellight/rt/vulkan/"+stage+".spv")).readAllBytes()).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+                boolean query=false,reorder=false;Set<Integer> caps=new HashSet<>();
+                for(int offset=5;offset<b.limit();){int count=b.get(offset)>>>16,op=b.get(offset)&65535;if(op==17)caps.add(b.get(offset+1));query|=op==4473;reorder|=op==5280;offset+=count;}
+                assertEquals(stage.contains("query"),query,stage);assertEquals(stage.contains("ser"),reorder,stage);assertEquals(query,caps.contains(4472));assertEquals(reorder,caps.contains(5383));
+            }
+        }
     }
     @Test void packagedSpirvHasIndependentNonrecursiveRtStages() throws Exception {
         try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))) {

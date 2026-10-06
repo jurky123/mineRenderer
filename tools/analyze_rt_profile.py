@@ -44,7 +44,9 @@ def summarize(path):
     for name in ("VoxelLight", "internalResolution", "requestedSppPerFrame",
                  "sppPerFrame", "renderMode", "rtDynamicModels", "rtDynamicGroups",
                  "rtDynamicTextureTiles", "rtDynamicTextureCopyBytes",
-                 "geometryCopyBytes", "sections", "sceneBytes", "emissiveTriangles"):
+                 "geometryCopyBytes", "sections", "sceneBytes", "emissiveTriangles",
+                 "pathHotBytes", "visibility", "optionalEnabled", "queuePolicy",
+                 "queueCalibration", "geometryRanges", "asScratchBytes"):
         match = re.search(r"\b" + name + r"=([^,\n]+)", status)
         if match:
             controls[name] = match.group(1)
@@ -54,11 +56,11 @@ def summarize(path):
         windows=collections.defaultdict(list)
         for row in rows:windows[int(row["frame"])].append(row)
         for window in windows.values():
-            if any(row["mode"]=="vulkan_rt_batch" for row in window):
+            if any(row["mode"].startswith("vulkan_rt_batch") for row in window):
                 scenes=[row for row in window if row["mode"]=="vulkan_rt_scene_commit"]
                 if len(scenes)==1:scene_cpu.append(int(scenes[0]["pass_cpu_submission_ns"])/1e6)
     else:
-        batches=sorted(int(row["frame"]) for row in rows if row["mode"]=="vulkan_rt_batch")
+        batches=sorted(int(row["frame"]) for row in rows if row["mode"].startswith("vulkan_rt_batch"))
         windows=collections.defaultdict(list)
         for row in rows:
             index=bisect.bisect_right(batches,int(row["frame"]))
@@ -74,14 +76,33 @@ def summarize(path):
     if raysPath.exists():
         with raysPath.open() as stream:
             ray_workloads=[{name:int(value) for name,value in row.items()} for row in csv.DictReader(stream)]
-    return {"final_controls": controls, "passes": timings(rows),
+    primary=sum(row["active_0"] for row in ray_workloads)
+    any_hit=sum(row["any_hit"] for row in ray_workloads)
+    alive=[sum(row["active_"+str(i)] for row in ray_workloads)/primary if primary else None for i in range(6)]
+    mismatch=sum(row.get("visibility_mismatches",0) for row in ray_workloads)
+    pipeline_path=pathlib.Path(str(path)+".pipelines.csv")
+    compiler_stats=[]
+    if pipeline_path.exists():
+        with pipeline_path.open() as stream:compiler_stats=list(csv.DictReader(stream))
+    queue_timings=collections.defaultdict(list)
+    for row in rows:
+        if row["mode"] in ("vulkan_rt_batch_fixed","vulkan_rt_batch_compact") and row["pass_gpu_ns"]:
+            queue_timings[(row["width"],row["height"],row.get("spp"),row["mode"])].append(int(row["pass_gpu_ns"])/1e6)
+    return {"final_controls": controls,
+            "any_hit_per_primary":any_hit/primary if primary else None,
+            "alive_fraction_by_bounce":alive,"visibility_replay_mismatches":mismatch,
+            "queue_ab_by_resolution_spp":[{"width":key[0],"height":key[1],"spp":key[2],"mode":key[3],"gpu":distribution(values)} for key,values in queue_timings.items()],
+            "driver_compiler_statistics":compiler_stats, "passes": timings(rows),
             "ray_workloads":ray_workloads,
             "world": timings(world),
             "scene_cpu_per_batch" if schema2 else "inferred_scene_cpu_per_batch": distribution(scene_cpu),
-            "workloads":sorted({(row["width"],row["height"],row.get("spp","unknown")) for row in rows if row["mode"]=="vulkan_rt_batch"}),
+            "workloads":sorted({(row["width"],row["height"],row.get("spp","unknown")) for row in rows if row["mode"].startswith("vulkan_rt_batch")}),
             "caveat": "Scope timings overlap; do not add parent and child passes. "
                       "Final controls do not prove settings throughout the captured window. "
-                      "World and pass rings can cover different time windows."}
+                      "World and pass rings can cover different time windows. "
+                      "Visibility replay is a 256-ray microbenchmark, not total inline visibility cost. "
+                      "L1/L2 traffic and runtime register spills require an external GPU profiler; "
+                      "queue summaries require matched alive curves/scenes before accepting a speedup."}
 
 
 if __name__ == "__main__":

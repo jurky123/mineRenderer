@@ -16,11 +16,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(VulkanCommandEncoder.class)
 abstract class VulkanTextureVersionsMixin {
     @Inject(method="writeToTexture",at=@At("HEAD"))
-    private void voxellight$upload(GpuTexture destination,ByteBuffer source,int mip,int layer,int x,int y,int w,int h,CallbackInfo ci){NativeTextureVersions.written(destination);}
+    private void voxellight$upload(GpuTexture destination,ByteBuffer source,int mip,int layer,int x,int y,int w,int h,CallbackInfo ci){NativeTextureVersions.written(destination,mip,x,y,w,h);}
     @Inject(method="copyTextureToTexture",at=@At("HEAD"))
-    private void voxellight$copy(GpuTexture source,GpuTexture destination,int mip,int dx,int dy,int sx,int sy,int w,int h,CallbackInfo ci){NativeTextureVersions.written(destination);}
+    private void voxellight$copy(GpuTexture source,GpuTexture destination,int mip,int dx,int dy,int sx,int sy,int w,int h,CallbackInfo ci){NativeTextureVersions.written(destination,mip,dx,dy,w,h);}
     @Inject(method="copyBufferToTexture",at=@At("HEAD"))
-    private void voxellight$bufferCopy(GpuBufferSlice source,int sourceX,int sourceY,int rowLength,int imageHeight,GpuTexture destination,int x,int y,int w,int h,int mip,int layer,CallbackInfo ci){NativeTextureVersions.written(destination);}
+    private void voxellight$bufferCopy(GpuBufferSlice source,int sourceX,int sourceY,int rowLength,int imageHeight,GpuTexture destination,int x,int y,int w,int h,int mip,int layer,CallbackInfo ci){NativeTextureVersions.written(destination,mip,x,y,w,h);}
     @Inject(method="createRenderPass",at=@At("HEAD"))
     private void voxellight$render(RenderPassDescriptor descriptor,CallbackInfoReturnable<?> ci){for(var attachment:descriptor.colorAttachments())if(attachment!=null)NativeTextureVersions.written(attachment.textureView().texture());}
     @Inject(method="clearColorTexture",at=@At("HEAD"))

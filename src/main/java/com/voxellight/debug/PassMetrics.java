@@ -48,6 +48,8 @@ public final class PassMetrics {
         });
     }
 
+    public Sample sample(long scopeId){return samples.get(scopeId);}
+
     public int size(){return samples.size();}
 
     public List<Sample> snapshot() {

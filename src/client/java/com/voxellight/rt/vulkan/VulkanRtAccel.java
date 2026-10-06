@@ -11,10 +11,8 @@ public final class VulkanRtAccel implements AutoCloseable, Destroyable {
     private final VulkanDevice device;
     private final VulkanRtBuffer storage;
     private final long handle, address;
-    private VulkanRtBuffer scratch;
-    private int primitiveCount,buildFlags,geometryType,geometryFlags;
-    private long vertexStride;
-    private int vertexFormat,indexType;
+    private String signature;
+    private long buildScratchBytes,updateScratchBytes;
     private boolean closed;
     private VulkanRtAccel(VulkanDevice device, int type, long bytes) {
         this.device=device;storage=new VulkanRtBuffer(device,bytes,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR);
@@ -35,46 +33,45 @@ public final class VulkanRtAccel implements AutoCloseable, Destroyable {
         info.sType$Default().type(type).flags(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR)
             .mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR).geometryCount(geometry.remaining()).pGeometries(geometry);
     }
-    static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,int scratchAlignment) {
-        return build(device,command,type,geometry,primitives,scratchAlignment,false,null);
+    static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,VulkanRtScratch scratch,boolean dynamic,VulkanRtAccel previous){
+        return build(device,command,type,geometry,new int[]{primitives},scratch,dynamic,previous);
     }
-    static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,int scratchAlignment,boolean dynamic,VulkanRtAccel previous) {
-        try(var stack=MemoryStack.stackPush()) {
-            var info=VkAccelerationStructureBuildGeometryInfoKHR.calloc(1,stack);
-            buildInfo(info.get(0),type,geometry);
+    static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int[] primitives,VulkanRtScratch scratch,boolean dynamic,VulkanRtAccel previous){
+        if(geometry.remaining()!=primitives.length)throw new IllegalArgumentException("Geometry/count mismatch");
+        try(var stack=MemoryStack.stackPush()){
+            var info=VkAccelerationStructureBuildGeometryInfoKHR.calloc(1,stack);buildInfo(info.get(0),type,geometry);
             if(dynamic)info.get(0).flags(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR|VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
-            int flags=info.get(0).flags();
-            boolean reuse=previous!=null&&previous.compatible(type,geometry,primitives,flags);
+            if(type==VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR&&java.util.stream.IntStream.range(0,geometry.remaining()).anyMatch(i->geometry.get(i).geometry().triangles().pNext()!=0))info.get(0).flags(info.get(0).flags()|EXTOpacityMicromap.VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DISABLE_OPACITY_MICROMAPS_BIT_EXT);
+            String signature=signature(type,geometry,primitives,info.get(0).flags());
+            boolean reuse=dynamic&&previous!=null&&!previous.closed&&signature.equals(previous.signature);
             VulkanRtAccel result;
             if(reuse)result=previous;
-            else {
+            else{
                 var sizes=VkAccelerationStructureBuildSizesInfoKHR.calloc(stack).sType$Default();
                 vkGetAccelerationStructureBuildSizesKHR(device.vkDevice(),VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,info.get(0),stack.ints(primitives),sizes);
-                result=new VulkanRtAccel(device,type,sizes.accelerationStructureSize());
-                try{result.scratch=new VulkanRtBuffer(device,Math.max(sizes.buildScratchSize(),sizes.updateScratchSize())+scratchAlignment,VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);}
-                catch(RuntimeException error){result.close();throw error;}
-                result.primitiveCount=primitives;result.buildFlags=flags;
-                result.geometryType=geometry.get(0).geometryType();result.geometryFlags=geometry.get(0).flags();
-                if(type==VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR){var t=geometry.get(0).geometry().triangles();result.vertexStride=t.vertexStride();result.vertexFormat=t.vertexFormat();result.indexType=t.indexType();}
+                result=new VulkanRtAccel(device,type,sizes.accelerationStructureSize());result.signature=signature;
+                result.buildScratchBytes=sizes.buildScratchSize();result.updateScratchBytes=sizes.updateScratchSize();
             }
-            try {
-                info.get(0).dstAccelerationStructure(result.handle).scratchData().deviceAddress(VulkanSbt.align(result.scratch.address(),scratchAlignment));
+            try{
+                info.get(0).dstAccelerationStructure(result.handle).scratchData().deviceAddress(scratch.acquire(command,stack,reuse?result.updateScratchBytes:result.buildScratchBytes));
                 if(reuse)info.get(0).mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR).srcAccelerationStructure(result.handle);
-                var range=VkAccelerationStructureBuildRangeInfoKHR.calloc(1,stack).primitiveCount(primitives);
-                vkCmdBuildAccelerationStructuresKHR(command,info,stack.pointers(range.address()));
-                return result;
-            } catch(RuntimeException error) {if(!reuse)result.close();throw error;}
-
+                var ranges=VkAccelerationStructureBuildRangeInfoKHR.calloc(primitives.length,stack);
+                for(int i=0;i<primitives.length;i++)ranges.get(i).primitiveCount(primitives[i]);
+                vkCmdBuildAccelerationStructuresKHR(command,info,stack.pointers(ranges.address()));return result;
+            }catch(RuntimeException error){if(!reuse)result.close();throw error;}
         }
     }
-    private boolean compatible(int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,int flags){
-        if(closed||(buildFlags&VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR)==0||flags!=buildFlags||primitiveCount!=primitives||geometry.remaining()!=1||geometry.get(0).geometryType()!=geometryType||geometry.get(0).flags()!=geometryFlags)return false;
-        if(type==VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR){var t=geometry.get(0).geometry().triangles();return t.vertexStride()==vertexStride&&t.vertexFormat()==vertexFormat&&t.indexType()==indexType;}
-        return type==VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    static String signature(int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int[] primitives,int flags){
+        var result=new StringBuilder().append(type).append('/').append(flags);
+        for(int i=0;i<geometry.remaining();i++){
+            var g=geometry.get(geometry.position()+i);result.append('/').append(g.geometryType()).append(':').append(g.flags()).append(':').append(primitives[i]);
+            if(type==VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR){var t=g.geometry().triangles();result.append(':').append(t.vertexStride()).append(':').append(t.vertexFormat()).append(':').append(t.indexType()).append(':').append(t.maxVertex()).append(':').append(t.pNext()!=0);}
+        }
+        return result.toString();
     }
-    long bytes(){return storage.size()+(scratch==null?0:scratch.size());}
+    long bytes(){return storage.size();}
     long handle() { return handle; }
     long address() { return address; }
-    @Override public void close() { if(!closed) {closed=true;device.createCommandEncoder().queueForDestroy(this);storage.close();if(scratch!=null)scratch.close();} }
+    @Override public void close() { if(!closed) {closed=true;device.createCommandEncoder().queueForDestroy(this);storage.close();} }
     @Override public void destroy() { vkDestroyAccelerationStructureKHR(device.vkDevice(),handle,null); }
 }

@@ -23,6 +23,9 @@ public final class RenderPassProfile {
     private static final long[] ids=new long[SLOTS], frames=new long[SLOTS];
     private static final boolean[] pending=new boolean[SLOTS];
     private static final com.voxellight.debug.RtWorkMetrics workMetrics=new com.voxellight.debug.RtWorkMetrics();
+    private static final java.util.Set<java.util.function.Consumer<PassMetrics.Sample>> observers=new java.util.LinkedHashSet<>();
+    public static void observe(java.util.function.Consumer<PassMetrics.Sample> observer){observers.add(observer);}
+    public static void unobserve(java.util.function.Consumer<PassMetrics.Sample> observer){observers.remove(observer);}
     private static final PassMetrics metrics=new PassMetrics(14400);
     private RenderPassProfile() { }
     public static void nextFrame() {
@@ -34,7 +37,7 @@ public final class RenderPassProfile {
                 if(values[0].isPresent() && values[1].isPresent()) {
                     long ticks=values[1].getAsLong()-values[0].getAsLong();
                     double ns=ticks*(double)period;
-                    if(ticks>=0 && Double.isFinite(ns) && ns<Long.MAX_VALUE)metrics.completeGpu(ids[i],Math.round(ns));
+                    if(ticks>=0 && Double.isFinite(ns) && ns<Long.MAX_VALUE){metrics.completeGpu(ids[i],Math.round(ns));var sample=metrics.sample(ids[i]);if(sample!=null)for(var observer:observers)observer.accept(sample);}
                     pending[i]=false;
                 }
             }
@@ -92,7 +95,8 @@ public final class RenderPassProfile {
     static void externalGpu(String name,long nanos){if(enabled){long id=++serial;metrics.recordScope(id,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,0);metrics.completeGpu(id,nanos);}}
     static void cpu(String name,long nanos){if(enabled)metrics.recordScope(++serial,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,nanos);}
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit){workMetrics.record(frame,w,h,samples,scene,active,shadow,anyHit);}
-    public static void export(Path path)throws IOException{metrics.export(path);String name=path.getFileName().toString();workMetrics.export(path.resolveSibling(name.endsWith(".passes.csv")?name.substring(0,name.length()-11)+".rays.csv":name+".rays.csv"));}
+    public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit,long opaque,long replay,long mismatches){workMetrics.record(frame,w,h,samples,scene,active,shadow,anyHit,opaque,replay,mismatches);}
+    public static void export(Path path)throws IOException{metrics.export(path);com.voxellight.rt.vulkan.VulkanPipelineDiagnostics.export(path.resolveSibling(path.getFileName()+".pipelines.csv"));String name=path.getFileName().toString();workMetrics.export(path.resolveSibling(name.endsWith(".passes.csv")?name.substring(0,name.length()-11)+".rays.csv":name+".rays.csv"));}
     static String status(){return ", passProfile="+(!enabled?"off":failed?"CPU only":pool==null?"not observed":"delayed GPU timestamps")+", passProfileSamples="+metrics.size()+", passProfileSkipped="+skipped;}
     private static void disable(){failed=true;if(pool!=null){try{pool.close();}catch(RuntimeException ignored){}pool=null;}}
     static void clear(){disable();failed=false;metrics.clear();workMetrics.clear();scopes.clear();java.util.Arrays.fill(pending,false);}

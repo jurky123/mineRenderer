@@ -16,6 +16,10 @@ abstract class VulkanRtxExtensionsMixin {
     private static void voxellight$externalMemory(Collection<String> extensions,VulkanPhysicalDevice physical,Set<?> features,CallbackInfoReturnable<VkDevice> ci){
         var capabilities=VulkanRtCapabilities.query(physical.vkPhysicalDevice());
         if(capabilities.supported())for(String extension:VulkanRtCapabilities.REQUIRED)if(!extensions.contains(extension))extensions.add(extension);
+        if(capabilities.supported()){
+            var vk=physical.vkPhysicalDevice();
+            for(String extension:VulkanRtCapabilities.OPTIONAL)if(capabilities.extensions().contains(extension)&&switch(extension){case "VK_KHR_pipeline_executable_properties"->VulkanRtCapabilities.executableStatistics(vk);case "VK_KHR_ray_query"->VulkanRtCapabilities.rayQuery(vk);case "VK_EXT_opacity_micromap"->VulkanRtCapabilities.micromap(vk);case "VK_NV_ray_tracing_invocation_reorder"->VulkanRtCapabilities.reorder(vk);default->false;})if(!extensions.contains(extension))extensions.add(extension);
+        }
         String suffix=System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")?"win32":"fd";
         String memory="VK_KHR_external_memory_"+suffix,semaphore="VK_KHR_external_semaphore_"+suffix;
         if(physical.hasDeviceExtension(memory)&&physical.hasDeviceExtension(semaphore)){extensions.add(memory);extensions.add(semaphore);}
@@ -31,6 +35,11 @@ abstract class VulkanRtxExtensionsMixin {
                 if(VkBaseOutStructure.create(node).sType()==VK12.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES){VkPhysicalDeviceVulkan12Features.create(node).bufferDeviceAddress(true);found=true;break;}
             }
             if(!found)next=VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default().bufferDeviceAddress(true).pNext(next).address();
+            var advertised=VulkanRtCapabilities.query(physical).extensions();
+            if(advertised.contains("VK_KHR_ray_query")&&VulkanRtCapabilities.rayQuery(physical))next=VkPhysicalDeviceRayQueryFeaturesKHR.calloc(stack).sType$Default().rayQuery(true).pNext(next).address();
+            if(advertised.contains("VK_EXT_opacity_micromap")&&VulkanRtCapabilities.micromap(physical))next=VkPhysicalDeviceOpacityMicromapFeaturesEXT.calloc(stack).sType$Default().micromap(true).pNext(next).address();
+            if(advertised.contains("VK_NV_ray_tracing_invocation_reorder")&&VulkanRtCapabilities.reorder(physical))next=VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV.calloc(stack).sType$Default().rayTracingInvocationReorder(true).pNext(next).address();
+            if(advertised.contains("VK_KHR_pipeline_executable_properties")&&VulkanRtCapabilities.executableStatistics(physical))next=VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR.calloc(stack).sType$Default().pipelineExecutableInfo(true).pNext(next).address();
             var accel=VkPhysicalDeviceAccelerationStructureFeaturesKHR.calloc(stack).sType$Default().accelerationStructure(true).pNext(next);
             var pipeline=VkPhysicalDeviceRayTracingPipelineFeaturesKHR.calloc(stack).sType$Default().rayTracingPipeline(true).rayTracingPipelineTraceRaysIndirect(VulkanRtCapabilities.indirectTracing(physical)).pNext(accel.address());
             long previous=info.pNext();info.pNext(pipeline.address());

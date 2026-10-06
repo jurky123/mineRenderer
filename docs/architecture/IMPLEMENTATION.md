@@ -1,5 +1,7 @@
 # alpha.24 架构实施记录
 
+**alpha.27 更新：** 当前执行合同已由 [执行层第一轮](../performance/RT-EXECUTION-ROUND-1.md) 覆盖：三类 geometry ranges、64B PathHot、独立 AOV/radiance、共享 scratch、visibility/queue/OMM/SER A/B。以下是 alpha.24 的历史实施基线，单 geometry、144B hot、65536 阈值与 per-AS scratch 描述已被替换。
+
 基线 alpha.23；本次版本 **0.39.0-alpha.24**。设计入口见 [README](README.md)。本页区分实际实现与目标合同：整体设计中的可选 SDK、完整分信号重建和高级采样没有因基础架构改动而自动完成。构建机没有 NVIDIA GPU，驱动同步、运动画质和性能验收待实机完成。
 
 ## 实际帧流程

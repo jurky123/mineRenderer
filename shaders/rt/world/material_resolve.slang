@@ -6,7 +6,7 @@ void material_resolve(){
         uint pathIndex=index+lane*camera.width*camera.height;float4 sample=output[pathIndex];
         if(sample.w>.5&&all(isfinite(sample.xyz))){
             valid++;float weight=1.0/valid;mean=mean*(1-weight)+sample.xyz*weight;
-            PathState path=loadPath(pathIndex);diffuse=diffuse*(1-weight)+path.diffuse.xyz*weight;reflection=reflection*(1-weight)+path.reflection.xyz*weight;refraction=refraction*(1-weight)+path.refraction.xyz*weight;
+            PathAov path=pathAovs[pathIndex];diffuse=diffuse*(1-weight)+path.diffuse.xyz*weight;reflection=reflection*(1-weight)+path.reflection.xyz*weight;refraction=refraction*(1-weight)+path.refraction.xyz*weight;
         }
     }
     output[index]=float4(mean,valid);

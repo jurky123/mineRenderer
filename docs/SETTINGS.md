@@ -57,3 +57,7 @@ alpha.22：手持物品按自身 UV 裁切图集，补偿 HUD/世界 FOV 差异�
 alpha.23：纹理裁切槽位与 BLAS 分组分开；按原始纹理和手持/世界类别组合几何。stats 的 `rtDynamicTextureTiles` 表示裁切纹理数量，`rtDynamicGroups` 表示几何分组数，二者无需相等。继续用相同分辨率、1 spp 和同一场景导出 profile 对比；GPU 提速仍待实机确认。
 
 alpha.24：统一 scene commit、稳定几何范围、持久 BLAS/TLAS refit、对象局部平移与上帧位置、纹理版本追踪、hot/cold path 和可选 GPU active queue 已接入。实时降噪后执行独立输出分辨率时域放大；Reference 不执行降噪/放大。profile 导出 `.passes.csv` 包含真实 frame/scope、尺寸、spp 和 scene generation，另有抽样 `.rays.csv`。stats 的 scheduling 表示 fixed batch 或 GPU compact continuation；初始 compaction 阈值为 65,536 paths，尚需实测。输出双 history 额外约 32 bytes/output pixel；`rtBufferAllocatedBytes`/`rtBufferRetiringBytes` 只覆盖本项目 Vulkan buffer。NRD/DLSS RR、ReSTIR、焦散和完整分信号重建仍未实现。
+
+## alpha.27 执行层 A/B
+
+默认 `rt_visibility trace`、`rt_queue auto`、`rt_omm off`、`rt_ser off`。`rt_visibility legacy|trace|query` 比较遮挡执行方式，`rt_queue auto|fixed|compact` 比较 continuation 调度；未知设备/范围回退在 stats 中报告。AUTO 未标定使用 fixed，`profile on` 时根据真实 alive 曲线/GPU 时间标定，关闭后使用 context 内已测策略。`rt_omm on|off` 和 `rt_ser on|off` 是能力门控请求，实际启用见 stats；visibility/OMM/SER 切换重建 context，要重新预热再 export。OMM 当前是保守三角级覆盖，混合 alpha 回退 any-hit。完整测量与冻结条件见 [执行层第一轮](performance/RT-EXECUTION-ROUND-1.md)。

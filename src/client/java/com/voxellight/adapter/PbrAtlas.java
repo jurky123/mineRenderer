@@ -36,6 +36,7 @@ final class PbrAtlas implements AutoCloseable {
         if(java.nio.file.Files.isRegularFile(user))try(var reader=java.nio.file.Files.newBufferedReader(user)){overrides.read(reader);}catch(Exception e){org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("Invalid user material overrides",e);}
         var rows=new LinkedHashMap<List<Integer>,Integer>();var values=new ArrayList<int[]>();
         int[] defaultRow=Material3.fromProfile("",PbrMaterials.FALLBACK).table(PbrMaterials.FALLBACK.packed(255));values.add(defaultRow);rows.put(Arrays.stream(defaultRow).boxed().toList(),0);
+        byte[] transmission=new byte[w*h];short[] opacity=new short[w*h];Arrays.fill(opacity,(short)-1);
         ByteBuffer ids=MemoryUtil.memCalloc(w*h*4).order(ByteOrder.LITTLE_ENDIAN),normal=MemoryUtil.memAlloc(w*h*4),lut=MemoryUtil.memCalloc(256*1280*4).order(ByteOrder.LITTLE_ENDIAN);
         try {
             for(int i=0;i<w*h;i++){normal.put(i*4,(byte)128);normal.put(i*4+1,(byte)128);normal.put(i*4+2,(byte)255);normal.put(i*4+3,(byte)255);}
@@ -44,9 +45,10 @@ final class PbrAtlas implements AutoCloseable {
                 var sprite=atlas.getSprite(name);if(!sprite.contents().name().equals(name))continue;
                 var fallback=materials.profile(name.toString());
                 // Animated maps need atlas animation synchronization; use stable profiles in this phase.
-                NativeImage spec=null,norm=null;
+                NativeImage spec=null,norm=null,albedo=null;
                 try {
                     if(!sprite.contents().isAnimated()) {
+                        try(var in=manager.getResource(resource).orElseThrow().open()){albedo=NativeImage.read(NativeImage.Format.RGBA,in);}
                         var specResource=manager.getResource(Identifier.fromNamespaceAndPath(resource.getNamespace(),resource.getPath().replace(".png","_s.png")));
                         if(specResource.isPresent())try(var in=specResource.get().open()){spec=NativeImage.read(NativeImage.Format.RGBA,in);}
                         var normalResource=manager.getResource(Identifier.fromNamespaceAndPath(resource.getNamespace(),resource.getPath().replace(".png","_n.png")));
@@ -67,21 +69,25 @@ final class PbrAtlas implements AutoCloseable {
                         else packed=new PbrMaterials.Profile(m3.perceptualRoughness(),m3.f0(),m3.conductor(),m3.porosity()).packed(ao);
                         int[] row=m3.table(packed);var key=Arrays.stream(row).boxed().toList();index=rows.get(key);if(index==null){if(values.size()>=65536){overflows++;index=0;}else{index=values.size();rows.put(key,index);values.add(row);}}
                         spriteProfiles.put(spec==null?fallback.packed(ao):((s>>16)&255)|(((s>>8)&255)<<8)|((s&255)<<16)|(ao<<24),index);}
+                        int type=values.get(index)[1]&255;transmission[y*w+x]=(byte)(type==3||type==4||type==7||type==9?1:0);
+                        if(albedo!=null)opacity[y*w+x]=(short)(albedo.getPixel(Math.min(albedo.getWidth()-1,(x-x0)*albedo.getWidth()/Math.max(1,x1-x0)),Math.min(albedo.getHeight()-1,(y-y0)*albedo.getHeight()/Math.max(1,y1-y0)))>>>24);
+                        if(authored.type()==Material3.Type.WATER||authored.transmission()>0&&authored.type()!=Material3.Type.DIFFUSE_TRANSMISSION)opacity[y*w+x]=256;
                         int offset=(y*w+x)*4;ids.putShort(offset,(short)(int)index);ids.put(offset+2,(byte)(spec==null?(authored.emission()<0?0:Math.round(authored.emission()*254)):(s>>>24)==255?0:s>>>24));
                         ids.put(offset+3,(byte)((spec!=null||authored.emission()>=0?4:0)|(authored.type()==Material3.Type.WATER?2:authored.transmission()>0&&authored.type()!=Material3.Type.DIFFUSE_TRANSMISSION?1:0)));
                         normal.put(offset,(byte)(n>>16));normal.put(offset+1,(byte)(n>>8));normal.put(offset+2,(byte)ao);normal.put(offset+3,(byte)((n>>>24)&255));
                     }
                 }catch(Exception e){org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("PBR texture fallback: {}",name,e);}
-                finally{if(spec!=null)spec.close();if(norm!=null)norm.close();}
+                finally{if(albedo!=null)albedo.close();if(spec!=null)spec.close();if(norm!=null)norm.close();}
             }
             for(int i=0;i<values.size();i++)for(int plane=0;plane<5;plane++)lut.putInt((plane*65536+i)*4,values.get(i)[plane]);profiles=values.size();bytes=(long)w*h*8+256*1280*4;
             ByteBuffer[] data={ids,normal,lut};var d=RenderSystem.getDevice();var encoder=d.createCommandEncoder();
             for(int i=0;i<3;i++){int tw=i==2?256:w,th=i==2?1280:h;textures[i]=d.createTexture("VoxelLight PBR atlas "+i,GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA8_UNORM,tw,th,1,1);views[i]=d.createTextureView(textures[i]);encoder.writeToTexture(textures[i],data[i],0,0,0,0,tw,th);}
-            buildNs=System.nanoTime()-started;
+            if(w!=atlas.getTextureView().getWidth(0)||h!=atlas.getTextureView().getHeight(0))Arrays.fill(opacity,(short)-1);
+            RtMaterialCoverage.publish(w,h,transmission,opacity);RtMaterialCoverage.watch(atlas.getTextureView().texture());buildNs=System.nanoTime()-started;
         }finally{MemoryUtil.memFree(ids);MemoryUtil.memFree(normal);MemoryUtil.memFree(lut);}
     }
     float[] waterMedium(){return waterMedium.mediumTable();}
     GpuTextureView view(int i){return views[i];}
     String status(){return ", pbrProfiles="+profiles+", labPbrSprites="+maps+", pbrPaletteOverflow="+overflows+", pbrAtlasBytes="+bytes+", pbrAtlasBuildNs="+buildNs;}
-    @Override public void close(){for(int i=0;i<3;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(textures[i]!=null){textures[i].close();textures[i]=null;}}maps=profiles=overflows=0;bytes=0;}
+    @Override public void close(){RtMaterialCoverage.clear();for(int i=0;i<3;i++){if(views[i]!=null){views[i].close();views[i]=null;}if(textures[i]!=null){textures[i].close();textures[i]=null;}}maps=profiles=overflows=0;bytes=0;}
 }
