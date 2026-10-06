@@ -1,3 +1,7 @@
+# 0.39.0-alpha.25 — allow clearing temporal upscale history
+
+Alpha.24 successfully initialized Vulkan RT on the reported RTX 4060 Laptop GPU, then failed at the first output-history clear: Minecraft 26.2 requires both RENDER_ATTACHMENT and COPY_DST for clearColorTexture. Output HDR history textures now include COPY_DST, preserving sampling/rendering flags and RGBA32F history. This fixes the reported validation exception that forced raster fallback. A regression executes the actual Minecraft CommandEncoder validation with a stub backend, and verifies the old flags fail before reaching the backend. Driver rendering and visual acceptance remain pending.
+
 # 0.39.0-alpha.24 — persistent scene, GPU continuation queues and motion reconstruction
 
 Terrain and dynamic changes are collected before one scene commit. Shader geometry uses stable free-list ranges; dynamic object identities and local mesh translations replace texture-only grouping. Same-layout BLAS/TLAS updates reuse AS storage, scratch and vertex/instance buffers. Native Vulkan texture-write versions avoid unchanged crop/albedo uploads; terrain-generation caching avoids rebuilding static emitter proposals for dynamic motion. Persistent fenced descriptor slots replace per-frame pools.

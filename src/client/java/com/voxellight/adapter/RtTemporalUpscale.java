@@ -12,6 +12,7 @@ import java.util.Optional;
 
 /** Output-resolution HDR history with RT-surface reprojection, independent of the denoiser. */
 final class RtTemporalUpscale implements AutoCloseable {
+    static final int HISTORY_USAGE=GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_DST;
     private static final String[] INPUTS={"Noisy","Previous","Albedo","Normal","Position","PreviousAlbedo","PreviousNormal","PreviousPosition","MotionPosition","PreviousMotionPosition"};
     private static final RenderPipeline PIPELINE=create();
     private static RenderPipeline create(){
@@ -30,7 +31,7 @@ final class RtTemporalUpscale implements AutoCloseable {
         if(width!=w||height!=h||textures[0]==null){
             close();width=w;height=h;
             if(!device.precompilePipeline(PIPELINE,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Temporal upscaler unavailable");
-            for(int i=0;i<2;i++){textures[i]=device.createTexture("VoxelLight output HDR temporal history",GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_RENDER_ATTACHMENT,GpuFormat.RGBA32_FLOAT,w,h,1,1);views[i]=device.createTextureView(textures[i]);}
+            for(int i=0;i<2;i++){textures[i]=device.createTexture("VoxelLight output HDR temporal history",HISTORY_USAGE,GpuFormat.RGBA32_FLOAT,w,h,1,1);views[i]=device.createTextureView(textures[i]);}
         }
         int write=1-read;
         // Cleared alpha prevents reading uninitialized history on first use or output resize.
