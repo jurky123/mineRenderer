@@ -1,5 +1,7 @@
 ## alpha.35 BLAS 更新与 scratch 优化
 
+实机 BLAS ABBA：8 段有效，scene commit 3.155→0.377 ms，native BLAS 2.979→0.208 ms；refit 数不变、scratch barriers 每 commit 约157→3，属性-only 跳过未命中。保留 optimized。其他 scope 存在轮间变化，不能把 BLAS 的88%降幅当作整帧收益。[完整结果与限制](performance/ALPHA-35-BLAS-ANALYSIS.md)。
+
 动态位置/geometry ranges 不变时，shader 属性继续上传但跳过 BLAS refit；独立 AS 更新使用共享 arena 的对齐、不重叠 scratch slices，保留跨提交和空间复用依赖。校准 native BLAS 计时，保留外部 submit span；新增按类别/原因的累计 AS 与 scratch 计数。`/voxellight rt_benchmark blas` 8 段专用 ABBA，比较 scene commit、保持 RIS/Query/Fixed/OMM off/SER off，默认 optimized，可回退 legacy。具体收益与客户端视觉待实测。[实施与验收](performance/RT-BLAS-OPTIMIZATION.md)。
 
 ## alpha.34 统一直接光 RIS
