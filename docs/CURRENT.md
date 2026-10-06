@@ -1,3 +1,13 @@
+## alpha.32 快照完整性、HYBRID 后段调度与 OMM 有效性
+
+本地 `build clientKit --offline` 通过，306 项 Java 测试零失败；24 个 RT SPIR-V stage/ABI 与真实 Slang 输运、混合 mask queue fixture 验证通过。CPU fixture 不验证 GPU 原子并发。
+
+- 自动测试固定选择最近的完整静态 section，预算 60 MiB，预留 4 MiB 动态几何空间；数量和精确版本签名未全部装入就不开始采样，修复 alpha.31 首段多一个 section 导致 visibility 对照无效。
+- 增加 `rt_queue hybrid` 与独立 `hybrid_queue` 两轮 ABBA：只对中等规模的 bounce 压缩，接近全屏和极小队列保持 fixed。由真实 alive 曲线决定 mask，AUTO 与默认控制不变。
+- OMM atlas 写入只失效受影响区域；动画 unknown 写入不复制整张 CPU 网格。静态 opacity epoch 变化后比较保守索引，仅重建分类变化的 BLAS，防止过期的硬件覆盖分类；混合 alpha 保留 any-hit。
+- 预热要求最近 30 个无计数器 GPU batch 的两半中位数在 10% 内；重复 A/B 波动大于 10% 标为不可比较，避免将 alpha.31 的 SER 约 59% 漂移称作普通噪声。
+- `pipelines-status.json` 明确驱动编译统计为空的原因，缺失 spill/缓存数据不作零值。本机无 NVIDIA GPU，HYBRID、OMM、SER、画面等价及硬件统计仍待新版实机验收，不能承诺 1.3–2× 或冻结。
+
 ## alpha.31 TraceRay/Compact 执行修复与测量干扰控制
 
 针对 alpha.30 单场景数据，TraceRay 采用 scalar solid-shadow 单次阻挡查询，cutout alpha 与 transmission 过滤使用专用 hit records；Compact 删除冗余 Max，计数和 indirect width 合并为同一原子字段。计数与 replay 只每八帧启用，A/B 汇总排除这些帧，raw CSV 与 counter_frames.json 保留追溯依据。未改变原 estimator 的材质/介质处理，CPU 数值与队列索引检查纳入构建。RTX 加速效果仍未测量，也不能直接与 alpha.30 受每帧计数干扰的数据推算版本加速。

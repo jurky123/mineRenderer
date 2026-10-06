@@ -86,7 +86,7 @@ def summarize(path):
         with pipeline_path.open() as stream:compiler_stats=list(csv.DictReader(stream))
     queue_timings=collections.defaultdict(list)
     for row in rows:
-        if row["mode"] in ("vulkan_rt_batch_fixed","vulkan_rt_batch_compact") and row["pass_gpu_ns"]:
+        if row["mode"] in ("vulkan_rt_batch_fixed","vulkan_rt_batch_compact","vulkan_rt_batch_hybrid") and row["pass_gpu_ns"]:
             queue_timings[(row["width"],row["height"],row.get("spp"),row["mode"])].append(int(row["pass_gpu_ns"])/1e6)
     return {"final_controls": controls,
             "any_hit_per_primary":any_hit/primary if primary else None,

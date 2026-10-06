@@ -3,7 +3,7 @@ package com.voxellight.rt;
 /** Execution-only A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
     public enum Visibility {LEGACY,TRACE,QUERY}
-    public enum Queue {AUTO,FIXED,COMPACT}
+    public enum Queue {AUTO,FIXED,COMPACT,HYBRID}
     private static Visibility visibility=Visibility.TRACE;
     private static Queue queue=Queue.AUTO;
     private static boolean omm,ser;

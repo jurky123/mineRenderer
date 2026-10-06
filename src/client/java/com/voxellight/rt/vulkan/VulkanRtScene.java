@@ -21,6 +21,9 @@ public final class VulkanRtScene implements AutoCloseable {
     private VulkanRtBuffer geometryBuffer;
     private final LinkedHashMap<SectionKey,Long> requestedPages=new LinkedHashMap<>();
     public void requestPages(Set<SectionKey> keys){long now=System.nanoTime();requestedPages.entrySet().removeIf(entry->now-entry.getValue()>3_000_000_000L);for(var key:keys){requestedPages.remove(key);requestedPages.put(key,now);while(requestedPages.size()>16){var iterator=requestedPages.keySet().iterator();iterator.next();iterator.remove();}}}
+    private final Map<SectionKey,int[]> opacityClassification=new HashMap<>();
+    private final Map<SectionKey,long[]> opacityCounts=new HashMap<>();
+    private final Map<SectionKey,RtGeometryStream.Section> opacitySources=new HashMap<>();
     private final Map<SectionKey,Section> sections=new LinkedHashMap<>();
     private VulkanRtAccel tlas,opaqueTlas;
     private VulkanRtBuffer opaqueInstanceBuffer;
@@ -53,9 +56,20 @@ public final class VulkanRtScene implements AutoCloseable {
     public Set<SectionKey> resident() { var keys=new HashSet<>(sections.keySet());keys.removeIf(VulkanRtScene::dynamic);return Set.copyOf(keys); }
     private Set<SectionKey> benchmarkTerrain=Set.of();
     public void benchmarkTerrain(Set<SectionKey> keys){benchmarkTerrain=Set.copyOf(keys);}
-    public List<RtGeometryStream.Section> benchmarkSnapshot(){var result=new ArrayList<RtGeometryStream.Section>();for(var entry:sections.entrySet())if(!dynamic(entry.getKey()))result.add(RtGeometryStream.snapshot(entry.getKey(),entry.getValue().version));return List.copyOf(result);}
+    public List<RtGeometryStream.Section> benchmarkSnapshot(double x,double y,double z){
+        var sizes=new HashMap<SectionKey,Long>();sections.forEach((key,value)->{if(!dynamic(key))sizes.put(key,value.vertices.size());});
+        var selected=benchmarkSelection(sizes,x,y,z);var result=new ArrayList<RtGeometryStream.Section>();
+        for(var key:selected)result.add(RtGeometryStream.snapshot(key,sections.get(key).version));return List.copyOf(result);
+    }
+    public static List<SectionKey> benchmarkSelection(Map<SectionKey,Long> sizes,double x,double y,double z){
+        long used=0,budget=GEOMETRY_BYTES-4L*1024*1024;var result=new ArrayList<SectionKey>();
+        var keys=sizes.keySet().stream().sorted(Comparator.comparingDouble((SectionKey key)->distance(key,x,y,z)).thenComparingInt(SectionKey::x).thenComparingInt(SectionKey::y).thenComparingInt(SectionKey::z)).toList();
+        for(var key:keys){long size=sizes.get(key);if(size>0&&size<=budget-used){used+=size;result.add(key);}}return List.copyOf(result);
+    }
+    public static long benchmarkSignature(List<RtGeometryStream.Section> snapshot){long signature=0;for(var section:snapshot)signature+=terrainEntrySignature(section.key(),section.version());return signature;}
+    private static long terrainEntrySignature(SectionKey key,long version){long value=key.hashCode()*0x9e3779b97f4a7c15L+version;value=(value^(value>>>30))*0xbf58476d1ce4e5b9L;return value^(value>>>27);}
     public long sceneBytes(){return bytes;}
-    public long terrainSignature(){long signature=0;for(var entry:sections.entrySet())if(!dynamic(entry.getKey())){long value=entry.getKey().hashCode()*0x9e3779b97f4a7c15L+entry.getValue().version;value=(value^(value>>>30))*0xbf58476d1ce4e5b9L;signature+=value^(value>>>27);}return signature;}
+    public long terrainSignature(){long signature=0;for(var entry:sections.entrySet())if(!dynamic(entry.getKey()))signature+=terrainEntrySignature(entry.getKey(),entry.getValue().version);return signature;}
     public long generation() { return generation; }
     long opaqueTlas(){return opaqueTlas==null?tlas():opaqueTlas.handle();}
     public boolean hasOpaque(){return opaqueTlas!=null;}
@@ -63,7 +77,8 @@ public final class VulkanRtScene implements AutoCloseable {
     long tlas() { return tlas==null?0:tlas.handle(); }
     VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", geometryCopyBytes="+geometryCopyBytes+", geometryCompactions="+geometryCompactions+", tlasRefits="+tlasRefits+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", geometryRanges="+rangeCounts()+", ommValidity="+com.voxellight.adapter.RtMaterialCoverage.opacityValid()+", asScratchBytes="+scratch.bytes()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", geometryCopyBytes="+geometryCopyBytes+", geometryCompactions="+geometryCompactions+", tlasRefits="+tlasRefits+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", geometryRanges="+rangeCounts()+", ommCoverage="+opacityCounts()+", knownOpacityTexels="+com.voxellight.adapter.RtMaterialCoverage.knownOpacityTexels()+", ommValidity="+com.voxellight.adapter.RtMaterialCoverage.opacityValid()+", asScratchBytes="+scratch.bytes()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    private String opacityCounts(){long[] total=new long[3];for(var counts:opacityCounts.values())for(int i=0;i<3;i++)total[i]+=counts[i];return "opaque:"+total[0]+"/transparent:"+total[1]+"/unknown:"+total[2];}
     private String rangeCounts(){long[] counts=new long[3];for(var section:sections.values())for(int i=0;i<section.counts.length;i++)counts[i]+=section.counts[i];return "opaque:"+counts[0]+"/cutout:"+counts[1]+"/transmission:"+counts[2];}
     private final LinkedHashMap<SectionKey,RtGeometryStream.Section> pending=new LinkedHashMap<>();
     public void collect(List<RtGeometryStream.Section> changes){for(var change:changes)pending.put(change.key(),change);}
@@ -92,18 +107,19 @@ public final class VulkanRtScene implements AutoCloseable {
         }
     }
     public void update(com.mojang.blaze3d.systems.CommandEncoder profileEncoder,List<RtGeometryStream.Section> changes,double x,double y,double z) {
-        geometryCopyBytes=0;long currentOpacity=com.voxellight.adapter.RtMaterialCoverage.opacityEpoch();boolean dirty=ommEnabled&&opacityEpoch!=currentOpacity;opacityEpoch=currentOpacity;
+        geometryCopyBytes=0;long currentOpacity=com.voxellight.adapter.RtMaterialCoverage.opacityEpoch();boolean opacityDirty=ommEnabled&&opacityEpoch!=currentOpacity;boolean dirty=opacityDirty;opacityEpoch=currentOpacity;
         var encoder=device.createCommandEncoder();
         var iterator=sections.entrySet().iterator();
         while(iterator.hasNext()) {
             var entry=iterator.next();var k=entry.getKey();
-            if(!admitted(k,x,y,z)) {
-                release(entry.getValue());iterator.remove();dirty=true;terrainGeneration++;
+            if(!admitted(k,x,y,z)||!benchmarkTerrain.isEmpty()&&!dynamic(k)&&!benchmarkTerrain.contains(k)) {
+                opacityClassification.remove(k);opacityCounts.remove(k);opacitySources.remove(k);release(entry.getValue());iterator.remove();dirty=true;terrainGeneration++;
             }
         }
         List<RtGeometryStream.Section> accepted=new ArrayList<>();
-        var ordered=new ArrayList<>(changes);
-        ordered.sort(Comparator.<RtGeometryStream.Section>comparingInt(change->sections.containsKey(change.key())?0:1)
+        var refresh=new LinkedHashMap<SectionKey,RtGeometryStream.Section>();if(opacityDirty)opacitySources.forEach((key,source)->{if(!Arrays.equals(opacityClassification.get(key),com.voxellight.adapter.RtMaterialCoverage.indices(source.triangles())))refresh.put(key,source);});for(var change:changes)refresh.put(change.key(),change);
+        var ordered=new ArrayList<>(refresh.values());
+        ordered.sort(Comparator.<RtGeometryStream.Section>comparingInt(change->benchmarkTerrain.contains(change.key())?-1:sections.containsKey(change.key())?0:1)
             .thenComparingDouble(change->distance(change.key(),x,y,z)));
         Set<SectionKey> protectedKeys=new HashSet<>();changes.forEach(change->protectedKeys.add(change.key()));protectedKeys.addAll(requestedPages.keySet());protectedKeys.addAll(benchmarkTerrain);
         long plannedBytes=bytes;int plannedCount=resident().size();
@@ -112,14 +128,14 @@ public final class VulkanRtScene implements AutoCloseable {
             var old=sections.get(change.key());
             // The instance motion table has a fixed 1024-entry tail. Never admit an out-of-range instance.
             if(old==null&&sections.size()+accepted.size()>=1024)continue;
-            if(old!=null&&old.version==change.version()){
+            if(old!=null&&old.version==change.version()&&!(opacityDirty&&!dynamic(change.key()))){
                 if(old.x!=change.x()||old.y!=change.y()||old.z!=change.z()||old.viewModel!=change.viewModel()||old.motionValid!=change.motionValid()){
                     sections.put(change.key(),new Section(old.version,old.vertices,old.blas,old.normals,old.emitters,change.x(),change.y(),change.z(),change.viewModel(),change.motionValid(),old.topology,old.counts,old.opaqueBlas,old.ommIndices));dirty=true;
                 }
                 continue;
             }
             if(change.vertices()==0) {
-                if(old!=null){sections.remove(change.key());plannedBytes-=old.vertices.size();if(!dynamic(change.key()))plannedCount--;release(old);dirty=true;}
+                if(old!=null){sections.remove(change.key());opacityClassification.remove(change.key());opacityCounts.remove(change.key());opacitySources.remove(change.key());plannedBytes-=old.vertices.size();if(!dynamic(change.key()))plannedCount--;release(old);dirty=true;}
                 continue;
             }
             long oldBytes=old==null?0:old.vertices.size();
@@ -132,7 +148,7 @@ public final class VulkanRtScene implements AutoCloseable {
                 change.triangles().length,plannedCount,old!=null||dynamic(change.key()),x,y,z,requestedPages.keySet());
             if(victims==null)continue;
             for(var victim:victims) {
-                var removed=sections.remove(victim);plannedBytes-=removed.vertices.size();plannedCount--;release(removed);dirty=true;terrainGeneration++;
+                var removed=sections.remove(victim);opacityClassification.remove(victim);opacityCounts.remove(victim);opacitySources.remove(victim);plannedBytes-=removed.vertices.size();plannedCount--;release(removed);dirty=true;terrainGeneration++;
             }
             accepted.add(change);plannedBytes=plannedBytes-oldBytes+change.triangles().length;
             if(old==null&&!dynamic(change.key()))plannedCount++;
@@ -159,7 +175,7 @@ public final class VulkanRtScene implements AutoCloseable {
                 if(ommEnabled&&!dynamic(change.key())&&layout.counts()[1]>0){
                     var indices=new VulkanRtBuffer(device,layout.counts()[1]*4L,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
                     micromapUploads.put(change.key(),indices);var data=ByteBuffer.allocateDirect(layout.counts()[1]*4).order(ByteOrder.nativeOrder());
-                    for(int triangle=0;triangle<layout.counts()[1];triangle++)data.putInt(com.voxellight.adapter.RtMaterialCoverage.opacity(layout.triangles(),(layout.base(1)+triangle)*120));
+                    var classifications=new int[layout.counts()[1]];var counts=new long[3];for(int triangle=0;triangle<layout.counts()[1];triangle++){int classification=com.voxellight.adapter.RtMaterialCoverage.opacity(layout.triangles(),(layout.base(1)+triangle)*120);classifications[triangle]=classification;data.putInt(classification);counts[classification==-2?0:classification==-1?1:2]++;}opacityClassification.put(change.key(),classifications);opacityCounts.put(change.key(),counts);
                     encoder.writeToBuffer(indices.slice(),data.flip());
                 }
                 encoder.writeToBuffer(buffer.slice(),ByteBuffer.allocateDirect(layout.triangles().length).put(layout.triangles()).flip());
@@ -185,7 +201,7 @@ public final class VulkanRtScene implements AutoCloseable {
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
                         for(int triangle=0;triangle<change.vertices()/3;triangle++)normals.putFloat(source.getFloat(triangle*120+20)).putFloat(source.getFloat(triangle*120+24)).putFloat(source.getFloat(triangle*120+28)).putFloat(0);
                         var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array(),material&&!dynamic(change.key())?com.voxellight.rt.RtEmitterTable.extract(layout.triangles()):List.of(),change.x(),change.y(),change.z(),change.viewModel(),change.motionValid(),topologyVersion(layout.triangles()),layout.counts(),opaque,omm));
-                        micromapUploads.remove(change.key());
+                        micromapUploads.remove(change.key());if(ommEnabled&&!dynamic(change.key())&&omm!=null)opacitySources.put(change.key(),change);else{opacitySources.remove(change.key());opacityClassification.remove(change.key());opacityCounts.remove(change.key());}
                         bytes+=buffer.size();
                         if(previous!=null){bytes-=previous.vertices.size();if(previous.ommIndices!=null)previous.ommIndices.close();if(previous.opaqueBlas!=null&&previous.opaqueBlas!=opaque)previous.opaqueBlas.close();if(previous.blas!=blas)previous.blas.close();if(previous.vertices!=buffer)previous.vertices.close();}
                     } catch(RuntimeException error) {if(sections.get(change.key())==retained){if(built!=null&&(retained==null||built!=retained.blas))built.close();if(opaqueBuilt!=null&&(retained==null||opaqueBuilt!=retained.opaqueBlas))opaqueBuilt.close();if(retained==null||retained.vertices!=buffer)buffer.close();}throw error; }
@@ -348,5 +364,5 @@ public final class VulkanRtScene implements AutoCloseable {
     }
     private static boolean admitted(SectionKey key,double x,double y,double z) {return dynamic(key)||Math.abs(key.x()*16.+8-x)<=512&&Math.abs(key.y()*16.+8-y)<=512&&Math.abs(key.z()*16.+8-z)<=512;}
     private void release(Section section) {if(section.ommIndices!=null)section.ommIndices.close();if(section.opaqueBlas!=null)section.opaqueBlas.close();bytes-=section.vertices.size();section.blas.close();section.vertices.close();}
-    @Override public void close() {scratch.close();if(opaqueTlas!=null)opaqueTlas.close();opaqueTlas=null;if(opaqueInstanceBuffer!=null)opaqueInstanceBuffer.close();opaqueInstanceBuffer=null; sections.values().forEach(this::release);sections.clear();pending.clear();previousPose.clear();packedGeometry.clear();allocator.clear();requestedPages.clear();emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);if(instanceBuffer!=null)instanceBuffer.close();instanceBuffer=null;tlasCount=0;if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++;terrainGeneration++; }
+    @Override public void close() {scratch.close();if(opaqueTlas!=null)opaqueTlas.close();opaqueTlas=null;if(opaqueInstanceBuffer!=null)opaqueInstanceBuffer.close();opaqueInstanceBuffer=null; sections.values().forEach(this::release);sections.clear();opacityClassification.clear();opacityCounts.clear();opacitySources.clear();pending.clear();previousPose.clear();packedGeometry.clear();allocator.clear();requestedPages.clear();emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);if(instanceBuffer!=null)instanceBuffer.close();instanceBuffer=null;tlasCount=0;if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++;terrainGeneration++; }
 }

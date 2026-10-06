@@ -3,6 +3,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static com.voxellight.rt.RtBenchmarkWarmup.Status.*;
 class RtBenchmarkWarmupTest {
+    @Test void gpuWarmupRequiresActualSamplesAndRejectsClockDrift(){
+        var samples=new java.util.ArrayList<Long>();assertFalse(RtBenchmarkWarmup.gpuStable(samples));
+        for(int i=0;i<30;i++)samples.add(i<15?10_000_000L:10_500_000L);assertTrue(RtBenchmarkWarmup.gpuStable(samples));
+        for(int i=15;i<30;i++)samples.set(i,13_000_000L);assertFalse(RtBenchmarkWarmup.gpuStable(samples));
+        for(int i=0;i<30;i++)samples.add(13_000_000L);assertTrue(RtBenchmarkWarmup.gpuStable(samples));
+        samples.set(samples.size()-1,0L);assertFalse(RtBenchmarkWarmup.gpuStable(samples));
+    }
     private static long seconds(long value){return value*1_000_000_000L;}
     @Test void slowSerInitializationDoesNotConsumeRenderedWarmup(){
         var w=new RtBenchmarkWarmup(0);

@@ -54,7 +54,7 @@ final class VulkanPathTracer implements AutoCloseable {
     }
     void enableTransport() { enable(true);transport=true; }
     void enableMaterials(){enableTransport();materials=true;}
-    public java.util.List<RtGeometryStream.Section> benchmarkSnapshot(){return context==null?java.util.List.of():context.scene.benchmarkSnapshot();}
+    public java.util.List<RtGeometryStream.Section> benchmarkSnapshot(){var p=Minecraft.getInstance().gameRenderer.mainCamera().position();return context==null?java.util.List.of():context.scene.benchmarkSnapshot(p.x,p.y,p.z);}
     com.voxellight.rt.RtBenchmarkState benchmarkState(){return context==null||!materials||failed||executionRevision!=com.voxellight.rt.RtExecutionOptions.revision()?null:context.benchmarkState(realtime,history.frozen());}
     boolean enabled() {return enabled;}
     boolean active(){return enabled&&!failed;}

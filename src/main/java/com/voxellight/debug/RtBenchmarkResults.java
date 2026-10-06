@@ -22,7 +22,7 @@ public final class RtBenchmarkResults {
         for(var sample:samples)if(sample.gpuNanos()!=null&&!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.gpuNanos());
         var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
     }
-    private static Timing batch(Block block){return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
+    private static Timing batch(Block block){return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
     public static Comparison compare(String name,List<Block> all){
         var blocks=all.stream().filter(b->b.plan.comparison().equals(name)).sorted(Comparator.comparingInt((Block b)->b.plan.round()).thenComparingInt(b->b.plan.position())).toList();
         var reasons=new ArrayList<String>();
@@ -47,6 +47,7 @@ public final class RtBenchmarkResults {
             int i=round*4;double a0=batch(blocks.get(i)).medianMs,a1=batch(blocks.get(i+3)).medianMs,b0=batch(blocks.get(i+1)).medianMs,b1=batch(blocks.get(i+2)).medianMs;
             double a=(a0+a1)/2,b=(b0+b1)/2;gains.add((a-b)/a*100);noise=Math.max(noise,Math.max(Math.abs(a0-a1)/a,Math.abs(b0-b1)/b)*100);
         }
+        if(noise>10)return new Comparison(name,"not_comparable",null,noise,List.copyOf(gains),List.of("repeat variation > 10%; clocks/background workload may have changed"));
         double gain=(gains.get(0)+gains.get(1))/2,threshold=Math.max(3,noise);
         String verdict=gains.stream().allMatch(g->g>threshold)?"candidate_faster":gains.stream().allMatch(g->g< -threshold)?"candidate_slower":Math.abs(gain)<=threshold?"within_variation":"inconsistent";
         return new Comparison(name,verdict,gain,noise,List.copyOf(gains),List.of("descriptive ABBA result; not a statistical confidence interval"));

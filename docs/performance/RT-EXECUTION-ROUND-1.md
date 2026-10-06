@@ -31,7 +31,7 @@ Opaque visibility 的 TraceRay payload 是单个 uint（4B），hit 保持 1，�
 
 这是合法的 OMM attachment：全部 index 为 special index 时 `micromap = VK_NULL_HANDLE`，不需要独立 micromap 数据对象。依据 [VkAccelerationStructureTrianglesOpacityMicromapEXT](https://docs.vulkan.org/refpages/latest/refpages/source/VkAccelerationStructureTrianglesOpacityMicromapEXT.html)。**混合 alpha 三角形尚未细分为子三角 micromap**，所以不能把它称为完整的高细分 OMM baker；叶片边缘仍执行 any-hit。此接入避免新增 SDK 和烘焙成本，先测已知覆盖的收益。
 
-Opacity 从静态资源 albedo 读取；原生 atlas 超过 ID 网格尺寸时全部保持 unknown，避免缩放丢失 alpha 细节。Minecraft Vulkan encoder 对已知静态 alpha 区域的后续写入使本 reload 的 opacity 状态失效，TLAS instance 禁用 OMM，回退精确 any-hit。写动画 unknown 区域和 alpha 不参与 cutout 判定的玻璃/水区域不会误伤。绕开 Minecraft encoder 的第三方底层纹理写入不在此 tracker 合同内；这种兼容场景保持 OMM off。
+Opacity 从静态资源 albedo 读取；原生 atlas 超过 ID 网格尺寸时全部保持 unknown，避免缩放丢失 alpha 细节。alpha.32 中 Minecraft Vulkan encoder 对已知静态 alpha 区域的后续写入仅使对应区域变为 unknown；opacity epoch 改变后重建驻留静态 OMM BLAS，回退受影响三角形的精确 any-hit。完整 coverage 不可用时 TLAS instance 仍禁用 OMM。写动画 unknown 区域和 alpha 不参与 cutout 判定的玻璃/水区域不会误伤。绕开 Minecraft encoder 的第三方底层纹理写入不在此 tracker 合同内；这种兼容场景保持 OMM off。
 
 ## Continuation 与 scratch
 
@@ -105,3 +105,5 @@ python3 tools/analyze_rt_profile.py benchmark-results/voxellight/*.passes.csv > 
 ## 本轮自动验证
 
 278 项 Java 回归（分类、OMM 阈值/失效、延迟曲线匹配、AS 签名/SBT/可选 SPIR-V 能力等）、23 个 RT SPIR-V stage 的 spirv-val/ABI 检查、真实 Minecraft GLSL pipeline 链接，以及实际 Slang CPU target 数值回归。Visibility 对比运行生产 fast/legacy 函数，仅以 CPU 三角相交替代硬件 traversal；状态验证运行生产 64B load/store、独立 AOV/radiance、两张 sample bank、八层 medium、invalid/delta/channel 和三类 primitive-base 映射。硬件驱动的 AS/OMM/Query/SER 执行仍需实机验收。
+
+alpha.32 新增按 bounce 的 HYBRID 候选、固定 60 MiB 静态快照完整装入校验、GPU 预热稳定检查和大幅重复段漂移拒绝，详见 [自动测试](RT-AUTOMATIC-BENCHMARK.md)。驱动编译统计缺失原因导出至 `pipelines-status.json`；运行时 spill/缓存指标仍需硬件 profiler。

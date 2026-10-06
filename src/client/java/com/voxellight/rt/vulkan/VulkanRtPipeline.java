@@ -77,7 +77,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
                 var create=VkRayTracingPipelineCreateInfoKHR.calloc(1,stack);create.get(0).sType$Default().flags(material&&com.voxellight.rt.RtExecutionOptions.omm()&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&VulkanRtCapabilities.micromap(device.vkDevice().getPhysicalDevice())?org.lwjgl.vulkan.EXTOpacityMicromap.VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT:0).pStages(stagesInfo).pGroups(groups).maxPipelineRayRecursionDepth(1).layout(layout);
                 if(statistics)create.get(0).flags(create.get(0).flags()|KHRPipelineExecutableProperties.VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR);
                 check(vkCreateRayTracingPipelinesKHR(device.vkDevice(),0,cache,create,null,out));pipeline=out.get(0);
-                if(statistics)VulkanPipelineDiagnostics.capture(device,pipeline,raygen==null?"primary":raygen);
+                if(statistics)VulkanPipelineDiagnostics.capture(device,pipeline,raygen==null?"primary":raygen);else VulkanPipelineDiagnostics.unavailable(raygen==null?"primary":raygen,"pipeline executable properties or statistics feature unavailable");
                 sbt=new VulkanRtBuffer(device,packing.bytes()+properties.shaderGroupBaseAlignment(),VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR);
                 var handles=stack.malloc(properties.shaderGroupHandleSize()*groupCount);check(vkGetRayTracingShaderGroupHandlesKHR(device.vkDevice(),pipeline,0,groupCount,handles));
                 var data=ByteBuffer.allocateDirect((int)sbt.size());long base=VulkanSbt.align(sbt.address(),properties.shaderGroupBaseAlignment())-sbt.address();
@@ -139,9 +139,10 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,layout,0,stack.longs(set),null);
         }
     }
-    public void dispatch(VkCommandBuffer command,int width,int height,int lanes){
+    public void dispatch(VkCommandBuffer command,int width,int height,int lanes){dispatchBounce(command,width,height,lanes,0);}
+    public void dispatchBounce(VkCommandBuffer command,int width,int height,int lanes,int bounce){
         try(var stack=MemoryStack.stackPush()){
-            if(material)vkCmdPushConstants(command,layout,VK_SHADER_STAGE_RAYGEN_BIT_KHR,0,stack.ints(0));
+            if(material)vkCmdPushConstants(command,layout,VK_SHADER_STAGE_RAYGEN_BIT_KHR,0,stack.ints(bounce));
             var raygen=region(stack,packing.raygenOffset());var miss=region(stack,packing.missOffset());var hit=region(stack,packing.hitOffset());
             vkCmdTraceRaysKHR(command,raygen,miss,hit,VkStridedDeviceAddressRegionKHR.calloc(stack),width,height,lanes);
         }

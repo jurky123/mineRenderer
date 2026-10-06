@@ -7,7 +7,8 @@ public final class RtMaterialCoverage {
     private record Grid(int width,int height,byte[] transmission,short[] opacity){}
     private static volatile Grid grid;
     private static java.lang.ref.WeakReference<com.mojang.blaze3d.textures.GpuTexture> watched=new java.lang.ref.WeakReference<>(null);
-    private static boolean opacityValid;private static long opacityEpoch;
+    private static boolean opacityValid;private static long opacityEpoch,knownOpacityTexels;
+    public static long knownOpacityTexels(){return knownOpacityTexels;}
     public static long opacityEpoch(){return opacityEpoch;}
     public static boolean opacityValid(){return opacityValid;}
     static void watch(com.mojang.blaze3d.textures.GpuTexture texture){watched=new java.lang.ref.WeakReference<>(texture);}
@@ -16,11 +17,13 @@ public final class RtMaterialCoverage {
         int tw=texture.getWidth(0),th=texture.getHeight(0);
         int x0=Math.clamp(x*current.width/tw,0,current.width-1),y0=Math.clamp(y*current.height/th,0,current.height-1);
         int x1=Math.clamp((int)Math.ceil((x+w)*(double)current.width/tw)-1,0,current.width-1),y1=Math.clamp((int)Math.ceil((y+h)*(double)current.height/th)-1,0,current.height-1);
-        for(int row=y0;row<=y1;row++)for(int column=x0;column<=x1;column++)if(current.opacity[row*current.width+column]>=0&&current.opacity[row*current.width+column]!=256){opacityValid=false;opacityEpoch++;return;}
+        short[] opacity=null;
+        for(int row=y0;row<=y1;row++)for(int column=x0;column<=x1;column++){int index=row*current.width+column;if(current.opacity[index]>=0&&current.opacity[index]!=256){if(opacity==null)opacity=current.opacity.clone();opacity[index]=-1;knownOpacityTexels--;}}
+        if(opacity!=null){grid=new Grid(current.width,current.height,current.transmission,opacity);opacityValid=knownOpacityTexels>0;opacityEpoch++;}
     }
     private RtMaterialCoverage(){}
-    static void publish(int w,int h,byte[] transmission,short[] opacity){grid=new Grid(w,h,transmission,opacity);opacityValid=true;opacityEpoch++;}
-    static void clear(){grid=null;opacityValid=false;opacityEpoch++;watched.clear();}
+    static void publish(int w,int h,byte[] transmission,short[] opacity){grid=new Grid(w,h,transmission,opacity);knownOpacityTexels=0;for(short alpha:opacity)if(alpha>=0&&alpha<256)knownOpacityTexels++;opacityValid=knownOpacityTexels>0;opacityEpoch++;}
+    static void clear(){grid=null;opacityValid=false;knownOpacityTexels=0;opacityEpoch++;watched.clear();}
     public static boolean transmissive(byte[] triangles,int offset){
         var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());int flags=data.getInt(offset+36);
         if((flags&128)!=0)return false; // Current dynamic material contract is diffuse.
@@ -32,7 +35,7 @@ public final class RtMaterialCoverage {
     }
     public static int opacity(byte[] triangles,int offset){
         var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());int flags=data.getInt(offset+36);
-        var current=grid;if(current==null||!opacityValid||(flags&128)!=0)return -3; // FULLY_UNKNOWN_TRANSPARENT: exact any-hit fallback.
+        var current=grid;if(current==null||(flags&128)!=0)return -3; // FULLY_UNKNOWN_TRANSPARENT: exact any-hit fallback.
         int[] bounds=bounds(data,offset,current);if(bounds==null)return -3;
         int state=-1,tint=data.getInt(offset+32)>>>24;
         for(int y=bounds[1];y<=bounds[3];y++)for(int x=bounds[0];x<=bounds[2];x++){
@@ -41,6 +44,12 @@ public final class RtMaterialCoverage {
             int next=visible?-2:-1;if(state==-1&&x==bounds[0]&&y==bounds[1])state=next;else if(state!=next)return -3;
         }
         return state;
+    }
+    /** CUTOUT retains source order after range splitting, so these indices match the BLAS range. */
+    public static int[] indices(byte[] triangles){
+        var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());int[] indices=new int[triangles.length/120];int count=0;
+        for(int offset=0;offset<triangles.length;offset+=120)if((data.getInt(offset+36)&1)!=0)indices[count++]=opacity(triangles,offset);
+        return java.util.Arrays.copyOf(indices,count);
     }
     private static int[] bounds(ByteBuffer data,int offset,Grid current){
         float minU=1,minV=1,maxU=0,maxV=0;

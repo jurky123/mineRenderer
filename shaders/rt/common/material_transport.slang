@@ -372,8 +372,9 @@ void advance(inout PathState path) {
 
 #if !defined(RT_CPU_FIXTURE)||defined(RT_QUEUE_FIXTURE)
 bool compactPaths(){return (uint(camera.origin.w)&4u)!=0;}
+bool compactBounce(uint bounce){uint mask=(uint(camera.origin.w)>>12)&63u;return compactPaths()&&(mask==0||(mask&(1u<<bounce))!=0);}
 void appendContinuation(uint pathIndex,PathState path){
-    uint bounce=uint(path.throughput.w);if(!compactPaths()||path.origin.w==0||path.padding!=0||bounce>=6)return;
+    uint bounce=uint(path.throughput.w);if(!compactBounce(bounce)||path.origin.w==0||path.padding!=0||bounce>=6)return;
 #ifdef RT_QUEUE_FIXTURE
     // CPU fixture replaces only GPU atomic reservation; packing/guards are production code.
     uint slot=pageFeedback[520u+bounce].x++;

@@ -4,7 +4,7 @@ struct DispatchSettings {uint bounce;};
 [shader("raygeneration")]
 void material_indirect() {
     uint2 pixel=DispatchRaysIndex().xy;uint index=pixel.y*camera.width+pixel.x+DispatchRaysIndex().z*camera.width*camera.height;
-    if(compactPaths()){
+    if(compactBounce(dispatchSettings.bounce)){
         uint bounce=dispatchSettings.bounce;
         if(bounce==0||DispatchRaysIndex().x>=pageFeedback[520u+bounce].x)return;
         uint capacity=camera.width*camera.height*max(1u,camera.padding);

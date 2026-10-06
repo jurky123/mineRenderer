@@ -13,11 +13,12 @@ public final class RtQueueCalibration {
     private final LinkedHashMap<Key,Costs> costs=new LinkedHashMap<>();
     private Curve latest;
     private long joined;
+    private long[] latestActive;
     public void alive(long frame,int width,int height,int spp,long scene,long[] active){
         if(active.length!=6||active[0]<=0)return;
         long sum=0;for(int i=1;i<6;i++){if(active[i]<0||active[i]>active[i-1])return;sum+=active[i];}
         var curve=new Curve(width,height,spp,scene,(int)Math.min(9,sum*10/(active[0]*5)));
-        curves.put(frame,curve);latest=curve;trim(curves,256);join(frame);
+        curves.put(frame,curve);latest=curve;latestActive=active.clone();trim(curves,256);join(frame);
     }
     public void timing(PassMetrics.Sample sample){
         if(!sample.mode().equals("vulkan_rt_batch_fixed")&&!sample.mode().equals("vulkan_rt_batch_compact"))return;
@@ -38,6 +39,15 @@ public final class RtQueueCalibration {
         if(values!=null&&values.fixed.size()>=6&&values.compact.size()>=6)return median(values.compact)<median(values.fixed)*.97;
         // Counter readback occurs every eighth frame: alternate each sampled frame, not every eighth block.
         return profiling&&((frame/8)&1)!=0;
+    }
+    /** Candidate scheduling policy, explicitly benchmarked rather than automatically assumed faster. */
+    public int hybridMask(int width,int height,int spp){
+        if(latest==null||latest.width!=width||latest.height!=height||latest.spp!=spp)return 0;
+        return hybridMask(latestActive);
+    }
+    public static int hybridMask(long[] active){
+        if(active==null||active.length!=6||active[0]<=0)return 0;int mask=0;
+        for(int bounce=1;bounce<6;bounce++){if(active[bounce]<0||active[bounce]>active[bounce-1])return 0;double fraction=active[bounce]/(double)active[0];if(active[bounce]>=2048&&fraction>=.05&&fraction<=.70)mask|=1<<bounce;}return mask;
     }
     private static long median(List<Long> values){var sorted=new ArrayList<>(values);sorted.sort(Long::compare);return sorted.get(sorted.size()/2);}
     private static void trim(LinkedHashMap<?,?> map,int size){while(map.size()>size)map.remove(map.firstEntry().getKey());}
