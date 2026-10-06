@@ -34,5 +34,8 @@ class RtLightRuntimeTest {
         }}finally{original.apply();}assertEquals(original,RtBenchmarkPlan.Config.current());
     }
     @Test void adaptiveFixedPointSumFitsEvenWhenAllMaximumCapacityEventsShareOneBucket(){long paths=(1L<<30)/400;assertTrue(paths*6*2*RtLightRuntime.ADAPTIVE_SCALE<(1L<<32));}
+    @Test void blasOnlyBenchmarkKeepsDirectTransportFixedAndRestoresScenePolicy(){
+        var original=RtBenchmarkPlan.Config.current();try{var plan=RtBenchmarkPlan.blas(true);assertEquals(8,plan.blocks().size());for(var b:plan.blocks()){assertEquals(RtExecutionOptions.Direct.RIS,b.config().direct());assertEquals(RtExecutionOptions.Visibility.QUERY,b.config().visibility());assertEquals(RtExecutionOptions.Queue.FIXED,b.config().queue());assertEquals(b.candidate()?RtExecutionOptions.SceneUpdate.OPTIMIZED:RtExecutionOptions.SceneUpdate.LEGACY,b.config().sceneUpdate());b.config().apply();assertEquals(b.config(),RtBenchmarkPlan.Config.current());}}finally{original.apply();}assertEquals(original,RtBenchmarkPlan.Config.current());
+    }
     @Test void emptyRuntimeHasAValidHeaderAndNoAliases(){var data=RtLightRuntime.build(List.of(),0,0,0,new float[]{1,1,1,1,1,1,1,1});assertEquals(RtLightRuntime.HEADER,data.remaining());assertEquals(0,data.getInt(4));assertEquals(0,data.getInt(52));}
 }

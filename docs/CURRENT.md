@@ -1,3 +1,7 @@
+## alpha.35 BLAS 更新与 scratch 优化
+
+动态位置/geometry ranges 不变时，shader 属性继续上传但跳过 BLAS refit；独立 AS 更新使用共享 arena 的对齐、不重叠 scratch slices，保留跨提交和空间复用依赖。校准 native BLAS 计时，保留外部 submit span；新增按类别/原因的累计 AS 与 scratch 计数。`/voxellight rt_benchmark blas` 8 段专用 ABBA，比较 scene commit、保持 RIS/Query/Fixed/OMM off/SER off，默认 optimized，可回退 legacy。具体收益与客户端视觉待实测。[实施与验收](performance/RT-BLAS-OPTIMIZATION.md)。
+
 ## alpha.34 统一直接光 RIS
 
 BLAS 定位：218 个动态分组，每次 commit 平均 153.96 次主 BLAS refit、0.653 次 build；并非每帧重建全部地形。需要校准 native 计时，区分位置/属性变化，检查小型动态分组与 scratch 串行复用。[定位报告](performance/ALPHA-34-BLAS-DIAGNOSIS.md)。

@@ -9,6 +9,11 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void scratchSlicesAreAlignedDisjointAndCanRestartOnlyAtBatchBoundary(){
+        long address=12345,cursor=0,previousEnd=address;for(long size:new long[]{1,257,4096,0,99999}){long offset=VulkanRtScratch.offset(address,cursor,256);long start=address+offset;assertEquals(0,start%256);assertTrue(start>=previousEnd);previousEnd=start+size;cursor=offset+size;}
+        assertTrue(cursor>199);assertEquals(199,VulkanRtScratch.offset(address,0,256));
+        assertThrows(ArithmeticException.class,()->VulkanRtScratch.offset(Long.MAX_VALUE,123,256));
+    }
     @Test void vanillaAtlasAnimationUploadDrawsOnlyAnimatedSpritesWithoutClearingTheAtlas()throws Exception{
         var atlas=new ClassNode();new ClassReader("net.minecraft.client.renderer.texture.TextureAtlas").accept(atlas,0);
         var upload=atlas.methods.stream().filter(m->m.name.equals("uploadAnimationFrames")).findFirst().orElseThrow();

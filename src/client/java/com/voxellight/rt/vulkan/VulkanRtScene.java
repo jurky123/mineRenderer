@@ -13,7 +13,7 @@ import static org.lwjgl.vulkan.VK10.*;
 
 /** One scene commit per frame, with stable attribute ranges and persistent updateable acceleration structures. */
 public final class VulkanRtScene implements AutoCloseable {
-    private record Section(long version, VulkanRtBuffer vertices, VulkanRtAccel blas, byte[] normals, List<com.voxellight.rt.RtEmitterTable.Triangle> emitters,double x,double y,double z,boolean viewModel,boolean motionValid,long topology,int[] counts,VulkanRtAccel opaqueBlas,VulkanRtBuffer ommIndices) {}
+    private record Section(long version, VulkanRtBuffer vertices, VulkanRtAccel blas, byte[] normals, List<com.voxellight.rt.RtEmitterTable.Triangle> emitters,double x,double y,double z,boolean viewModel,boolean motionValid,long topology,int[] counts,byte[] positions,VulkanRtAccel opaqueBlas,VulkanRtBuffer ommIndices) {}
     private final VulkanDevice device;
     private final int scratchAlignment;
     private final VulkanRtScratch scratch;
@@ -53,6 +53,7 @@ public final class VulkanRtScene implements AutoCloseable {
     public long historyGeneration(){return terrainGeneration;}
     private long opacityEpoch=Long.MIN_VALUE;
     private long generation, builds, refits,tlasBuilds, bytes,geometryCopyBytes,geometryCompactions;
+    private long attributeOnlyUpdates,staticBuilds,dynamicBuilds,dynamicRefits,updatedTriangles,positionUpdates,layoutUpdates,opaqueUpdates;
     static final long GEOMETRY_BYTES=64L*1024*1024;
     static final int TRIANGLE_CAPACITY=(int)(GEOMETRY_BYTES/120);
     private final com.voxellight.rt.RtGeometryAllocator allocator=new com.voxellight.rt.RtGeometryAllocator(TRIANGLE_CAPACITY);
@@ -85,7 +86,7 @@ public final class VulkanRtScene implements AutoCloseable {
     long tlas() { return tlas==null?0:tlas.handle(); }
     VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", geometryCopyBytes="+geometryCopyBytes+", geometryCompactions="+geometryCompactions+", tlasRefits="+tlasRefits+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", geometryRanges="+rangeCounts()+", ommCoverage="+opacityCounts()+", knownOpacityTexels="+com.voxellight.adapter.RtMaterialCoverage.knownOpacityTexels()+", ommValidity="+com.voxellight.adapter.RtMaterialCoverage.opacityValid()+", asScratchBytes="+scratch.bytes()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", blasAttributeOnly="+attributeOnlyUpdates+", blasStaticBuilds="+staticBuilds+", blasDynamicBuilds="+dynamicBuilds+", blasDynamicRefits="+dynamicRefits+", blasPositionUpdates="+positionUpdates+", blasLayoutUpdates="+layoutUpdates+", blasOpaqueUpdates="+opaqueUpdates+", blasUpdatedTriangles="+updatedTriangles+", geometryCopyBytes="+geometryCopyBytes+", geometryCompactions="+geometryCompactions+", tlasRefits="+tlasRefits+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", geometryRanges="+rangeCounts()+", ommCoverage="+opacityCounts()+", knownOpacityTexels="+com.voxellight.adapter.RtMaterialCoverage.knownOpacityTexels()+", ommValidity="+com.voxellight.adapter.RtMaterialCoverage.opacityValid()+", asScratchBytes="+scratch.bytes()+", asScratchBarriers="+scratch.barriers()+", asScratchSlices="+scratch.slices()+", sceneUpdate="+com.voxellight.rt.RtExecutionOptions.sceneUpdate()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
     private String opacityCounts(){long[] total=new long[3];for(var counts:opacityCounts.values())for(int i=0;i<3;i++)total[i]+=counts[i];return "opaque:"+total[0]+"/transparent:"+total[1]+"/unknown:"+total[2];}
     private String rangeCounts(){long[] counts=new long[3];for(var section:sections.values())for(int i=0;i<section.counts.length;i++)counts[i]+=section.counts[i];return "opaque:"+counts[0]+"/cutout:"+counts[1]+"/transmission:"+counts[2];}
     private final LinkedHashMap<SectionKey,RtGeometryStream.Section> pending=new LinkedHashMap<>();
@@ -138,7 +139,7 @@ public final class VulkanRtScene implements AutoCloseable {
             if(old==null&&sections.size()+accepted.size()>=1024)continue;
             if(old!=null&&old.version==change.version()&&!(opacityDirty&&!dynamic(change.key()))){
                 if(old.x!=change.x()||old.y!=change.y()||old.z!=change.z()||old.viewModel!=change.viewModel()||old.motionValid!=change.motionValid()){
-                    sections.put(change.key(),new Section(old.version,old.vertices,old.blas,old.normals,old.emitters,change.x(),change.y(),change.z(),change.viewModel(),change.motionValid(),old.topology,old.counts,old.opaqueBlas,old.ommIndices));dirty=true;
+                    sections.put(change.key(),new Section(old.version,old.vertices,old.blas,old.normals,old.emitters,change.x(),change.y(),change.z(),change.viewModel(),change.motionValid(),old.topology,old.counts,old.positions,old.opaqueBlas,old.ommIndices));dirty=true;
                 }
                 continue;
             }
@@ -189,7 +190,8 @@ public final class VulkanRtScene implements AutoCloseable {
                 encoder.writeToBuffer(buffer.slice(),ByteBuffer.allocateDirect(layout.triangles().length).put(layout.triangles()).flip());
             }
             var command=encoder.allocateAndBeginTransientCommandBuffer();
-            try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_blas");var stack=MemoryStack.stackPush()) {
+            try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_blas_submit");var stack=MemoryStack.stackPush()) {
+                try(var nativeProfile=com.voxellight.adapter.RenderPassProfile.beginNative(command,"vulkan_rt_blas")){
                 barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT|VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
                 for(var change:accepted) {
                     var buffer=uploads.remove(change.key());
@@ -200,20 +202,29 @@ public final class VulkanRtScene implements AutoCloseable {
                         var omm=micromapUploads.get(change.key());
                         if(omm!=null){var opacity=VkAccelerationStructureTrianglesOpacityMicromapEXT.calloc(sectionStack).sType$Default().indexType(VK_INDEX_TYPE_UINT32).indexStride(4).micromap(0);opacity.indexBuffer().deviceAddress(omm.address());geometry.get(1).geometry().triangles().pNext(opacity.address());}
                         var old=sections.get(change.key());
-                        boolean canRefit=dynamic(change.key())&&old!=null&&old.vertices.size()==buffer.size();
-                        var blas=built=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,geometry,layout.counts(),scratch,dynamic(change.key()),canRefit?old.blas:null);
-                        if(old!=null&&blas==old.blas)refits++;else builds++;
-                        VulkanRtAccel opaque=null;
-                        if(material&&layout.counts()[0]>0){var opaqueGeometry=VulkanRtAccel.triangles(sectionStack,buffer,layout.counts()[0]*3);opaque=opaqueBuilt=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,opaqueGeometry,layout.counts()[0],scratch,dynamic(change.key()),old==null?null:old.opaqueBlas);}
+                        byte[] positions=dynamic(change.key())?layout.positions():null;
+                        boolean attributesOnly=com.voxellight.rt.RtExecutionOptions.sceneUpdate()==com.voxellight.rt.RtExecutionOptions.SceneUpdate.OPTIMIZED&&dynamic(change.key())&&old!=null&&old.vertices==buffer&&Arrays.equals(old.counts,layout.counts())&&Arrays.equals(old.positions,positions);
+                        VulkanRtAccel blas,opaque;
+                        if(attributesOnly){blas=old.blas;opaque=old.opaqueBlas;attributeOnlyUpdates++;}
+                        else{
+                            if(dynamic(change.key())&&old!=null){if(!Arrays.equals(old.positions,positions))positionUpdates++;if(!Arrays.equals(old.counts,layout.counts())||old.vertices.size()!=buffer.size())layoutUpdates++;}
+                            boolean canRefit=dynamic(change.key())&&old!=null&&old.vertices.size()==buffer.size();
+                            blas=built=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,geometry,layout.counts(),scratch,dynamic(change.key()),canRefit?old.blas:null);
+                            updatedTriangles+=change.vertices()/3;
+                            if(old!=null&&blas==old.blas){refits++;dynamicRefits++;}else{builds++;if(dynamic(change.key()))dynamicBuilds++;else staticBuilds++;}
+                            opaque=null;
+                            if(material&&layout.counts()[0]>0){opaqueUpdates++;var opaqueGeometry=VulkanRtAccel.triangles(sectionStack,buffer,layout.counts()[0]*3);opaque=opaqueBuilt=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,opaqueGeometry,layout.counts()[0],scratch,dynamic(change.key()),old==null?null:old.opaqueBlas);}
+                        }
                         var source=ByteBuffer.wrap(layout.triangles()).order(ByteOrder.nativeOrder());
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
                         for(int triangle=0;triangle<change.vertices()/3;triangle++)normals.putFloat(source.getFloat(triangle*120+20)).putFloat(source.getFloat(triangle*120+24)).putFloat(source.getFloat(triangle*120+28)).putFloat(0);
-                        var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array(),material&&!dynamic(change.key())?com.voxellight.rt.RtEmitterTable.extract(layout.triangles()):List.of(),change.x(),change.y(),change.z(),change.viewModel(),change.motionValid(),topologyVersion(layout.triangles()),layout.counts(),opaque,omm));
+                        var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array(),material&&!dynamic(change.key())?com.voxellight.rt.RtEmitterTable.extract(layout.triangles()):List.of(),change.x(),change.y(),change.z(),change.viewModel(),change.motionValid(),topologyVersion(layout.triangles()),layout.counts(),positions,opaque,omm));
                         micromapUploads.remove(change.key());if(ommEnabled&&!dynamic(change.key())&&omm!=null)opacitySources.put(change.key(),change);else{opacitySources.remove(change.key());opacityClassification.remove(change.key());opacityCounts.remove(change.key());}
                         bytes+=buffer.size();
                         if(previous!=null){bytes-=previous.vertices.size();if(previous.ommIndices!=null)previous.ommIndices.close();if(previous.opaqueBlas!=null&&previous.opaqueBlas!=opaque)previous.opaqueBlas.close();if(previous.blas!=blas)previous.blas.close();if(previous.vertices!=buffer)previous.vertices.close();}
                     } catch(RuntimeException error) {if(sections.get(change.key())==retained){if(built!=null&&(retained==null||built!=retained.blas))built.close();if(opaqueBuilt!=null&&(retained==null||opaqueBuilt!=retained.opaqueBlas))opaqueBuilt.close();if(retained==null||retained.vertices!=buffer)buffer.close();}throw error; }
                 }
+                } // Record native end timestamp before ending/submitting the command buffer.
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);scratch.submitted();
             }
             if(terrainDirty)terrainGeneration++;try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_tlas")){rebuildTlas(profileEncoder,x,y,z);}generation++;

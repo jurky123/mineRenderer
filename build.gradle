@@ -84,6 +84,7 @@ tasks.register('clientKit', Zip) {
     from('docs/performance/RT-EXECUTION-ROUND-1.md')
     from('docs/performance/RT-AUTOMATIC-BENCHMARK.md')
     from('docs/performance/RT-DIRECT-LIGHTING-ROUND-2.md')
+    from('docs/performance/RT-BLAS-OPTIMIZATION.md')
 }
 
 // Legacy CUDA/OptiX tracing artifacts must never leak from a previous local build.

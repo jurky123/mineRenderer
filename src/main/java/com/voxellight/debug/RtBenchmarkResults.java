@@ -22,7 +22,7 @@ public final class RtBenchmarkResults {
         for(var sample:samples)if(sample.gpuNanos()!=null&&!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.gpuNanos());
         var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
     }
-    private static Timing batch(Block block){return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
+    private static Timing comparisonTiming(Block block){if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
     public static Comparison compare(String name,List<Block> all){
         var blocks=all.stream().filter(b->b.plan.comparison().equals(name)).sorted(Comparator.comparingInt((Block b)->b.plan.round()).thenComparingInt(b->b.plan.position())).toList();
         var reasons=new ArrayList<String>();
@@ -36,7 +36,7 @@ public final class RtBenchmarkResults {
             if(block.state==null||!block.state.matches(block.plan.config()))reasons.add("actual controls do not match requested variant");
             if(!block.valid)reasons.add("invalid block "+block.plan.round()+"/"+block.plan.position());
             if(reference==null||block.state==null||!reference.sameWorkload(block.state))reasons.add("resolution/spp/mode/terrain working set changed");
-            var time=batch(block);if(time==null||time.samples<30||time.medianMs==null)reasons.add("insufficient GPU batch timestamps");
+            var time=comparisonTiming(block);if(time==null||time.samples<30||time.medianMs==null)reasons.add("insufficient GPU comparison timestamps");
         }
         // Sampled alive curves must exist; throughput timing alone does not prove matched ray work.
         if(blocks.stream().anyMatch(b->b.aliveFraction.length!=6))reasons.add("missing alive-path counters");
@@ -44,7 +44,7 @@ public final class RtBenchmarkResults {
         if(!reasons.isEmpty())return new Comparison(name,"not_comparable",null,null,List.of(),reasons.stream().distinct().toList());
         var gains=new ArrayList<Double>();double noise=0;
         for(int round=0;round<2;round++){
-            int i=round*4;double a0=batch(blocks.get(i)).medianMs,a1=batch(blocks.get(i+3)).medianMs,b0=batch(blocks.get(i+1)).medianMs,b1=batch(blocks.get(i+2)).medianMs;
+            int i=round*4;double a0=comparisonTiming(blocks.get(i)).medianMs,a1=comparisonTiming(blocks.get(i+3)).medianMs,b0=comparisonTiming(blocks.get(i+1)).medianMs,b1=comparisonTiming(blocks.get(i+2)).medianMs;
             double a=(a0+a1)/2,b=(b0+b1)/2;gains.add((a-b)/a*100);noise=Math.max(noise,Math.max(Math.abs(a0-a1)/a,Math.abs(b0-b1)/b)*100);
         }
         if(noise>10)return new Comparison(name,"not_comparable",null,noise,List.copyOf(gains),List.of("repeat variation > 10%; clocks/background workload may have changed"));

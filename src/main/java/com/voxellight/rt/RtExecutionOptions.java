@@ -2,6 +2,10 @@ package com.voxellight.rt;
 
 /** Execution-only A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
+    public enum SceneUpdate {LEGACY,OPTIMIZED}
+    private static SceneUpdate sceneUpdate=SceneUpdate.OPTIMIZED;
+    public static SceneUpdate sceneUpdate(){return sceneUpdate;}
+    public static void sceneUpdate(SceneUpdate value){if(sceneUpdate!=value){sceneUpdate=value;revision++;}}
     public enum Direct {LEGACY,RIS}
     private static Direct direct=Direct.RIS;
     public static Direct direct(){return direct;}

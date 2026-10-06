@@ -67,3 +67,5 @@ alpha.24：统一 scene commit、稳定几何范围、持久 BLAS/TLAS refit、�
 `/voxellight rt_benchmark start [4..30]` 自动预热、两轮 ABBA、采样、导出 ZIP。默认每段 6 秒。`status` / `stop` 查看进度和中断。临时执行控制不持久化，结束恢复。详见 [自动验收](performance/RT-AUTOMATIC-BENCHMARK.md)。
 
 alpha.34：`rt_direct ris`（默认）/`legacy` 是会话执行控制，与 visibility/queue 控制一样不保存到 settings.json。统一局部光与环境 RIS，Sun/Moon 和可选手持灯独立；详见 [直接光第二轮](performance/RT-DIRECT-LIGHTING-ROUND-2.md)。
+
+alpha.35：`rt_scene_update optimized` 默认启用属性变化跳过 refit 和不重叠 scratch slices；`legacy` 保留旧更新策略用于 A/B。会话控制不保存。

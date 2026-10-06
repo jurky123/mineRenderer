@@ -1,3 +1,7 @@
+## alpha.35 BLAS 更新与 scratch 优化
+
+动态位置/geometry ranges 不变时，shader 属性继续上传但跳过 BLAS refit；独立 AS 更新使用共享 arena 的对齐、不重叠 scratch slices，保留跨提交和空间复用依赖。校准 native BLAS 计时，保留外部 submit span；新增按类别/原因的累计 AS 与 scratch 计数。`/voxellight rt_benchmark blas` 8 段专用 ABBA，比较 scene commit、保持 RIS/Query/Fixed/OMM off/SER off，默认 optimized，可回退 legacy。具体收益与客户端视觉待实测。[实施与验收](performance/RT-BLAS-OPTIMIZATION.md)。
+
 ## alpha.34 统一直接光 RIS
 
 原生 flame、emitter 与环境光合并到 section-local / spatial hierarchical alias 和 fresh RIS；Sun/Moon 与可选手持灯独立连接。每次 surface hit 最多三个直接光连接，深层采用带补偿 NEE roulette；primary/secondary/deep 预算 8/4/1。时间自适应只改变 proposal，保留全局支持；同步修改 BSDF-hit / miss MIS，PathHot 保持 64B。新增 `/voxellight rt_direct legacy|ris`（默认 RIS）和 `/voxellight rt_benchmark direct` 两轮 ABBA、8 段专用测试，导出 per-bounce 连接/候选计数。实际提速和视觉待 RTX 验收，0.5–0.7 transport ratio 尚未实测。[详细设计与验收](performance/RT-DIRECT-LIGHTING-ROUND-2.md)。

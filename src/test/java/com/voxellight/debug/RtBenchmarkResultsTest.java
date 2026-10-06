@@ -17,6 +17,11 @@ class RtBenchmarkResultsTest {
         return out;
     }
     private String verdict(double... times){return RtBenchmarkResults.compare("visibility",blocks(times)).verdict();}
+    @Test void blasComparisonUsesSceneCommitRatherThanUnchangedTransport(){
+        var blocks=new ArrayList<RtBenchmarkResults.Block>();for(var p:RtBenchmarkPlan.blas(true).blocks()){var c=p.config();var state=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),c.omm(),c.ser(),true,true,12,50,20,1000,c.direct(),c.sceneUpdate());
+            blocks.add(new RtBenchmarkResults.Block(p,0,100,state,true,List.of(),Map.of("vulkan_rt_batch_fixed",new RtBenchmarkResults.Timing(100,8.,8.),"vulkan_rt_scene_commit",new RtBenchmarkResults.Timing(100,p.candidate()?2.:3.,3.)),new double[]{1,.6,.4,.2,.1,.05},.1,256,0,0));}
+        var result=RtBenchmarkResults.compare("blas",blocks);assertEquals("candidate_faster",result.verdict());assertEquals(100./3,result.improvementPercent(),1e-8);
+    }
     @Test void repeatableGainAndRegression(){
         assertEquals("candidate_faster",verdict(10,8,8,10,10,8,8,10));
         assertEquals("candidate_slower",verdict(10,12,12,10,10,12,12,10));
@@ -50,9 +55,9 @@ class RtBenchmarkResultsTest {
         assertNull(RtBenchmarkResults.timing(List.of(0L)).medianMs());
     }
     @Test void PlanUsesIndependentABBAControlsAndSkipsUnsupportedFeatures(){
-        var minimal=RtBenchmarkPlan.create(false,false,false,false);assertEquals(16,minimal.blocks().size());assertEquals(6,minimal.skipped().size());
-        var full=RtBenchmarkPlan.create(true,true,true,true);assertEquals(64,full.blocks().size());
-        for(int i=0;i<64;i++){var p=full.blocks().get(i);assertEquals(i%8/4,p.round());assertEquals(i%4,p.position());assertEquals(i%4==1||i%4==2,p.candidate());}
+        var minimal=RtBenchmarkPlan.create(false,false,false,false);assertEquals(24,minimal.blocks().size());assertEquals(6,minimal.skipped().size());
+        var full=RtBenchmarkPlan.create(true,true,true,true);assertEquals(72,full.blocks().size());
+        for(int i=0;i<72;i++){var p=full.blocks().get(i);assertEquals(i%8/4,p.round());assertEquals(i%4,p.position());assertEquals(i%4==1||i%4==2,p.candidate());}
         assertThrows(UnsupportedOperationException.class,()->full.blocks().clear());
     }
     @Test void DelayedFramesBelongOnlyToTheirSubmissionWindow(){

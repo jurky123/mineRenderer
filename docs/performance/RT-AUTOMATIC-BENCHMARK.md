@@ -6,7 +6,7 @@
 /voxellight rt_benchmark start
 ```
 
-不需要逐项手动切换。默认每段采样 6 秒，至少预热 4 秒，随后留 2 秒接收延迟 GPU 数据。根据硬件支持运行 16–64 段，通常约 2–12 分钟，另加驱动管线初始化耗时；SER 首次创建在用户实测中约 52 秒，期间渲染线程可能暂停。也可 `start 15` 延长每段采样（允许 4–30 秒）。`/voxellight rt_benchmark` 等同默认 start。
+不需要逐项手动切换。默认每段采样 6 秒，至少预热 4 秒，随后留 2 秒接收延迟 GPU 数据。根据硬件支持运行 24–72 段，通常约 2–12 分钟，另加驱动管线初始化耗时；SER 首次创建在用户实测中约 52 秒，期间渲染线程可能暂停。也可 `start 15` 延长每段采样（允许 4–30 秒）。`/voxellight rt_benchmark` 等同默认 start。
 
 ```text
 /voxellight rt_benchmark status
@@ -85,3 +85,5 @@ OMM 的 atlas 更新按区域失效：受影响静态 alpha 转为 unknown，其
 alpha.32 实测的各段工作集一致，但 OMM coverage 全零、SER 大幅漂移、编译统计驱动零 executable，不能据此冻结；详细记录见 [当前阶段](../CURRENT.md)。
 
 alpha.34 新增 `/voxellight rt_benchmark direct [seconds]`：仅测 direct lighting，8 段、默认 10 秒；固定 Query/Fixed/OMM off/SER off，仅比较 legacy/RIS。summary schema 6 和每段 `.direct_lighting.json` 提供实际 Direct mode 与 per-bounce 连接计数。完整 start 追加 direct lighting pair。见 [第二轮设计](RT-DIRECT-LIGHTING-ROUND-2.md)。
+
+alpha.35：`rt_benchmark blas [seconds]` 只比较 scene-update legacy/optimized，8 段，默认 10 秒。summary schema 7 中 blas 比较目标为 scene commit，transport 保持 RIS；完整 start 追加 blas pair，最多 72 段。[BLAS 验收](RT-BLAS-OPTIMIZATION.md)。

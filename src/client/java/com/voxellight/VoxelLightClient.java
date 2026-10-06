@@ -87,6 +87,8 @@ public final class VoxelLightClient implements ClientModInitializer {
                     }));
             command.then(literal("rt_benchmark")
                 .executes(context->com.voxellight.adapter.RtBenchmarkRunner.start(6,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                .then(literal("blas").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startBlas(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                    .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.startBlas(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
                 .then(literal("direct").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startDirect(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
                     .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.startDirect(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
                 .then(literal("start").executes(context->com.voxellight.adapter.RtBenchmarkRunner.start(6,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
@@ -215,6 +217,7 @@ public final class VoxelLightClient implements ClientModInitializer {
             for(boolean enabled:new boolean[]{true,false})volumetricCommand.then(literal(enabled?"on":"off").executes(context->{
                 PROBE.setVolumetric(enabled);context.getSource().sendFeedback(Component.literal("VoxelLight: shadowed volumetric "+enabled));return 1;
             }));
+            var sceneUpdateCommand=literal("rt_scene_update");for(var value:com.voxellight.rt.RtExecutionOptions.SceneUpdate.values())sceneUpdateCommand.then(literal(value.name().toLowerCase(java.util.Locale.ROOT)).executes(context->{com.voxellight.rt.RtExecutionOptions.sceneUpdate(value);context.getSource().sendFeedback(Component.literal("VoxelLight: scene update "+value));return 1;}));command.then(sceneUpdateCommand);
             var directCommand=literal("rt_direct");for(var value:com.voxellight.rt.RtExecutionOptions.Direct.values())directCommand.then(literal(value.name().toLowerCase(java.util.Locale.ROOT)).executes(context->{com.voxellight.rt.RtExecutionOptions.direct(value);context.getSource().sendFeedback(Component.literal("VoxelLight: direct lighting "+value));return 1;}));command.then(directCommand);
             var visibilityCommand=literal("rt_visibility");
             for(var value:com.voxellight.rt.RtExecutionOptions.Visibility.values())visibilityCommand.then(literal(value.name().toLowerCase(java.util.Locale.ROOT)).executes(context->{com.voxellight.rt.RtExecutionOptions.visibility(value);context.getSource().sendFeedback(Component.literal("VoxelLight: visibility "+value+"; actual enabled path in stats"));return 1;}));command.then(visibilityCommand);
