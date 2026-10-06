@@ -2,7 +2,7 @@
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
 import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss'}
+STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_shadow_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss'}
 VARIANTS={name+suffix:(name,defines) for suffix,defines in [("_query",["RT_RAY_QUERY"]),("_ser",["RT_SER"]),("_query_ser",["RT_RAY_QUERY","RT_SER"])] for name in ["material_primary","material_indirect"]}
 VARIANTS.update(material_visibility_trace=('material_visibility_benchmark',['RT_VIS_BENCH']),material_visibility_query=('material_visibility_benchmark',['RT_VIS_BENCH','RT_RAY_QUERY']))
 STAGES.update({name:'raygeneration' for name in VARIANTS})

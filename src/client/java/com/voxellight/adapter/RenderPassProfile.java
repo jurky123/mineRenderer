@@ -18,6 +18,9 @@ public final class RenderPassProfile {
     private static int width,height,spp;
     private static long sceneGeneration;
     private static final java.util.ArrayDeque<Scope> scopes=new java.util.ArrayDeque<>();
+    private static final java.util.LinkedHashSet<Long> counterFrames=new java.util.LinkedHashSet<>();
+    public static void markCounterFrame(){counterFrames.add(frame);while(counterFrames.size()>14400)counterFrames.removeFirst();}
+    public static boolean counterFrame(long submissionFrame){return counterFrames.contains(submissionFrame);}
     public static long frameId(){return frame;}
     public static void workload(int w,int h,int samples,long generation){width=w;height=h;spp=samples;sceneGeneration=generation;}
     private static final long[] ids=new long[SLOTS], frames=new long[SLOTS];
@@ -104,5 +107,5 @@ public final class RenderPassProfile {
     public static void export(Path path)throws IOException{metrics.export(path);com.voxellight.rt.vulkan.VulkanPipelineDiagnostics.export(path.resolveSibling(path.getFileName()+".pipelines.csv"));String name=path.getFileName().toString();workMetrics.export(path.resolveSibling(name.endsWith(".passes.csv")?name.substring(0,name.length()-11)+".rays.csv":name+".rays.csv"));}
     static String status(){return ", passProfile="+(!enabled?"off":failed?"CPU only":pool==null?"not observed":"delayed GPU timestamps")+", passProfileSamples="+metrics.size()+", passProfileSkipped="+skipped;}
     private static void disable(){failed=true;if(pool!=null){try{pool.close();}catch(RuntimeException ignored){}pool=null;}}
-    static void clear(){disable();failed=false;metrics.clear();workMetrics.clear();scopes.clear();java.util.Arrays.fill(pending,false);}
+    static void clear(){disable();failed=false;metrics.clear();workMetrics.clear();counterFrames.clear();scopes.clear();java.util.Arrays.fill(pending,false);}
 }

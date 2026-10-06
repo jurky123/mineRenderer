@@ -93,7 +93,7 @@ case 6:paths6[local]=hot;break;
 case 7:paths7[local]=hot;break;
 }}
 
-#ifndef RT_CPU_FIXTURE
+#if !defined(RT_CPU_FIXTURE)||defined(RT_QUEUE_FIXTURE)
 [[vk::binding(7,0)]] RWStructuredBuffer<uint4> pageFeedback;
 #endif
 void requestMissPages(float3 origin,float3 direction,uint pathIndex){
@@ -151,7 +151,7 @@ bool crossMedium(inout MediumStack media,Material m,bool entering){return enteri
 bool opaqueBlocked(float3 origin,float3 direction,float maximum){
     if((uint(camera.origin.w)&8u)==0)return false;
 #ifdef RT_CPU_FIXTURE
-    return fixtureTraceFiltered(origin,direction,maximum,2).distance>=0;
+    return fixtureTraceFiltered(origin,direction,maximum,3).distance>=0;
 #else
 #ifndef RT_VIS_BENCH
     if((uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[513].x,1,ignored);InterlockedAdd(pageFeedback[540].x,1,ignored);
@@ -164,7 +164,15 @@ bool opaqueBlocked(float3 origin,float3 direction,float maximum){
     query.TraceRayInline(opaqueWorld,RAY_FLAG_NONE,254,ray);while(query.Proceed()){}
     return query.CommittedStatus()==COMMITTED_TRIANGLE_HIT;
 #else
-    uint blocked=1;TraceRay(opaqueWorld,RAY_FLAG_FORCE_OPAQUE|RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH|RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,254,3,0,1,ray,blocked);return blocked!=0;
+    uint blocked=1;
+#ifdef RT_VIS_BENCH
+    // Replay remains opaque-only so TraceRay and Query test identical geometry.
+    TraceRay(opaqueWorld,RAY_FLAG_FORCE_OPAQUE|RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH|RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,254,3,0,1,ray,blocked);
+#else
+    // One solid-blocker traversal: opaque hardware hits, alpha cutout, ignore transmission.
+    TraceRay(world,RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH|RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,254,4,1,1,ray,blocked);
+#endif
+    return blocked!=0;
 #endif
 #endif
 }
@@ -362,14 +370,19 @@ void advance(inout PathState path) {
     storeMedia(path,media);path.radiance.w=asfloat(seed);
 }
 
-#ifndef RT_CPU_FIXTURE
+#if !defined(RT_CPU_FIXTURE)||defined(RT_QUEUE_FIXTURE)
 bool compactPaths(){return (uint(camera.origin.w)&4u)!=0;}
 void appendContinuation(uint pathIndex,PathState path){
     uint bounce=uint(path.throughput.w);if(!compactPaths()||path.origin.w==0||path.padding!=0||bounce>=6)return;
-    uint slot;InterlockedAdd(pageFeedback[520u+bounce].w,1,slot);
+#ifdef RT_QUEUE_FIXTURE
+    // CPU fixture replaces only GPU atomic reservation; packing/guards are production code.
+    uint slot=pageFeedback[520u+bounce].x++;
+#else
+    uint slot;InterlockedAdd(pageFeedback[520u+bounce].x,1,slot);
+#endif
     uint capacity=camera.width*camera.height*max(1u,camera.padding);
     // Each surviving path appends once: slot is bounded by capacity, with no dropping.
     pageFeedback[1568u+(bounce&1u)*capacity+slot]=uint4(pathIndex,0,0,0);
-    uint ignored;InterlockedMax(pageFeedback[520u+bounce].x,slot+1,ignored);
+    // The atomic reservation is also the indirect dispatch width: no per-path Max.
 }
 #endif

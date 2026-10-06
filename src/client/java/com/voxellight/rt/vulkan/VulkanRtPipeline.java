@@ -29,7 +29,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             var properties=VkPhysicalDeviceRayTracingPipelinePropertiesKHR.calloc(stack).sType$Default();
             var root=VkPhysicalDeviceProperties2.calloc(stack).sType$Default().pNext(properties.address());
             VK11.vkGetPhysicalDeviceProperties2(device.vkDevice().getPhysicalDevice(),root);
-            packing=VulkanSbt.layout(properties.shaderGroupHandleSize(),properties.shaderGroupHandleAlignment(),properties.shaderGroupBaseAlignment(),properties.maxShaderGroupStride(),material?2:1,material?4:1);
+            packing=VulkanSbt.layout(properties.shaderGroupHandleSize(),properties.shaderGroupHandleAlignment(),properties.shaderGroupBaseAlignment(),properties.maxShaderGroupStride(),material?2:1,material?7:1);
             var bindings=VkDescriptorSetLayoutBinding.calloc(bindingCount,stack);
             int stages=VK_SHADER_STAGE_RAYGEN_BIT_KHR|VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR|VK_SHADER_STAGE_MISS_BIT_KHR|VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
             int[] types={KHRAccelerationStructure.VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,KHRAccelerationStructure.VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR};
@@ -40,7 +40,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             if(material)layoutInfo.pPushConstantRanges(VkPushConstantRange.calloc(1,stack).stageFlags(VK_SHADER_STAGE_RAYGEN_BIT_KHR).offset(0).size(4));
             check(vkCreatePipelineLayout(device.vkDevice(),layoutInfo,null,out));layout=out.get(0);
             String prefix=material?"material_":transport?"transport_":"";
-            byte[][] binaries=material?new byte[][]{load(raygen),load(prefix+"sky"),load(prefix+"closest_hit"),load("material_cutout"),load("material_visibility_miss")}:new byte[][]{load(transport?raygen:"primary"),load(prefix+"sky"),load(prefix+"closest_hit")};
+            byte[][] binaries=material?new byte[][]{load(raygen),load(prefix+"sky"),load(prefix+"closest_hit"),load("material_cutout"),load("material_visibility_miss"),load("material_shadow_cutout")}:new byte[][]{load(transport?raygen:"primary"),load(prefix+"sky"),load(prefix+"closest_hit")};
             cacheFile=cachePath(root.properties(),binaries);
             var cacheCreate=VkPipelineCacheCreateInfo.calloc(stack).sType$Default();
             ByteBuffer initial=null;
@@ -53,7 +53,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             long[] modules=new long[binaries.length];
             try {
                 var stagesInfo=VkPipelineShaderStageCreateInfo.calloc(binaries.length,stack);
-                int[] stageTypes={VK_SHADER_STAGE_RAYGEN_BIT_KHR,VK_SHADER_STAGE_MISS_BIT_KHR,VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,VK_SHADER_STAGE_ANY_HIT_BIT_KHR,VK_SHADER_STAGE_MISS_BIT_KHR};
+                int[] stageTypes={VK_SHADER_STAGE_RAYGEN_BIT_KHR,VK_SHADER_STAGE_MISS_BIT_KHR,VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,VK_SHADER_STAGE_ANY_HIT_BIT_KHR,VK_SHADER_STAGE_MISS_BIT_KHR,VK_SHADER_STAGE_ANY_HIT_BIT_KHR};
                 for(int i=0;i<binaries.length;i++) {
                     var code=MemoryUtil.memAlloc(binaries[i].length).put(binaries[i]).flip();
                     try {check(vkCreateShaderModule(device.vkDevice(),VkShaderModuleCreateInfo.calloc(stack).sType$Default().pCode(code),null,out));modules[i]=out.get(0);}
@@ -61,16 +61,17 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
                     // Slang emits "main" unless -fvk-use-entrypoint-name is set.
                     stagesInfo.get(i).sType$Default().stage(stageTypes[i]).module(modules[i]).pName(stack.UTF8("main"));
                 }
-                int groupCount=material?7:3;
+                int groupCount=material?10:3;
                 var groups=VkRayTracingShaderGroupCreateInfoKHR.calloc(groupCount,stack);
                 for(int i=0;i<groupCount;i++)groups.get(i).sType$Default().generalShader(VK_SHADER_UNUSED_KHR).closestHitShader(VK_SHADER_UNUSED_KHR).anyHitShader(VK_SHADER_UNUSED_KHR).intersectionShader(VK_SHADER_UNUSED_KHR);
                 groups.get(0).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR).generalShader(0);
                 groups.get(1).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR).generalShader(1);
                 if(material){
                     groups.get(2).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR).generalShader(4);
-                    for(int i=3;i<7;i++)groups.get(i).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR);
+                    for(int i=3;i<10;i++)groups.get(i).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR);
                     for(int i=3;i<6;i++)groups.get(i).closestHitShader(2);
                     groups.get(4).anyHitShader(3);
+                    groups.get(8).anyHitShader(5);groups.get(9).anyHitShader(5);
                 }else groups.get(2).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR).closestHitShader(2);
                 boolean statistics=device.vkDevice().getCapabilities().VK_KHR_pipeline_executable_properties&&VulkanRtCapabilities.executableStatistics(device.vkDevice().getPhysicalDevice());
                 var create=VkRayTracingPipelineCreateInfoKHR.calloc(1,stack);create.get(0).sType$Default().flags(material&&com.voxellight.rt.RtExecutionOptions.omm()&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&VulkanRtCapabilities.micromap(device.vkDevice().getPhysicalDevice())?org.lwjgl.vulkan.EXTOpacityMicromap.VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT:0).pStages(stagesInfo).pGroups(groups).maxPipelineRayRecursionDepth(1).layout(layout);
@@ -80,7 +81,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
                 sbt=new VulkanRtBuffer(device,packing.bytes()+properties.shaderGroupBaseAlignment(),VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR);
                 var handles=stack.malloc(properties.shaderGroupHandleSize()*groupCount);check(vkGetRayTracingShaderGroupHandlesKHR(device.vkDevice(),pipeline,0,groupCount,handles));
                 var data=ByteBuffer.allocateDirect((int)sbt.size());long base=VulkanSbt.align(sbt.address(),properties.shaderGroupBaseAlignment())-sbt.address();
-                long[] offsets=material?new long[]{packing.raygenOffset(),packing.missOffset(),packing.missOffset()+packing.stride(),packing.hitOffset(),packing.hitOffset()+packing.stride(),packing.hitOffset()+2*packing.stride(),packing.hitOffset()+3*packing.stride()}:new long[]{packing.raygenOffset(),packing.missOffset(),packing.hitOffset()};
+                long[] offsets=material?new long[]{packing.raygenOffset(),packing.missOffset(),packing.missOffset()+packing.stride(),packing.hitOffset(),packing.hitOffset()+packing.stride(),packing.hitOffset()+2*packing.stride(),packing.hitOffset()+3*packing.stride(),packing.hitOffset()+4*packing.stride(),packing.hitOffset()+5*packing.stride(),packing.hitOffset()+6*packing.stride()}:new long[]{packing.raygenOffset(),packing.missOffset(),packing.hitOffset()};
                 for(int i=0;i<groupCount;i++)for(int b=0;b<properties.shaderGroupHandleSize();b++)data.put((int)(base+offsets[i]+b),handles.get(i*properties.shaderGroupHandleSize()+b));
                 device.createCommandEncoder().writeToBuffer(sbt.slice(),data);
                 sbtBase=sbt.address()+base;
@@ -154,7 +155,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
     static void bufferWrite(VkWriteDescriptorSet write,long set,int binding,int type,VkDescriptorBufferInfo.Buffer info) {
         write.sType$Default().dstSet(set).dstBinding(binding).descriptorType(type).descriptorCount(info.remaining()).pBufferInfo(info);
     }
-    private VkStridedDeviceAddressRegionKHR region(MemoryStack stack,long offset) {return VkStridedDeviceAddressRegionKHR.calloc(stack).deviceAddress(sbtBase+offset).stride(packing.stride()).size(packing.stride()*(material?(offset==packing.missOffset()?2:offset==packing.hitOffset()?4:1):1));}
+    private VkStridedDeviceAddressRegionKHR region(MemoryStack stack,long offset) {return VkStridedDeviceAddressRegionKHR.calloc(stack).deviceAddress(sbtBase+offset).stride(packing.stride()).size(packing.stride()*(material?(offset==packing.missOffset()?2:offset==packing.hitOffset()?7:1):1));}
     private static byte[] load(String stage) {
         try(var stream=VulkanRtPipeline.class.getResourceAsStream("/assets/voxellight/rt/vulkan/"+stage+".spv")) {
             if(stream==null)throw new IllegalStateException("Missing prebuilt RT stage "+stage);byte[] bytes=stream.readAllBytes();

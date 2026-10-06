@@ -6,7 +6,7 @@ void material_indirect() {
     uint2 pixel=DispatchRaysIndex().xy;uint index=pixel.y*camera.width+pixel.x+DispatchRaysIndex().z*camera.width*camera.height;
     if(compactPaths()){
         uint bounce=dispatchSettings.bounce;
-        if(bounce==0||DispatchRaysIndex().x>=pageFeedback[520u+bounce].w)return;
+        if(bounce==0||DispatchRaysIndex().x>=pageFeedback[520u+bounce].x)return;
         uint capacity=camera.width*camera.height*max(1u,camera.padding);
         index=pageFeedback[1568u+(bounce&1u)*capacity+DispatchRaysIndex().x].x;
     }

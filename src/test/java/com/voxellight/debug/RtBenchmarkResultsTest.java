@@ -79,4 +79,8 @@ class RtBenchmarkResultsTest {
         var old=output.get(1);output.set(1,new RtBenchmarkResults.Block(old.plan(),old.firstFrame(),old.lastFrame(),old.state(),true,List.of(),old.timings(),old.aliveFraction(),.1,0,0,0));
         assertEquals("not_comparable",RtBenchmarkResults.compare("query_vs_legacy",output).verdict());
     }
+    @Test void counterHeavyFramesNeverEnterTransportTimingSummary(){
+        var samples=List.of(new PassMetrics.Sample(1,"batch",1,1,0,1_000_000L,1,0,1,1),new PassMetrics.Sample(2,"batch",1,1,0,99_000_000L,2,0,1,1),new PassMetrics.Sample(3,"batch",1,1,0,3_000_000L,3,0,1,1));
+        var times=RtBenchmarkResults.timings(samples,Set.of(2L));assertEquals(2,times.get("batch").samples());assertEquals(2.0,times.get("batch").medianMs());
+    }
 }

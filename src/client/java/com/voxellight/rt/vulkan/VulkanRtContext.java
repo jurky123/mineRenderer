@@ -100,13 +100,15 @@ public final class VulkanRtContext implements AutoCloseable {
             case FIXED->false;case COMPACT->true;case AUTO->queueCalibration.compact(RenderPassProfile.frameId(),width,height,spp,RenderPassProfile.enabled());
         };
         {
+            boolean sampledCounters=RenderPassProfile.enabled()&&(frame%8)==0;
+            if(sampledCounters)RenderPassProfile.markCounterFrame();
             var data=ByteBuffer.allocateDirect(96).order(ByteOrder.nativeOrder());inverseClip.get(0,data);
-            data.position(64).putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat((material&&reconstructionGuides?1:0)+(RenderPassProfile.enabled()?2:0)+(compact?4:0)+(scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?8:0)+(scene.hasNonOpaque()?16:0)+(ommEnabled?256:0)+(RenderPassProfile.enabled()?512:0)+(queryAvailable&&((RenderPassProfile.frameId()/8)&1)!=0?1024:0)).putInt(width).putInt(height).putInt(transport?frame++:0).putInt(spp).flip();
+            data.position(64).putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat((material&&reconstructionGuides?1:0)+(sampledCounters?2:0)+(compact?4:0)+(scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?8:0)+(scene.hasNonOpaque()?16:0)+(ommEnabled?256:0)+(sampledCounters?512:0)+(queryAvailable&&((RenderPassProfile.frameId()/8)&1)!=0?1024:0)).putInt(width).putInt(height).putInt(transport?frame++:0).putInt(spp).flip();
             encoder.writeToBuffer(camera.slice(),data);
             if(material){
                 encoder.writeToBuffer(feedback.slice(0,16),ByteBuffer.allocateDirect(16));
                 var counters=ByteBuffer.allocateDirect((544-513)*16).order(ByteOrder.nativeOrder());
-                for(int bounce=1;bounce<6;bounce++){int offset=(520+bounce-513)*16;counters.putInt(offset,1).putInt(offset+4,1).putInt(offset+8,1);}
+                for(int bounce=1;bounce<6;bounce++){int offset=(520+bounce-513)*16;counters.putInt(offset,0).putInt(offset+4,1).putInt(offset+8,1);}
                 encoder.writeToBuffer(feedback.slice(513*16,(544-513)*16),counters);
             }
             var nativeEncoder=device.createCommandEncoder();
@@ -128,7 +130,7 @@ public final class VulkanRtContext implements AutoCloseable {
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));nativeEncoder.execute(command);
                 pipeline.retireDescriptors();if(indirect!=null)indirect.retireDescriptors();if(resolve!=null)resolve.retireDescriptors();
             }
-            if(material&&RenderPassProfile.enabled()&&scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY)benchmarkVisibility(assets);
+            if(material&&sampledCounters&&scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY)benchmarkVisibility(assets);
             encoder.copyBufferToTexture(output.slice(),0,0,width,height,destination,0,0,width,height,0,0);
             if(material&&!feedbackPending&&((frame-1)%8)==0)readPageFeedback(encoder);
             return true;

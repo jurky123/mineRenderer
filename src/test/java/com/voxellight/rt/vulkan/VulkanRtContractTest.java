@@ -20,10 +20,10 @@ class VulkanRtContractTest {
             g.get(2).geometry().triangles().vertexData().deviceAddress(777);assertEquals(initial,VulkanRtAccel.signature(type,g,new int[]{10,20,30},1));
         }
     }
-    @Test void visibilitySbtKeepsBothMissesAndAllFourHitRecordsAligned(){
-        var layout=VulkanSbt.layout(32,32,64,4096,2,4);
+    @Test void visibilitySbtKeepsBothMissesAndAllSevenHitRecordsAligned(){
+        var layout=VulkanSbt.layout(32,32,64,4096,2,7);
         assertEquals(0,layout.missOffset()%64);assertEquals(0,layout.hitOffset()%64);
-        assertTrue(layout.hitOffset()>=layout.missOffset()+2*layout.stride());assertEquals(layout.hitOffset()+4*layout.stride(),layout.bytes());
+        assertTrue(layout.hitOffset()>=layout.missOffset()+2*layout.stride());assertEquals(layout.hitOffset()+7*layout.stride(),layout.bytes());
     }
     @Test void allResizedRangesAreReleasedBeforeGrowingReplacements(){
         var allocator=new com.voxellight.rt.RtGeometryAllocator(100);

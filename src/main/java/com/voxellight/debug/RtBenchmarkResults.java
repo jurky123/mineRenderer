@@ -17,6 +17,11 @@ public final class RtBenchmarkResults {
         int n=values.size();double median=n%2==1?values.get(n/2):(values.get(n/2-1)/2.0+values.get(n/2)/2.0);
         return new Timing(n,median/1e6,values.get((n-1)*95/100)/1e6);
     }
+    public static Map<String,Timing> timings(List<PassMetrics.Sample> samples,Set<Long> counterFrames){
+        var grouped=new LinkedHashMap<String,List<Long>>();
+        for(var sample:samples)if(sample.gpuNanos()!=null&&!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.gpuNanos());
+        var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
+    }
     private static Timing batch(Block block){return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
     public static Comparison compare(String name,List<Block> all){
         var blocks=all.stream().filter(b->b.plan.comparison().equals(name)).sorted(Comparator.comparingInt((Block b)->b.plan.round()).thenComparingInt(b->b.plan.position())).toList();

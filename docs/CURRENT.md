@@ -1,3 +1,7 @@
+## alpha.31 TraceRay/Compact 执行修复与测量干扰控制
+
+针对 alpha.30 单场景数据，TraceRay 采用 scalar solid-shadow 单次阻挡查询，cutout alpha 与 transmission 过滤使用专用 hit records；Compact 删除冗余 Max，计数和 indirect width 合并为同一原子字段。计数与 replay 只每八帧启用，A/B 汇总排除这些帧，raw CSV 与 counter_frames.json 保留追溯依据。未改变原 estimator 的材质/介质处理，CPU 数值与队列索引检查纳入构建。RTX 加速效果仍未测量，也不能直接与 alpha.30 受每帧计数干扰的数据推算版本加速。
+
 ## alpha.30 SER 初始化与直接收益验收
 
 根据 alpha.29 实测，前三组工作负载一致且完成两轮：TraceRay 较 Legacy 慢约 19.3%，Query 较 TraceRay 快约 18.9%，Compact 较 Fixed 慢约 18.6%。这些是用户单场景、214×120、1 spp、带诊断计数条件下的描述性 transport 数据，不能推出全局默认或总体 FPS 收益。SER 初始化耗时 51.9 秒触发了错误预热超时。

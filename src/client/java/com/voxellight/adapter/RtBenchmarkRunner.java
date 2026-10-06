@@ -45,6 +45,7 @@ public final class RtBenchmarkRunner {
     private long currentFrame;
     private PassMetrics metrics=new PassMetrics(32000);
     private RtWorkMetrics rays=new RtWorkMetrics();
+    private final Set<Long> counterFrames=new LinkedHashSet<>();
     private final long[] alive=new long[6];
     private long shadow,anyHit,opaque,replay,mismatches,scopeCount;
     private final LinkedHashSet<String> invalid=new LinkedHashSet<>();
@@ -72,7 +73,7 @@ public final class RtBenchmarkRunner {
     private static double[] pose(){var client=Minecraft.getInstance();if(client.player==null)return null;var p=client.gameRenderer.mainCamera().position();return new double[]{p.x,p.y,p.z,client.player.getXRot(),client.player.getYRot()};}
     private boolean moved(){var p=pose();if(p==null||pose==null)return true;for(int i=0;i<5;i++)if(Math.abs(p[i]-pose[i])>(i<3?.03:.1))return true;return false;}
     private void begin(){
-        plan.blocks().get(index).config().apply();phase=Phase.INITIALIZING;phaseStart=System.nanoTime();warmup=new RtBenchmarkWarmup(phaseStart);lastDiagnostic=0;first=last=Long.MAX_VALUE;measuredState=null;blockExported=false;invalid.clear();
+        plan.blocks().get(index).config().apply();phase=Phase.INITIALIZING;phaseStart=System.nanoTime();warmup=new RtBenchmarkWarmup(phaseStart);lastDiagnostic=0;first=last=Long.MAX_VALUE;measuredState=null;blockExported=false;invalid.clear();counterFrames.clear();
         metrics=new PassMetrics(32000);rays=new RtWorkMetrics();Arrays.fill(alive,0);shadow=anyHit=opaque=replay=mismatches=scopeCount=0;
         feedback.accept(progress());
     }
@@ -111,6 +112,7 @@ public final class RtBenchmarkRunner {
     private boolean owns(long frame){return RtBenchmarkResults.ownsFrame(frame,first,last);}
     private void gpu(PassMetrics.Sample sample){
         if(!owns(sample.frame())||sample.gpuNanos()==null)return;
+        if(RenderPassProfile.counterFrame(sample.frame()))counterFrames.add(sample.frame());
         metrics.recordScope(sample.scopeId(),sample.frame(),sample.parentScopeId(),sample.mode(),sample.width(),sample.height(),sample.spp(),sample.sceneGeneration(),sample.cpuNanos());metrics.completeGpu(sample.scopeId(),sample.gpuNanos());scopeCount++;
         if(sample.mode().startsWith("vulkan_rt_batch")&&(sample.width()!=measuredState.width()||sample.height()!=measuredState.height()||sample.spp()!=measuredState.spp()))invalid.add("submitted batch dimensions/spp differ from block metadata");
     }
@@ -122,14 +124,16 @@ public final class RtBenchmarkRunner {
     }
     private String blockName(){var b=plan.blocks().get(index);return String.format(java.util.Locale.ROOT,"%02d-%s-r%d-p%d-%s",index+1,b.comparison(),b.round()+1,b.position()+1,b.candidate()?"B":"A");}
     private void completeBlock()throws IOException{
-        var grouped=new LinkedHashMap<String,List<Long>>();for(var sample:metrics.snapshot())if(sample.gpuNanos()!=null)grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.gpuNanos());
-        var times=new LinkedHashMap<String,RtBenchmarkResults.Timing>();grouped.forEach((name,values)->times.put(name,RtBenchmarkResults.timing(values)));
+        var times=RtBenchmarkResults.timings(metrics.snapshot(),counterFrames);
         long frames=last-first+1,batches=metrics.snapshot().stream().filter(s->s.mode().startsWith("vulkan_rt_batch")).count();
         if(batches<30||batches<frames*.8)invalid.add("GPU batch timestamp coverage below 80% or fewer than 30 samples");
         if(scopeCount>metrics.size())invalid.add("raw GPU sample ring overflow");
         var fractions=alive[0]==0?new double[0]:new double[6];for(int i=0;i<fractions.length;i++)fractions[i]=alive[i]/(double)alive[0];
         var result=new RtBenchmarkResults.Block(plan.blocks().get(index),first,last,measuredState,invalid.isEmpty(),List.copyOf(invalid),times,fractions,alive[0]==0?null:anyHit/(double)alive[0],replay,mismatches,RenderPassProfile.skippedQueries()-querySkips);
         results.add(result);blockExported=true;String name=blockName();metrics.export(directory.resolve(name+".passes.csv"));rays.export(directory.resolve(name+".rays.csv"));
+        Files.writeString(directory.resolve(name+".counter_frames.json"),new GsonBuilder().create().toJson(counterFrames));
+        var leanFrames=metrics.snapshot().stream().map(PassMetrics.Sample::frame).filter(frame->!counterFrames.contains(frame)).collect(java.util.stream.Collectors.toSet());
+        Files.writeString(directory.resolve(name+".diagnostic_timings.json"),new GsonBuilder().setPrettyPrinting().create().toJson(RtBenchmarkResults.timings(metrics.snapshot(),leanFrames)));
         Files.writeString(directory.resolve(name+".json"),new GsonBuilder().setPrettyPrinting().create().toJson(result));
         Files.writeString(directory.resolve(name+".txt"),"start\n"+startStatus+"\nend\n"+VoxelLightClient.probe().status()+"\n");
         feedback.accept("VoxelLight: "+name+" captured "+batches+" GPU batches; "+(result.valid()?"workload checks passed":String.join("; ",result.reasons())));
@@ -140,7 +144,7 @@ public final class RtBenchmarkRunner {
         try{
             if(reason!=null&&!blockExported&&first!=Long.MAX_VALUE){invalid.add("interrupted: "+reason);if(last==Long.MAX_VALUE)last=Math.max(first,currentFrame-1);completeBlock();}
             var comparisons=new ArrayList<RtBenchmarkResults.Comparison>();for(String name:plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().toList())comparisons.add(RtBenchmarkResults.compare(name,results));
-            var report=new LinkedHashMap<String,Object>();report.put("schema",3);report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy","fixed resident terrain snapshot; dynamic models and lighting remain live");report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);
+            var report=new LinkedHashMap<String,Object>();report.put("schema",4);report.put("timingPolicy","GPU timestamps on counter-free frames; counters/replay every eighth frame; raw CSV includes both, see counter_frames.json");report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy","fixed resident terrain snapshot; dynamic models and lighting remain live");report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);
             report.put("device",com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().toString());report.put("version",FabricLoader.getInstance().getModContainer("voxellight").orElseThrow().getMetadata().getVersion().getFriendlyString());
             report.put("limitations",List.of("current-version execution controls only; not alpha.26 vs alpha.28 speedup","completed GPU timestamps; replay benchmarks outside transport batch","two ABBA rounds are descriptive, not a statistical confidence interval","alive drift threshold 5 percentage points; dynamic geometry/light changes may remain","no automatic image correctness, L1/L2 traffic or runtime spill validation"));
             Files.writeString(directory.resolve("warmup.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(warmupDiagnostics));
