@@ -1,3 +1,7 @@
+## alpha.28 自动 A/B 验收
+
+新增 `rt_benchmark start/status/stop`，按设备能力执行两轮 ABBA，隔离采样帧并接收延迟 GPU 数据，导出原始 CSV、状态、汇总与 ZIP；工作负载变化或波动范围内不宣称收益。完整说明见 [自动验收](performance/RT-AUTOMATIC-BENCHMARK.md)。执行层算法保持 alpha.27，RTX 实测待用户运行。
+
 # 0.39.0-alpha.27 — Vulkan RT execution round 1
 
 Material section BLAS now contains OPAQUE/CUTOUT/TRANSMISSION ranges with matching geometry-index SBT records. Opaque traversal bypasses any-hit; a separate opaque visibility AS supports a 4-byte first-hit TraceRay payload and an optional Ray Query variant. PathHot is 64B (was 144B), radiance/AOV accumulate outside continuation, and one scene scratch arena replaces per-AS scratch. Queue AUTO joins delayed GPU timings with real alive curves, with forced fixed/compact A/B controls. OMM uses conservative triangle special indices and exact unknown any-hit fallback; mixed-alpha subtriangle baking is not implemented. SER is an explicit, feature-gated final A/B, default off.

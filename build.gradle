@@ -82,6 +82,7 @@ tasks.register('clientKit', Zip) {
     from('docs/RT-LIGHT-TRANSPORT.md')
     from('docs/VULKAN-RT-MIGRATION.md')
     from('docs/performance/RT-EXECUTION-ROUND-1.md')
+    from('docs/performance/RT-AUTOMATIC-BENCHMARK.md')
 }
 
 // Legacy CUDA/OptiX tracing artifacts must never leak from a previous local build.

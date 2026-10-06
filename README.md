@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.27**：Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.28**：新增一条命令自动完成执行层 A/B、GPU 采样、波动判定和 ZIP 导出。保留 Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
 
-[下载 alpha.27 安装包](https://temp.sh/eLAYw/voxellight-client-kit-26.2-0.39.0-alpha.27.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.28 安装包](https://temp.sh/qPSYq/voxellight-client-kit-26.2-0.39.0-alpha.28.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -18,6 +18,8 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 `rt_scale 0` 保留至少 4×、最高 640×360 的自动分辨率；`1..8` 指定线性缩放，实际尺寸受设备 buffer 范围和 1 GiB continuation 预算约束，stats 显示实际尺寸。场景有 256 MiB 压缩 CPU 页缓存、64 MiB GPU working set 和异步 miss 请求优先页；无法重建服务器尚未加载的区块。透明/加法粒子、动态 LabPBR 材质、DLSS RR、OMM/SER 性能验收仍未完成。此版本的 RTX 降噪、动态外观和性能需要实机验证。
 
+自动验收：进入正常 Vulkan PT 世界站定，执行 `/voxellight rt_benchmark start`。通常约 2–8 分钟，结束自动恢复原执行控制并导出 `benchmark-results/voxellight/rt-suite-<时间戳>.zip`。`status` 查看进度，`stop` 中断并导出。收益处于重复段波动范围内时明确报告 `within_variation`。
+
 ## 构建与验证
 
 ```sh
@@ -27,6 +29,8 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 构建工具需要 Slang 和 SPIR-V 验证工具，详见 [Vulkan 迁移记录](docs/VULKAN-RT-MIGRATION.md)。构建执行 Java 回归、真实 Minecraft GLSL pipeline 链接、23 个 RT SPIR-V stage 验证，以及实际 Slang CPU target 对原始 BSDF/材质/环境的数值校验。独立降噪 helper 需要 NVIDIA SDK 头文件和 Windows/Linux C++ 工具链，不需要 nvcc 或旧 tracing build。产物位于 `build/libs/` 和 `build/distributions/`；client kit 只含本 mod 和当前操作文档。
 
 ## 文档
+
+- [一条命令自动 A/B 与结果判定](docs/performance/RT-AUTOMATIC-BENCHMARK.md)
 
 - [系统架构调整设计：总体、场景、PT、重建与迁移验收](docs/architecture/README.md)（设计基线 alpha.23；[alpha.24 实施与未完成项](docs/architecture/IMPLEMENTATION.md)）
 - [安装与命令](docs/INSTALL.md)

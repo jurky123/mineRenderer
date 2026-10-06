@@ -42,9 +42,9 @@ public final class VoxelLightClient implements ClientModInitializer {
         LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 reference lighting prototype loaded; rendering effects are off by default");
         ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> { RenderProbe.invalidateCasterAdmission(); SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false); });
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> { RenderProbe.invalidateCasterAdmission(); SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true); });
-        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> SCENE.changeLevel(level));
+        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {com.voxellight.adapter.RtBenchmarkRunner.stop();SCENE.changeLevel(level);});
         ClientTickEvents.END_CLIENT_TICK.register(SCENE::tick);
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> SCENE.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {com.voxellight.adapter.RtBenchmarkRunner.stop();SCENE.close();});
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             var command = literal("voxellight")
                     .then(literal("settings").executes(context->{context.getSource().getClient().execute(()->context.getSource().getClient().setScreenAndShow(new com.voxellight.ui.RendererSettingsScreen(null)));return 1;}))
@@ -85,6 +85,12 @@ public final class VoxelLightClient implements ClientModInitializer {
                             return 0;
                         }
                     }));
+            command.then(literal("rt_benchmark")
+                .executes(context->com.voxellight.adapter.RtBenchmarkRunner.start(6,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                .then(literal("start").executes(context->com.voxellight.adapter.RtBenchmarkRunner.start(6,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                    .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.start(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
+                .then(literal("status").executes(context->{context.getSource().sendFeedback(Component.literal(com.voxellight.adapter.RtBenchmarkRunner.status()));return 1;}))
+                .then(literal("stop").executes(context->{com.voxellight.adapter.RtBenchmarkRunner.stop();return 1;})));
             var modeCommand = literal("mode");
             for (var mode : RenderProbe.Mode.values()) {
                 modeCommand.then(literal(mode.name().toLowerCase(java.util.Locale.ROOT)).executes(context -> {

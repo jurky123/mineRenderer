@@ -61,3 +61,7 @@ alpha.24：统一 scene commit、稳定几何范围、持久 BLAS/TLAS refit、�
 ## alpha.27 执行层 A/B
 
 默认 `rt_visibility trace`、`rt_queue auto`、`rt_omm off`、`rt_ser off`。`rt_visibility legacy|trace|query` 比较遮挡执行方式，`rt_queue auto|fixed|compact` 比较 continuation 调度；未知设备/范围回退在 stats 中报告。AUTO 未标定使用 fixed，`profile on` 时根据真实 alive 曲线/GPU 时间标定，关闭后使用 context 内已测策略。`rt_omm on|off` 和 `rt_ser on|off` 是能力门控请求，实际启用见 stats；visibility/OMM/SER 切换重建 context，要重新预热再 export。OMM 当前是保守三角级覆盖，混合 alpha 回退 any-hit。完整测量与冻结条件见 [执行层第一轮](performance/RT-EXECUTION-ROUND-1.md)。
+
+## 自动执行层验收（alpha.28）
+
+`/voxellight rt_benchmark start [4..30]` 自动预热、两轮 ABBA、采样、导出 ZIP。默认每段 6 秒。`status` / `stop` 查看进度和中断。临时执行控制不持久化，结束恢复。详见 [自动验收](performance/RT-AUTOMATIC-BENCHMARK.md)。

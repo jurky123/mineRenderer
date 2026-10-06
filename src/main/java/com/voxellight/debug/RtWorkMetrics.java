@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 
 /** Bounded delayed GPU ray counters; frame IDs refer to submission, not readback completion. */
 public final class RtWorkMetrics {
-    private record Sample(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches){}
+    public record Sample(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches){}
     private final LinkedHashMap<Long,Sample> samples=new LinkedHashMap<>();
     public void record(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit){
         record(frame,width,height,spp,scene,active,shadow,anyHit,0,0,0);
@@ -16,6 +16,7 @@ public final class RtWorkMetrics {
         samples.put(frame,new Sample(frame,width,height,spp,scene,active.clone(),shadow,anyHit,opaqueVisibility,visibilitySamples,visibilityMismatches));
         while(samples.size()>1800)samples.remove(samples.firstEntry().getKey());
     }
+    public Sample sample(long frame){return samples.get(frame);}
     public void clear(){samples.clear();}
     public void export(Path path)throws IOException{
         try(var writer=Files.newBufferedWriter(path)){

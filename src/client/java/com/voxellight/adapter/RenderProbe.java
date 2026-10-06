@@ -86,6 +86,7 @@ public final class RenderProbe {
     public void setCoverageBlend(boolean value) {RenderSystem.assertOnRenderThread();lighting.setCoverageBlend(value);}
     public void setAtmosphere(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setAtmosphere(enabled);}
     public void setVolumetric(boolean enabled){RenderSystem.assertOnRenderThread();lighting.setVolumetric(enabled);}
+    public com.voxellight.rt.RtBenchmarkState benchmarkState(){return lighting.benchmarkState();}
     public void setRaster(){RenderSystem.assertOnRenderThread();lighting.setRaster();}
     public void accumulate(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulate(value);}
     public void probeLighting(){RenderSystem.assertOnRenderThread();lighting.probeLighting();}

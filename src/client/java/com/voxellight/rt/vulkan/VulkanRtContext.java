@@ -27,7 +27,7 @@ public final class VulkanRtContext implements AutoCloseable {
     private VulkanRtBuffer[] pathBanks;
     private final long maxStorageRange;
     private final boolean indirectTracing;
-    private final boolean queryAvailable,queryEnabled,serEnabled,ommEnabled;
+    private final boolean queryAvailable,ommAvailable,serAvailable,queryEnabled,serEnabled,ommEnabled;
     private boolean compact,queueAvailable;
     private final com.voxellight.rt.RtQueueCalibration queueCalibration=new com.voxellight.rt.RtQueueCalibration();
     private final java.util.function.Consumer<com.voxellight.debug.PassMetrics.Sample> timingObserver=queueCalibration::timing;
@@ -50,8 +50,8 @@ public final class VulkanRtContext implements AutoCloseable {
         var physical=device.vkDevice().getPhysicalDevice();
         queryAvailable=material&&device.vkDevice().getCapabilities().VK_KHR_ray_query&&capabilities.extensions().contains("VK_KHR_ray_query")&&VulkanRtCapabilities.rayQuery(physical);
         queryEnabled=queryAvailable&&com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.QUERY;
-        serEnabled=material&&device.vkDevice().getCapabilities().VK_NV_ray_tracing_invocation_reorder&&com.voxellight.rt.RtExecutionOptions.ser()&&capabilities.extensions().contains("VK_NV_ray_tracing_invocation_reorder")&&VulkanRtCapabilities.reorder(physical);
-        ommEnabled=material&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&com.voxellight.rt.RtExecutionOptions.omm()&&capabilities.extensions().contains("VK_EXT_opacity_micromap")&&VulkanRtCapabilities.micromap(physical);
+        serAvailable=material&&device.vkDevice().getCapabilities().VK_NV_ray_tracing_invocation_reorder&&capabilities.extensions().contains("VK_NV_ray_tracing_invocation_reorder")&&VulkanRtCapabilities.reorder(physical);serEnabled=serAvailable&&com.voxellight.rt.RtExecutionOptions.ser();
+        ommAvailable=material&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&capabilities.extensions().contains("VK_EXT_opacity_micromap")&&VulkanRtCapabilities.micromap(physical);ommEnabled=ommAvailable&&com.voxellight.rt.RtExecutionOptions.omm();
         String variant=(queryEnabled?"_query":"")+(serEnabled?"_ser":"");
         if(!capabilities.supported())throw new IllegalStateException(capabilities.reason());
         try(var stack=MemoryStack.stackPush()){var properties=VkPhysicalDeviceProperties.calloc(stack);vkGetPhysicalDeviceProperties(device.vkDevice().getPhysicalDevice(),properties);maxStorageRange=Integer.toUnsignedLong(properties.limits().maxStorageBufferRange());if(material&&maxStorageRange<128L*1024*1024)throw new IllegalStateException("Stable material geometry requires 128 MiB storage-buffer range");if(material&&properties.limits().maxPerStageDescriptorStorageBuffers()<15)throw new IllegalStateException("Material batch requires 15 storage-buffer bindings");}
@@ -188,6 +188,12 @@ public final class VulkanRtContext implements AutoCloseable {
     public void commitScene(CommandEncoder encoder,double x,double y,double z){
         if(closed)throw new IllegalStateException("Closed RT context");
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_scene_commit")){scene.commit(encoder,x,y,z);}
+    }
+    public com.voxellight.rt.RtBenchmarkState benchmarkState(boolean realtime,boolean frozen){
+        if(closed||!material||width==0)return null;
+        return new com.voxellight.rt.RtBenchmarkState(width,height,samples,realtime,frozen,queryAvailable,queueAvailable,ommAvailable,serAvailable,
+            com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY:queryEnabled?com.voxellight.rt.RtExecutionOptions.Visibility.QUERY:com.voxellight.rt.RtExecutionOptions.Visibility.TRACE,
+            compact?com.voxellight.rt.RtExecutionOptions.Queue.COMPACT:com.voxellight.rt.RtExecutionOptions.Queue.FIXED,ommEnabled,serEnabled,com.voxellight.adapter.RtMaterialCoverage.opacityValid(),scene.hasOpaque(),scene.terrainSignature(),scene.generation(),scene.resident().size(),scene.sceneBytes());
     }
     public String status() { return (material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, environment=shared HDR 256x128, environmentSampling=GPU solid-angle CDF, lightNee=sun/moon+environment+held, lightMis=power heuristic, cameraWater=initialized, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=external frame reconstruction, internalResolution="+width+"x"+height+", recursion=1, sppPerFrame="+samples+", scheduling="+(compact?"GPU compact continuation":"fixed batch")+", queuePolicy="+com.voxellight.rt.RtExecutionOptions.queue()+", queueCalibration="+queueCalibration.status()+", rayWorkload="+lastWorkload+", rtMissPageRequests="+pageRequestCount+", optionalAdvertised="+optionalCapabilities+", optionalEnabled="+(queryEnabled?"ray_query/":"")+(ommEnabled?"OMM/":"")+(serEnabled?"SER":"")+", visibility="+(com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?"legacy":queryEnabled?"query":"trace")+", pathHotBytes=64, optionalProfile=pending RTX measurements, cameraUploadsPerFrame=1, outputCopiesPerFrame=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size()*(material?samples:1)+(pathMedia==null?0:pathMedia.size())+(pathAovs==null?0:pathAovs.size()))+", "+scene.status()+VulkanRtBuffer.memoryStatus(); }
     @Override public void close() {if(!closed){closed=true;RenderPassProfile.unobserve(timingObserver);scene.close();pipeline.close();if(indirect!=null)indirect.close();if(resolve!=null)resolve.close();camera.close();if(visibilityTrace!=null)visibilityTrace.close();if(visibilityQuery!=null)visibilityQuery.close();if(pathAovs!=null)pathAovs.close();if(pathMedia!=null)pathMedia.close();if(feedback!=null)feedback.close();pageRequests.clear();if(pathBanks!=null){for(var bank:pathBanks)if(bank!=null)bank.close();pathBanks=null;}else if(paths!=null)paths.close();if(output!=null)output.close();}}

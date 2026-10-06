@@ -51,6 +51,8 @@ public final class VulkanRtScene implements AutoCloseable {
     VulkanRtScene(VulkanDevice device,int scratchAlignment) {this(device,scratchAlignment,false);}
     VulkanRtScene(VulkanDevice device,int scratchAlignment,boolean material) { this.device=device;this.scratchAlignment=scratchAlignment;this.material=material;ommEnabled=material&&com.voxellight.rt.RtExecutionOptions.omm()&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&VulkanRtCapabilities.micromap(device.vkDevice().getPhysicalDevice());scratch=new VulkanRtScratch(device,scratchAlignment); }
     public Set<SectionKey> resident() { var keys=new HashSet<>(sections.keySet());keys.removeIf(VulkanRtScene::dynamic);return Set.copyOf(keys); }
+    public long sceneBytes(){return bytes;}
+    public long terrainSignature(){long signature=0;for(var entry:sections.entrySet())if(!dynamic(entry.getKey())){long value=entry.getKey().hashCode()*0x9e3779b97f4a7c15L+entry.getValue().version;value=(value^(value>>>30))*0xbf58476d1ce4e5b9L;signature+=value^(value>>>27);}return signature;}
     public long generation() { return generation; }
     long opaqueTlas(){return opaqueTlas==null?tlas():opaqueTlas.handle();}
     public boolean hasOpaque(){return opaqueTlas!=null;}
