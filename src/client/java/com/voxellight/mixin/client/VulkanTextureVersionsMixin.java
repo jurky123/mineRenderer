@@ -22,7 +22,7 @@ abstract class VulkanTextureVersionsMixin {
     @Inject(method="copyBufferToTexture",at=@At("HEAD"))
     private void voxellight$bufferCopy(GpuBufferSlice source,int sourceX,int sourceY,int rowLength,int imageHeight,GpuTexture destination,int x,int y,int w,int h,int mip,int layer,CallbackInfo ci){NativeTextureVersions.written(destination,mip,x,y,w,h);}
     @Inject(method="createRenderPass",at=@At("HEAD"))
-    private void voxellight$render(RenderPassDescriptor descriptor,CallbackInfoReturnable<?> ci){for(var attachment:descriptor.colorAttachments())if(attachment!=null)NativeTextureVersions.written(attachment.textureView().texture());}
+    private void voxellight$render(RenderPassDescriptor descriptor,CallbackInfoReturnable<?> ci){for(var attachment:descriptor.colorAttachments())if(attachment!=null)NativeTextureVersions.rendered(attachment.textureView());}
     @Inject(method="clearColorTexture",at=@At("HEAD"))
     private void voxellight$clear(GpuTexture texture,Vector4fc color,CallbackInfo ci){NativeTextureVersions.written(texture);}
     @Inject(method="clearColorAndDepthTextures(Lcom/mojang/blaze3d/textures/GpuTexture;Lorg/joml/Vector4fc;Lcom/mojang/blaze3d/textures/GpuTexture;D)V",at=@At("HEAD"))

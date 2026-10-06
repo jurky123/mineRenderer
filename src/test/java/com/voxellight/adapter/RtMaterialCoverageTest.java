@@ -34,6 +34,26 @@ class RtMaterialCoverageTest {
         var sorted=com.voxellight.rt.RtGeometryRanges.split(source,offset->RtMaterialCoverage.transmissive(source,offset));assertArrayEquals(RtMaterialCoverage.indices(source),RtMaterialCoverage.indices(sorted.triangles()));
         RtMaterialCoverage.publish(2,2,new byte[4],new short[]{-1,-1,-1,-1});assertArrayEquals(new int[]{-3,-3},RtMaterialCoverage.indices(source));
     }
+    @Test void vanillaAnimationRenderPassPreservesStaticCoverageAndStillInvalidatesAlbedoVersion(){
+        var texture=new com.mojang.blaze3d.textures.GpuTexture(0,"atlas",com.mojang.blaze3d.GpuFormat.RGBA8_UNORM,4,4,1,2){public void close(){}public boolean isClosed(){return false;}};
+        var view=new com.mojang.blaze3d.textures.GpuTextureView(texture,0,1){public void close(){}public boolean isClosed(){return false;}};
+        var alpha=new short[16];java.util.Arrays.fill(alpha,(short)255);alpha[0]=-1;RtMaterialCoverage.publish(4,4,new byte[16],alpha);RtMaterialCoverage.watch(texture);
+        long version=NativeTextureVersions.version(texture),epoch=RtMaterialCoverage.opacityEpoch();
+        RtMaterialCoverage.animationPass(texture,()->NativeTextureVersions.rendered(view));
+        assertEquals(version+1,NativeTextureVersions.version(texture));assertEquals(epoch,RtMaterialCoverage.opacityEpoch());assertEquals(15,RtMaterialCoverage.knownOpacityTexels());
+        var mip=new com.mojang.blaze3d.textures.GpuTextureView(texture,1,1){public void close(){}public boolean isClosed(){return false;}};
+        NativeTextureVersions.rendered(mip);assertEquals(epoch,RtMaterialCoverage.opacityEpoch());
+        assertThrows(IllegalStateException.class,()->RtMaterialCoverage.animationPass(texture,()->{throw new IllegalStateException("draw failed");}));
+        NativeTextureVersions.rendered(view);assertFalse(RtMaterialCoverage.opacityValid());assertEquals(0,RtMaterialCoverage.knownOpacityTexels());
+    }
+    @Test void trustedAnimationScopeDoesNotHideDirectWritesOrAnotherTextureRender(){
+        var texture=new com.mojang.blaze3d.textures.GpuTexture(0,"atlas",com.mojang.blaze3d.GpuFormat.RGBA8_UNORM,2,2,1,1){public void close(){}public boolean isClosed(){return false;}};
+        var other=new com.mojang.blaze3d.textures.GpuTexture(0,"other",com.mojang.blaze3d.GpuFormat.RGBA8_UNORM,2,2,1,1){public void close(){}public boolean isClosed(){return false;}};
+        var view=new com.mojang.blaze3d.textures.GpuTextureView(texture,0,1){public void close(){}public boolean isClosed(){return false;}};
+        RtMaterialCoverage.publish(2,2,new byte[4],new short[]{255,255,255,255});RtMaterialCoverage.watch(texture);
+        RtMaterialCoverage.animationPass(texture,()->RtMaterialCoverage.written(texture,0,0,0,1,1));assertEquals(3,RtMaterialCoverage.knownOpacityTexels());
+        RtMaterialCoverage.animationPass(other,()->NativeTextureVersions.rendered(view));assertFalse(RtMaterialCoverage.opacityValid());
+    }
     @Test void uncertainAndAuthoredTransmissionCannotEnterOpaqueRange(){
         var source=triangle(0,255);assertTrue(RtMaterialCoverage.transmissive(source,0));
         RtMaterialCoverage.publish(2,2,new byte[4],new short[]{255,255,255,255});assertFalse(RtMaterialCoverage.transmissive(source,0));

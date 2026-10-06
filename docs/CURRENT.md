@@ -1,3 +1,13 @@
+## alpha.33 原版 atlas 动画误伤 OMM 修复
+
+`build clientKit --offline` 通过，309 项测试零失败；24 个 RT stage/ABI 与输运数值验证保持通过。新动画 hook 的实际 GPU/Mixin 启动及 OMM 效果仍待 RTX 实测。
+
+alpha.32 用户 RTX 结果完整运行 48 段，296 个静态 section 和版本签名全程一致，所有段 workload 校验通过；Query 相对 TraceRay 22.58% 更快，相对 Legacy 9.64% 更快；全 Compact 8.29% 更慢；HYBRID 改善 2.71%，仍在 3% 判定阈值内。SER 重复段波动 46.34%，不可比较。上述只代表该场景/设备的当前版本控制 A/B，不是版本总加速。
+
+OMM 仍因 `knownOpacityTexels=0` 被跳过。根因是 26.2 `TextureAtlas.uploadAnimationFrames` 使用 atlas render pass 仅绘制动画 sprite，而旧 render-target hook 按整张 mip0 失效，导致任一动画更新清空静态 coverage。现在仅在精确原版动画上传作用域内保留预先已知的静态分类；动画 sprite 本来就是 unknown。非原版 atlas render pass、直接纹理上传、清屏和其他纹理仍保守失效；mip>0 render target 不再误写 mip0。纹理版本计数照常推进，实际动态 albedo 不冻结。作用域异常退出后恢复，CPU tests 和实际 26.2 bytecode 合同校验覆盖该行为。
+
+驱动已启用编译统计捕获，但返回零 executable；无法从此结果得到 register spill、L1/L2 流量。OMM 修复需要新版 RTX 对照验证，执行层仍未冻结。当前建议该场景使用 Query / Fixed / OMM off / SER off，HYBRID 为测试候选，不将约 2.7% 宣布为稳定收益。
+
 ## alpha.32 快照完整性、HYBRID 后段调度与 OMM 有效性
 
 本地 `build clientKit --offline` 通过，306 项 Java 测试零失败；24 个 RT SPIR-V stage/ABI 与真实 Slang 输运、混合 mask queue fixture 验证通过。CPU fixture 不验证 GPU 原子并发。

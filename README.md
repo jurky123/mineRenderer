@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.32**：补齐快照完整装入校验、按 bounce 的 HYBRID A/B、OMM 区域失效与索引重建、GPU 预热稳定检查和驱动统计缺失诊断。自动 A/B 使用无计数器帧计算耗时，整轮固定静态地形并保留动态模型/光照。保留 Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.33**：修复原版 atlas 动画 render pass 导致静态 OMM coverage 全部失效的问题。补齐快照完整装入校验、按 bounce 的 HYBRID A/B、OMM 区域失效与索引重建、GPU 预热稳定检查和驱动统计缺失诊断。自动 A/B 使用无计数器帧计算耗时，整轮固定静态地形并保留动态模型/光照。保留 Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
 
-[下载 alpha.32 安装包](https://temp.sh/xODGb/voxellight-client-kit-26.2-0.39.0-alpha.32.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.33 安装包](https://temp.sh/KxDrG/voxellight-client-kit-26.2-0.39.0-alpha.33.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -46,7 +46,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.21。
 
-本轮验证：306 项 Java 测试通过；24 个 RT SPIR-V stage 验证与 Minecraft GLSL 链接通过；实际 Slang 材质/地形/环境输运、数值边界与光源采样通过，RIS 200,000 次采样的含遮挡 RGB 能量误差低于 0.8%。Windows/Linux 独立去噪桥接已构建，但 NVIDIA GPU 运行验收尚未完成。
+本轮验证：309 项 Java 测试通过；24 个 RT SPIR-V stage 验证与 Minecraft GLSL 链接通过；实际 Slang 材质/地形/环境输运、数值边界与光源采样通过，RIS 200,000 次采样的含遮挡 RGB 能量误差低于 0.8%。Windows/Linux 独立去噪桥接已构建，但 NVIDIA GPU 运行验收尚未完成。
 
 手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。
 

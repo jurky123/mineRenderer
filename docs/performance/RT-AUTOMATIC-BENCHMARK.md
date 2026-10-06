@@ -1,4 +1,4 @@
-# 自动 Vulkan PT 执行层 A/B 测试（alpha.32）
+# 自动 Vulkan PT 执行层 A/B 测试（alpha.33）
 
 进入已正常运行的 Vulkan PT 世界，等区块加载稳定，站定并关闭菜单，执行：
 
@@ -77,3 +77,9 @@ Compact 队列从每存活路径 Add(count)+Max(width) 改为单次 Add(width)�
 OMM 的 atlas 更新按区域失效：受影响静态 alpha 转为 unknown，其他区域继续保守分类；动画区域已经 unknown 的写入不会复制整个 opacity 网格。opacity epoch 改变时重新分类驻留 CUTOUT，只用所保留的原始 section 重建索引实际变化的 OMM BLAS，避免复用过期的 opaque/transparent 索引。stats 同时记录 `knownOpacityTexels` 和 opaque/transparent/unknown 三类 OMM 三角形数量；静态已知 texel 为零时明确视为 coverage 不可用。当前仍是保守 triangle special-index OMM，混合 alpha 仍走精确 any-hit；高细分 micromap 烘焙尚未实现。
 
 本机没有 NVIDIA GPU。GPU warmup 与重复段漂移拒绝用于提高测试可信度，不能隔离世界光照/动态变化，也不能替代画面、寄存器 spill、L1/L2 流量和 GPU 并发验收。执行层能否冻结仍需新版 RTX 结果。
+
+## alpha.33 动画 atlas 合同
+
+26.2 原版 atlas 动画通过 `uploadAnimationFrames` 的 render pass 绘制动画 sprite。此精确调用作用域只更新预分类 unknown 的动画区域，保留其他静态覆盖；其他 render target 写入继续保守失效，并使用 attachment view 的实际 mip。纹理版本仍递增，Vulkan albedo 更新保持正常。测试包含实际原版方法的 bytecode 合同和异常恢复；第三方直接底层写入仍不在此合同内，兼容场景保持 OMM off。
+
+alpha.32 实测的各段工作集一致，但 OMM coverage 全零、SER 大幅漂移、编译统计驱动零 executable，不能据此冻结；详细记录见 [当前阶段](../CURRENT.md)。

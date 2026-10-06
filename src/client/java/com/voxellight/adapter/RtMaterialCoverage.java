@@ -8,6 +8,16 @@ public final class RtMaterialCoverage {
     private static volatile Grid grid;
     private static java.lang.ref.WeakReference<com.mojang.blaze3d.textures.GpuTexture> watched=new java.lang.ref.WeakReference<>(null);
     private static boolean opacityValid;private static long opacityEpoch,knownOpacityTexels;
+    private static final ThreadLocal<com.mojang.blaze3d.textures.GpuTexture> animationTarget=new ThreadLocal<>();
+    /** Vanilla atlas animation draws only preclassified unknown sprite regions; preserve static texels. */
+    public static void animationPass(com.mojang.blaze3d.textures.GpuTexture texture,Runnable draw){
+        var previous=animationTarget.get();animationTarget.set(texture);
+        try{draw.run();}finally{if(previous==null)animationTarget.remove();else animationTarget.set(previous);}
+    }
+    public static void rendered(com.mojang.blaze3d.textures.GpuTextureView view){
+        if(animationTarget.get()==view.texture())return;
+        int mip=view.baseMipLevel();written(view.texture(),mip,0,0,view.getWidth(0),view.getHeight(0));
+    }
     public static long knownOpacityTexels(){return knownOpacityTexels;}
     public static long opacityEpoch(){return opacityEpoch;}
     public static boolean opacityValid(){return opacityValid;}

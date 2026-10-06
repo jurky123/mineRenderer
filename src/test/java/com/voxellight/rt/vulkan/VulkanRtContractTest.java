@@ -9,6 +9,15 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void vanillaAtlasAnimationUploadDrawsOnlyAnimatedSpritesWithoutClearingTheAtlas()throws Exception{
+        var atlas=new ClassNode();new ClassReader("net.minecraft.client.renderer.texture.TextureAtlas").accept(atlas,0);
+        var upload=atlas.methods.stream().filter(m->m.name.equals("uploadAnimationFrames")).findFirst().orElseThrow();
+        var calls=Arrays.stream(upload.instructions.toArray()).filter(i->i instanceof MethodInsnNode).map(i->(MethodInsnNode)i).toList();
+        assertTrue(calls.stream().anyMatch(c->c.owner.equals("net/minecraft/client/renderer/texture/SpriteContents$AnimationState")&&c.name.equals("drawToAtlas")));
+        assertTrue(calls.stream().anyMatch(c->c.name.equals("createRenderPass")));
+        assertFalse(calls.stream().anyMatch(c->c.name.startsWith("clear")||c.name.equals("writeToTexture")||c.name.equals("copyTextureToTexture")));
+        assertTrue(calls.stream().anyMatch(c->c.owner.equals("java/util/Optional")&&c.name.equals("empty")),"Native animation pass retains existing static atlas pixels");
+    }
     @Test void multiGeometryRefitSignatureIncludesPerRangeCountsFlagsAndLayout(){
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()){
             var g=org.lwjgl.vulkan.VkAccelerationStructureGeometryKHR.calloc(3,stack);
