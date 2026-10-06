@@ -47,3 +47,7 @@ Alpha.20：近 16 个火把/灯笼仍在本地提案表，但只连接最近两�
 动态 RT 采用原生实体、方块实体、手持物/手臂、custom quad 和 quad particle 捕获；共用 primary/indirect 场景并参与照明、遮挡与反射。当前动态模型用原生 albedo/tint 与漫反射，粒子使用 cutout，尚未迁移 glint、透明/加法粒子混合或动态模型 LabPBR 法线/金属材质。捕获、纹理 atlas、几何均有预算，溢出模型会跳过。
 
 场景使用 256 MiB 压缩 CPU backing cache、64 MiB GPU 地形/动态 working set。每八帧稀疏 miss feedback 请求 section，最多 16 个 ray-priority 页可以进入满场景；未由服务器加载的区块仍不能凭空重建。stats 显示 backing pages/bytes、命中/淘汰计数、miss 请求和动态模型数。
+
+alpha.21：PT 模式旁路光栅效果和材质捕获；动态纹理按稳定分组、同拓扑 BLAS refit、局部几何复制；稳定中心射线 guide 和单次 guide MRT；只执行选中的去噪后端，OptiX 只处理实际使用的 beauty 层。动态物体暂时拒绝历史，真实物体运动向量和 NRD/DLSS 尚未接入。
+
+性能验收请先用 `rt_spp 1`、`rt_scale 0`，保持窗口大小一致，执行 `/voxellight profile on`，等待地形稳定后静止和移动各测试约 20 秒，再 `/voxellight export`。数据位于 `benchmark-results/voxellight/`，关注 `.passes.csv` 和同名 `.txt` 中的实际内部分辨率、动态分组/refit 与复制字节数。切换 `rt_reconstruction vulkan` 可比较纯 Vulkan 后端。要评估清晰度，可另测 `rt_scale 2`，其像素数增加，不能与 scale 0 的性能直接比较。

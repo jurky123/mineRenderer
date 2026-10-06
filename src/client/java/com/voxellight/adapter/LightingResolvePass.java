@@ -28,6 +28,7 @@ final class LightingResolvePass implements AutoCloseable {
     boolean replacesClouds(){return weather.replacesClouds();}
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final VulkanPathTracer vulkanRt=new VulkanPathTracer();
+    boolean rtActive(){return vulkanRt.active();}
     void setVulkanMaterials(){vulkanRt.enableMaterials();}
     void setVulkanTransportTest(){vulkanRt.enableTransport();}
     void setVulkanRtPoc(){vulkanRt.enable(true);}
@@ -57,6 +58,7 @@ final class LightingResolvePass implements AutoCloseable {
     void setPbrDebug(int value){pbrDebug=value;}
 
     boolean prepare(RenderTarget target) {
+        if(rtActive())return true;
         if (LightingEnvironment.targetBytes(target.width,target.height) > LightingEnvironment.TARGET_LIMIT
                 || RenderSystem.getShaderFog() == null) { close(); return false; }
         var device = RenderSystem.getDevice();
@@ -74,6 +76,7 @@ final class LightingResolvePass implements AutoCloseable {
         return true;
     }
     void render(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows,GpuSampler terrainSampler) {
+        if(rtActive()){weather.prepare(encoder,true);return;}
         material.capture(encoder,terrainSampler);
         if(composite.polished()&&!ao.debug()&&pbrDebug==0&&(composite.needsMotion()||surfaces.needsMotion()))motion.prepare(encoder,output,material,actualProjection,projectionObserved);else motion.close();
         waterMask.render(encoder,output,material,composite.polished()&&weather.caustics()&&!ao.debug());
@@ -114,12 +117,12 @@ final class LightingResolvePass implements AutoCloseable {
     void setVolumeTemporal(boolean value){composite.setVolumeTemporal(value);}
     void setVolumeFilter(boolean value){composite.setVolumeFilter(value);}
     void setQuality(com.voxellight.world.VisualQuality value){composite.setQuality(value);surfaces.setQuality(value);}
-    void prepareWater(RenderTarget target,ShadowRenderer shadows){composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
-    boolean bindWater(RenderPass pass){return composite.bindWater(pass);}
+    void prepareWater(RenderTarget target,ShadowRenderer shadows){if(rtActive())return;composite.usePyramid(surfaces.pyramid());composite.prepareWater(target,shadows,environment,ao,weather);}
+    boolean bindWater(RenderPass pass){return !rtActive()&&composite.bindWater(pass);}
     void setTemporal(boolean enabled){temporal.setEnabled(enabled);}
     void invalidateHistory(){temporal.invalidate();}
     void renderCaptured(CommandEncoder encoder,RenderTarget output,MaterialCapture material,ShadowRenderer shadows) {
-        if(vulkanRt.enabled())return;
+        if(rtActive())return;
         renderCurrent(encoder,output,material,shadows,false);
         var result=hdrView;
         composite.render(encoder,output,material,shadows,result,environment,ao,false,weather,motion);

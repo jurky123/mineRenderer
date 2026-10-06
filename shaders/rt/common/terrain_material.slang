@@ -20,7 +20,7 @@ uint paletteWord(uint id,uint plane) { return assets.Load(assets.Load(56)+((id&6
 float linearChannel(float s){return s<=.04045?s/12.92:pow((s+.055)/1.055,2.4);}
 float3 linearRgb(uint value){float3 s=float3(value&255,(value>>8)&255,(value>>16)&255)/255.0;return float3(linearChannel(s.x),linearChannel(s.y),linearChannel(s.z));}
 float2 terrainUv(TerrainVertex a,TerrainVertex b,TerrainVertex c,float2 bary){return a.uv*(1-bary.x-bary.y)+b.uv*bary.x+c.uv*bary.y;}
-uint dynamicTexel(uint flags,float2 uv){uint slot=flags>>20,dimension=assets.Load(204);uint2 pixel=min(uint2(saturate(uv)*128),uint2(127));pixel+=uint2(slot%16,slot/16)*128;return assets.Load(assets.Load(200)+(pixel.y*dimension+pixel.x)*4);}
+uint dynamicTexel(uint flags,float2 uv){uint slot=flags>>20,dimension=assets.Load(204);uint2 pixel=min(uint2(saturate(uv)*dimension),uint2(dimension-1));return assets.Load(assets.Load(200)+(slot*dimension*dimension+pixel.y*dimension+pixel.x)*4);}
  bool visibleTexel(uint triangle,float2 bary) {
     TerrainVertex a=terrainVertex(triangle,0);
     if((a.flags&1)==0)return true;

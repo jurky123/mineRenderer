@@ -43,6 +43,16 @@ def main():
     executable=output/'numerical_edges'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_numerical_edges.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    guides=(ROOT/'src/main/resources/assets/voxellight/shaders/rt_denoiser_guides.fsh').read_text()
+    reconstruction=(ROOT/'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh').read_text()
+    functions=guides[guides.index('vec2 rtFlow'):guides.index('void main()')]
+    assert functions==reconstruction[reconstruction.index('vec2 rtFlow'):reconstruction.index('void main()')], 'reconstruction/OptiX guide validation drift'
+    for glsl,slang in [('vec2','float2'),('vec4','float4')]:functions=functions.replace(glsl,slang)
+    (output/'reconstruction_fixture_functions.slang').write_text(functions)
+    subprocess.run([compiler,str(ROOT/'shaders/rt/tests/reconstruction_fixture.slang'),'-I',str(output),'-target','cpp','-entry','reconstruction_fixture','-stage','compute','-o',str(output/'reconstruction_fixture.cpp')],check=True)
+    executable=output/'reconstruction_fixture'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_reconstruction_fixture.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     source=ROOT/'shaders/rt/tests/emitter_sampling.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','emitter_sampling','-stage','compute','-o',str(output/'emitter_sampling.cpp')],check=True)
     executable=output/'emitter_sampling'

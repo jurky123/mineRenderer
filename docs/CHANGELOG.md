@@ -1,3 +1,17 @@
+# 0.39.0-alpha.21 — remove redundant work and stabilize reconstruction
+
+PT bypasses raster material/entity captures, cascade shadow preparation, AO, water reflection, volumetric and raster composites; world light parameters, native PBR assets and HDR sky remain prepared. Vanilla rendering remains available during RT warmup/failure. OptiX and Vulkan reconstruction are mutually exclusive per frame; the temporal AOV model now denoises only the beauty layer that is actually displayed. External staging is six float4 planes rather than twelve, and only one previous output plane is retained.
+
+Dynamic native quads are grouped by stable texture slot and hand/world category. Same-count dynamic geometry uses out-of-place BLAS UPDATE from an ALLOW_UPDATE build; topology/count changes build a replacement. Packed shader geometry/normal buffers persist, copying only changed or relocated sections. Queue barriers preserve previous-frame shader reads before buffer overwrites. Texture uploads copy only active 128² tiles directly into packed asset cells, avoiding a full 2048² atlas copy. Stats expose `rtDynamicGroups`, `blasRefits`, `geometryCopyBytes` and `rtDynamicTextureCopyBytes`. This is grouping/refit, not per-object transform-only instancing; animated CPU extraction and TLAS rebuilding remain.
+
+Realtime guides use one stable pixel-center visibility ray independent of noisy sample jitter. That extra ray is disabled in reference mode. Camera-space normal, previous-to-current pixel flow and confidence are produced in one three-target pass. Reprojection validates surface-plane distance and pixel footprint, materials and albedo; sky history follows rotation. Dynamic objects conservatively reject history until true object motion is available. Specular/transmission motion, temporal upscaling and NRD/DLSS integration remain pending; low internal resolution is still visible after denoising.
+
+`profile on` now records primary, bounces 1–5 and sample resolve directly inside the same Vulkan command buffer, plus geometry copying, dynamic capture, guide conversion and OptiX exchange. No added RT dispatch/submission is needed for timestamps. Export `.passes.csv` after a fixed-resolution run; the OptiX exchange timing includes the external wait, not a pure CUDA kernel-only measurement.
+
+Validation includes actual GLSL-to-Slang CPU fixtures for pixel flow direction, surface-footprint acceptance, plane/disocclusion rejection, dynamic rejection, normal/material/albedo validation and sky rotation, plus actual Minecraft MRT output-order validation and existing transport tests. Driver-level BLAS refit, native synchronization, visual quality and performance remain RTX acceptance gates; the build host has no NVIDIA GPU.
+
+References: [Vulkan AS update constraints](https://docs.vulkan.org/spec/latest/chapters/accelstructures.html), [OptiX denoiser layer contract](https://raytracing-docs.nvidia.com/optix8/api/optix__host_8h.html). No driver performance gain is claimed from CPU tests.
+
 # 0.39.0-alpha.20 — realtime reconstruction and batched Vulkan transport
 
 Vulkan retains all tracing. The independent OptiX Temporal AOV helper consumes GPU beauty/albedo/camera-normal/flow/trust and diffuse/reflection/refraction inputs through external memory and binary semaphores; failure retains Vulkan temporal/spatial filtering. Moving-camera history validates RT positions, normals, materials and light changes. Reference progressive accumulation is separate (`rt_mode reference`), with explicit freeze.

@@ -31,7 +31,9 @@ public final class VulkanRtScene implements AutoCloseable {
     public int emitterCount(){return emitterData.remaining()/64;}
     private long terrainGeneration;
     public long historyGeneration(){return terrainGeneration;}
-    private long generation, builds, tlasBuilds, bytes;
+    private long generation, builds, refits,tlasBuilds, bytes,geometryCopyBytes;
+    private record Packed(long offset,long version){}
+    private final Map<SectionKey,Packed> packedGeometry=new HashMap<>();
     VulkanRtScene(VulkanDevice device,int scratchAlignment) {this(device,scratchAlignment,false);}
     VulkanRtScene(VulkanDevice device,int scratchAlignment,boolean material) { this.device=device;this.scratchAlignment=scratchAlignment;this.material=material; }
     public Set<SectionKey> resident() { var keys=new HashSet<>(sections.keySet());keys.removeIf(VulkanRtScene::dynamic);return Set.copyOf(keys); }
@@ -39,9 +41,9 @@ public final class VulkanRtScene implements AutoCloseable {
     long tlas() { return tlas==null?0:tlas.handle(); }
     VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", geometryCopyBytes="+geometryCopyBytes+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
     public void update(com.mojang.blaze3d.systems.CommandEncoder profileEncoder,List<RtGeometryStream.Section> changes,double x,double y,double z) {
-        boolean dirty=false;
+        geometryCopyBytes=0;boolean dirty=false;
         var encoder=device.createCommandEncoder();
         var iterator=sections.entrySet().iterator();
         while(iterator.hasNext()) {
@@ -91,45 +93,54 @@ public final class VulkanRtScene implements AutoCloseable {
             }
             var command=encoder.allocateAndBeginTransientCommandBuffer();
             try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_blas");var stack=MemoryStack.stackPush()) {
-                barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
+                barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT|VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
                 for(var change:accepted) {
                     var buffer=uploads.remove(change.key());
                     try(var sectionStack=MemoryStack.stackPush()) {
                         var geometry=VulkanRtAccel.triangles(sectionStack,buffer,change.vertices());
                         if(material)geometry.get(0).flags(0); // Let any-hit reject cutout texels.
-                        var blas=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,geometry,change.vertices()/3,scratchAlignment);
+                        var old=sections.get(change.key());
+                        boolean canRefit=dynamic(change.key())&&old!=null&&old.vertices.size()==buffer.size();
+                        var blas=VulkanRtAccel.build(device,command,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,geometry,change.vertices()/3,scratchAlignment,dynamic(change.key()),canRefit?old.blas:null);
+                        if(canRefit)refits++;else builds++;
                         var source=ByteBuffer.wrap(change.triangles()).order(ByteOrder.nativeOrder());
                         var normals=ByteBuffer.allocate(change.vertices()/3*16).order(ByteOrder.nativeOrder());
                         for(int triangle=0;triangle<change.vertices()/3;triangle++)normals.putFloat(source.getFloat(triangle*120+20)).putFloat(source.getFloat(triangle*120+24)).putFloat(source.getFloat(triangle*120+28)).putFloat(0);
                         var previous=sections.put(change.key(),new Section(change.version(),buffer,blas,normals.array(),material&&!dynamic(change.key())?com.voxellight.rt.RtEmitterTable.extract(change.triangles()):List.of()));
-                        bytes+=buffer.size();if(previous!=null)release(previous);builds++;
+                        bytes+=buffer.size();if(previous!=null)release(previous);
                     } catch(RuntimeException error) { buffer.close();throw error; }
                 }
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
             }
-            try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_tlas")){rebuildTlas(x,y,z);}generation++;if(terrainDirty)terrainGeneration++;
+            try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_tlas")){rebuildTlas(profileEncoder,x,y,z);}generation++;if(terrainDirty)terrainGeneration++;
         } finally { uploads.values().forEach(VulkanRtBuffer::close); }
     }
-    private void rebuildTlas(double x,double y,double z) {
+    private void rebuildTlas(com.mojang.blaze3d.systems.CommandEncoder profileEncoder,double x,double y,double z) {
         if(tlas!=null) {tlas.close();tlas=null;}
-        if(normalBuffer!=null) {normalBuffer.close();normalBuffer=null;}
-        if(geometryBuffer!=null){geometryBuffer.close();geometryBuffer=null;}
         emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);
-        if(sections.isEmpty())return;
+        if(sections.isEmpty()){packedGeometry.clear();return;}
         int triangles=sections.values().stream().mapToInt(section->section.normals.length/16).sum();
         if(triangles>=0x1000000)throw new IllegalStateException("RT instance normal base exceeds 24 bits");
-        var data=ByteBuffer.allocateDirect(triangles*16);
-        sections.values().forEach(section->data.put(section.normals));data.flip();
-        normalBuffer=new VulkanRtBuffer(device,data.remaining(),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        var encoder=device.createCommandEncoder();encoder.writeToBuffer(normalBuffer.slice(),data);
-        if(material) {
-            geometryBuffer=new VulkanRtBuffer(device,bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-            long offset=0;
-            // Same LinkedHashMap order as InstanceCustomIndex and normal bases; GPU-to-GPU only.
-            for(var section:sections.values()) {
-                encoder.copyToBuffer(section.vertices.slice(),geometryBuffer.slice(offset,section.vertices.size()));
-                offset+=section.vertices.size();
+        var encoder=device.createCommandEncoder();
+        if(normalBuffer==null)normalBuffer=new VulkanRtBuffer(device,(64L*1024*1024/120)*16,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        if(material&&geometryBuffer==null)geometryBuffer=new VulkanRtBuffer(device,64L*1024*1024,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        try(var profile=com.voxellight.adapter.RenderPassProfile.begin(profileEncoder,"vulkan_rt_geometry_copy")){
+            try(var stack=MemoryStack.stackPush()){
+                var command=encoder.allocateAndBeginTransientCommandBuffer();
+                barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT);
+                VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
             }
+            long offset=0,normalOffset=0;var next=new HashMap<SectionKey,Packed>();
+            for(var entry:sections.entrySet()){
+                var section=entry.getValue();var old=packedGeometry.get(entry.getKey());
+                if(old==null||old.offset!=offset||old.version!=section.version){
+                    if(material)encoder.copyToBuffer(section.vertices.slice(),geometryBuffer.slice(offset,section.vertices.size()));
+                    encoder.writeToBuffer(normalBuffer.slice(normalOffset,section.normals.length),ByteBuffer.allocateDirect(section.normals.length).put(section.normals).flip());
+                    geometryCopyBytes+=section.vertices.size();
+                }
+                next.put(entry.getKey(),new Packed(offset,section.version));offset+=section.vertices.size();normalOffset+=section.normals.length;
+            }
+            packedGeometry.clear();packedGeometry.putAll(next);
         }
         var instances=new VulkanRtBuffer(device,(long)sections.size()*VkAccelerationStructureInstanceKHR.SIZEOF,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
         try(var packed=allocateInstances(sections.size());var stack=MemoryStack.stackPush()) {
@@ -186,5 +197,5 @@ public final class VulkanRtScene implements AutoCloseable {
     }
     private static boolean admitted(SectionKey key,double x,double y,double z) {return dynamic(key)||Math.abs(key.x()*16.+8-x)<=512&&Math.abs(key.y()*16.+8-y)<=512&&Math.abs(key.z()*16.+8-z)<=512;}
     private void release(Section section) {bytes-=section.vertices.size();section.blas.close();section.vertices.close();}
-    @Override public void close() { sections.values().forEach(this::release);sections.clear();requestedPages.clear();emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++;terrainGeneration++; }
+    @Override public void close() { sections.values().forEach(this::release);sections.clear();packedGeometry.clear();requestedPages.clear();emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);if(tlas!=null)tlas.close();if(normalBuffer!=null)normalBuffer.close();if(geometryBuffer!=null)geometryBuffer.close();geometryBuffer=null;tlas=null;normalBuffer=null;generation++;terrainGeneration++; }
 }

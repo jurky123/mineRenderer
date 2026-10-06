@@ -77,6 +77,11 @@ final class ArtificialLights implements AutoCloseable {
     }
 
     float[] rtVirtualLight(){var held=heldLight();if(held==null)return new float[8];float intensity=com.voxellight.world.HeldLightIntensity.intensity(held.emission(),held.flame());return new float[]{(float)held.x(),(float)held.y(),(float)held.z(),1,held.color().red()*intensity,held.color().green()*intensity,held.color().blue()*intensity,0};}
+    void prepareRt(WorldSceneBridge bridge){
+        var stats=bridge.stats();
+        if(worldGeneration!=stats.worldGeneration()||resourceGeneration!=stats.resourceGeneration()){close();loadMaterials();}
+        worldGeneration=stats.worldGeneration();resourceGeneration=stats.resourceGeneration();
+    }
     void prepare(WorldSceneBridge bridge, SectionKey camera) {
         long start = System.nanoTime();
         var stats = bridge.stats();

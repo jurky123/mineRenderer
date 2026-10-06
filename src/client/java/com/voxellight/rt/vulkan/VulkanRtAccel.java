@@ -32,16 +32,21 @@ public final class VulkanRtAccel implements AutoCloseable, Destroyable {
             .mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR).geometryCount(geometry.remaining()).pGeometries(geometry);
     }
     static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,int scratchAlignment) {
+        return build(device,command,type,geometry,primitives,scratchAlignment,false,null);
+    }
+    static VulkanRtAccel build(VulkanDevice device,VkCommandBuffer command,int type,VkAccelerationStructureGeometryKHR.Buffer geometry,int primitives,int scratchAlignment,boolean dynamic,VulkanRtAccel previous) {
         try(var stack=MemoryStack.stackPush()) {
             var info=VkAccelerationStructureBuildGeometryInfoKHR.calloc(1,stack);
             buildInfo(info.get(0),type,geometry);
+            if(dynamic)info.get(0).flags(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR|VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
             var sizes=VkAccelerationStructureBuildSizesInfoKHR.calloc(stack).sType$Default();
             vkGetAccelerationStructureBuildSizesKHR(device.vkDevice(),VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,info.get(0),stack.ints(primitives),sizes);
             var result=new VulkanRtAccel(device,type,sizes.accelerationStructureSize());
             VulkanRtBuffer scratch=null;
             try {
-                scratch=new VulkanRtBuffer(device,sizes.buildScratchSize()+scratchAlignment,VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                scratch=new VulkanRtBuffer(device,(previous==null?sizes.buildScratchSize():sizes.updateScratchSize())+scratchAlignment,VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 info.get(0).dstAccelerationStructure(result.handle).scratchData().deviceAddress(VulkanSbt.align(scratch.address(),scratchAlignment));
+                if(previous!=null)info.get(0).mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR).srcAccelerationStructure(previous.handle);
                 var range=VkAccelerationStructureBuildRangeInfoKHR.calloc(1,stack).primitiveCount(primitives);
                 vkCmdBuildAccelerationStructuresKHR(command,info,stack.pointers(range.address()));
                 return result;

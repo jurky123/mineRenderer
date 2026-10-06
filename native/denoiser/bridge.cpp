@@ -58,7 +58,7 @@ void importMemory(Session& s,jlong handle,size_t size){CUDA_EXTERNAL_MEMORY_HAND
 #else
  if(result!=CUDA_SUCCESS)closeHandle(handle);
 #endif
- check(result);CUDA_EXTERNAL_MEMORY_BUFFER_DESC buffer{};buffer.size=s.plane*12;check(cuExternalMemoryGetMappedBuffer_fn(&s.mapped,s.memory,&buffer));
+ check(result);CUDA_EXTERNAL_MEMORY_BUFFER_DESC buffer{};buffer.size=s.plane*6;check(cuExternalMemoryGetMappedBuffer_fn(&s.mapped,s.memory,&buffer));
 }
 void importSemaphore(CUexternalSemaphore& semaphore,jlong handle){CUDA_EXTERNAL_SEMAPHORE_HANDLE_DESC desc{};
 #ifdef _WIN32
@@ -86,8 +86,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_com_voxellight_nvidia_OptixDenoiserNativ
   check(cuDevicePrimaryCtxRetain_fn(&session->context,device));Current current(session->context);check(cuStreamCreate_fn(&session->stream,CU_STREAM_NON_BLOCKING));check(optixInit());OptixDeviceContextOptions options{};check(optixDeviceContextCreate(session->context,&options,&session->optix));check(voxellight::createTemporalAov(session->optix,&session->denoiser));
   memoryUsed=true;importMemory(*session,memory,allocation);readyUsed=true;importSemaphore(session->ready,ready);doneUsed=true;importSemaphore(session->done,done);
   OptixDenoiserSizes sizes{};check(optixDenoiserComputeMemoryResources(session->denoiser,width,height,&sizes));session->stateBytes=sizes.stateSizeInBytes;session->scratchBytes=std::max(sizes.withoutOverlapScratchSizeInBytes,sizes.computeAverageColorSizeInBytes);session->guideBytes=size_t(width)*height*sizes.internalGuideLayerPixelSizeInBytes;
-  for(auto pair:{std::pair<CUdeviceptr*,size_t>{&session->state,session->stateBytes},{&session->scratch,session->scratchBytes},{&session->average,16},{&session->previous,session->plane*4},{&session->guide[0],session->guideBytes},{&session->guide[1],session->guideBytes}})check(cuMemAlloc_v2_fn(pair.first,pair.second));
-  check(cuMemsetD8Async_fn(session->previous,0,session->plane*4,session->stream));for(auto p:session->guide)check(cuMemsetD8Async_fn(p,0,session->guideBytes,session->stream));
+  for(auto pair:{std::pair<CUdeviceptr*,size_t>{&session->state,session->stateBytes},{&session->scratch,session->scratchBytes},{&session->average,16},{&session->previous,session->plane},{&session->guide[0],session->guideBytes},{&session->guide[1],session->guideBytes}})check(cuMemAlloc_v2_fn(pair.first,pair.second));
+  check(cuMemsetD8Async_fn(session->previous,0,session->plane,session->stream));for(auto p:session->guide)check(cuMemsetD8Async_fn(p,0,session->guideBytes,session->stream));
   check(optixDenoiserSetup(session->denoiser,session->stream,width,height,session->state,session->stateBytes,session->scratch,session->scratchBytes));check(cuStreamSynchronize_fn(session->stream));return reinterpret_cast<jlong>(session);
  }catch(const std::exception& error){delete session;if(!memoryUsed)closeHandle(memory);if(!readyUsed)closeHandle(ready);if(!doneUsed)closeHandle(done);fail(env,error);return 0;}
 }
@@ -96,10 +96,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_voxellight_nvidia_OptixDenoiserNative
  try{Current current(s.context);CUDA_EXTERNAL_SEMAPHORE_WAIT_PARAMS wait{};check(cuWaitExternalSemaphoresAsync_fn(&s.ready,&wait,1,s.stream));consumed=true;
   voxellight::TemporalAovFrame frame{};frame.albedo=s.image(s.mapped+s.plane);frame.normal=s.image(s.mapped+s.plane*2);frame.flow=s.image(s.mapped+s.plane*3,OPTIX_PIXEL_FORMAT_FLOAT2);frame.flowTrust=s.image(s.mapped+s.plane*4,OPTIX_PIXEL_FORMAT_FLOAT1);frame.previousValid=previousValid;
   frame.previousInternalGuide=s.image(s.guide[s.bank],OPTIX_PIXEL_FORMAT_INTERNAL_GUIDE_LAYER,unsigned(s.guideBytes/(s.width*s.height)));frame.outputInternalGuide=s.image(s.guide[1-s.bank],OPTIX_PIXEL_FORMAT_INTERNAL_GUIDE_LAYER,unsigned(s.guideBytes/(s.width*s.height)));
-  for(int i=0;i<4;i++){unsigned plane=i==0?0:4+i;frame.input[i]=s.image(s.mapped+s.plane*plane);frame.output[i]=s.image(s.mapped+s.plane*(8+i));frame.previousOutput[i]=s.image(s.previous+s.plane*i);}
+  for(int i=0;i<1;i++){unsigned plane=i==0?0:4+i;frame.input[i]=s.image(s.mapped+s.plane*plane);frame.output[i]=s.image(s.mapped+s.plane*(5+i));frame.previousOutput[i]=s.image(s.previous+s.plane*i);}
   auto beauty=frame.input[0];check(optixDenoiserComputeAverageColor(s.denoiser,s.stream,&beauty,s.average,s.scratch,s.scratchBytes));frame.averageColor=s.average;
   check(voxellight::denoiseTemporalAov(s.denoiser,s.stream,s.state,s.stateBytes,s.scratch,s.scratchBytes,frame));
-  check(cuMemcpyDtoDAsync_v2_fn(s.previous,s.mapped+s.plane*8,s.plane*4,s.stream));s.bank=1-s.bank;
+  check(cuMemcpyDtoDAsync_v2_fn(s.previous,s.mapped+s.plane*5,s.plane,s.stream));s.bank=1-s.bank;
   CUDA_EXTERNAL_SEMAPHORE_SIGNAL_PARAMS signal{};check(cuSignalExternalSemaphoresAsync_fn(&s.done,&signal,1,s.stream));signalled=true;
  }catch(const std::exception& error){if(consumed&&!signalled){try{Current current(s.context);CUDA_EXTERNAL_SEMAPHORE_SIGNAL_PARAMS signal{};check(cuSignalExternalSemaphoresAsync_fn(&s.done,&signal,1,s.stream));}catch(...){}}fail(env,error);}
 }

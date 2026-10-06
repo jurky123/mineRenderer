@@ -18,10 +18,12 @@ final class RtReconstruction implements AutoCloseable {
     private static final String[] INPUTS={"Noisy","Previous","Albedo","Normal","Position","PreviousAlbedo","PreviousNormal","PreviousPosition"};
     private static RenderPipeline pipeline(String shader){
         var bindings=BindGroupLayout.builder();for(String name:INPUTS)bindings.withSampler(name);
-        return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/"+shader))
+        var builder=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/"+shader))
             .withVertexShader(Identifier.fromNamespaceAndPath("voxellight","probe")).withFragmentShader(Identifier.fromNamespaceAndPath("voxellight",shader))
             .withBindGroupLayout(bindings.withUniform("ReconstructionSettings",UniformType.UNIFORM_BUFFER).build())
-            .withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withColorTargetState(new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL)).withCull(false).build();
+            .withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withColorTargetState(new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL)).withCull(false);
+        if(shader.equals("rt_denoiser_guides"))for(int i=1;i<3;i++)builder.withColorTargetState(i,new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL));
+        return builder.build();
     }
     private static final RenderPipeline PIPELINE=pipeline("rt_reconstruct");
     private static final RenderPipeline GUIDES=pipeline("rt_denoiser_guides");
@@ -68,12 +70,7 @@ final class RtReconstruction implements AutoCloseable {
         }
         int write=1-read;for(int plane=0;plane<3;plane++)context.copyGuide(encoder,plane,guides[write][plane]);
         var data=ByteBuffer.allocateDirect(160).order(ByteOrder.nativeOrder());previousClip.get(0,data);data.position(64).putFloat((float)previousX).putFloat((float)previousY).putFloat((float)previousZ).putFloat(valid&&generation==epoch?1:0).putFloat(w).putFloat(h).putFloat(reactive?4:32).putFloat(0);viewRotation.get(96,data);data.position(160).flip();encoder.writeToBuffer(settings.slice(),data);
-        try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_reconstruction");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight RT temporal reconstruction").withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(colorViews[write],Optional.empty()))){
-            pass.setPipeline(PIPELINE);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-            GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2]};
-            for(int i=0;i<inputs.length;i++)pass.bindTexture(INPUTS[i],inputs[i],sampler);pass.setUniform("ReconstructionSettings",settings);pass.draw(3,1,0,0);
-        }
-        GpuTextureView result=colorViews[write];
+        GpuTextureView result=null;
         if(useOptix&&optix==null&&!backend.startsWith("fallback")){
             try{
                 if(!device.precompilePipeline(GUIDES,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Denoiser guide pipeline unavailable");
@@ -84,16 +81,23 @@ final class RtReconstruction implements AutoCloseable {
             }catch(RuntimeException error){backend="fallback Vulkan temporal/spatial: "+error.getMessage();org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("OptiX reconstruction unavailable; Vulkan reconstruction retained",error);}
         }
         if(optix!=null){
-            for(int mode=0;mode<3;mode++){
-                data.putFloat(92,mode);encoder.writeToBuffer(settings.slice(),data);
-                try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight denoiser motion/normal/trust").withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(denoiserViews[mode],Optional.empty()))){
-                    pass.setPipeline(GUIDES);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-                    GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2]};
-                    for(int i=0;i<inputs.length;i++)pass.bindTexture(INPUTS[i],inputs[i],sampler);pass.setUniform("ReconstructionSettings",settings);pass.draw(3,1,0,0);
-                }
+            var descriptor=RenderPassDescriptor.create(()->"VoxelLight denoiser motion/normal/trust").withRenderArea(new RenderPass.RenderArea(0,0,w,h));
+            for(var guide:denoiserViews)descriptor.withColorAttachment(guide,Optional.empty());
+            try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_denoiser_guides");var pass=encoder.createRenderPass(descriptor)){
+                pass.setPipeline(GUIDES);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+                GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2]};
+                for(int i=0;i<inputs.length;i++)pass.bindTexture(INPUTS[i],inputs[i],sampler);pass.setUniform("ReconstructionSettings",settings);pass.draw(3,1,0,0);
             }
-            try{optix.resolve(encoder,context,denoiserGuides[0],denoiserGuides[1],denoiserGuides[2],denoised,valid&&generation==epoch);result=denoisedView;}
-            catch(RuntimeException error){optix.close();optix=null;backend="fallback Vulkan temporal/spatial: "+error.getMessage();valid=false;org.slf4j.LoggerFactory.getLogger("VoxelLight").error("OptiX denoiser failed; Vulkan reconstruction retained",error);}
+            try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_optix_exchange")){optix.resolve(encoder,context,denoiserGuides[0],denoiserGuides[1],denoiserGuides[2],denoised,valid&&generation==epoch);result=denoisedView;}
+            catch(RuntimeException error){optix.close();optix=null;backend="fallback Vulkan temporal/spatial: "+error.getMessage();valid=false;data.putFloat(76,0);encoder.writeToBuffer(settings.slice(),data);org.slf4j.LoggerFactory.getLogger("VoxelLight").error("OptiX denoiser failed; Vulkan reconstruction retained",error);}
+        }
+        if(result==null){
+        try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_reconstruction");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight RT temporal reconstruction").withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(colorViews[write],Optional.empty()))){
+            pass.setPipeline(PIPELINE);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+            GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2]};
+            for(int i=0;i<inputs.length;i++)pass.bindTexture(INPUTS[i],inputs[i],sampler);pass.setUniform("ReconstructionSettings",settings);pass.draw(3,1,0,0);
+        }
+            result=colorViews[write];
         }
         previousClip.set(clip);previousX=x;previousY=y;previousZ=z;generation=epoch;valid=true;read=write;return result;
     }

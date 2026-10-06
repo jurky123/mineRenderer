@@ -49,6 +49,14 @@ final class MaterialCapture implements AutoCloseable {
     private int width, height, draws;
     private String state = "waiting";
 
+    boolean prepareRt(){
+        var mc=Minecraft.getInstance();var scene=VoxelLightClient.scene();
+        if(mc.level==null||!scene.isEnabled())return false;
+        var stats=scene.bridge().stats();
+        if(world!=stats.worldGeneration()||resources!=stats.resourceGeneration())close();
+        world=stats.worldGeneration();resources=stats.resourceGeneration();pbr.prepare();
+        state="RT material atlases; raster capture bypassed";return true;
+    }
     boolean prepare(RenderTarget target) {
         var minecraft = Minecraft.getInstance(); var scene = VoxelLightClient.scene();
         if (!scene.isEnabled() || minecraft.level == null) { close(); state = "scene/world unavailable"; return false; }

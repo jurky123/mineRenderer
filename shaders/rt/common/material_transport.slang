@@ -140,17 +140,6 @@ void addRadiance(inout PathState path,float3 contribution,int directChannel=-1){
 }
 float4 pathOutput(PathState path){return float4(path.padding==0&&finiteEnergy(path.radiance.xyz)?path.radiance.xyz:float3(0),path.padding==0?1:0);}
 uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)||dielectric(m)?1:0);}
-void primaryGuide(PathState path,float3 point,Material m,float3 normal){
-#ifndef RT_CPU_FIXTURE
-    if(path.throughput.w==0&&DispatchRaysIndex().z==0){
-        uint pixels=camera.width*camera.height,index=DispatchRaysIndex().y*camera.width+DispatchRaysIndex().x;
-        uint base=pixels*max(1u,camera.padding)+4;
-        output[base+index]=float4(m.baseColor,m.type+1);
-        output[base+pixels+index]=float4(normal,m.microfacetAlpha);
-        output[base+pixels*2+index]=float4(point,length(point-camera.origin.xyz));
-    }
-#endif
-}
 void advance(inout PathState path) {
     if(path.origin.w==0||path.padding!=0)return;
     uint seed=asuint(path.radiance.w);MediumStack media=loadMedia(path);
@@ -191,7 +180,6 @@ void advance(inout PathState path) {
             float3 waterNormal=terrainWaterNormal(surface.frame.n,point,camera.origin.xyz,controls.x,controls.z,asfloat(assets.Load(80)),controls.y,controls.w);
             if(dot(waterNormal,surface.geometryNormal)>0)surface.frame=makeFrame(waterNormal,surface.frame.t,surface.frame.b);
         }
-        primaryGuide(path,point,m,surface.frame.n);
         float3 wo=-path.direction.xyz;float3 n=dot(surface.frame.n,wo)>0?surface.frame.n:-surface.frame.n;
         Frame frame=makeFrame(n,surface.frame.t,surface.frame.b);
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();

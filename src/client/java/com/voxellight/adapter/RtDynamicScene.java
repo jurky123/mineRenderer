@@ -22,13 +22,15 @@ final class RtDynamicScene implements AutoCloseable {
     private final DynamicModelBuffer particles=new DynamicModelBuffer("RT quad particles");
     private final DynamicModelBuffer hands=new DynamicModelBuffer("RT held models");
     private final BlockEntityShadows blocks=new BlockEntityShadows();
-    private GpuTexture atlas,cell;
+    private GpuTexture cell;
     private GpuTextureView cellView;
-    private GpuTextureView atlasView;
-    private int previousCount;
-    private long bytes;
+    private int previousCount,sourceModels;
+    private final LinkedHashMap<GpuTextureView,Integer> textureSlots=new LinkedHashMap<>();
+    private Set<SectionKey> previousKeys=Set.of();
+    private long bytes,textureCopyBytes;
     RtDynamicScene(){entities.rtCapture();blocks.rtCapture();}
     void prepare(CommandEncoder encoder,VulkanRtContext context,double x,double y,double z){
+        long captureStart=System.nanoTime();
         entities.prepare();blocks.prepare();hands.begin();var mc=net.minecraft.client.Minecraft.getInstance();
         if(mc.player!=null&&mc.options.getCameraType().isFirstPerson()&&!mc.player.isSpectator()&&!mc.player.isSleeping()&&!mc.gameRenderer.gameRenderState().guiRenderState.isHudHidden){
             var collection=new net.minecraft.client.renderer.SubmitNodeCollection(){
@@ -41,19 +43,37 @@ final class RtDynamicScene implements AutoCloseable {
             try{mc.gameRenderer.itemInHandRenderer.submitHandsWithItems(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false),pose,collector,mc.player,15728880);}catch(RuntimeException error){hands.begin();org.slf4j.LoggerFactory.getLogger("VoxelLight").debug("RT first-person model capture deferred",error);}
         }
         hands.finish();particles.begin();for(var group:mc.gameRenderer.gameRenderState().levelRenderState.particlesRenderState.particles)if(group instanceof net.minecraft.client.renderer.state.level.QuadParticleRenderState quad)particles.captureParticles(quad);particles.finish();var models=new ArrayList<DynamicModelBuffer.RtModel>();models.addAll(hands.rtModels());models.addAll(entities.rtModels());models.addAll(blocks.rtModels());models.addAll(particles.rtModels());
-        var textures=new LinkedHashMap<GpuTextureView,Integer>();var changes=new ArrayList<RtGeometryStream.Section>();int index=0;bytes=0;
-        if(atlas==null){var device=RenderSystem.getDevice();if(!device.precompilePipeline(COPY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Dynamic RT atlas unavailable");atlas=device.createTexture("VoxelLight RT dynamic textures",GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA8_UNORM,SIZE,SIZE,1,1);atlasView=device.createTextureView(atlas);cell=device.createTexture("VoxelLight dynamic RT texture resample",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA8_UNORM,CELL,CELL,1,1);cellView=device.createTextureView(cell);}
+        var textures=textureSlots;var groups=new LinkedHashMap<SectionKey,java.io.ByteArrayOutputStream>();var changes=new ArrayList<RtGeometryStream.Section>();bytes=0;sourceModels=models.size();
+        if(cell==null){var device=RenderSystem.getDevice();if(!device.precompilePipeline(COPY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Dynamic RT atlas unavailable");cell=device.createTexture("VoxelLight dynamic RT texture resample",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA8_UNORM,CELL,CELL,1,1);cellView=device.createTextureView(cell);}
+        int handModels=hands.rtModels().size(),modelIndex=0;
         for(var model:models){
+            boolean hand=modelIndex++<handModels;
             var texture=model.texture().textureView();if(!textures.containsKey(texture)&&textures.size()>=SLOTS)continue;
-            int slot=textures.computeIfAbsent(texture,ignored->textures.size());byte[] vertices=triangles(model.quads(),slot,x,y,z);bytes+=vertices.length;
-            if(bytes>8L*1024*1024)break;long hash=0xcbf29ce484222325L;for(byte b:vertices){hash^=b&255;hash*=0x100000001b3L;}
-            changes.add(new RtGeometryStream.Section(new SectionKey(index++,Integer.MIN_VALUE,0),hash,vertices));
+            int slot=textures.computeIfAbsent(texture,ignored->textures.size());byte[] vertices=triangles(model.quads(),slot,x,y,z);
+            if(bytes+vertices.length>8L*1024*1024)break;bytes+=vertices.length;
+            var key=new SectionKey(slot,Integer.MIN_VALUE,hand?1:0);
+            groups.computeIfAbsent(key,ignored->new java.io.ByteArrayOutputStream()).writeBytes(vertices);
         }
-        for(int i=index;i<previousCount;i++)changes.add(new RtGeometryStream.Section(new SectionKey(i,Integer.MIN_VALUE,0),0,new byte[0]));previousCount=index;
+        for(var entry:groups.entrySet()){
+            byte[] vertices=entry.getValue().toByteArray();long hash=0xcbf29ce484222325L;
+            for(byte b:vertices){hash^=b&255;hash*=0x100000001b3L;}
+            changes.add(new RtGeometryStream.Section(entry.getKey(),hash,vertices));
+        }
+        for(var key:previousKeys)if(!groups.containsKey(key))changes.add(new RtGeometryStream.Section(key,0,new byte[0]));
+        previousKeys=Set.copyOf(groups.keySet());previousCount=groups.size();
+        RenderPassProfile.cpu("vulkan_rt_dynamic_capture",System.nanoTime()-captureStart);
         context.prepareScene(encoder,changes,x,y,z);
-        for(var entry:textures.entrySet()){try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight dynamic RT texture copy").withRenderArea(new RenderPass.RenderArea(0,0,CELL,CELL)).withColorAttachment(cellView,Optional.empty()))){
-            pass.setPipeline(COPY);pass.bindTexture("Sampler0",entry.getKey(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
-        }encoder.copyTextureToTexture(cell,atlas,0,entry.getValue()%16*CELL,entry.getValue()/16*CELL,0,0,CELL,CELL);
+    }
+    void uploadTextures(CommandEncoder encoder,com.voxellight.rt.vulkan.VulkanRtBuffer assets,long offset){
+        textureCopyBytes=0;if(cell==null)return;
+        var activeSlots=new HashSet<Integer>();for(var key:previousKeys)activeSlots.add(key.x());
+        try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_dynamic_textures")){
+            for(var entry:textureSlots.entrySet())if(activeSlots.contains(entry.getValue())){
+                try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight dynamic RT texture copy").withRenderArea(new RenderPass.RenderArea(0,0,CELL,CELL)).withColorAttachment(cellView,Optional.empty()))){
+                    pass.setPipeline(COPY);pass.bindTexture("Sampler0",entry.getKey(),RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
+                }
+                long size=(long)CELL*CELL*4;encoder.copyTextureToBuffer(cell,assets,offset+entry.getValue()*size,()->{},0);textureCopyBytes+=size;
+            }
         }
     }
     static byte[] triangles(byte[] quads,int slot,double x,double y,double z){
@@ -67,7 +87,6 @@ final class RtDynamicScene implements AutoCloseable {
         return output.array();
     }
     boolean hasHands(){return !hands.rtModels().isEmpty();}
-    GpuTexture atlas(){return atlas;}
-    String status(){return ", rtDynamicModels="+previousCount+", rtDynamicBytes="+bytes+", rtDynamicCoverage=entity+block_entity+held+custom+cutout_quad_particles";}
-    public void close(){entities.close();blocks.close();hands.close();particles.close();if(cellView!=null)cellView.close();if(cell!=null)cell.close();cellView=null;cell=null;if(atlasView!=null)atlasView.close();if(atlas!=null)atlas.close();atlasView=null;atlas=null;previousCount=0;bytes=0;}
+    String status(){return ", rtDynamicModels="+sourceModels+", rtDynamicGroups="+previousCount+", rtDynamicBytes="+bytes+", rtDynamicTextureCopyBytes="+textureCopyBytes+", rtDynamicCoverage=entity+block_entity+held+custom+cutout_quad_particles";}
+    public void close(){entities.close();blocks.close();hands.close();particles.close();if(cellView!=null)cellView.close();if(cell!=null)cell.close();cellView=null;cell=null;previousCount=sourceModels=0;bytes=textureCopyBytes=0;previousKeys=Set.of();textureSlots.clear();}
 }

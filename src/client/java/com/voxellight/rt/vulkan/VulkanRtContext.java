@@ -29,7 +29,8 @@ public final class VulkanRtContext implements AutoCloseable {
     public long maxPixels(int spp){return Math.min(maxStorageRange/(material?432:spp*64),1024L*1024*1024/(spp*(material?432:64)));}
     private int frame;
     private int width,height,samples=1;
-    private boolean closed;
+    private boolean closed,reconstructionGuides=true;
+    public void reconstructionGuides(boolean value){reconstructionGuides=value;}
     private final String optionalCapabilities;
     public VulkanRtContext(VulkanDevice device) {this(device,false);}
     public VulkanRtContext(VulkanDevice device,boolean transport) {this(device,transport,false);}
@@ -80,22 +81,23 @@ public final class VulkanRtContext implements AutoCloseable {
         }
         {
             var data=ByteBuffer.allocateDirect(96).order(ByteOrder.nativeOrder());inverseClip.get(0,data);
-            data.position(64).putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat(1).putInt(width).putInt(height).putInt(transport?frame++:0).putInt(spp).flip();
+            data.position(64).putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat(material&&!reconstructionGuides?0:1).putInt(width).putInt(height).putInt(transport?frame++:0).putInt(spp).flip();
             encoder.writeToBuffer(camera.slice(),data);
             if(material)encoder.writeToBuffer(feedback.slice(0,16),ByteBuffer.allocateDirect(16));
             var nativeEncoder=device.createCommandEncoder();
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_batch");var stack=MemoryStack.stackPush()) {
                 var command=nativeEncoder.allocateAndBeginTransientCommandBuffer();
                 VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_TRANSFER_READ_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_UNIFORM_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
-                pipeline.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks);pipeline.dispatch(command,width,height,spp);
+                pipeline.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks);
+                try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_primary")){pipeline.dispatch(command,width,height,spp);}
                 if(transport){
                     indirect.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks);
                     for(int bounce=1;bounce<6;bounce++){
                         VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
-                        indirect.dispatch(command,width,height,spp);
+                        try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_bounce_"+bounce)){indirect.dispatch(command,width,height,spp);}
                     }
                     VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
-                    resolve.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks);resolve.dispatch(command,width,height,1);
+                    resolve.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks);try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_sample_resolve")){resolve.dispatch(command,width,height,1);}
                 }
                 VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_READ_BIT);
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));nativeEncoder.execute(command);

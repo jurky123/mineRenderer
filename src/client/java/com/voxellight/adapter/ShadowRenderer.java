@@ -135,6 +135,13 @@ public final class ShadowRenderer implements AutoCloseable {
     private String state = "off";
 
     /** Render current casters while missing sections rebuild; missing geometry cannot invalidate known occlusion. */
+    boolean prepareRt(){
+        var mc=Minecraft.getInstance();var scene=VoxelLightClient.scene();
+        if(mc.level==null||!scene.isEnabled())return false;
+        var sky=mc.gameRenderer.gameRenderState().levelRenderState.skyRenderState;
+        frameLight=worldSun?(sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD?ShadowLight.world(sky.sunAngle,sky.moonAngle,sky.rainBrightness,sky.moonPhase.index()):ShadowLight.none()):ShadowLight.fixed();
+        artificial.prepareRt(scene.bridge());state="RT light parameters; raster shadow passes bypassed";return true;
+    }
     public boolean prepare() {
         var minecraft = Minecraft.getInstance();
         var scene = VoxelLightClient.scene();

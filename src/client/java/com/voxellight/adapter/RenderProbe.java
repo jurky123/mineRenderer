@@ -182,7 +182,7 @@ public final class RenderProbe {
     }
 
     public void beginEntityMaterialFrame() {
-        entityCaptureScope = mode.isMaterial() && "Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName());
+        entityCaptureScope = mode.isMaterial() && !(mode==Mode.FOUNDATION&&lighting.rtActive()) && "Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName());
         materialFrameReady = false;
         entityMaterialPass = entityCaptureScope ? "solid hook not observed" : "off";
         entityMaterials.begin();
@@ -237,6 +237,7 @@ public final class RenderProbe {
     public void setEnvironment(String option,boolean value){RenderSystem.assertOnRenderThread();lighting.setEnvironment(option,value);}
     public void setSingleRaster(boolean value){RenderSystem.assertOnRenderThread();material.setSingleRaster(value);}
     public boolean renderNativeOpaque(net.minecraft.client.renderer.chunk.ChunkSectionsToRender terrain,RenderTarget target,com.mojang.blaze3d.textures.GpuSampler sampler){
+        if(mode==Mode.FOUNDATION&&lighting.rtActive())return false;
         if(!mode.isMaterial() || !material.singleRaster() || !"Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()) || net.minecraft.client.Minecraft.getInstance().wireframe)return false;
         if(target.width<=0 || target.height<=0 || target.getColorTexture()==null || target.getDepthTextureView()==null || target.getColorTexture().getFormat()!=GpuFormat.RGBA8_UNORM)return false;
         try{
@@ -285,12 +286,12 @@ public final class RenderProbe {
 
         frame++;
         try {
-            if ((mode.isShadow() || mode == Mode.FOUNDATION) && !shadows.prepare()) {
+            if ((mode.isShadow() || mode == Mode.FOUNDATION) && !(mode==Mode.FOUNDATION&&lighting.rtActive()?shadows.prepareRt():shadows.prepare())) {
                 releaseScratch();
                 state = "shadow not ready; vanilla rendering retained";
                 return;
             }
-            if (mode.isMaterial() && !material.prepare(target)) {
+            if (mode.isMaterial() && !(mode==Mode.FOUNDATION&&lighting.rtActive()?material.prepareRt():material.prepare(target))) {
                 releaseScratch(); state = "material unavailable; vanilla retained"; return;
             }
             if (mode == Mode.FOUNDATION && !lighting.prepare(target)) {

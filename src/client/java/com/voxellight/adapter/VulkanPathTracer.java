@@ -53,6 +53,7 @@ final class VulkanPathTracer implements AutoCloseable {
     void enableTransport() { enable(true);transport=true; }
     void enableMaterials(){enableTransport();materials=true;}
     boolean enabled() {return enabled;}
+    boolean active(){return enabled&&!failed;}
     void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows) {
         displayedThisFrame=false;
         if(!enabled||failed)return;
@@ -94,9 +95,10 @@ final class VulkanPathTracer implements AutoCloseable {
                 com.voxellight.rt.vulkan.VulkanRtBuffer materialAssets=null;
                 // Live mode updates lights/animations every frame; explicit frozen mode snapshots them.
                 if(materials)try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_material_assets")){
-                    materialAssets=useHistory&&history.frozen()&&history.samples()>0?assets.buffer():assets.prepare(encoder,device,material,weather,shadows,context.scene,dynamic.atlas());
+                    materialAssets=useHistory&&history.frozen()&&history.samples()>0?assets.buffer():assets.prepare(encoder,device,material,weather,shadows,context.scene,dynamic);
                 }
                 if(materials&&materialAssets==null){state="waiting for Material 3 atlases";return;}
+                context.reconstructionGuides(materials&&realtime);
                 int budget=transport?samplesPerFrame:1;
                 if(useHistory&&history.frozen())budget=Math.min(budget,history.target()-history.samples());
                 if(!context.renderBatch(encoder,java.util.List.of(),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets,budget)){state="waiting for terrain BLAS";return;}

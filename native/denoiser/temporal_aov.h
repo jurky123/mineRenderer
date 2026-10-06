@@ -10,7 +10,7 @@ namespace voxellight {
 struct TemporalAovFrame {
     OptixImage2D albedo{},normal{},flow{},flowTrust{};
     OptixImage2D previousInternalGuide{},outputInternalGuide{};
-    std::array<OptixImage2D,4> input{},previousOutput{},output{};
+    std::array<OptixImage2D,1> input{},previousOutput{},output{};
     CUdeviceptr averageColor=0;
     bool previousValid=false;
 };
@@ -25,10 +25,10 @@ inline OptixResult denoiseTemporalAov(OptixDenoiser denoiser,CUstream stream,
     guides.flow=frame.flow;guides.flowTrustworthiness=frame.flowTrust;
     guides.previousOutputInternalGuideLayer=frame.previousInternalGuide;
     guides.outputInternalGuideLayer=frame.outputInternalGuide;
-    OptixDenoiserLayer layers[4]{};
-    OptixDenoiserAOVType types[4]={OPTIX_DENOISER_AOV_TYPE_BEAUTY,OPTIX_DENOISER_AOV_TYPE_DIFFUSE,OPTIX_DENOISER_AOV_TYPE_REFLECTION,OPTIX_DENOISER_AOV_TYPE_REFRACTION};
-    for(int i=0;i<4;i++){layers[i].input=frame.input[i];layers[i].previousOutput=frame.previousOutput[i];layers[i].output=frame.output[i];layers[i].type=types[i];}
+    OptixDenoiserLayer layers[1]{};
+    OptixDenoiserAOVType types[1]={OPTIX_DENOISER_AOV_TYPE_BEAUTY};
+    for(int i=0;i<1;i++){layers[i].input=frame.input[i];layers[i].previousOutput=frame.previousOutput[i];layers[i].output=frame.output[i];layers[i].type=types[i];}
     OptixDenoiserParams control{};control.temporalModeUsePreviousLayers=frame.previousValid;control.hdrAverageColor=frame.averageColor;
-    return optixDenoiserInvoke(denoiser,stream,&control,state,stateBytes,&guides,layers,4,0,0,scratch,scratchBytes);
+    return optixDenoiserInvoke(denoiser,stream,&control,state,stateBytes,&guides,layers,1,0,0,scratch,scratchBytes);
 }
 }

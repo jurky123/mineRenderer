@@ -131,6 +131,11 @@ class ShadowPipelineTest {
                         assertEquals(List.of("outAlbedo", "outNormal", "outEmission", "outMaterialPbr"), names,
                                 "Native output rebinding order must match the actual MRT attachments");
                     }
+                    if(field.equals("RT_RECON_GUIDES")){
+                        assertEquals(3,pipeline.getColorTargetStates().length);
+                        var names=new ArrayList<String>();for(Object output:fragment.outputs()){var name=output.getClass().getDeclaredMethod("name");name.setAccessible(true);names.add((String)name.invoke(output));}
+                        assertEquals(List.of("normalGuide","flowGuide","trustGuide"),names,"Denoiser MRT order must match CUDA plane inputs");
+                    }
                     if(field.equals("MOTION")){
                         assertEquals(3,pipeline.getColorTargetStates().length);assertEquals(GpuFormat.RG16_FLOAT,pipeline.getColorTargetStates()[0].format());assertEquals(GpuFormat.R32_FLOAT,pipeline.getColorTargetStates()[1].format());assertEquals(GpuFormat.RGBA8_UNORM,pipeline.getColorTargetStates()[2].format());
                         var names=new ArrayList<String>();for(Object output:fragment.outputs()){var name=output.getClass().getDeclaredMethod("name");name.setAccessible(true);names.add((String)name.invoke(output));}assertEquals(List.of("velocity","depthGuide","normalGuide"),names);
