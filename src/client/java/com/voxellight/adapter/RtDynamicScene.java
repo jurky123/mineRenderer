@@ -30,6 +30,8 @@ final class RtDynamicScene implements AutoCloseable {
     private GpuTextureView cellView;
     private int previousCount,sourceModels;
     private final LinkedHashMap<TextureRegion,Integer> textureSlots=new LinkedHashMap<>();
+    private final Map<GpuTextureView,Integer> geometryGroups=new LinkedHashMap<>();
+    private Set<Integer> activeTextureSlots=Set.of();
     private Set<SectionKey> previousKeys=Set.of();
     private long bytes,textureCopyBytes;
     RtDynamicScene(){entities.rtCapture();blocks.rtCapture();}
@@ -55,6 +57,9 @@ final class RtDynamicScene implements AutoCloseable {
         var textures=textureSlots;
         var modelRegions=models.stream().map(model->region(model.quads(),model.texture().textureView())).toList();
         var requiredRegions=new HashSet<>(modelRegions);textures.keySet().removeIf(key->!requiredRegions.contains(key));
+        var requiredSources=new HashSet<GpuTextureView>();for(var region:modelRegions)requiredSources.add(region.texture());
+        geometryGroups.keySet().removeIf(key->!requiredSources.contains(key));
+        var frameTextureSlots=new HashSet<Integer>();
         var groups=new LinkedHashMap<SectionKey,java.io.ByteArrayOutputStream>();var changes=new ArrayList<RtGeometryStream.Section>();bytes=0;sourceModels=models.size();
         if(cell==null){var device=RenderSystem.getDevice();if(!device.precompilePipeline(COPY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Dynamic RT atlas unavailable");cell=device.createTexture("VoxelLight dynamic RT texture resample",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA8_UNORM,CELL,CELL,1,1);cellView=device.createTextureView(cell);regions=device.createBuffer(()->"RT atlas crop regions",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,(long)SLOTS*256);}
         int handModels=hands.rtModels().size(),modelIndex=0;
@@ -63,7 +68,9 @@ final class RtDynamicScene implements AutoCloseable {
             var texture=modelRegions.get(modelIndex++);if(!textures.containsKey(texture)&&textures.size()>=SLOTS)continue;
             int slot=textures.computeIfAbsent(texture,ignored->freeSlot(textures.values()));byte[] vertices=triangles(model.quads(),slot,x,y,z,texture);
             if(bytes+vertices.length>8L*1024*1024)break;bytes+=vertices.length;
-            var key=new SectionKey(slot,Integer.MIN_VALUE,hand?1:0);
+            // Crop tiles are per triangle material data, not BLAS identities.
+            var key=geometryKey(geometryGroups,texture,hand);
+            frameTextureSlots.add(slot);
             groups.computeIfAbsent(key,ignored->new java.io.ByteArrayOutputStream()).writeBytes(vertices);
         }
         for(var entry:groups.entrySet()){
@@ -72,13 +79,13 @@ final class RtDynamicScene implements AutoCloseable {
             changes.add(new RtGeometryStream.Section(entry.getKey(),hash,vertices));
         }
         for(var key:previousKeys)if(!groups.containsKey(key))changes.add(new RtGeometryStream.Section(key,0,new byte[0]));
-        previousKeys=Set.copyOf(groups.keySet());previousCount=groups.size();
+        previousKeys=Set.copyOf(groups.keySet());previousCount=groups.size();activeTextureSlots=Set.copyOf(frameTextureSlots);
         RenderPassProfile.cpu("vulkan_rt_dynamic_capture",System.nanoTime()-captureStart);
         context.prepareScene(encoder,changes,x,y,z);
     }
     void uploadTextures(CommandEncoder encoder,com.voxellight.rt.vulkan.VulkanRtBuffer assets,long offset){
         textureCopyBytes=0;if(cell==null)return;
-        var activeSlots=new HashSet<Integer>();for(var key:previousKeys)activeSlots.add(key.x());
+        var activeSlots=activeTextureSlots;
         var cropData=ByteBuffer.allocateDirect(SLOTS*256).order(ByteOrder.nativeOrder());
         for(var entry:textureSlots.entrySet()){var r=entry.getKey();cropData.position(entry.getValue()*256);cropData.putFloat(r.u()).putFloat(r.v()).putFloat(r.width()).putFloat(r.height());}
         cropData.position(0).limit(SLOTS*256);encoder.writeToBuffer(regions.slice(),cropData);
@@ -104,6 +111,10 @@ final class RtDynamicScene implements AutoCloseable {
         }
         return output.array();
     }
+    static SectionKey geometryKey(Map<GpuTextureView,Integer> groups,TextureRegion region,boolean hand){
+        int group=groups.computeIfAbsent(region.texture(),ignored->freeSlot(groups.values()));
+        return new SectionKey(group,Integer.MIN_VALUE,hand?1:0);
+    }
     static int freeSlot(Collection<Integer> slots){
         var used=new boolean[SLOTS];for(int slot:slots)used[slot]=true;
         for(int slot=0;slot<SLOTS;slot++)if(!used[slot])return slot;
@@ -124,6 +135,6 @@ final class RtDynamicScene implements AutoCloseable {
         return new TextureRegion(texture,u,v,maxU-u,maxV-v);
     }
     boolean hasHands(){return !hands.rtModels().isEmpty();}
-    String status(){return ", rtDynamicModels="+sourceModels+", rtDynamicGroups="+previousCount+", rtDynamicBytes="+bytes+", rtDynamicTextureCopyBytes="+textureCopyBytes+", rtDynamicCoverage=entity+block_entity+held+custom+cutout_quad_particles";}
-    public void close(){entities.close();blocks.close();hands.close();particles.close();if(cellView!=null)cellView.close();if(cell!=null)cell.close();if(regions!=null)regions.close();regions=null;cellView=null;cell=null;previousCount=sourceModels=0;bytes=textureCopyBytes=0;previousKeys=Set.of();textureSlots.clear();}
+    String status(){return ", rtDynamicModels="+sourceModels+", rtDynamicGroups="+previousCount+", rtDynamicTextureTiles="+activeTextureSlots.size()+", rtDynamicBytes="+bytes+", rtDynamicTextureCopyBytes="+textureCopyBytes+", rtDynamicCoverage=entity+block_entity+held+custom+cutout_quad_particles";}
+    public void close(){entities.close();blocks.close();hands.close();particles.close();if(cellView!=null)cellView.close();if(cell!=null)cell.close();if(regions!=null)regions.close();regions=null;cellView=null;cell=null;previousCount=sourceModels=0;bytes=textureCopyBytes=0;previousKeys=Set.of();activeTextureSlots=Set.of();textureSlots.clear();geometryGroups.clear();}
 }

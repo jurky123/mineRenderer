@@ -1,3 +1,13 @@
+# 0.39.0-alpha.23 — decouple cropped textures from dynamic BLAS groups
+
+Alpha.22 fixed sprite detail and terrain relocation but incorrectly used each cropped texture tile as a geometry group identity. The new profile showed 86 dynamic groups versus 7 previously, with BLAS CPU median rising from 1.296 to 8.874 ms. Dynamic groups now use the original native texture view plus hand/world category; each triangle retains its independent crop tile in its material flags. Animated source views keep stable group IDs, inactive IDs are reclaimed, and accepted triangle texture slots are tracked separately from geometry groups for uploads. Cropped sprite detail, HUD projection and terrain-first packing remain intact.
+
+The submitted alpha.22 profile confirms geometry copy GPU median 0.034 ms versus alpha.21 2.017 ms; last copied bytes 369,360 versus 63,688,080. It also shows regressions: whole-world GPU median 33.117 ms versus 16.710 ms; RT batch 23.718 versus 10.717 ms; OptiX exchange 3.958 versus 2.135 ms; cropped texture upload 1.593 versus 0.178 ms. These are observed timings, not controlled causal comparisons: both final statuses report 214x120 and 1 spp, but alpha.21 retains an earlier 8-spp diagnostic and per-pass exports lack per-dispatch spp/clock metadata. More groups directly explain increased BLAS work; the full GPU slowdown needs matched scene/sampling and GPU clock measurements after regrouping.
+
+The selected fix reduces BLAS grouping without reverting the visual correction. It does not yet eliminate per-frame crop tile uploads, add transform-only instances, integrate NRD/DLSS or replace scene packing with an allocator. New status `rtDynamicTextureTiles` is independent from `rtDynamicGroups` so future profiles can distinguish texture and geometry workloads.
+
+Validation includes two distinct crop/material slots sharing a world BLAS identity while hand geometry remains separate, existing sprite/FOV tests, native GLSL binding checks and transport regressions. RTX quality/performance acceptance remains pending; this build host has no NVIDIA GPU.
+
 # 0.39.0-alpha.22 — held texture and projection corrections
 
 Dynamic atlas textures now crop the captured model UV region before resampling and remap triangle UVs to that region. A 16-pixel item sprite in a 4096-wide atlas retains its own 128-pixel tile instead of collapsing below one pixel. Small entity textures retain whole-texture slots. First-person native geometry compensates for HUD versus world FOV before native item transforms, preserving its screen footprint when the world FOV changes.

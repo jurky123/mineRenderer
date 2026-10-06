@@ -53,3 +53,5 @@ alpha.21：PT 模式旁路光栅效果和材质捕获；动态纹理按稳定分
 性能验收请先用 `rt_spp 1`、`rt_scale 0`，保持窗口大小一致，执行 `/voxellight profile on`，等待地形稳定后静止和移动各测试约 20 秒，再 `/voxellight export`。数据位于 `benchmark-results/voxellight/`，关注 `.passes.csv` 和同名 `.txt` 中的实际内部分辨率、动态分组/refit 与复制字节数。切换 `rt_reconstruction vulkan` 可比较纯 Vulkan 后端。要评估清晰度，可另测 `rt_scale 2`，其像素数增加，不能与 scale 0 的性能直接比较。
 
 alpha.22：手持物品按自身 UV 裁切图集，补偿 HUD/世界 FOV 差异；动态几何放到静态地形之后以减少搬移。动态图集回收未使用槽位，避免反复切换物品耗尽槽位。实机外观仍待验收。
+
+alpha.23：纹理裁切槽位与 BLAS 分组分开；按原始纹理和手持/世界类别组合几何。stats 的 `rtDynamicTextureTiles` 表示裁切纹理数量，`rtDynamicGroups` 表示几何分组数，二者无需相等。继续用相同分辨率、1 spp 和同一场景导出 profile 对比；GPU 提速仍待实机确认。

@@ -31,4 +31,19 @@ class RtDynamicGeometryTest {
  @Test void changingHeldItemsReusesReleasedSlotsWithoutOverwritingLiveTextures(){
   assertEquals(1,RtDynamicScene.freeSlot(java.util.List.of(0,2,3)));
  }
+ @Test void atlasCropTilesDoNotMultiplyBlasGroupsOrChangeMaterialSlots(){
+  var groups=new java.util.LinkedHashMap<com.mojang.blaze3d.textures.GpuTextureView,Integer>();
+  var a=new RtDynamicScene.TextureRegion(null,.1f,.2f,.01f,.02f);
+  var b=new RtDynamicScene.TextureRegion(null,.5f,.6f,.01f,.02f);
+  var key=RtDynamicScene.geometryKey(groups,a,false);
+  assertEquals(key,RtDynamicScene.geometryKey(groups,b,false));
+  assertNotEquals(key,RtDynamicScene.geometryKey(groups,b,true));
+  assertEquals(1,groups.size());
+  int stride=com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK.getVertexSize();
+  var quads=ByteBuffer.allocate(stride*4).order(ByteOrder.nativeOrder());
+  for(int i=0;i<4;i++)quads.putFloat(i*stride+16,.1f).putFloat(i*stride+20,.2f);
+  var one=ByteBuffer.wrap(RtDynamicScene.triangles(quads.array(),3,0,0,0,a)).order(ByteOrder.nativeOrder());
+  var two=ByteBuffer.wrap(RtDynamicScene.triangles(quads.array(),19,0,0,0,b)).order(ByteOrder.nativeOrder());
+  assertEquals(3,one.getInt(36)>>>20);assertEquals(19,two.getInt(36)>>>20);
+ }
 }
