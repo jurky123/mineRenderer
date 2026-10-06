@@ -119,6 +119,8 @@ public final class VulkanRtScene implements AutoCloseable {
         if(tlas!=null) {tlas.close();tlas=null;}
         emitterData=ByteBuffer.allocateDirect(0);flameData=ByteBuffer.allocateDirect(0);
         if(sections.isEmpty()){packedGeometry.clear();return;}
+        // Keep animated groups at the tail: their size changes must not relocate terrain.
+        var entries=sections.entrySet().stream().sorted(Comparator.comparing(entry->dynamic(entry.getKey()))).toList();
         int triangles=sections.values().stream().mapToInt(section->section.normals.length/16).sum();
         if(triangles>=0x1000000)throw new IllegalStateException("RT instance normal base exceeds 24 bits");
         var encoder=device.createCommandEncoder();
@@ -131,7 +133,7 @@ public final class VulkanRtScene implements AutoCloseable {
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
             }
             long offset=0,normalOffset=0;var next=new HashMap<SectionKey,Packed>();
-            for(var entry:sections.entrySet()){
+            for(var entry:entries){
                 var section=entry.getValue();var old=packedGeometry.get(entry.getKey());
                 if(old==null||old.offset!=offset||old.version!=section.version){
                     if(material)encoder.copyToBuffer(section.vertices.slice(),geometryBuffer.slice(offset,section.vertices.size()));
@@ -146,7 +148,7 @@ public final class VulkanRtScene implements AutoCloseable {
         try(var packed=allocateInstances(sections.size());var stack=MemoryStack.stackPush()) {
             int i=0,base=0;
             var emitters=new ArrayList<com.voxellight.rt.RtEmitterTable.Triangle>();
-            for(var entry:sections.entrySet()) {
+            for(var entry:entries) {
                 var instance=packed.get(i++);var k=entry.getKey();
                 for(var emitter:entry.getValue().emitters)emitters.add(com.voxellight.rt.RtEmitterTable.world(emitter,base,i-1,k.x(),k.y(),k.z()));
                 instance.transform().matrix(0,1).matrix(5,1).matrix(10,1).matrix(3,dynamic(k)?0:k.x()*16f).matrix(7,dynamic(k)?0:k.y()*16f).matrix(11,dynamic(k)?0:k.z()*16f);

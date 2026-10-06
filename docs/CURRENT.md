@@ -1,3 +1,13 @@
+# 0.39.0-alpha.22 — held texture and projection corrections
+
+Dynamic atlas textures now crop the captured model UV region before resampling and remap triangle UVs to that region. A 16-pixel item sprite in a 4096-wide atlas retains its own 128-pixel tile instead of collapsing below one pixel. Small entity textures retain whole-texture slots. First-person native geometry compensates for HUD versus world FOV before native item transforms, preserving its screen footprint when the world FOV changes.
+
+Packed geometry orders static terrain before animated groups, with the same order used for normals, TLAS custom indices and emitter references. Dynamic size changes consequently relocate dynamic groups rather than the terrain suffix. Terrain eviction/edit size changes can still relocate terrain; a free-list allocator and per-object instancing remain future work.
+
+The uploaded alpha.21 profile contains 611 GPU batch samples: median 10.717 ms, P95 13.986 ms; OptiX exchange median 2.135 ms, P95 2.607 ms. These are pass timings from the uploaded run, not isolated fixed-spp comparisons: the exported status says 214x120, requested 1 spp, while its retained diagnostic reports an earlier 8-spp frame. Scene CPU median 7.260 ms includes two scene records per rendered frame; it must not be interpreted as full-frame time. Last geometry copy was 63,688,080 bytes. Further performance comparisons require matched resolution and spp.
+
+Validation adds atlas sprite footprint, HUD/world projection equivalence and actual native GLSL pipeline binding checks. No NVIDIA GPU is available on the build host; held appearance and reduced geometry transfer need RTX acceptance. Glint, full dynamic LabPBR and first-person hurt/view bob parity remain pending.
+
 # 0.39.0-alpha.21 — remove redundant work and stabilize reconstruction
 
 PT bypasses raster material/entity captures, cascade shadow preparation, AO, water reflection, volumetric and raster composites; world light parameters, native PBR assets and HDR sky remain prepared. Vanilla rendering remains available during RT warmup/failure. OptiX and Vulkan reconstruction are mutually exclusive per frame; the temporal AOV model now denoises only the beauty layer that is actually displayed. External staging is six float4 planes rather than twelve, and only one previous output plane is retained.
