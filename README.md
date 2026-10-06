@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.25**：修复 alpha.24 时域放大历史缺少 COPY_DST 标志、首次清空时导致 RT 回退光栅的问题；保留 alpha.24 架构调整。全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.26**：修复场景网格替换的临时容量冲突，并在几何区间碎片化时重排属性缓冲、重置历史，避免直接退出 RT；包含 alpha.25 历史纹理清空修复。全新安装默认 effects off。
 
-[下载 alpha.25 安装包](https://temp.sh/QczFN/voxellight-client-kit-26.2-0.39.0-alpha.25.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.26 安装包](https://temp.sh/tEDaw/voxellight-client-kit-26.2-0.39.0-alpha.26.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -41,7 +41,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.21。
 
-本轮验证：265 项 Java 测试通过；14 个 RT SPIR-V stage 验证与 Minecraft GLSL 链接通过；实际 Slang 材质/地形/环境输运、数值边界与光源采样通过，RIS 200,000 次采样的含遮挡 RGB 能量误差低于 0.8%。Windows/Linux 独立去噪桥接已构建，但 NVIDIA GPU 运行验收尚未完成。
+本轮验证：268 项 Java 测试通过；14 个 RT SPIR-V stage 验证与 Minecraft GLSL 链接通过；实际 Slang 材质/地形/环境输运、数值边界与光源采样通过，RIS 200,000 次采样的含遮挡 RGB 能量误差低于 0.8%。Windows/Linux 独立去噪桥接已构建，但 NVIDIA GPU 运行验收尚未完成。
 
 手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。
 

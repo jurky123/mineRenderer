@@ -1,3 +1,9 @@
+# 0.39.0-alpha.26 — recover fragmented scene geometry ranges
+
+Alpha.25 cleared output history successfully in the reported run, then fell back to raster when allocating shader geometry ranges. Allocation now releases all deleted and resized ranges before allocating any incoming/replacement range, preventing a growing mesh from exhausting capacity while later shrinking meshes still occupy their old ranges. If final geometry fits the admitted budget but holes cannot fit an incoming range, the attribute arena is repacked under the existing GPU read-to-write dependency. This exceptional path recopies attributes/normals, updates TLAS custom indices, rebuilds emitter proposals and invalidates reconstruction/previous-pose history. Ordinary updates retain stable offsets; surviving surface identities are preserved. Stats exposes geometryCompactions.
+
+Regressions exercise growth/shrink at full capacity, fragmentation with sufficient total space and rejected oversized layouts without mutation. This addresses the reported allocator exception; NVIDIA driver/visual/performance acceptance remains pending.
+
 # 0.39.0-alpha.25 — allow clearing temporal upscale history
 
 Alpha.24 successfully initialized Vulkan RT on the reported RTX 4060 Laptop GPU, then failed at the first output-history clear: Minecraft 26.2 requires both RENDER_ATTACHMENT and COPY_DST for clearColorTexture. Output HDR history textures now include COPY_DST, preserving sampling/rendering flags and RGBA32F history. This fixes the reported validation exception that forced raster fallback. A regression executes the actual Minecraft CommandEncoder validation with a stub backend, and verifies the old flags fail before reaching the backend. Driver rendering and visual acceptance remain pending.

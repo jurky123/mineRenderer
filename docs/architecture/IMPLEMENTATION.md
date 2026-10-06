@@ -27,7 +27,7 @@ Reference 使用同一积分器，关闭 guide/降噪/放大并保持原有渐�
 | 射线计数 | profile on 时记录六个顶点层的有效路径 dispatch、shadow trace、any-hit invocation；每八帧异步读取 header，导出 `.rays.csv` | any-hit 是调用次数；六层计数包含 miss，不是六层成功命中数；不是全帧逐射线日志 |
 | Collect/commit | terrain 和 dynamic 先合并，最多一次场景 commit；无变化不构建 TLAS | dynamic CPU 提取仍由原生 renderer 提供 |
 | AS 生命周期 | 同大小动态顶点复用；BLAS/TLAS UPDATE 复用原 AS/storage/scratch；构建签名不匹配则 BUILD 新对象 | 当前单 geometry、无索引三角形；场景全部 opaque 才绕过 any-hit，混合 section 尚未拆 range |
-| 稳定 shader arena | first-fit 空闲区间分配，以三角形为单位；删除合并空闲区间，其他 section 不搬家 | 64 MiB current arena；碎片或满额触发现有安全回退，没有在线压缩 |
+| 稳定 shader arena | first-fit 空闲区间分配，以三角形为单位；删除合并空闲区间，其他 section 不搬家 | 64 MiB current arena；alpha.26 先回收全部删除/尺寸变化范围；碎片时异常路径重排属性缓冲并重置历史，常规更新不搬家 |
 | 动态实例 | entity UUID、block position、view-model owner + feature 作为身份；位置从局部顶点中分离 | 平移可仅更新 TLAS；旋转/动画仍修改 CPU 捕获顶点并 refit；未共享重复模型 BLAS |
 | 动态运动 | 保留上帧动态顶点和 translation；同 topology 的当前 barycentric hit 映射到上帧位置 | topology 由 UV/tint/material flags 合同校验，不是任意 renderer 的显式顶点身份；粒子保守拒绝历史 |
 | 表面身份 | 稳定 arena allocation identity；新建/不兼容 topology 用负号拒绝历史；静态按正身份验证 | identity 用 float 精确整数编码，达到 2^24 时需 reset；还没有完整独立 instance-table ABI |
@@ -64,3 +64,7 @@ Continuation 容量按 432×width×height×spp 保留原 1 GiB 上限；cold 单
 `./gradlew build clientKit --offline` 验证 Java 回归、真实 Minecraft GLSL pipeline 链接、14 个 Vulkan RT stage 和 hot/cold/camera ABI、实际 Slang/GLSL CPU target 的 BSDF/环境/光源/运动 helper 数值合同。CPU 校验不能验证原地 UPDATE 的驱动执行、GPU 队列并发和 temporal upscaler 画质。
 
 实机用相同窗口、资源包、世界/视角与 1 spp：分别记录静止、实体平移/动画、手持切换、挖放方块、动画纹理；开 `profile on` 后导出。保持同一实际 internal resolution 才与 alpha.23 比较；另测较高内部分辨率、多 spp 触发 compact，用 stats 的 scheduling 确认路径。比较 `rt_reconstruction optix` / `vulkan`，观察动态拖影、遮挡露出、天空旋转、细线及玻璃反射。检查 geometry/texture copy、AS refit/build、retiring bytes，以及 `.rays.csv` 的活跃率；不要由 CPU build 成功宣称 GPU 提速。
+
+## alpha.26 allocator 修正
+
+本帧最终布局先检查总三角形容量，再统一释放删除与尺寸变化的旧范围，最后分配新范围。若总量在预算内但无足够连续空间，清空 allocator 并按最终 section 顺序重排；所有 packed version 标为需重传，保留 surviving identity，清空 previous pose、增加 terrain generation。后续同帧 TLAS UPDATE/BUILD 使用新 custom index；emitter proposal 和实时/reference 历史随 generation 更新。重排不会搬 BLAS 顶点 buffer，仅搬 shader 属性及 normal 索引。stats 的 geometryCompactions 记录这一异常恢复路径。

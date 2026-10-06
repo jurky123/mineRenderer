@@ -23,5 +23,6 @@ public final class RtGeometryAllocator {
         if(after!=null&&base+count==after.getKey()){count+=after.getValue();free.remove(after.getKey());}
         free.put(base,count);
     }
+    public int capacity(){return capacity;}
     public void clear(){free.clear();free.put(0,capacity);}
 }

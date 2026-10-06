@@ -37,11 +37,11 @@ public final class VulkanRtScene implements AutoCloseable {
     private long emitterTerrainVersion=-1;
     private final Map<SectionKey,Section> previousPose=new HashMap<>();
     public long historyGeneration(){return terrainGeneration;}
-    private long generation, builds, refits,tlasBuilds, bytes,geometryCopyBytes;
+    private long generation, builds, refits,tlasBuilds, bytes,geometryCopyBytes,geometryCompactions;
     static final long GEOMETRY_BYTES=64L*1024*1024;
     static final int TRIANGLE_CAPACITY=(int)(GEOMETRY_BYTES/120);
     private final com.voxellight.rt.RtGeometryAllocator allocator=new com.voxellight.rt.RtGeometryAllocator(TRIANGLE_CAPACITY);
-    private record Packed(long offset,long version,int count,int identity){}
+    record Packed(long offset,long version,int count,int identity){}
     private int nextIdentity=1;
     private final Map<SectionKey,Packed> packedGeometry=new HashMap<>();
     VulkanRtScene(VulkanDevice device,int scratchAlignment) {this(device,scratchAlignment,false);}
@@ -51,7 +51,7 @@ public final class VulkanRtScene implements AutoCloseable {
     long tlas() { return tlas==null?0:tlas.handle(); }
     VulkanRtBuffer geometry() {return geometryBuffer;}
     VulkanRtBuffer normals() { return normalBuffer; }
-    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", geometryCopyBytes="+geometryCopyBytes+", tlasRefits="+tlasRefits+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
+    public String status() { return "sections="+resident().size()+", dynamicMeshes="+(sections.size()-resident().size())+", rayPriorityPages="+requestedPages.size()+", blasBuilds="+builds+", blasRefits="+refits+", geometryCopyBytes="+geometryCopyBytes+", geometryCompactions="+geometryCompactions+", tlasRefits="+tlasRefits+", tlasBuilds="+tlasBuilds+", sceneBytes="+bytes+", deterministicFlames="+flameCount()+", emissiveTriangles="+emitterCount()+", shaderGeometryBytes="+(geometryBuffer==null?0:geometryBuffer.size()); }
     private final LinkedHashMap<SectionKey,RtGeometryStream.Section> pending=new LinkedHashMap<>();
     public void collect(List<RtGeometryStream.Section> changes){for(var change:changes)pending.put(change.key(),change);}
     public void commit(com.mojang.blaze3d.systems.CommandEncoder encoder,double x,double y,double z){
@@ -181,13 +181,19 @@ public final class VulkanRtScene implements AutoCloseable {
                 barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT);
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
             }
-            // Keep surviving ranges stable. Reclaim is safe after the read -> write dependency above.
-            var removed=packedGeometry.entrySet().iterator();
-            while(removed.hasNext()){var entry=removed.next();if(!sections.containsKey(entry.getKey())){allocator.release((int)(entry.getValue().offset/120),entry.getValue().count);removed.remove();}}
+            // Release every removed/resized range before allocating any replacement.
+            // A grow followed by a shrink must fit the final frame, not both old and new sizes.
+            var counts=new LinkedHashMap<SectionKey,Integer>();
+            for(var entry:entries)counts.put(entry.getKey(),entry.getValue().normals.length/16);
+            if(allocateRanges(packedGeometry,counts,allocator)){
+                geometryCompactions++;terrainGeneration++;previousPose.clear();
+            }
             for(var entry:entries){
                 var section=entry.getValue();var old=packedGeometry.get(entry.getKey());int count=section.normals.length/16;
-                if(old!=null&&old.count!=count){allocator.release((int)(old.offset/120),old.count);packedGeometry.remove(entry.getKey());old=null;}
-                if(old==null){if(nextIdentity>=16777216)throw new IllegalStateException("RT surface identity exhausted; reset required");int base=allocator.allocate(count);if(base<0)throw new IllegalStateException("RT stable geometry arena fragmented/full");old=new Packed(base*120L,Long.MIN_VALUE,count,nextIdentity++);packedGeometry.put(entry.getKey(),old);}
+                if(old.identity==0){
+                    if(nextIdentity>=16777216)throw new IllegalStateException("RT surface identity exhausted; reset required");
+                    old=new Packed(old.offset,old.version,count,nextIdentity++);packedGeometry.put(entry.getKey(),old);
+                }
                 if(old.version!=section.version){
                     if(material)encoder.copyToBuffer(section.vertices.slice(),geometryBuffer.slice(old.offset,section.vertices.size()));
                     encoder.writeToBuffer(normalBuffer.slice(old.offset/120*16,section.normals.length),ByteBuffer.allocateDirect(section.normals.length).put(section.normals).flip());
@@ -222,6 +228,32 @@ public final class VulkanRtScene implements AutoCloseable {
             barrier(command,stack,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR|VK_ACCESS_SHADER_READ_BIT);
             VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);
         }
+    }
+    /** Plan the whole final layout before any GPU copies. True means fragmented ranges were repacked. */
+    static boolean allocateRanges(Map<SectionKey,Packed> ranges,Map<SectionKey,Integer> counts,com.voxellight.rt.RtGeometryAllocator allocator){
+        long total=0;for(int count:counts.values()){if(count<=0)throw new IllegalArgumentException("Empty geometry range");total+=count;}
+        if(total>allocator.capacity())throw new IllegalStateException("RT final geometry exceeds admitted capacity");
+        var removed=ranges.entrySet().iterator();
+        while(removed.hasNext()){
+            var entry=removed.next();if(!Objects.equals(counts.get(entry.getKey()),entry.getValue().count)){
+                allocator.release((int)(entry.getValue().offset/120),entry.getValue().count);removed.remove();
+            }
+        }
+        for(var entry:counts.entrySet())if(!ranges.containsKey(entry.getKey())){
+            int base=allocator.allocate(entry.getValue());
+            if(base<0){
+                // Total capacity was checked above. This is fragmentation, so rebuild only the
+                // attribute layout; existing BLAS geometry and surface identities remain intact.
+                allocator.clear();
+                for(var current:counts.entrySet()){
+                    var old=ranges.get(current.getKey());int offset=allocator.allocate(current.getValue());
+                    ranges.put(current.getKey(),new Packed(offset*120L,Long.MIN_VALUE,current.getValue(),old==null?0:old.identity));
+                }
+                return true;
+            }
+            ranges.put(entry.getKey(),new Packed(base*120L,Long.MIN_VALUE,entry.getValue(),0));
+        }
+        return false;
     }
     private List<Map.Entry<SectionKey,Section>> orderedSections(){return sections.entrySet().stream().sorted(Comparator.comparing(entry->dynamic(entry.getKey()))).toList();}
     static boolean needsAnyHit(byte[] triangles){var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());for(int offset=36;offset<triangles.length;offset+=120)if((data.getInt(offset)&1)!=0)return true;return false;}

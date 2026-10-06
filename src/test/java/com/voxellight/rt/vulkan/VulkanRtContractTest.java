@@ -9,6 +9,37 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void allResizedRangesAreReleasedBeforeGrowingReplacements(){
+        var allocator=new com.voxellight.rt.RtGeometryAllocator(100);
+        var a=new com.voxellight.world.SectionKey(0,0,0);var b=new com.voxellight.world.SectionKey(1,0,0);
+        var ranges=new LinkedHashMap<com.voxellight.world.SectionKey,VulkanRtScene.Packed>();
+        ranges.put(a,new VulkanRtScene.Packed(allocator.allocate(60)*120L,1,60,1));
+        ranges.put(b,new VulkanRtScene.Packed(allocator.allocate(40)*120L,1,40,2));
+        var counts=new LinkedHashMap<com.voxellight.world.SectionKey,Integer>();counts.put(a,80);counts.put(b,20);
+        assertFalse(VulkanRtScene.allocateRanges(ranges,counts,allocator));
+        assertEquals(0,ranges.get(a).offset());assertEquals(80*120,ranges.get(b).offset());assertEquals(-1,allocator.allocate(1));
+    }
+    @Test void fragmentedArenaRepacksFinalLayoutWithoutChangingSurvivingIdentities(){
+        var allocator=new com.voxellight.rt.RtGeometryAllocator(100);
+        var a=new com.voxellight.world.SectionKey(0,0,0);var hole=new com.voxellight.world.SectionKey(1,0,0);
+        var b=new com.voxellight.world.SectionKey(2,0,0);var incoming=new com.voxellight.world.SectionKey(3,0,0);
+        var ranges=new LinkedHashMap<com.voxellight.world.SectionKey,VulkanRtScene.Packed>();
+        ranges.put(a,new VulkanRtScene.Packed(allocator.allocate(20)*120L,10,20,11));
+        ranges.put(hole,new VulkanRtScene.Packed(allocator.allocate(30)*120L,10,30,12));
+        ranges.put(b,new VulkanRtScene.Packed(allocator.allocate(20)*120L,10,20,13));
+        var counts=new LinkedHashMap<com.voxellight.world.SectionKey,Integer>();counts.put(a,20);counts.put(b,20);counts.put(incoming,50);
+        assertTrue(VulkanRtScene.allocateRanges(ranges,counts,allocator));
+        assertEquals(11,ranges.get(a).identity());assertEquals(13,ranges.get(b).identity());assertEquals(0,ranges.get(incoming).identity());
+        assertEquals(Long.MIN_VALUE,ranges.get(b).version());assertEquals(20*120,ranges.get(b).offset());assertFalse(ranges.containsKey(hole));
+        assertEquals(90,allocator.allocate(10));
+    }
+    @Test void impossibleFinalLayoutIsRejectedBeforeMutatingExistingRanges(){
+        var allocator=new com.voxellight.rt.RtGeometryAllocator(100);var key=new com.voxellight.world.SectionKey(0,0,0);
+        var old=new VulkanRtScene.Packed(allocator.allocate(60)*120L,10,60,11);
+        var ranges=new HashMap<com.voxellight.world.SectionKey,VulkanRtScene.Packed>();ranges.put(key,old);
+        assertThrows(IllegalStateException.class,()->VulkanRtScene.allocateRanges(ranges,Map.of(key,101),allocator));
+        assertEquals(old,ranges.get(key));assertEquals(60,allocator.allocate(40));
+    }
     @Test void opaqueClassificationAndMotionTopologyUseMaterialLayoutInsteadOfWorldPose(){
         var vertices=ByteBuffer.allocate(120).order(ByteOrder.nativeOrder());
         long topology=VulkanRtScene.topologyVersion(vertices.array());
