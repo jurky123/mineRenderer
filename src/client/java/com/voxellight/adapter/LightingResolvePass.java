@@ -27,7 +27,7 @@ final class LightingResolvePass implements AutoCloseable {
     private final EnvironmentPass weather=new EnvironmentPass();
     boolean replacesClouds(){return weather.replacesClouds();}
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
-    private final VulkanRtDebugPass vulkanRt=new VulkanRtDebugPass();
+    private final VulkanPathTracer vulkanRt=new VulkanPathTracer();
     void setVulkanMaterials(){vulkanRt.enableMaterials();}
     void setVulkanTransportTest(){vulkanRt.enableTransport();}
     void setVulkanRtPoc(){vulkanRt.enable(true);}
@@ -35,6 +35,9 @@ final class LightingResolvePass implements AutoCloseable {
     void accumulate(boolean value){vulkanRt.accumulate(value);}
     void probeLighting(){vulkanRt.probeLighting();}
     void accumulateFreeze(boolean value){vulkanRt.accumulateFreeze(value);}
+    void rtOptix(boolean value){vulkanRt.optix(value);}
+    void rtRealtime(boolean value){vulkanRt.realtime(value);}
+    void rtScale(int value){vulkanRt.internalScale(value);}
     void samplesPerFrame(int value){vulkanRt.samplesPerFrame(value);}
     void accumulateSpp(int value){vulkanRt.accumulateSpp(value);}
     void accumulateReset(){vulkanRt.accumulateReset();}
@@ -85,6 +88,7 @@ final class LightingResolvePass implements AutoCloseable {
         composite.render(encoder,output,material,shadows,result,environment,ao,true,weather,motion);
 
     }
+    boolean replacesHands(){return vulkanRt.replacesHands();}
     void displayVulkanRt(RenderTarget output,MaterialCapture material,ShadowRenderer shadows){if(vulkanRt.enabled())vulkanRt.render(RenderSystem.getDevice().createCommandEncoder(),output,actualProjection,projectionObserved,material,weather,shadows);}
     void captureProjection(Matrix4f projection){actualProjection.set(projection);projectionObserved=true;}
     void endFrame(){motion.endFrame();weather.endFrame();projectionObserved=false;composite.endFrame();}

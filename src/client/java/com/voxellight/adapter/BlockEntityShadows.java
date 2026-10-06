@@ -20,7 +20,8 @@ import org.slf4j.LoggerFactory;
 /** Loaded-only block-entity casters, independent of the main camera's visible section list. */
 final class BlockEntityShadows implements AutoCloseable {
     private final DynamicModelBuffer buffer=new DynamicModelBuffer("block entity");
-    private boolean enabled=true,loggedFailure;
+    private boolean enabled=true,loggedFailure,rtCapture;
+    void rtCapture(){rtCapture=true;}
     private int selected,candidates,overflow,failures,chunks;
     private long captureNs;
 
@@ -53,6 +54,8 @@ final class BlockEntityShadows implements AutoCloseable {
                     int light,int overlay,int tint,TextureAtlasSprite sprite,int outline,ModelFeatureRenderer.CrumblingOverlay crumbling) {
                 buffer.capture(model,state,pose,type,light,overlay,tint,sprite);
             }
+            @Override public void submitItem(PoseStack pose,net.minecraft.world.item.ItemDisplayContext display,int light,int overlay,int outline,int[] tints,java.util.List<net.minecraft.client.resources.model.geometry.BakedQuad> quads,net.minecraft.client.renderer.item.ItemStackRenderState.FoilType foil){if(rtCapture)buffer.captureItem(pose,light,overlay,tints,quads);}
+            @Override public void submitCustomGeometry(PoseStack pose,RenderType type,net.minecraft.client.renderer.SubmitNodeCollector.CustomGeometryRenderer renderer){if(rtCapture)buffer.captureCustom(pose,type,renderer);}
         };
         var collector=new SubmitNodeStorage(){
             @Override public SubmitNodeCollection order(int ignored){return collection;}
@@ -79,6 +82,7 @@ final class BlockEntityShadows implements AutoCloseable {
         }
         buffer.finish();captureNs=System.nanoTime()-start;
     }
+    java.util.List<DynamicModelBuffer.RtModel> rtModels(){return buffer.rtModels();}
     void upload(CommandEncoder encoder){buffer.upload(encoder);}
     int maxIndices(){return buffer.maxIndices();}
     void borrowIndices(com.mojang.blaze3d.buffers.GpuBuffer indices,com.mojang.blaze3d.IndexType type){buffer.borrowIndices(indices,type);}

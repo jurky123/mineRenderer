@@ -35,6 +35,12 @@ abstract class GameRendererMixin {
         VoxelLightClient.probe().endWorldBudget(target);
     }
 
+    // Native hands are drawn after the PT composite; retain them when PT capture/display failed.
+    @Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
+    private void voxellight$ptHands(CallbackInfo ci) {
+        if(VoxelLightClient.probe().replacesHands())ci.cancel();
+    }
+
     @Inject(method = "resize", at = @At("HEAD"))
     private void voxellight$resizeResources(CallbackInfo ci) {
         VoxelLightClient.probe().resize();

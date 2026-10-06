@@ -28,5 +28,6 @@ public final class StationaryAccumulation {
         return true;
     }
     public boolean needsSample(){return !enabled||!frozen||samples<target;}
-    public void accepted(){if(enabled&&samples<target)samples++;}
+    public void accepted(){accepted(1);}
+    public void accepted(int count){if(count<1||count>8)throw new IllegalArgumentException("Batch samples must be 1..8");if(enabled)samples=Math.min(target,samples+count);}
 }

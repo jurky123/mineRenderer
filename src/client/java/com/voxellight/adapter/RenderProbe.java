@@ -90,6 +90,9 @@ public final class RenderProbe {
     public void accumulate(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulate(value);}
     public void probeLighting(){RenderSystem.assertOnRenderThread();lighting.probeLighting();}
     public void accumulateFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulateFreeze(value);}
+    public void rtOptix(boolean value){lighting.rtOptix(value);}
+    public void rtRealtime(boolean value){lighting.rtRealtime(value);}
+    public void rtScale(int value){lighting.rtScale(value);}
     public void samplesPerFrame(int value){RenderSystem.assertOnRenderThread();lighting.samplesPerFrame(value);}
     public void accumulateSpp(int value){RenderSystem.assertOnRenderThread();lighting.accumulateSpp(value);}
     public void accumulateReset(){RenderSystem.assertOnRenderThread();lighting.accumulateReset();}
@@ -229,6 +232,7 @@ public final class RenderProbe {
         renderPass(target, null);
     }
 
+    public boolean replacesHands(){return mode==Mode.FOUNDATION&&lighting.replacesHands();}
     public boolean replacesClouds(){return mode==Mode.FOUNDATION&&lighting.replacesClouds();}
     public void setEnvironment(String option,boolean value){RenderSystem.assertOnRenderThread();lighting.setEnvironment(option,value);}
     public void setSingleRaster(boolean value){RenderSystem.assertOnRenderThread();material.setSingleRaster(value);}

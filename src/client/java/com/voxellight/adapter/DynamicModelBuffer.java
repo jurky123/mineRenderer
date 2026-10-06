@@ -70,6 +70,37 @@ final class DynamicModelBuffer implements AutoCloseable {
         } finally { scratch.clear(); }
     }
 
+    void captureItem(PoseStack pose,int light,int overlay,int[] tints,List<net.minecraft.client.resources.model.geometry.BakedQuad> quads){
+        for(var quad:quads){var type=quad.materialInfo().itemRenderType();
+            captureCustom(pose,type,(current,consumer)->{var instance=new QuadInstance();int i=quad.materialInfo().tintIndex();instance.setColor(i>=0&&i<tints.length?tints[i]:-1);instance.setLightCoords(light);instance.setOverlayCoords(overlay);consumer.putBakedQuad(current,quad,instance);});
+        }
+    }
+    void captureCustom(PoseStack pose,RenderType type,net.minecraft.client.renderer.SubmitNodeCollector.CustomGeometryRenderer renderer){
+        if(type.isOutline()||type.primitiveTopology()!=PrimitiveTopology.QUADS){skipped++;return;}
+        var texture=type.prepare().textures().stream().filter(t->t.name().equals("Sampler0")).findFirst();if(texture.isEmpty())return;
+        allocate();scratch.clear();try{var builder=new BufferBuilder(scratch,PrimitiveTopology.QUADS,DefaultVertexFormat.BLOCK);renderer.render(pose.last(),builder);try(var mesh=builder.build()){if(mesh!=null)append(mesh,texture.get());}}finally{scratch.clear();}
+    }
+    void captureParticles(net.minecraft.client.renderer.state.level.QuadParticleRenderState state){
+        allocate();
+        for(var layer:state.layers()){
+            scratch.clear();try{
+                var builder=new BufferBuilder(scratch,PrimitiveTopology.QUADS,DefaultVertexFormat.BLOCK);
+                VertexConsumer consumer=new VertexConsumer(){
+                    public VertexConsumer addVertex(float x,float y,float z){builder.addVertex(x,y,z).setNormal(0,0,0);return this;}
+                    public VertexConsumer setColor(int r,int g,int b,int a){builder.setColor(r,g,b,a);return this;}
+                    public VertexConsumer setColor(int color){builder.setColor(color);return this;}
+                    public VertexConsumer setUv(float u,float v){builder.setUv(u,v);return this;}
+                    public VertexConsumer setUv1(int u,int v){return this;}
+                    public VertexConsumer setUv2(int u,int v){builder.setUv2(u,v);return this;}
+                    public VertexConsumer setNormal(float x,float y,float z){builder.setNormal(x,y,z);return this;}
+                    public VertexConsumer setLineWidth(float width){return this;}
+                };
+                state.buildLayer(layer,consumer);try(var mesh=builder.build()){
+                    if(mesh!=null){var view=net.minecraft.client.Minecraft.getInstance().getTextureManager().getTexture(layer.textureAtlasLocation()).getTextureView();append(mesh,new PreparedRenderType.Texture("Sampler0",view,RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.NEAREST)));}
+                }
+            }catch(IllegalArgumentException error){skipped++;}finally{scratch.clear();}
+        }
+    }
     boolean append(MeshData mesh,PreparedRenderType.Texture texture) {
         var data=mesh.vertexBuffer().duplicate();
         if(draws.size()>=DynamicCasterSelection.MAX_MODELS || data.remaining()>DynamicCasterSelection.FRAME_BYTES
@@ -110,6 +141,12 @@ final class DynamicModelBuffer implements AutoCloseable {
             pass.bindTexture("Sampler0", draw.texture().textureView(), draw.texture().sampler());
             pass.drawIndexed(draw.indices(), 1, 0, draw.baseVertex(), 0);
         }
+    }
+    record RtModel(byte[] quads,PreparedRenderType.Texture texture){}
+    List<RtModel> rtModels(){
+        if(frame==null)return List.of();var result=new ArrayList<RtModel>();int stride=DefaultVertexFormat.BLOCK.getVertexSize();
+        for(var draw:draws){int count=draw.indices()/6*4;byte[] bytes=new byte[count*stride];var source=frame.duplicate();source.position(draw.baseVertex()*stride).limit((draw.baseVertex()+count)*stride);source.get(bytes);result.add(new RtModel(bytes,draw.texture()));}
+        return List.copyOf(result);
     }
     int modelCount() { return draws.size(); }
     int skipped() { return skipped; }

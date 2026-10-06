@@ -23,7 +23,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
     private final int bindingCount;
     VulkanRtPipeline(VulkanDevice device) { this(device,null); }
     VulkanRtPipeline(VulkanDevice device,String raygen) {
-        transport=raygen!=null;material=transport&&raygen.startsWith("material_");bindingCount=material?7:transport?5:4;
+        transport=raygen!=null;material=transport&&raygen.startsWith("material_");bindingCount=material?15:transport?5:4;
         this.device=device;
         try(var stack=MemoryStack.stackPush()) {
             var properties=VkPhysicalDeviceRayTracingPipelinePropertiesKHR.calloc(stack).sType$Default();
@@ -32,7 +32,7 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             packing=VulkanSbt.layout(properties.shaderGroupHandleSize(),properties.shaderGroupHandleAlignment(),properties.shaderGroupBaseAlignment(),properties.maxShaderGroupStride());
             var bindings=VkDescriptorSetLayoutBinding.calloc(bindingCount,stack);
             int stages=VK_SHADER_STAGE_RAYGEN_BIT_KHR|VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR|VK_SHADER_STAGE_MISS_BIT_KHR|VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-            int[] types={KHRAccelerationStructure.VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+            int[] types={KHRAccelerationStructure.VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
             for(int i=0;i<bindingCount;i++)bindings.get(i).binding(i).descriptorType(types[i]).descriptorCount(1).stageFlags(stages);
             var out=stack.mallocLong(1);
             check(vkCreateDescriptorSetLayout(device.vkDevice(),VkDescriptorSetLayoutCreateInfo.calloc(stack).sType$Default().pBindings(bindings),null,out));setLayout=out.get(0);
@@ -86,7 +86,10 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
         trace(command,tlas,output,normals,camera,paths,null,null,width,height);
     }
     public void trace(VkCommandBuffer command,long tlas,VulkanRtBuffer output,VulkanRtBuffer normals,VulkanRtBuffer camera,VulkanRtBuffer paths,VulkanRtBuffer geometry,VulkanRtBuffer assets,int width,int height) {
-        if(material&&(geometry==null||assets==null))throw new IllegalArgumentException("Material pipeline requires geometry and atlas buffers");
+        bind(command,tlas,output,normals,camera,paths,geometry,assets,null,null);dispatch(command,width,height,1);
+    }
+    public void bind(VkCommandBuffer command,long tlas,VulkanRtBuffer output,VulkanRtBuffer normals,VulkanRtBuffer camera,VulkanRtBuffer paths,VulkanRtBuffer geometry,VulkanRtBuffer assets,VulkanRtBuffer feedback,VulkanRtBuffer[] banks){
+        if(material&&(geometry==null||assets==null||feedback==null))throw new IllegalArgumentException("Material pipeline requires geometry and atlas buffers");
         if(transport!=(paths!=null))throw new IllegalArgumentException("Continuation buffer does not match pipeline ABI");
         try(var stack=MemoryStack.stackPush()) {
             var sizes=VkDescriptorPoolSize.calloc(3,stack);
@@ -98,7 +101,8 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             var writes=VkWriteDescriptorSet.calloc(bindingCount,stack);
             var acceleration=VkWriteDescriptorSetAccelerationStructureKHR.calloc(stack).sType$Default().pAccelerationStructures(stack.longs(tlas));
             writes.get(0).sType$Default().dstSet(set).dstBinding(0).descriptorType(KHRAccelerationStructure.VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR).descriptorCount(1).pNext(acceleration.address());
-            VulkanRtBuffer[] buffers={output,normals,camera,paths,geometry,assets};
+            VulkanRtBuffer[] buffers=new VulkanRtBuffer[bindingCount-1];VulkanRtBuffer[] base={output,normals,camera,paths,geometry,assets,feedback};System.arraycopy(base,0,buffers,0,Math.min(base.length,buffers.length));
+            if(material)for(int lane=1;lane<8;lane++)buffers[lane+6]=lane<banks.length?banks[lane]:banks[0];
             for(int i=0;i<bindingCount-1;i++) {
                 var buffer=VkDescriptorBufferInfo.calloc(1,stack).buffer(buffers[i].vkBuffer()).offset(0).range(buffers[i].size());
                 bufferWrite(writes.get(i+1),set,i+1,i==2?VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,buffer);
@@ -106,8 +110,12 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             vkUpdateDescriptorSets(device.vkDevice(),writes,null);
             vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,pipeline);
             vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,layout,0,stack.longs(set),null);
+        }
+    }
+    public void dispatch(VkCommandBuffer command,int width,int height,int lanes){
+        try(var stack=MemoryStack.stackPush()){
             var raygen=region(stack,packing.raygenOffset());var miss=region(stack,packing.missOffset());var hit=region(stack,packing.hitOffset());
-            vkCmdTraceRaysKHR(command,raygen,miss,hit,VkStridedDeviceAddressRegionKHR.calloc(stack),width,height,1);
+            vkCmdTraceRaysKHR(command,raygen,miss,hit,VkStridedDeviceAddressRegionKHR.calloc(stack),width,height,lanes);
         }
     }
     static void bufferWrite(VkWriteDescriptorSet write,long set,int binding,int type,VkDescriptorBufferInfo.Buffer info) {

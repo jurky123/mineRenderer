@@ -17,11 +17,12 @@ public final class RtGeometryStream {
  private static final ThreadLocal<Long> compileGeneration=new ThreadLocal<>();
  public static long compileEpoch(){var value=compileGeneration.get();return value==null?epoch():value;}
  public static void withGeneration(long generation,Runnable task){compileGeneration.set(generation);try{task.run();}finally{compileGeneration.remove();}}
+ private static final com.voxellight.rt.RtPageCache cache=new com.voxellight.rt.RtPageCache(256L*1024*1024);
  private static long epoch,bytes;
  private static final LinkedHashMap<SectionKey,Section> pending=new LinkedHashMap<>();
  private RtGeometryStream(){}
  public static synchronized long epoch(){return epoch;}
- public static synchronized void enable(boolean value){enabled=value;com.voxellight.rt.RtInvalidationQueue.enabled(value);pending.clear();snapshots.clear();bytes=0;epoch++;}
+ public static synchronized void enable(boolean value){enabled=value;com.voxellight.rt.RtInvalidationQueue.enabled(value);pending.clear();snapshots.clear();cache.clear();bytes=0;epoch++;}
  public static synchronized boolean enabled(){return enabled;}
  public static void compiled(int x,int y,int z,SectionCompiler.Results results,long generation,RenderSectionRegion region){
   synchronized(RtGeometryStream.class){if(!enabled||generation!=epoch||!current(region))return;}
@@ -48,11 +49,18 @@ public final class RtGeometryStream {
     int sky=(in.getInt(offset+24)>>>20)&15;out.putInt(tint).putInt(flags|thin|(sky<<8));
    }}
   }
-  synchronized(RtGeometryStream.class){if(!enabled||generation!=epoch||!current(region))return;var key=new SectionKey(x,y,z);var old=pending.put(key,new Section(key,geometryVersion(out.array()),out.array()));if(old!=null)bytes-=old.triangles.length;bytes+=out.capacity();
+  synchronized(RtGeometryStream.class){if(!enabled||generation!=epoch||!current(region))return;var key=new SectionKey(x,y,z);long version=geometryVersion(out.array());cache.put(key,com.voxellight.rt.RtInvalidationQueue.revision(x,y,z),version,out.array());var old=pending.put(key,new Section(key,version,out.array()));if(old!=null)bytes-=old.triangles.length;bytes+=out.capacity();
    while(bytes>64L*1024*1024||pending.size()>1024){var iterator=pending.entrySet().iterator();bytes-=iterator.next().getValue().triangles.length;iterator.remove();}
   }
  }
  private static long geometryVersion(byte[] bytes){long hash=0xcbf29ce484222325L;for(byte b:bytes){hash^=b&255;hash*=0x100000001b3L;}return hash;}
  public static synchronized List<Section> drain(int limit){var result=new ArrayList<Section>();var i=pending.values().iterator();while(i.hasNext()&&result.size()<limit){var section=i.next();result.add(section);bytes-=section.triangles.length;i.remove();}return result;}
+ public static synchronized boolean restore(SectionKey key){
+  if(!enabled)return false;if(pending.containsKey(key))return true;
+  var page=cache.get(key,com.voxellight.rt.RtInvalidationQueue.revision(key.x(),key.y(),key.z()));if(page==null)return false;
+  if(bytes+page.triangles().length>64L*1024*1024)return false;
+  var section=new Section(key,page.version(),page.triangles());pending.put(key,section);bytes+=section.triangles.length;return true;
+ }
+ public static String status(){return cache.status();}
  public static synchronized int pending(){return pending.size();}
 }

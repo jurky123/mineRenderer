@@ -30,6 +30,11 @@ class VulkanRtContractTest {
         assertNull(VulkanRtScene.evictions(sizes,Set.of(),new com.voxellight.world.SectionKey(8,0,0),64*mib,0,8*mib,2,false,8,8,8));
         assertEquals(List.of(near),VulkanRtScene.evictions(sizes,Set.of(),new com.voxellight.world.SectionKey(7,0,0),64*mib,0,8*mib,2,false,120,8,8));
     }
+    @Test void requestedReflectionPageCanEnterAFullNearWorkingSetWithoutEvictingAnotherProtectedPage(){
+        long mib=1024L*1024;var near=new com.voxellight.world.SectionKey(0,0,0);var other=new com.voxellight.world.SectionKey(1,0,0);var reflection=new com.voxellight.world.SectionKey(20,0,0);var sizes=Map.of(near,32*mib,other,32*mib);
+        assertNull(VulkanRtScene.evictions(sizes,Set.of(near),reflection,64*mib,0,8*mib,2,false,8,8,8));
+        assertEquals(List.of(other),VulkanRtScene.evictions(sizes,Set.of(near),reflection,64*mib,0,8*mib,2,false,8,8,8,Set.of(reflection)));
+    }
     @Test void admissionIsAtomicAndPreservesEditedSections() {
         long mib=1024L*1024;
         var edited=new com.voxellight.world.SectionKey(0,0,0);
@@ -42,7 +47,7 @@ class VulkanRtContractTest {
         assertNull(VulkanRtScene.evictions(sizes,Set.of(),edited,64*mib,32*mib,65*mib,2,true,8,8,8));
     }
     @Test void backendSwitchPreservesRasterAndDebugRunsBeforeProjectionReset() throws Exception {
-        for(String name:List.of("VulkanRtDebugPass")) {
+        for(String name:List.of("VulkanPathTracer")) {
             var node=new ClassNode();new ClassReader("com.voxellight.adapter."+name).accept(node,0);
             for(var method:node.methods)for(var instruction:method.instructions)
                 if(instruction instanceof MethodInsnNode call)
@@ -58,7 +63,7 @@ class VulkanRtContractTest {
 
     @Test void rtBufferDescriptorsActuallyWriteOneBinding() {
         try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
-            for(int binding=1;binding<=6;binding++) {
+            for(int binding=1;binding<=7;binding++) {
                 var info=org.lwjgl.vulkan.VkDescriptorBufferInfo.calloc(1,stack).buffer(123).offset(0).range(binding==3?96:4096);
                 var write=org.lwjgl.vulkan.VkWriteDescriptorSet.calloc(stack);
                 int type=binding==3?org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;

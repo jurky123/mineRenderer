@@ -1,25 +1,22 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.19**：修正虚拟火把点源的外壳自遮挡，保留其他遮挡与每帧 1–8 spp。全新安装默认不启用效果。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.20**：实时重建、多 spp 批处理、火把 RIS、压缩场景分页与原生动态模型 RT 接入。全新安装默认 effects off。
 
-[下载 alpha.19 安装包](https://temp.sh/walCq/voxellight-client-kit-26.2-0.39.0-alpha.19.zip)（临时链接）。替换旧 jar 后，进入世界执行：
+[下载 alpha.20 安装包](https://temp.sh/qrVqd/voxellight-client-kit-26.2-0.39.0-alpha.20.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
-/voxellight held_lights on
-/voxellight rt_accumulate freeze off
-/voxellight rt_accumulate spp 256
-/voxellight rt_accumulate on
-/voxellight status
+/voxellight rt_mode realtime
+/voxellight rt_reconstruction optix
+/voxellight rt_spp 1
+/voxellight stats
 ```
 
-静止时每帧增加一个样本，默认目标 64 spp，允许 4–4096。默认保持动态光照：目标前求线性 HDR 运行平均，目标后以 1/目标的权重持续更新。太阳/月亮、手持光、动画纹理和水波持续更新，手持灯切换或明显光照变化会重置历史。移动、视角/FOV/分辨率变化、地形编辑和资源重载也会重置。`rt_accumulate reset` 手动重置，`off` 恢复每帧 1 spp。可用 `rt_accumulate freeze on` 显式冻结快照并在目标达到后停止追踪，`freeze off` 返回动态模式。坏样本逐像素拒绝，不会污染累积；这不是时间重投影或去噪。
+实时模式优先使用独立 OptiX temporal AOV denoiser，失败回退 Vulkan 时空滤波；全部追踪仍是 Vulkan camera primary + 五次 continuation，没有恢复旧 OptiX/CUDA tracer 或运行时 PTX 编译。`rt_mode reference` 使用独立静止渐进累积，可设置 `rt_accumulate spp 256` 和显式 freeze。
 
-按用户授权，旧 OptiX/CUDA **追踪**实现、JNI 桥、运行时 PTX/OptiX 编译器、旧动态捕获、旧命令和混合渲染分支已经删除，安装包不包含旧 native DLL/SO/PTX。旧配置中的 RTX preset/backend/sample target 自动迁移，旧路径独有开关丢弃。材质/BSDF/环境/水面的原始数学基准继续用于 Slang 数值校验。独立 OptiX temporal AOV 去噪接口与 GPU export 基础保留，尚未接入 Vulkan 输出。
+多 spp 在同一套帧调度中批处理，相机只上传一次，末尾平均后复制一次 radiance。近火把连接缩减为最近两个直接连接加一个 RIS 采样连接，手持源保持独立。场景包含地形与原生实体/方块实体、手持/手臂、自定义 quad、cutout quad 粒子；动态模型目前使用原生纹理/tint 的漫反射材质。
 
-当前 Vulkan 路径包含原生地形 BLAS/TLAS、Material 3/LabPBR、cutout、介质栈、最多 6 次反弹、共享 HDR 天空、太阳/月亮/环境/手持光与原生发光地形 NEE/MIS。手持点光每次有效表面/介质着色独立连接，不再与天空争用随机光源选择，连续 BSDF MIS 不作用于该离散点光。预编译 Slang/SPIR-V 随 jar 发布，游戏内不编译 PT 程序。`rt_backend vulkan_poc` 为法线调试；`vulkan_transport_test` 为灰色材质输运对照；`raster` 恢复光栅。`preset vulkan_quality` 开启 Vulkan 材质路径和累积；performance/balanced/quality 是光栅预设。
-
-仍有边界：64 MiB/512 section 地形预算、最高 640×360 追踪分辨率，实体尚未进入 RT；仅 LabPBR 发光且原生发光等级为零的材质 NEE、完整环境一致性、AOV 重建/去噪/DLSS RR 和性能验收仍待完成。静止累积版本需要 RTX 实机验收。
+`rt_scale 0` 保留至少 4×、最高 640×360 的自动分辨率；`1..8` 指定线性缩放，实际尺寸受设备 buffer 范围和 1 GiB continuation 预算约束，stats 显示实际尺寸。场景有 256 MiB 压缩 CPU 页缓存、64 MiB GPU working set 和异步 miss 请求优先页；无法重建服务器尚未加载的区块。透明/加法粒子、动态 LabPBR 材质、DLSS RR、OMM/SER 性能验收仍未完成。此版本的 RTX 降噪、动态外观和性能需要实机验证。
 
 ## 构建与验证
 
@@ -27,7 +24,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，�
 ./gradlew build clientKit
 ```
 
-构建工具需要 Slang 和 SPIR-V 验证工具，详见 [Vulkan 迁移记录](docs/VULKAN-RT-MIGRATION.md)。构建执行 Java 回归、真实 Minecraft GLSL pipeline 链接、12 个 RT SPIR-V stage 验证，以及实际 Slang CPU target 对原始 BSDF/材质/环境的数值校验。无需旧 CUDA/OptiX native build。产物位于 `build/libs/` 和 `build/distributions/`；client kit 只含本 mod 和当前操作文档。
+构建工具需要 Slang 和 SPIR-V 验证工具，详见 [Vulkan 迁移记录](docs/VULKAN-RT-MIGRATION.md)。构建执行 Java 回归、真实 Minecraft GLSL pipeline 链接、14 个 RT SPIR-V stage 验证，以及实际 Slang CPU target 对原始 BSDF/材质/环境的数值校验。独立降噪 helper 需要 NVIDIA SDK 头文件和 Windows/Linux C++ 工具链，不需要 nvcc 或旧 tracing build。产物位于 `build/libs/` 和 `build/distributions/`；client kit 只含本 mod 和当前操作文档。
 
 ## 文档
 
@@ -40,10 +37,8 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的纯客户端 Fabric 光照原型，�
 - [环境采样](docs/RT-ENVIRONMENT.md)
 - [版本历史](docs/CHANGELOG.md)
 
-旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.19。
+旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.20。
 
-Alpha.15 validation: 246 Java tests passed; 12 shipped SPIR-V stages validated; actual Minecraft GLSL pipelines linked. Material/terrain/environment parity passed (57,600 cases / 32 cases / 400,000 samples), along with actual shader numerical boundary checks and 100,000 emitter CDF/solid-angle PDF samples. RTX visual and performance acceptance remains pending.
+本轮验证：254 项 Java 测试通过；14 个 RT SPIR-V stage 验证与 Minecraft GLSL 链接通过；实际 Slang 材质/地形/环境输运、数值边界与光源采样通过，RIS 200,000 次采样的含遮挡 RGB 能量误差低于 0.8%。Windows/Linux 独立去噪桥接已构建，但 NVIDIA GPU 运行验收尚未完成。
 
-手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。alpha.19 已通过 CPU 实际表面输运和遮挡测试，RTX 游戏画面尚待实机验收。
-
-使用 `/voxellight rt_spp 2` 增加每帧采样（1–8）。近期原生火把/灯笼光源最多 16 个独立连接；其他光源继续随机 NEE。
+手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。

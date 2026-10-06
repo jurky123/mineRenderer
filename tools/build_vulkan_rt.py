@@ -2,7 +2,7 @@
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
 import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit'}
+STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration'}
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)
     if not found and name == 'slangc':
@@ -44,8 +44,8 @@ def validate_layout(reflection, transport=False, material=False):
         expected.pop('padding'); expected.update(frame=88, padding=92)
         path = parameters['paths']['type']['resultType']
         expected_path=dict(origin=0,direction=16,throughput=32,radiance=48)
-        if material: expected_path.update(absorptionIor=64,scatteringPhase=192,mediumIds=320,mediumCount=352,etaScale=356,previousDelta=360,padding=364)
-        if path['sizes'][0]['value'] != (368 if material else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
+        if material: expected_path.update(absorptionIor=64,scatteringPhase=192,mediumIds=320,mediumCount=352,etaScale=356,previousDelta=360,padding=364,diffuse=368,reflection=384,refraction=400,channel=416,reserved0=420,reserved1=424,reserved2=428)
+        if path['sizes'][0]['value'] != (432 if material else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
             raise ValueError('continuation ABI mismatch')
     if offsets != expected:
         raise ValueError(f'camera ABI mismatch: {offsets}')
@@ -69,5 +69,5 @@ def main():
         validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
         manifest['shaders'][entry] = {'stage': stage, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64/368 bytes')
+    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64/432 bytes')
 if __name__ == '__main__': main()

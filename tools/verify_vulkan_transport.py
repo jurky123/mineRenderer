@@ -48,6 +48,11 @@ def main():
     executable=output/'emitter_sampling'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_emitter_sampling.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/flame_sampling.slang'
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','flame_sampling','-stage','compute','-o',str(output/'flame_sampling.cpp')],check=True)
+    executable=output/'flame_sampling'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_flame_sampling.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     source=ROOT/'shaders/rt/tests/visibility_transport.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','visibility_transport','-stage','compute','-o',str(output/'visibility_transport.cpp')],check=True)
     executable=output/'visibility_transport'

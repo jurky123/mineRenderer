@@ -9,8 +9,10 @@ bool finiteRgb(vec3 value){return !any(isnan(value))&&!any(isinf(value));}
 vec4 accumulateSample(vec4 current,vec4 prior,float target){
     if(!finiteRgb(prior.rgb)||isnan(prior.a)||isinf(prior.a))prior=vec4(0);
     if(current.a<=.5||isnan(current.a)||isinf(current.a)||!finiteRgb(current.rgb))return prior;
-    float count=min(max(prior.a,0)+1,target);
-    return vec4(prior.rgb*(1-1/count)+max(current.rgb,vec3(0))/count,count);
+    float batch=max(1,current.a),previous=max(prior.a,0);
+    float count=min(previous+batch,target);
+    float weight=previous<target?batch/(previous+batch):1-pow(1-1/target,batch);
+    return vec4(prior.rgb*(1-weight)+max(current.rgb,vec3(0))*weight,count);
 }
 void main(){
     vec4 prior=vec4(0);

@@ -39,12 +39,12 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     private GpuTextureView albedoView;
     private VulkanRtBuffer buffer;
     private int[] widths,heights,offsets;
-    private int environmentOffset,emitterOffset,flameOffset;
+    private int environmentOffset,emitterOffset,flameOffset,dynamicOffset;
     private long emitterGeneration=-1;
     private String lightingStatus="";
     String status(){return lightingStatus;}
     private final VulkanRtEnvironmentAssets environment=new VulkanRtEnvironmentAssets();
-    VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows,com.voxellight.rt.vulkan.VulkanRtScene scene) {
+    VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows,com.voxellight.rt.vulkan.VulkanRtScene scene,GpuTexture dynamicAtlas) {
         var atlas=Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
         var ids=material.rtAtlas(0);var normal=material.rtAtlas(1);var palette=material.rtAtlas(2);
         if(ids==null||normal==null||palette==null)return null;
@@ -55,7 +55,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             heights=new int[]{atlas.getHeight(0),ids.getHeight(0),normal.getHeight(0),palette.getHeight(0)};
             offsets=new int[4];long bytes=208;
             for(int i=0;i<4;i++){offsets[i]=Math.toIntExact(bytes);bytes=Math.addExact(bytes,Math.multiplyExact((long)widths[i]*heights[i],4));}
-            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;flameOffset=Math.toIntExact(bytes);bytes+=16*64;
+            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;flameOffset=Math.toIntExact(bytes);bytes+=16*64;dynamicOffset=Math.toIntExact(bytes);bytes+=(long)RtDynamicScene.SIZE*RtDynamicScene.SIZE*4;
             if(bytes>256L*1024*1024)throw new IllegalStateException("Vulkan material atlas budget exceeded (256 MiB)");
             try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
                 var properties=org.lwjgl.vulkan.VkPhysicalDeviceProperties.calloc(stack);
@@ -81,7 +81,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         for(float value:shadows.rtVirtualLight())header.putFloat(value);
         var water=material.waterMedium();header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
         header.putInt(124,scene.emitterCount());header.putInt(156,emitterOffset);
-        header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).putInt(scene.flameCount()).putInt(flameOffset).putInt(0).putInt(0).flip();
+        header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).putInt(scene.flameCount()).putInt(flameOffset).putInt(dynamicOffset).putInt(RtDynamicScene.SIZE).flip();
         var player=Minecraft.getInstance().player;
         String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
         lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
@@ -93,6 +93,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             pass.setPipeline(COPY);pass.bindTexture("Sampler0",atlas,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
         }
         encoder.copyTextureToBuffer(albedo,buffer,offsets[0],()->{},0);
+        if(dynamicAtlas!=null)encoder.copyTextureToBuffer(dynamicAtlas,buffer,dynamicOffset,()->{},0);
         return buffer;
     }
     long bytes(){return buffer==null?0:buffer.size();}

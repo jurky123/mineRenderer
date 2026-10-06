@@ -1,3 +1,13 @@
+# 0.39.0-alpha.20 — realtime reconstruction and batched Vulkan transport
+
+Vulkan retains all tracing. The independent OptiX Temporal AOV helper consumes GPU beauty/albedo/camera-normal/flow/trust and diffuse/reflection/refraction inputs through external memory and binary semaphores; failure retains Vulkan temporal/spatial filtering. Moving-camera history validates RT positions, normals, materials and light changes. Reference progressive accumulation is separate (`rt_mode reference`), with explicit freeze.
+
+Multi-spp uses one camera upload, batched primary and five continuation passes, one sample resolve and one radiance copy. Separate path banks obey the device storage-buffer range; stats report actual internal resolution and memory caps. Flame connections retain nearest two plus one visibility-tested RIS selection, independently of held lighting. A compressed CPU page cache and asynchronous miss requests prioritize loaded terrain within the bounded GPU working set.
+
+Native entity/block entity, first-person hands/items, custom quad and cutout quad particle geometry now enters the Vulkan scene using native texture/tint diffuse materials. Native hand overlay is suppressed only after successful PT display and hand capture. Transparent/additive particles, glint and full dynamic LabPBR parity remain pending. Responsibilities are split into VulkanPathTracer, RtDynamicScene, RtReconstruction, RtDiagnostics and scene/cache owners.
+
+Validation: 254 Java tests, 14 SPIR-V stages, Minecraft GLSL linking, actual Slang numerical parity and 200,000 flame RIS samples with occlusion passed. Both host-only denoiser bridges build. This host has no NVIDIA GPU: interop, visual quality, dynamic coverage and frame-time acceptance still need RTX testing. DLSS RR and optional OMM/SER remain deferred until reconstruction profiling, as requested by the review.
+
 # 0.39.0-alpha.15 — independent held-light connection
 
 Alpha.14 held lighting still failed user visual acceptance. Its delta point light shared stochastic selection with sun/sky, allowing high environment power to starve held connections. It now has a separate deterministic inverse-square connection at eligible surfaces and medium events; sky/sun distribution and complementary miss MIS exclude the delta source. Visibility and material shading remain intact; no light leaks or unconditional full-screen brightness are substituted. Status adds main/offhand item IDs and virtual source position to distinguish recognition from transport failures. Visual acceptance remains pending; no RTX GPU is available on the build host.

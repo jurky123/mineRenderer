@@ -14,13 +14,55 @@ SurfacePayload fixtureTrace(float3 origin,float3 direction,float maximum);
 [[vk::binding(2, 0)]] StructuredBuffer<float4> normals;
 struct Camera {float4 inverseClip0;float4 inverseClip1;float4 inverseClip2;float4 inverseClip3;float4 origin;uint width;uint height;uint frame;uint padding;};
 [[vk::binding(3, 0)]] ConstantBuffer<Camera> camera;
-// 368-byte explicit continuation ABI; eight nested media survive dispatch boundaries.
+// 432-byte explicit continuation ABI; eight nested media survive dispatch boundaries.
 struct PathState {
     float4 origin,direction,throughput,radiance;
     float4 absorptionIor[8];float4 scatteringPhase[8];uint4 mediumIds[2];
     uint mediumCount;float etaScale;uint previousDelta;uint padding;
+    float4 diffuse,reflection,refraction;uint channel;uint reserved0,reserved1,reserved2;
 };
 [[vk::binding(4, 0)]] RWStructuredBuffer<PathState> paths;
+[[vk::binding(8,0)]] RWStructuredBuffer<PathState> paths1;
+[[vk::binding(9,0)]] RWStructuredBuffer<PathState> paths2;
+[[vk::binding(10,0)]] RWStructuredBuffer<PathState> paths3;
+[[vk::binding(11,0)]] RWStructuredBuffer<PathState> paths4;
+[[vk::binding(12,0)]] RWStructuredBuffer<PathState> paths5;
+[[vk::binding(13,0)]] RWStructuredBuffer<PathState> paths6;
+[[vk::binding(14,0)]] RWStructuredBuffer<PathState> paths7;
+PathState loadPath(uint index){uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
+case 0:return paths[local];
+case 1:return paths1[local];
+case 2:return paths2[local];
+case 3:return paths3[local];
+case 4:return paths4[local];
+case 5:return paths5[local];
+case 6:return paths6[local];
+case 7:return paths7[local];
+}return (PathState)0;}
+void storePath(uint index,PathState path){uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
+case 0:paths[local]=path;break;
+case 1:paths1[local]=path;break;
+case 2:paths2[local]=path;break;
+case 3:paths3[local]=path;break;
+case 4:paths4[local]=path;break;
+case 5:paths5[local]=path;break;
+case 6:paths6[local]=path;break;
+case 7:paths7[local]=path;break;
+}}
+
+#ifndef RT_CPU_FIXTURE
+[[vk::binding(7,0)]] RWStructuredBuffer<uint4> pageFeedback;
+#endif
+void requestMissPages(float3 origin,float3 direction){
+#ifndef RT_CPU_FIXTURE
+    uint2 pixel=DispatchRaysIndex().xy;
+    if(camera.frame%8!=0||DispatchRaysIndex().z!=0||pixel.x%16!=0||pixel.y%16!=0)return;
+    for(uint step=0;step<4;step++){
+        uint index;InterlockedAdd(pageFeedback[0].x,1,index);if(index>=512)return;
+        int3 key=int3(floor((origin+direction*(32u<<step))/16));pageFeedback[index+1]=uint4(asuint(key.x),asuint(key.y),asuint(key.z),1);
+    }
+#endif
+}
 SurfacePayload traceSurface(float3 origin,float3 direction,float maximum=4096) {
 #ifdef RT_CPU_FIXTURE
     return fixtureTrace(origin,direction,maximum);
@@ -39,7 +81,7 @@ float3 connectionOrigin(float3 point,float3 normal,float3 direction){
 void heldProbe(PathState path,uint slot,float4 value){
 #ifndef RT_CPU_FIXTURE
     uint2 pixel=DispatchRaysIndex().xy;
-    if(path.throughput.w==0&&pixel.x==camera.width/2&&pixel.y==camera.height/2)output[camera.width*camera.height+slot]=value;
+    if(path.throughput.w==0&&pixel.x==camera.width/2&&pixel.y==camera.height/2&&DispatchRaysIndex().z==0)output[camera.width*camera.height*max(1u,camera.padding)+slot]=value;
 #endif
 }
 MediumStack loadMedia(PathState path) {
@@ -89,12 +131,26 @@ float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum
     return float3(0); // Conservative interface-limit handling.
 }
 bool finiteEnergy(float3 value){return all(isfinite(value))&&all(value>=0);}
-void addRadiance(inout PathState path,float3 contribution){
+void addRadiance(inout PathState path,float3 contribution,int directChannel=-1){
     float3 sum=path.radiance.xyz+contribution;
     if(!finiteEnergy(contribution)||!finiteEnergy(sum)){path.padding=1;path.origin.w=0;return;}
     path.radiance.xyz=sum;
+    uint channel=directChannel>=0&&path.throughput.w==0?uint(directChannel):path.channel;
+    if(channel==1)path.reflection.xyz+=contribution;else if(channel==2)path.refraction.xyz+=contribution;else path.diffuse.xyz+=contribution;
 }
 float4 pathOutput(PathState path){return float4(path.padding==0&&finiteEnergy(path.radiance.xyz)?path.radiance.xyz:float3(0),path.padding==0?1:0);}
+uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)||dielectric(m)?1:0);}
+void primaryGuide(PathState path,float3 point,Material m,float3 normal){
+#ifndef RT_CPU_FIXTURE
+    if(path.throughput.w==0&&DispatchRaysIndex().z==0){
+        uint pixels=camera.width*camera.height,index=DispatchRaysIndex().y*camera.width+DispatchRaysIndex().x;
+        uint base=pixels*max(1u,camera.padding)+4;
+        output[base+index]=float4(m.baseColor,m.type+1);
+        output[base+pixels+index]=float4(normal,m.microfacetAlpha);
+        output[base+pixels*2+index]=float4(point,length(point-camera.origin.xyz));
+    }
+#endif
+}
 void advance(inout PathState path) {
     if(path.origin.w==0||path.padding!=0)return;
     uint seed=asuint(path.radiance.w);MediumStack media=loadMedia(path);
@@ -116,8 +172,8 @@ void advance(inout PathState path) {
             if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002)));
             LightSample held=sampleHeldLight(event);
             if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*visibility(event,held.wi,media,max(.001,held.distance-.002)));
-            for(uint index=0;index<flameCount();index++){
-                LightSample flame=sampleFlame(event,index);
+            for(uint index=0;index<min(3u,flameCount());index++){
+                LightSample flame=flameConnection(event,index,seed);
                 if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*visibility(event,flame.wi,media,max(.001,flame.distance-.002),true));
             }
             LightSample emitter=sampleEmitter(event,seed);
@@ -126,6 +182,7 @@ void advance(inout PathState path) {
         path.throughput.xyz*=expNeg(extinction,distance);
     }
     if(hit.distance<0) {
+        requestMissPages(path.origin.xyz,path.direction.xyz);
         addRadiance(path,path.throughput.xyz*missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0));path.origin.w=0;
     } else {
         Material m=surface.material;float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
@@ -134,14 +191,15 @@ void advance(inout PathState path) {
             float3 waterNormal=terrainWaterNormal(surface.frame.n,point,camera.origin.xyz,controls.x,controls.z,asfloat(assets.Load(80)),controls.y,controls.w);
             if(dot(waterNormal,surface.geometryNormal)>0)surface.frame=makeFrame(waterNormal,surface.frame.t,surface.frame.b);
         }
+        primaryGuide(path,point,m,surface.frame.n);
         float3 wo=-path.direction.xyz;float3 n=dot(surface.frame.n,wo)>0?surface.frame.n:-surface.frame.n;
         Frame frame=makeFrame(n,surface.frame.t,surface.frame.b);
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
         float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,emitterHitPdf(hit.triangle,path.origin.xyz,point));
         addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
         // One stochastic sky/sun sample plus an independent held delta connection.
-        for(int connection=0;connection<2+int(flameCount());connection++){
-        LightSample light=connection==0?sampleOneLight(point,seed):connection==1?sampleHeldLight(point):sampleFlame(point,uint(connection-2));
+        for(int connection=0;connection<2+int(min(3u,flameCount()));connection++){
+        LightSample light=connection==0?sampleOneLight(point,seed):connection==1?sampleHeldLight(point):flameConnection(point,uint(connection-2),seed);
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
         if(connection==1){heldProbe(path,0,float4(light.radiance,light.distance));heldProbe(path,1,float4(direct.f,direct.pdf));heldProbe(path,2,float4(dot(n,light.wi),dot(surface.geometryNormal,light.wi),dot(n,wo),dot(surface.geometryNormal,wo)));}
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
@@ -152,7 +210,7 @@ void advance(inout PathState path) {
             float maximum=light.distance-max(0,dot(start-point,light.wi))-.002;
             float3 transmittance=visible&&maximum>.001?visibility(start,light.wi,shadowMedia,maximum,connection>=2):float3(0);
             if(connection==1)heldProbe(path,3,float4(transmittance,visible?1:0));
-            if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmittance);
+            if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmittance,int(directChannel(m,n,light.wi)));
         }
         }
         LightSample emitter=sampleEmitter(point,seed);
@@ -164,7 +222,7 @@ void advance(inout PathState path) {
                 float mis=emitter.kind==3||path.throughput.w>=5?1:powerHeuristic(emitter.pdf,e.pdf);
                 float3 start=connectionOrigin(point,surface.geometryNormal,emitter.wi);
                 float maximum=emitter.distance-max(0,dot(start-point,emitter.wi))-.002;
-                if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3));
+                if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3),int(directChannel(m,n,emitter.wi)));
             }
         }
         if(path.throughput.w>=5) {path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}
@@ -174,6 +232,7 @@ void advance(inout PathState path) {
             valid=crossMedium(media,m,entering);path.etaScale*=sample.eta*sample.eta;
         }
         if(!isfinite(sample.pdf)||!finiteEnergy(sample.weight)||!all(isfinite(sample.wi)))path.padding=1;
+        if(path.throughput.w==0)path.channel=(sample.flags&TRANSMISSION)!=0?2:(sample.flags&(GLOSSY|SPECULAR))!=0?1:0;
         path.throughput.xyz*=sample.weight;
         if(!finiteEnergy(path.throughput.xyz)||!isfinite(path.etaScale)){path.padding=1;valid=false;}path.throughput.w+=1;
         path.origin=float4(offsetRayOrigin(point,surface.geometryNormal,sample.wi),valid?1:0);path.direction=float4(sample.wi,sample.pdf);path.previousDelta=(sample.flags&DELTA)!=0?1:0;

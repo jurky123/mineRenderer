@@ -89,7 +89,7 @@ class ShadowPipelineTest {
         var addBindings = GlslCompiler.class.getDeclaredMethod("addToBindGroup", List.class, IntermediaryShaderModule.class, RenderPipeline.class);
         addBindings.setAccessible(true);
         try (var loader = shippedLoader(); var compiler = new GlslCompiler()) {
-            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE", "FIRST", "REDUCE", "VOLUMETRIC", "VOLUME_FILTER", "VOLUME_TEMPORAL", "MOTION", "WATER_MASK", "SURFACE_REFLECTION", "SURFACE_COMPOSITE", "COLOR_TEMPORAL", "CLOUD", "VULKAN_ACCUMULATE", "VULKAN_DISPLAY", "VULKAN_MATERIAL_DISPLAY", "VULKAN_ATLAS", "VULKAN_ENV_MAP", "VULKAN_ENV_CELLS", "VULKAN_ENV_ROWS")) {
+            for (String field : List.of("CASTER", "ENTITY", "COMPOSITE", "MASK", "MAP", "CAPTURE", "NATIVE_CAPTURE", "DISPLAY", "LIGHTING", "OUTPUT", "CULL", "NO_CULL", "LIGHTING_TEMPORAL", "TEMPORAL", "AO", "AO_FILTER", "BLOOM_EXTRACT", "BLOOM_BLUR", "WATER_STORE", "FIRST", "REDUCE", "VOLUMETRIC", "VOLUME_FILTER", "VOLUME_TEMPORAL", "MOTION", "WATER_MASK", "SURFACE_REFLECTION", "SURFACE_COMPOSITE", "COLOR_TEMPORAL", "CLOUD", "RT_RECON_PIPELINE","RT_RECON_GUIDES","VULKAN_ACCUMULATE", "VULKAN_DISPLAY", "VULKAN_MATERIAL_DISPLAY", "VULKAN_ATLAS", "VULKAN_ENV_MAP", "VULKAN_ENV_CELLS", "VULKAN_ENV_ROWS")) {
                 var pipeline = pipeline(loader, field);
                 try (var vertex = compile(compiler, loader, pipeline.getVertexShader().getPath(), ShaderType.VERTEX,pipeline.getShaderDefines());
                      var fragment = compile(compiler, loader, pipeline.getFragmentShader().getPath(), ShaderType.FRAGMENT,pipeline.getShaderDefines())) {
@@ -386,10 +386,11 @@ class ShadowPipelineTest {
             var field=Class.forName("com.voxellight.adapter.VulkanRtEnvironmentAssets",true,loader).getDeclaredField(name.substring(11));
             field.setAccessible(true);return (RenderPipeline)field.get(null);
         }
+        if(name.startsWith("RT_RECON_")){var field=Class.forName("com.voxellight.adapter.RtReconstruction",true,loader).getDeclaredField(name.substring(9));field.setAccessible(true);return (RenderPipeline)field.get(null);}
         if(name.equals("VULKAN_ACCUMULATE")){var field=Class.forName("com.voxellight.adapter.VulkanRtAccumulation",true,loader).getDeclaredField("PIPELINE");field.setAccessible(true);return (RenderPipeline)field.get(null);}
         if(name.startsWith("VULKAN_")) {
             boolean atlas=name.equals("VULKAN_ATLAS");
-            var field=Class.forName("com.voxellight.adapter."+(atlas?"VulkanRtMaterialAssets":"VulkanRtDebugPass"),true,loader).getDeclaredField(atlas?"COPY":name.substring(7));
+            var field=Class.forName("com.voxellight.adapter."+(atlas?"VulkanRtMaterialAssets":"VulkanPathTracer"),true,loader).getDeclaredField(atlas?"COPY":name.substring(7));
             field.setAccessible(true);return (RenderPipeline)field.get(null);
         }
         if(name.equals("CLOUD")){var field=Class.forName("com.voxellight.adapter."+"VoxelCloudPass",true,loader).getDeclaredField(name);field.setAccessible(true);return (RenderPipeline)field.get(null);}

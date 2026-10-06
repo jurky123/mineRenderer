@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
 final class EntityShadows implements AutoCloseable {
     private final DynamicModelBuffer buffer=new DynamicModelBuffer("entity");
     private boolean enabled=true;
+    private boolean rtCapture;
+    void rtCapture(){rtCapture=true;}
     private int selected,candidates,overflow,failures;
     private long captureNanos;
     private boolean loggedFailure;
@@ -30,6 +32,7 @@ final class EntityShadows implements AutoCloseable {
         var selection = new DynamicCasterSelection<Entity>();
         float partial = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         for (var entity : minecraft.level.entitiesForRendering()) {
+            if(rtCapture&&entity==minecraft.getCameraEntity()&&minecraft.options.getCameraType().isFirstPerson())continue;
             if (entity.isRemoved() || entity.isInvisible() || entity.isSpectator()) continue;
             var p = entity.getPosition(partial);
             selection.consider(entity, entity.getId(), p.distanceToSqr(camera.pos));
@@ -40,6 +43,8 @@ final class EntityShadows implements AutoCloseable {
                     int light, int overlay, int tint, TextureAtlasSprite sprite, int outline, ModelFeatureRenderer.CrumblingOverlay crumbling) {
                 buffer.capture(model, state, pose, type, light, overlay, tint, sprite);
             }
+            @Override public void submitItem(PoseStack pose,net.minecraft.world.item.ItemDisplayContext display,int light,int overlay,int outline,int[] tints,java.util.List<net.minecraft.client.resources.model.geometry.BakedQuad> quads,net.minecraft.client.renderer.item.ItemStackRenderState.FoilType foil){if(rtCapture)buffer.captureItem(pose,light,overlay,tints,quads);}
+            @Override public void submitCustomGeometry(PoseStack pose,RenderType type,net.minecraft.client.renderer.SubmitNodeCollector.CustomGeometryRenderer renderer){if(rtCapture)buffer.captureCustom(pose,type,renderer);}
             // Blob shadows, labels, flame, leash, custom geometry and item submits remain private and are discarded.
         };
         var collector = new SubmitNodeStorage() {
@@ -69,6 +74,7 @@ final class EntityShadows implements AutoCloseable {
             int light,int overlay,int tint,TextureAtlasSprite sprite) {
         return DynamicModelBuffer.buildModel(scratch,model,state,pose,light,overlay,tint,sprite);
     }
+    java.util.List<DynamicModelBuffer.RtModel> rtModels(){return buffer.rtModels();}
     void upload(CommandEncoder encoder){buffer.upload(encoder);}
     int maxIndices(){return buffer.maxIndices();}
     void borrowIndices(com.mojang.blaze3d.buffers.GpuBuffer indices,com.mojang.blaze3d.IndexType type){buffer.borrowIndices(indices,type);}
