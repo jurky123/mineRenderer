@@ -12,6 +12,6 @@ int main(){
  GlobalParams_0 globals{};globals.normals_0={normals.data(),normals.size()};globals.camera_0=&camera;globals.output_0={output,8};globals.paths_0={hot,4};globals.paths1_0={hot1,4};globals.pathMedia_0={media,8};globals.pathAovs_0={aovs,8};
  ComputeVaryingInput varying{};varying.endGroupID={1,1,1};path_storage(&varying,nullptr,&globals);
  unsigned seed;std::memcpy(&seed,&output[0].w,4);
- if(output[0].x!=3||output[0].y!=5||output[0].z!=7||seed!=0x87654321u||output[1].x!=1||output[1].y!=2||output[1].z!=3||std::abs(output[1].w-1.2f)>1e-6f||output[2].x!=7||output[2].w!=49||output[3].x!=1||output[3].w!=8||hot[1].seed_0!=0||hot1[1].seed_0!=seed||output[4].x!=1||output[4].y!=1||output[4].z!=1||output[4].w!=0||output[6].x!=19||output[6].y!=29||output[6].z!=49)return 1;
- std::puts("Production Slang PathHot 64B: split radiance/AOV, second sample bank, RNG and eight nested media roundtrip passed");
+ if(output[0].x!=3||output[0].y!=5||output[0].z!=7||seed!=0x87654321u||output[1].x!=1||output[1].y!=2||output[1].z!=3||std::abs(output[1].w-1.2f)>1e-6f||output[2].x!=7||output[2].w!=49||output[3].x!=1||output[3].w!=8||hot[1].seed_0!=0||hot1[1].seed_0!=seed||output[4].x!=1||output[4].y!=1||output[4].z!=1||output[4].w!=0||output[6].x!=19||output[6].y!=29||output[6].z!=49||output[5].x!=405)return 1;
+ std::puts("Production Slang PathHot 64B: split radiance/AOV, second sample bank, RNG, previous proposal cell and eight nested media roundtrip passed");
 }

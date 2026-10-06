@@ -50,9 +50,9 @@ class RtBenchmarkResultsTest {
         assertNull(RtBenchmarkResults.timing(List.of(0L)).medianMs());
     }
     @Test void PlanUsesIndependentABBAControlsAndSkipsUnsupportedFeatures(){
-        var minimal=RtBenchmarkPlan.create(false,false,false,false);assertEquals(8,minimal.blocks().size());assertEquals(6,minimal.skipped().size());
-        var full=RtBenchmarkPlan.create(true,true,true,true);assertEquals(56,full.blocks().size());
-        for(int i=0;i<56;i++){var p=full.blocks().get(i);assertEquals(i%8/4,p.round());assertEquals(i%4,p.position());assertEquals(i%4==1||i%4==2,p.candidate());}
+        var minimal=RtBenchmarkPlan.create(false,false,false,false);assertEquals(16,minimal.blocks().size());assertEquals(6,minimal.skipped().size());
+        var full=RtBenchmarkPlan.create(true,true,true,true);assertEquals(64,full.blocks().size());
+        for(int i=0;i<64;i++){var p=full.blocks().get(i);assertEquals(i%8/4,p.round());assertEquals(i%4,p.position());assertEquals(i%4==1||i%4==2,p.candidate());}
         assertThrows(UnsupportedOperationException.class,()->full.blocks().clear());
     }
     @Test void DelayedFramesBelongOnlyToTheirSubmissionWindow(){

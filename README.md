@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.33**：修复原版 atlas 动画 render pass 导致静态 OMM coverage 全部失效的问题。补齐快照完整装入校验、按 bounce 的 HYBRID A/B、OMM 区域失效与索引重建、GPU 预热稳定检查和驱动统计缺失诊断。自动 A/B 使用无计数器帧计算耗时，整轮固定静态地形并保留动态模型/光照。保留 Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.34**：统一局部光、emissive triangles 与环境光到空间层级 alias + RIS，每次 surface hit 最多三个直接光连接，保留 Sun/Moon 与可选手持灯。加入深层 NEE roulette、时间自适应 proposal、Owen family sampling 和配套 MIS；保留 64B PathHot 与第一轮执行层。新增专用 direct lighting 自动 A/B。实际 GPU 提速与场景视觉待 RTX 验收，全新安装默认 effects off。
 
-[下载 alpha.33 安装包](https://temp.sh/KxDrG/voxellight-client-kit-26.2-0.39.0-alpha.33.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.34 安装包](https://temp.sh/bmMZW/voxellight-client-kit-26.2-0.39.0-alpha.34.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -14,11 +14,13 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 实时模式优先使用独立 OptiX temporal AOV denoiser，失败回退 Vulkan 时空滤波；全部追踪仍是 Vulkan camera primary + 五次 continuation，没有恢复旧 OptiX/CUDA tracer 或运行时 PTX 编译。`rt_mode reference` 使用独立静止渐进累积，可设置 `rt_accumulate spp 256` 和显式 freeze。
 
-多 spp 在同一套帧调度中批处理，相机只上传一次，末尾平均后复制一次 radiance。近火把连接缩减为最近两个直接连接加一个 RIS 采样连接，手持源保持独立。场景包含地形与原生实体/方块实体、手持/手臂、自定义 quad、cutout quad 粒子；动态模型目前使用原生纹理/tint 的漫反射材质。
+多 spp 在同一套帧调度中批处理，相机只上传一次，末尾平均后复制一次 radiance。直接光默认采用统一 RIS，手持源保持独立；`rt_direct legacy` 可回退旧直接光用于对照。场景包含地形与原生实体/方块实体、手持/手臂、自定义 quad、cutout quad 粒子；动态模型目前使用原生纹理/tint 的漫反射材质。
 
 `rt_scale 0` 保留至少 4×、最高 640×360 的自动分辨率；`1..8` 指定线性缩放，实际尺寸受设备 buffer 范围和 1 GiB continuation 预算约束，stats 显示实际尺寸。场景有 256 MiB 压缩 CPU 页缓存、64 MiB GPU working set 和异步 miss 请求优先页；无法重建服务器尚未加载的区块。透明/加法粒子、动态 LabPBR 材质、DLSS RR、OMM/SER 性能验收仍未完成。此版本的 RTX 降噪、动态外观和性能需要实机验证。
 
-自动验收：进入正常 Vulkan PT 世界站定，执行 `/voxellight rt_benchmark start`。通常约 2–12 分钟，另加驱动管线初始化耗时，结束自动恢复原执行控制并导出 `benchmark-results/voxellight/rt-suite-<时间戳>.zip`。`status` 查看进度，`stop` 中断并导出。收益处于重复段波动范围内时明确报告 `within_variation`。
+第二轮专用验收：执行 `/voxellight rt_benchmark direct`（8 段，默认每段 10 秒）。[设计与指标说明](docs/performance/RT-DIRECT-LIGHTING-ROUND-2.md)。
+
+完整自动验收：进入正常 Vulkan PT 世界站定，执行 `/voxellight rt_benchmark start`。通常约 2–12 分钟，另加驱动管线初始化耗时，结束自动恢复原执行控制并导出 `benchmark-results/voxellight/rt-suite-<时间戳>.zip`。`status` 查看进度，`stop` 中断并导出。收益处于重复段波动范围内时明确报告 `within_variation`。
 
 ## 构建与验证
 
@@ -30,6 +32,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 ## 文档
 
+- [直接光第二轮设计、MIS 与自动验收](docs/performance/RT-DIRECT-LIGHTING-ROUND-2.md)
 - [一条命令自动 A/B 与结果判定](docs/performance/RT-AUTOMATIC-BENCHMARK.md)
 
 - [系统架构调整设计：总体、场景、PT、重建与迁移验收](docs/architecture/README.md)（设计基线 alpha.23；[alpha.24 实施与未完成项](docs/architecture/IMPLEMENTATION.md)）
@@ -46,7 +49,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.21。
 
-本轮验证：309 项 Java 测试通过；24 个 RT SPIR-V stage 验证与 Minecraft GLSL 链接通过；实际 Slang 材质/地形/环境输运、数值边界与光源采样通过，RIS 200,000 次采样的含遮挡 RGB 能量误差低于 0.8%。Windows/Linux 独立去噪桥接已构建，但 NVIDIA GPU 运行验收尚未完成。
+本轮验证：315 项 Java 测试通过；24 个 RT SPIR-V stage 与 Minecraft GLSL 链接通过；生产 Slang 统一 RIS 对彩色遮挡点光、面积光、环境、自适应 proposal、深层 roulette 与表面 NEE/BSDF MIS 做每 case 200,000 次数值回归，RGB 能量误差在 2% 验收阈值内。NVIDIA GPU 帧时间与实机场景视觉尚待验收。
 
 手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。
 

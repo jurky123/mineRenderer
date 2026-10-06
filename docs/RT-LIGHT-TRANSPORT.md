@@ -1,3 +1,5 @@
+> alpha.34 默认使用统一层级 RIS 直接光；旧 flame/emitter 多连接仍用于 legacy A/B。最新 proposal、K×s×q MIS 与深层 roulette 见 [第二轮设计](performance/RT-DIRECT-LIGHTING-ROUND-2.md)。
+
 > alpha.13 runtime update: legacy tracing and commands below are historical. Current commands and stationary accumulation are documented in [SETTINGS.md](SETTINGS.md). Vulkan owns tracing; OptiX denoising is not connected yet.
 
 # Physically based RT light transport — 0.37

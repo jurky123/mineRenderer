@@ -6,7 +6,7 @@
 /voxellight rt_benchmark start
 ```
 
-不需要逐项手动切换。默认每段采样 6 秒，至少预热 4 秒，随后留 2 秒接收延迟 GPU 数据。根据硬件支持运行 8–56 段，通常约 2–12 分钟，另加驱动管线初始化耗时；SER 首次创建在用户实测中约 52 秒，期间渲染线程可能暂停。也可 `start 15` 延长每段采样（允许 4–30 秒）。`/voxellight rt_benchmark` 等同默认 start。
+不需要逐项手动切换。默认每段采样 6 秒，至少预热 4 秒，随后留 2 秒接收延迟 GPU 数据。根据硬件支持运行 16–64 段，通常约 2–12 分钟，另加驱动管线初始化耗时；SER 首次创建在用户实测中约 52 秒，期间渲染线程可能暂停。也可 `start 15` 延长每段采样（允许 4–30 秒）。`/voxellight rt_benchmark` 等同默认 start。
 
 ```text
 /voxellight rt_benchmark status
@@ -83,3 +83,5 @@ OMM 的 atlas 更新按区域失效：受影响静态 alpha 转为 unknown，其
 26.2 原版 atlas 动画通过 `uploadAnimationFrames` 的 render pass 绘制动画 sprite。此精确调用作用域只更新预分类 unknown 的动画区域，保留其他静态覆盖；其他 render target 写入继续保守失效，并使用 attachment view 的实际 mip。纹理版本仍递增，Vulkan albedo 更新保持正常。测试包含实际原版方法的 bytecode 合同和异常恢复；第三方直接底层写入仍不在此合同内，兼容场景保持 OMM off。
 
 alpha.32 实测的各段工作集一致，但 OMM coverage 全零、SER 大幅漂移、编译统计驱动零 executable，不能据此冻结；详细记录见 [当前阶段](../CURRENT.md)。
+
+alpha.34 新增 `/voxellight rt_benchmark direct [seconds]`：仅测 direct lighting，8 段、默认 10 秒；固定 Query/Fixed/OMM off/SER off，仅比较 legacy/RIS。summary schema 6 和每段 `.direct_lighting.json` 提供实际 Direct mode 与 per-bounce 连接计数。完整 start 追加 direct lighting pair。见 [第二轮设计](RT-DIRECT-LIGHTING-ROUND-2.md)。

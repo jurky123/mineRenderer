@@ -80,6 +80,12 @@ def main():
     executable=output/'continuation_queue'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_continuation_queue.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    subprocess.run(['java','-cp',str(ROOT/'build/classes/java/main'),str(ROOT/'tools/native/GenerateLightRuntime.java'),str(output)],check=True)
+    source=ROOT/'shaders/rt/tests/direct_lighting.slang'
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','direct_lighting','-stage','compute','-o',str(output/'direct_lighting.cpp')],check=True)
+    executable=output/'direct_lighting'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_direct_lighting.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable),str(output)],text=True)
     (output/'result.txt').write_text(result);print(result,end='')
 
 if __name__=='__main__':main()

@@ -39,10 +39,13 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     private GpuTextureView albedoView;
     private VulkanRtBuffer buffer;
     private int[] widths,heights,offsets;
-    private int environmentOffset,emitterOffset,flameOffset,dynamicOffset;
+    private int environmentOffset,emitterOffset,flameOffset,dynamicOffset,runtimeOffset;
+    private static final int RUNTIME_BYTES=2*1024*1024;
+    private long runtimeGeneration=-1,runtimeProposalRevision=-1,runtimeFrame=-1;
+    private int runtimeCellX=Integer.MIN_VALUE,runtimeCellY,runtimeCellZ,runtimeBytes,runtimeLights,runtimeSections;
     private long emitterGeneration=-1,albedoVersion=Long.MIN_VALUE;
     private String lightingStatus="";
-    String status(){return lightingStatus;}
+    String status(){return lightingStatus+", lightRuntimeLights="+runtimeLights+", lightRuntimeSections="+runtimeSections+", lightRuntimeBytes="+runtimeBytes+", lightProposalRevision="+runtimeProposalRevision+", directLighting="+com.voxellight.rt.RtExecutionOptions.direct();}
     private final VulkanRtEnvironmentAssets environment=new VulkanRtEnvironmentAssets();
     VulkanRtBuffer prepare(CommandEncoder encoder,VulkanDevice device,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows,com.voxellight.rt.vulkan.VulkanRtScene scene,RtDynamicScene dynamic) {
         var atlas=Minecraft.getInstance().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
@@ -53,9 +56,9 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             // Keep the native albedo resolution; IDs and normals have their existing PbrAtlas dimensions.
             widths=new int[]{atlas.getWidth(0),ids.getWidth(0),normal.getWidth(0),palette.getWidth(0)};
             heights=new int[]{atlas.getHeight(0),ids.getHeight(0),normal.getHeight(0),palette.getHeight(0)};
-            offsets=new int[4];long bytes=208;
+            offsets=new int[4];long bytes=256;
             for(int i=0;i<4;i++){offsets[i]=Math.toIntExact(bytes);bytes=Math.addExact(bytes,Math.multiplyExact((long)widths[i]*heights[i],4));}
-            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;flameOffset=Math.toIntExact(bytes);bytes+=16*64;dynamicOffset=Math.toIntExact(bytes);bytes+=(long)RtDynamicScene.SIZE*RtDynamicScene.SIZE*4;
+            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;flameOffset=Math.toIntExact(bytes);bytes+=16*64;dynamicOffset=Math.toIntExact(bytes);bytes+=(long)RtDynamicScene.SIZE*RtDynamicScene.SIZE*4;runtimeOffset=Math.toIntExact(bytes);bytes+=RUNTIME_BYTES;
             if(bytes>256L*1024*1024)throw new IllegalStateException("Vulkan material atlas budget exceeded (256 MiB)");
             try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
                 var properties=org.lwjgl.vulkan.VkPhysicalDeviceProperties.calloc(stack);
@@ -69,7 +72,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             encoder.copyTextureToBuffer(palette.texture(),buffer,offsets[3],()->{},0);
         }
         // Metadata is small CPU control data; all atlas pixels stay on the GPU.
-        var header=ByteBuffer.allocateDirect(208).order(ByteOrder.LITTLE_ENDIAN);
+        var header=ByteBuffer.allocateDirect(256).order(ByteOrder.LITTLE_ENDIAN);
         int[] extra={environmentOffset,environmentOffset+256*128*16,environmentOffset+256*128*32,96};
         for(int i=0;i<4;i++)header.putInt(widths[i]).putInt(heights[i]).putInt(offsets[i]).putInt(extra[i]);
         var controls=weather.rtSettings();header.putFloat(WaterSurface.clock()).putFloat(controls[2]).putFloat(WaterSurface.waveStrength()).putFloat(controls[4])
@@ -81,11 +84,19 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         for(float value:shadows.rtVirtualLight())header.putFloat(value);
         var water=material.waterMedium();header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
         header.putInt(124,scene.emitterCount());header.putInt(156,emitterOffset);
-        header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).putInt(scene.flameCount()).putInt(flameOffset).putInt(dynamicOffset).putInt(RtDynamicScene.CELL).flip();
+        header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).putInt(scene.flameCount()).putInt(flameOffset).putInt(dynamicOffset).putInt(RtDynamicScene.CELL);
+        var position=Minecraft.getInstance().gameRenderer.mainCamera().position();int cx=(int)Math.floor(position.x/16),cy=(int)Math.floor(position.y/16),cz=(int)Math.floor(position.z/16);long frame=RenderPassProfile.frameId();
+        if(runtimeGeneration!=scene.emitterGeneration()||cx!=runtimeCellX||cy!=runtimeCellY||cz!=runtimeCellZ||runtimeProposalRevision!=scene.proposalRevision()&&frame-runtimeFrame>=64){
+            var runtime=com.voxellight.rt.RtLightRuntime.build(com.voxellight.rt.RtLightRuntime.sources(scene.emitterData(),scene.flameData()),position.x,position.y,position.z,scene.proposalFactors());
+            if(runtime.remaining()>RUNTIME_BYTES)throw new IllegalStateException("Light Runtime capacity exceeded");
+            runtimeBytes=runtime.remaining();runtimeLights=runtime.getInt(4);runtimeSections=runtime.getInt(8);encoder.writeToBuffer(buffer.slice(runtimeOffset,runtimeBytes),runtime);
+            runtimeGeneration=scene.emitterGeneration();runtimeProposalRevision=scene.proposalRevision();runtimeFrame=frame;runtimeCellX=cx;runtimeCellY=cy;runtimeCellZ=cz;
+        }
+        header.putInt(runtimeOffset).putInt(runtimeBytes).putInt(8).putInt(4).putInt(1).putInt((int)runtimeProposalRevision).putInt(com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE);header.position(256);header.flip();
         var player=Minecraft.getInstance().player;
         String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
         lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
-        encoder.writeToBuffer(buffer.slice(0,208),header);
+        encoder.writeToBuffer(buffer.slice(0,256),header);
         if(emitterGeneration!=scene.emitterGeneration()){if(scene.emitterCount()>0)encoder.writeToBuffer(buffer.slice(emitterOffset,scene.emitterCount()*64L),scene.emitterData());if(scene.flameCount()>0)encoder.writeToBuffer(buffer.slice(flameOffset,scene.flameCount()*64L),scene.flameData());emitterGeneration=scene.emitterGeneration();}
         environment.prepare(encoder,device,buffer,environmentOffset,weather,shadows);
         long version=NativeTextureVersions.version(atlas.texture());
@@ -100,5 +111,5 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         return buffer;
     }
     long bytes(){return buffer==null?0:buffer.size();}
-    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;emitterGeneration=-1;albedoVersion=Long.MIN_VALUE;albedoView=null;albedo=null;}
+    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;runtimeGeneration=runtimeProposalRevision=-1;runtimeCellX=Integer.MIN_VALUE;runtimeBytes=runtimeLights=runtimeSections=0;emitterGeneration=-1;albedoVersion=Long.MIN_VALUE;albedoView=null;albedo=null;}
 }

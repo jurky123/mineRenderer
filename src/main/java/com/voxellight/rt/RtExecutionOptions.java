@@ -2,6 +2,10 @@ package com.voxellight.rt;
 
 /** Execution-only A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
+    public enum Direct {LEGACY,RIS}
+    private static Direct direct=Direct.RIS;
+    public static Direct direct(){return direct;}
+    public static void direct(Direct value){if(direct!=value){direct=value;revision++;}}
     public enum Visibility {LEGACY,TRACE,QUERY}
     public enum Queue {AUTO,FIXED,COMPACT,HYBRID}
     private static Visibility visibility=Visibility.TRACE;

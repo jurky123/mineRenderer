@@ -38,7 +38,15 @@ public final class VulkanRtScene implements AutoCloseable {
     private ByteBuffer emitterData=ByteBuffer.allocateDirect(0);
     public ByteBuffer emitterData(){return emitterData.asReadOnlyBuffer();}
     public int emitterCount(){return emitterData.remaining()/64;}
-    private long terrainGeneration,emitterGeneration;
+    private long terrainGeneration,emitterGeneration,proposalRevision;
+    private final float[] proposalFactors={1,1,1,1,1,1,1,1};
+    public long proposalRevision(){return proposalRevision;}
+    public float[] proposalFactors(){return proposalFactors.clone();}
+    public void proposalFeedback(long sourceGeneration,long[] count,long[] visible){
+        if(sourceGeneration!=emitterGeneration)return;boolean changed=false;
+        for(int i=0;i<8;i++)if(count[i]>=16){float observed=Math.clamp((float)(visible[i]/((double)com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE*count[i])),.25f,1f);float next=proposalFactors[i]*.85f+observed*.15f;if(Math.abs(next-proposalFactors[i])>.005f)changed=true;proposalFactors[i]=next;}
+        if(changed)proposalRevision++;
+    }
     public long emitterGeneration(){return emitterGeneration;}
     private long emitterTerrainVersion=-1;
     private final Map<SectionKey,Section> previousPose=new HashMap<>();

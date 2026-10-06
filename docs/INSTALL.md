@@ -1,8 +1,8 @@
-# VoxelLight 0.39.0-alpha.33 安装
+# VoxelLight 0.39.0-alpha.34 安装
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.33.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.34.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 
@@ -38,3 +38,5 @@ alpha.23：纹理裁切槽位与 BLAS 分组分开；按原始纹理和手持/�
 alpha.24：统一 scene commit、稳定几何范围、持久 BLAS/TLAS refit、对象局部平移与上帧位置、纹理版本追踪、hot/cold path 和可选 GPU active queue 已接入。实时降噪后执行独立输出分辨率时域放大；Reference 不执行降噪/放大。profile 导出 `.passes.csv` 包含真实 frame/scope、尺寸、spp 和 scene generation，另有抽样 `.rays.csv`。stats 的 scheduling 表示 fixed batch 或 GPU compact continuation；初始 compaction 阈值为 65,536 paths，尚需实测。输出双 history 额外约 32 bytes/output pixel；`rtBufferAllocatedBytes`/`rtBufferRetiringBytes` 只覆盖本项目 Vulkan buffer。NRD/DLSS RR、ReSTIR、焦散和完整分信号重建仍未实现。
 
 自动验收：在正常 Vulkan PT 世界站定执行 `/voxellight rt_benchmark start`，结束导出 ZIP 并恢复控制。详见 [自动测试](performance/RT-AUTOMATIC-BENCHMARK.md)。
+
+alpha.34 默认直接光 RIS。第二轮专用验收执行 `/voxellight rt_benchmark direct`，自动对照 legacy/RIS 并恢复设置；见 [第二轮设计](performance/RT-DIRECT-LIGHTING-ROUND-2.md)。

@@ -60,7 +60,7 @@ PathState loadPath(uint index){
     path.direction=hot.direction;
     path.throughput=hot.throughput;
     path.radiance=float4(0,0,0,asfloat(hot.seed));path.reserved0=index;
-    path.mediumCount=hot.state&15u;
+    path.reserved1=hot.reserved;path.mediumCount=hot.state&15u;
     path.etaScale=hot.etaScale;
     path.previousDelta=(hot.state>>4)&1u;
     path.padding=(hot.state>>5)&1u;
@@ -76,7 +76,7 @@ void storePath(uint index,PathState path){PathHot hot;
     hot.direction=path.direction;
     hot.throughput=path.throughput;
     hot.seed=asuint(path.radiance.w);
-    hot.state=path.mediumCount|(path.previousDelta<<4)|(path.padding<<5)|(path.channel<<6);hot.reserved=0;
+    hot.state=path.mediumCount|(path.previousDelta<<4)|(path.padding<<5)|(path.channel<<6);hot.reserved=path.reserved1;
     hot.etaScale=path.etaScale;
     if(path.mediumCount>0){MediumStorage media=(MediumStorage)0;
         for(uint i=0;i<path.mediumCount;i++){media.absorptionIor[i]=path.absorptionIor[i];media.scatteringPhase[i]=path.scatteringPhase[i];}
@@ -252,12 +252,13 @@ float4 pathOutput(PathState path){
     return float4(path.padding==0&&finiteEnergy(radiance)?radiance:float3(0),path.padding==0?1:0);
 }
 uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)||dielectric(m)?1:0);}
+#include "light_runtime.slang"
 void advance(inout PathState path) {
     if(path.origin.w==0||path.padding!=0)return;
 #ifndef RT_CPU_FIXTURE
     if((uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
 #endif
-    uint seed=asuint(path.radiance.w);MediumStack media=loadMedia(path);
+    uint seed=asuint(path.radiance.w),lightingSeed=directHash(seed^0xc83a91e1u);MediumStack media=loadMedia(path);
     SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);
     TerrainSurface surface=(TerrainSurface)0;bool entering=false;
     if(hit.distance>=0) {
@@ -290,26 +291,34 @@ void advance(inout PathState path) {
         Medium m=media.entries[media.count-1];float3 extinction=m.sigmaA+m.sigmaS;
         // Realtime finite-segment first-order scattering; full free-flight reference remains pending.
         if(maxComponent(m.sigmaS)>0) {
+            directVolumeCounter(0);
             MediumDistanceSample sample=sampleMediumDistance(extinction,distance,seed);float3 event=path.origin.xyz+path.direction.xyz*sample.distance;
-            LightSample light=sampleOneLight(event,seed);
+            if(directRis()){
+                LightSample sun=runtimeSun(lightingSeed);if(sun.pdf>0){addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,sun.wi),m.g)/(sample.pdf*sun.pdf))*sun.radiance*volumeVisibility(event,sun,media));}
+                LightSample held=sampleHeldLight(event);if(held.pdf>0){addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*volumeVisibility(event,held,media));}
+                DirectReservoir selected=selectDirect(event,(Material)0,(Frame)0,float3(0),float3(0),1,uint(path.throughput.w),lightingSeed,true,m.g,path.direction.xyz);
+                if(selected.target>0){float3 transmission=volumeVisibility(event,selected.light,media);directAdapt(selected,transmission);addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS/sample.pdf*selected.value*transmission);}
+            }else{
+            LightSample light=sampleOneLight(event,lightingSeed);
             // This first-order segment estimator has no competing phase continuation.
             // Applying surface MIS here would remove energy rather than reduce variance.
-            if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002)));
+            if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*volumeVisibility(event,light,media));
             LightSample held=sampleHeldLight(event);
-            if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*visibility(event,held.wi,media,max(.001,held.distance-.002)));
+            if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*volumeVisibility(event,held,media));
             uint firstFlame=nearestFlame(event,0xffffffffu),secondFlame=nearestFlame(event,firstFlame);
             for(uint index=0;index<min(3u,flameCount());index++){
-                LightSample flame=flameConnection(event,index,seed,firstFlame,secondFlame);
-                if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*visibility(event,flame.wi,media,max(.001,flame.distance-.002),true));
+                LightSample flame=flameConnection(event,index,lightingSeed,firstFlame,secondFlame);
+                if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*volumeVisibility(event,flame,media));
             }
-            LightSample emitter=sampleEmitter(event,seed);
-            if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*visibility(event,emitter.wi,media,max(.001,emitter.distance-.002),emitter.kind==3));
+            LightSample emitter=sampleEmitter(event,lightingSeed);
+            if(emitter.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,emitter.wi),m.g)/(sample.pdf*emitter.pdf))*emitter.radiance*volumeVisibility(event,emitter,media));
+            }
         }
         path.throughput.xyz*=expNeg(extinction,distance);
     }
     if(hit.distance<0) {
         requestMissPages(path.origin.xyz,path.direction.xyz,path.reserved0);
-        addRadiance(path,path.throughput.xyz*missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0));path.origin.w=0;
+        addRadiance(path,path.throughput.xyz*(directRis()?runtimeMiss(path.direction.xyz,path.direction.w,path.previousDelta!=0,uint(max(0,path.throughput.w-1))):missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0)));path.origin.w=0;
     } else {
         Material m=surface.material;float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
         if(m.type==WATER) {
@@ -320,12 +329,33 @@ void advance(inout PathState path) {
         float3 wo=-path.direction.xyz;float3 n=dot(surface.frame.n,wo)>0?surface.frame.n:-surface.frame.n;
         Frame frame=makeFrame(n,surface.frame.t,surface.frame.b);
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
-        float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,emitterHitPdf(hit.triangle,path.origin.xyz,point));
+        float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,directRis()?runtimeHitPdf(hit.triangle,path.origin.xyz,point,path.reserved1,uint(max(0,path.throughput.w-1))):emitterHitPdf(hit.triangle,path.origin.xyz,point));
         addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
+        directCounter(uint(path.throughput.w),0);
+        if(directRis()){
+            path.reserved1=runtimeCell(point); // Stable discrete proposal token survives origin offset and continuation.
+            for(uint connection=0;connection<2;connection++){
+                LightSample light=connection==0?runtimeSun(lightingSeed):sampleHeldLight(point);BsdfEval e=(BsdfEval)0;if(light.pdf>0)e=evalBsdf(m,frame,wo,light.wi,eta);
+                if(connection==1){heldProbe(path,0,float4(light.radiance,light.distance));heldProbe(path,1,float4(e.f,e.pdf));heldProbe(path,2,float4(dot(n,light.wi),dot(surface.geometryNormal,light.wi),dot(n,wo),dot(surface.geometryNormal,wo)));}
+                if(light.pdf<=0||e.pdf<=0||!validShadingHemisphere(surface.geometryNormal,n,wo,light.wi))continue;
+                MediumStack shadowMedia=media;bool visible=!dielectric(m)||m.type==THIN_DIELECTRIC||dot(n,light.wi)>=0||crossMedium(shadowMedia,m,entering);
+                float3 start=connectionOrigin(point,surface.geometryNormal,light.wi);float maximum=light.distance-max(0,dot(start-point,light.wi))-.002;float3 transmission=0;
+                if(visible&&maximum>.001){directCounter(uint(path.throughput.w),1);transmission=visibility(start,light.wi,shadowMedia,maximum);}
+                if(connection==1)heldProbe(path,3,float4(transmission,visible?1:0));
+                float mis=connection==1||path.throughput.w>=5?1:powerHeuristic(light.pdf,e.pdf);
+                addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmission,int(directChannel(m,n,light.wi)));
+            }
+            DirectReservoir selected=selectDirect(point,m,frame,wo,surface.geometryNormal,eta,uint(path.throughput.w),lightingSeed);
+            if(selected.target>0){MediumStack shadowMedia=media;bool visible=!dielectric(m)||m.type==THIN_DIELECTRIC||dot(n,selected.light.wi)>=0||crossMedium(shadowMedia,m,entering);
+                float3 start=connectionOrigin(point,surface.geometryNormal,selected.light.wi);float maximum=selected.light.distance-max(0,dot(start-point,selected.light.wi))-.002;float3 transmission=0;
+                if(visible&&maximum>.001){directCounter(uint(path.throughput.w),1);transmission=visibility(start,selected.light.wi,shadowMedia,maximum,selected.light.kind==3);}
+                directAdapt(selected,transmission);addRadiance(path,path.throughput.xyz*selected.value*transmission,int(directChannel(m,n,selected.light.wi)));
+            }
+        }else{
         // One stochastic sky/sun sample plus an independent held delta connection.
         uint firstFlame=nearestFlame(point,0xffffffffu),secondFlame=nearestFlame(point,firstFlame);
         for(int connection=0;connection<2+int(min(3u,flameCount()));connection++){
-        LightSample light=connection==0?sampleOneLight(point,seed):connection==1?sampleHeldLight(point):flameConnection(point,uint(connection-2),seed,firstFlame,secondFlame);
+        LightSample light=connection==0?sampleOneLight(point,lightingSeed):connection==1?sampleHeldLight(point):flameConnection(point,uint(connection-2),lightingSeed,firstFlame,secondFlame);
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
         if(connection==1){heldProbe(path,0,float4(light.radiance,light.distance));heldProbe(path,1,float4(direct.f,direct.pdf));heldProbe(path,2,float4(dot(n,light.wi),dot(surface.geometryNormal,light.wi),dot(n,wo),dot(surface.geometryNormal,wo)));}
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
@@ -334,12 +364,13 @@ void advance(inout PathState path) {
             float mis=lightMisWeight(light,direct.pdf,path.throughput.w<5);
             float3 start=connectionOrigin(point,surface.geometryNormal,light.wi);
             float maximum=light.distance-max(0,dot(start-point,light.wi))-.002;
+            if(visible&&maximum>.001)directCounter(uint(path.throughput.w),1);
             float3 transmittance=visible&&maximum>.001?visibility(start,light.wi,shadowMedia,maximum,connection>=2):float3(0);
             if(connection==1)heldProbe(path,3,float4(transmittance,visible?1:0));
             if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmittance,int(directChannel(m,n,light.wi)));
         }
         }
-        LightSample emitter=sampleEmitter(point,seed);
+        LightSample emitter=sampleEmitter(point,lightingSeed);
         if(emitter.pdf>0){
             BsdfEval e=evalBsdf(m,frame,wo,emitter.wi,eta);
             MediumStack shadowMedia=media;bool visible=true;
@@ -348,8 +379,9 @@ void advance(inout PathState path) {
                 float mis=emitter.kind==3||path.throughput.w>=5?1:powerHeuristic(emitter.pdf,e.pdf);
                 float3 start=connectionOrigin(point,surface.geometryNormal,emitter.wi);
                 float maximum=emitter.distance-max(0,dot(start-point,emitter.wi))-.002;
-                if(maximum>.001)addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3),int(directChannel(m,n,emitter.wi)));
+                if(maximum>.001){directCounter(uint(path.throughput.w),1);addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3),int(directChannel(m,n,emitter.wi)));}
             }
+        }
         }
         if(path.throughput.w>=5) {path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}
         BsdfSample sample=sampleBsdf(m,frame,wo,seed,eta);

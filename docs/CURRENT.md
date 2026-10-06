@@ -1,3 +1,7 @@
+## alpha.34 统一直接光 RIS
+
+原生 flame、emitter 与环境光合并到 section-local / spatial hierarchical alias 和 fresh RIS；Sun/Moon 与可选手持灯独立连接。每次 surface hit 最多三个直接光连接，深层采用带补偿 NEE roulette；primary/secondary/deep 预算 8/4/1。时间自适应只改变 proposal，保留全局支持；同步修改 BSDF-hit / miss MIS，PathHot 保持 64B。新增 `/voxellight rt_direct legacy|ris`（默认 RIS）和 `/voxellight rt_benchmark direct` 两轮 ABBA、8 段专用测试，导出 per-bounce 连接/候选计数。实际提速和视觉待 RTX 验收，0.5–0.7 transport ratio 尚未实测。[详细设计与验收](performance/RT-DIRECT-LIGHTING-ROUND-2.md)。
+
 ## alpha.33 原版 atlas 动画误伤 OMM 修复
 
 `build clientKit --offline` 通过，309 项测试零失败；24 个 RT stage/ABI 与输运数值验证保持通过。新动画 hook 的实际 GPU/Mixin 启动及 OMM 效果仍待 RTX 实测。

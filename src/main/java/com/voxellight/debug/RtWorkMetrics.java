@@ -6,25 +6,31 @@ import java.util.LinkedHashMap;
 
 /** Bounded delayed GPU ray counters; frame IDs refer to submission, not readback completion. */
 public final class RtWorkMetrics {
-    public record Sample(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches){}
+    public record Sample(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches,long[][] direct){
+        public Sample(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches){this(frame,width,height,spp,scene,active,shadow,anyHit,opaqueVisibility,visibilitySamples,visibilityMismatches,new long[6][4]);}
+    }
     private final LinkedHashMap<Long,Sample> samples=new LinkedHashMap<>();
     public void record(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit){
         record(frame,width,height,spp,scene,active,shadow,anyHit,0,0,0);
     }
     public void record(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches){
+        record(frame,width,height,spp,scene,active,shadow,anyHit,opaqueVisibility,visibilitySamples,visibilityMismatches,new long[6][4]);
+    }
+    public void record(long frame,int width,int height,int spp,long scene,long[] active,long shadow,long anyHit,long opaqueVisibility,long visibilitySamples,long visibilityMismatches,long[][] direct){
+        if(direct.length!=6)throw new IllegalArgumentException("six direct counters");var copied=new long[6][];for(int i=0;i<6;i++){if(direct[i].length!=4)throw new IllegalArgumentException("four counter components");copied[i]=direct[i].clone();}
         if(active.length!=6)throw new IllegalArgumentException("six vertices");
-        samples.put(frame,new Sample(frame,width,height,spp,scene,active.clone(),shadow,anyHit,opaqueVisibility,visibilitySamples,visibilityMismatches));
+        samples.put(frame,new Sample(frame,width,height,spp,scene,active.clone(),shadow,anyHit,opaqueVisibility,visibilitySamples,visibilityMismatches,copied));
         while(samples.size()>1800)samples.remove(samples.firstEntry().getKey());
     }
     public Sample sample(long frame){return samples.get(frame);}
     public void clear(){samples.clear();}
     public void export(Path path)throws IOException{
         try(var writer=Files.newBufferedWriter(path)){
-            writer.write("frame,width,height,spp,scene_generation,active_0,active_1,active_2,active_3,active_4,active_5,shadow_rays,any_hit,opaque_visibility,visibility_samples,visibility_mismatches\n");
+            writer.write("frame,width,height,spp,scene_generation,active_0,active_1,active_2,active_3,active_4,active_5,shadow_rays,any_hit,opaque_visibility,visibility_samples,visibility_mismatches");for(int i=0;i<6;i++)writer.write(",surface_hits_"+i+",direct_visibility_"+i+",ris_candidates_"+i+",ris_selected_"+i);writer.write("\n");
             for(var sample:samples.values()){
                 writer.write(sample.frame+","+sample.width+","+sample.height+","+sample.spp+","+sample.scene);
                 for(long count:sample.active)writer.write(","+count);
-                writer.write(","+sample.shadow+","+sample.anyHit+","+sample.opaqueVisibility+","+sample.visibilitySamples+","+sample.visibilityMismatches+"\n");
+                writer.write(","+sample.shadow+","+sample.anyHit+","+sample.opaqueVisibility+","+sample.visibilitySamples+","+sample.visibilityMismatches);for(var counters:sample.direct)for(long count:counters)writer.write(","+count);writer.write("\n");
             }
         }
     }
