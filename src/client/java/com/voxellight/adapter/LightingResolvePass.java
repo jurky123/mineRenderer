@@ -28,6 +28,7 @@ final class LightingResolvePass implements AutoCloseable {
     boolean replacesClouds(){return weather.replacesClouds();}
     void setEnvironment(String option,boolean value){switch(option){case "voxel_clouds"->composite.setVoxelClouds(value);case "sky"->weather.setSky(value);case "clouds"->weather.setClouds(value);case "cloud_shadows"->weather.setCloudShadows(value);case "underwater"->weather.setUnderwater(value);case "caustics"->weather.setCaustics(value);case "rain_ripples"->weather.setRipples(value);default->throw new IllegalArgumentException(option);}}
     private final VulkanPathTracer vulkanRt=new VulkanPathTracer();
+    public java.util.List<RtGeometryStream.Section> benchmarkSnapshot(){return vulkanRt.benchmarkSnapshot();}
     com.voxellight.rt.RtBenchmarkState benchmarkState(){return vulkanRt.benchmarkState();}
     boolean rtActive(){return vulkanRt.active();}
     void setVulkanMaterials(){vulkanRt.enableMaterials();}

@@ -238,4 +238,10 @@ class VulkanRtContractTest {
             }
         }
     }
+    @Test void benchmarkTerrainCannotBeEvictedByGrowingDynamicModels(){
+        long mib=1024L*1024;var terrain=new com.voxellight.world.SectionKey(1,0,0);var dynamic=new com.voxellight.world.SectionKey(1,Integer.MIN_VALUE,0);
+        var sizes=Map.of(terrain,63*mib,dynamic,mib);
+        assertNull(VulkanRtScene.evictions(sizes,Set.of(terrain),dynamic,64*mib,mib,2*mib,1,true,8,8,8));
+        assertEquals(List.of(),VulkanRtScene.evictions(sizes,Set.of(terrain),dynamic,64*mib,mib,mib,1,true,8,8,8));
+    }
 }

@@ -28,6 +28,10 @@ public final class RtPageCache {
         try{inflater.setInput(page.compressed);int offset=0;while(!inflater.finished()&&offset<restored.length){int n=inflater.inflate(restored,offset,restored.length-offset);if(n==0)break;offset+=n;}if(offset!=restored.length||!inflater.finished())throw new IllegalStateException("Corrupt RT page");hits++;return new Restored(page.version,restored);}
         catch(DataFormatException error){throw new IllegalStateException("Corrupt RT page",error);}finally{inflater.end();}
     }
+    /** Exact resident version for a controlled benchmark snapshot, independent of later world revisions. */
+    public synchronized Restored snapshot(SectionKey key,long version){
+        var page=pages.get(key);return page==null||page.version!=version?null:get(key,page.revision);
+    }
     public synchronized void clear(){pages.clear();bytes=hits=misses=evictions=0;}
     public synchronized String status(){return ", rtBackingPages="+pages.size()+", rtBackingBytes="+bytes+", rtPageHits="+hits+", rtPageMisses="+misses+", rtPageEvictions="+evictions;}
 }

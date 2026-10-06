@@ -21,6 +21,10 @@ public final class RtBenchmarkRunner {
     private final Object level=Minecraft.getInstance().level;
     private final long resources=VoxelLightClient.scene().bridge().stats().resourceGeneration();
     private final RtBenchmarkPlan.Plan plan;
+    private final List<RtGeometryStream.Section> terrain=VoxelLightClient.probe().benchmarkSnapshot();
+    public static List<RtGeometryStream.Section> terrainSnapshot(){return running==null?null:running.terrain;}
+    private final List<Map<String,Object>> warmupDiagnostics=new ArrayList<>();
+    private long lastDiagnostic;
     private final int seconds;
     private final Path directory;
     private final Consumer<String> feedback;
@@ -44,6 +48,7 @@ public final class RtBenchmarkRunner {
     private long shadow,anyHit,opaque,replay,mismatches,scopeCount;
     private final LinkedHashSet<String> invalid=new LinkedHashSet<>();
     private RtBenchmarkRunner(int seconds,Consumer<String> feedback)throws IOException{
+        if(terrain.isEmpty())throw new IllegalStateException("no resident terrain snapshot");
         this.seconds=seconds;this.feedback=feedback;
         plan=RtBenchmarkPlan.create(initial.querySupported(),initial.compactSupported(),initial.ommSupported()&&initial.opacityValid(),initial.serSupported());
         directory=FabricLoader.getInstance().getGameDir().resolve("benchmark-results/voxellight/rt-suite-"+System.currentTimeMillis());Files.createDirectories(directory);
@@ -77,7 +82,11 @@ public final class RtBenchmarkRunner {
         var state=VoxelLightClient.probe().benchmarkState();var block=plan.blocks().get(index);
         if(!RtBenchmarkPlan.Config.current().equals(block.config())||!RenderPassProfile.enabled()){finish("execution controls/profiling changed manually");return;}
         if(phase==Phase.WARMUP){
-            if(now-phaseStart>30_000_000_000L){finish("warmup did not settle / actual RT configuration unavailable");return;}
+            if(now-lastDiagnostic>=1_000_000_000L){
+                var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("block",index+1);diagnostic.put("elapsedSeconds",(now-phaseStart)/1e9);diagnostic.put("actual",state);diagnostic.put("requested",block.config());diagnostic.put("stableSeconds",(now-stableSince)/1e9);diagnostic.put("renderer",VoxelLightClient.probe().status());warmupDiagnostics.add(diagnostic);lastDiagnostic=now;
+            }
+
+            if(now-phaseStart>30_000_000_000L){finish(state==null?"warmup: renderer unavailable; see warmup.json":!state.matches(block.config())?"warmup: requested controls not active; see warmup.json":state.frozen()?"warmup: accumulation frozen":"warmup: pinned terrain did not settle; see warmup.json");return;}
             if(state==null||!state.matches(block.config())||state.frozen())return;
             if(state.width()!=initial.width()||state.height()!=initial.height()||state.spp()!=initial.spp()||state.realtime()!=initial.realtime()){finish("resolution/spp/render mode changed");return;}
             if(terrainSignature!=state.terrainSignature()){terrainSignature=state.terrainSignature();stableSince=now;}
@@ -127,9 +136,10 @@ public final class RtBenchmarkRunner {
         try{
             if(reason!=null&&!blockExported&&first!=Long.MAX_VALUE){invalid.add("interrupted: "+reason);if(last==Long.MAX_VALUE)last=Math.max(first,currentFrame-1);completeBlock();}
             var comparisons=new ArrayList<RtBenchmarkResults.Comparison>();for(String name:plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().toList())comparisons.add(RtBenchmarkResults.compare(name,results));
-            var report=new LinkedHashMap<String,Object>();report.put("schema",1);report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);
+            var report=new LinkedHashMap<String,Object>();report.put("schema",2);report.put("terrainPolicy","fixed resident terrain snapshot; dynamic models and lighting remain live");report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);
             report.put("device",com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().toString());report.put("version",FabricLoader.getInstance().getModContainer("voxellight").orElseThrow().getMetadata().getVersion().getFriendlyString());
             report.put("limitations",List.of("current-version execution controls only; not alpha.26 vs alpha.28 speedup","completed GPU timestamps; replay benchmarks outside transport batch","two ABBA rounds are descriptive, not a statistical confidence interval","alive drift threshold 5 percentage points; dynamic geometry/light changes may remain","no automatic image correctness, L1/L2 traffic or runtime spill validation"));
+            Files.writeString(directory.resolve("warmup.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(warmupDiagnostics));
             Files.writeString(directory.resolve("summary.json"),new GsonBuilder().setPrettyPrinting().create().toJson(report));
             StringBuilder text=new StringBuilder("VoxelLight automatic RT benchmark\nSettings restored. "+(reason==null?"Completed.":"Interrupted: "+reason)+"\n");
             for(var c:comparisons)text.append(c.name()).append(": ").append(c.verdict()).append("; improvement %=").append(c.improvementPercent()).append("; repeat variation %=").append(c.repeatVariationPercent()).append("\n");

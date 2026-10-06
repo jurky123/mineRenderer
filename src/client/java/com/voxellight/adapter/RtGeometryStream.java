@@ -64,6 +64,7 @@ public final class RtGeometryStream {
   if(bytes+page.triangles().length>64L*1024*1024)return false;
   var section=new Section(key,page.version(),page.triangles());pending.put(key,section);bytes+=section.triangles.length;return true;
  }
+ public static synchronized Section snapshot(SectionKey key,long version){var page=cache.snapshot(key,version);if(page==null)throw new IllegalStateException("resident terrain snapshot unavailable: "+key);return new Section(key,page.version(),page.triangles());}
  public static String status(){return cache.status();}
  public static synchronized int pending(){return pending.size();}
 }

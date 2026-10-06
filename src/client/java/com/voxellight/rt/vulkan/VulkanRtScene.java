@@ -51,6 +51,9 @@ public final class VulkanRtScene implements AutoCloseable {
     VulkanRtScene(VulkanDevice device,int scratchAlignment) {this(device,scratchAlignment,false);}
     VulkanRtScene(VulkanDevice device,int scratchAlignment,boolean material) { this.device=device;this.scratchAlignment=scratchAlignment;this.material=material;ommEnabled=material&&com.voxellight.rt.RtExecutionOptions.omm()&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&VulkanRtCapabilities.micromap(device.vkDevice().getPhysicalDevice());scratch=new VulkanRtScratch(device,scratchAlignment); }
     public Set<SectionKey> resident() { var keys=new HashSet<>(sections.keySet());keys.removeIf(VulkanRtScene::dynamic);return Set.copyOf(keys); }
+    private Set<SectionKey> benchmarkTerrain=Set.of();
+    public void benchmarkTerrain(Set<SectionKey> keys){benchmarkTerrain=Set.copyOf(keys);}
+    public List<RtGeometryStream.Section> benchmarkSnapshot(){var result=new ArrayList<RtGeometryStream.Section>();for(var entry:sections.entrySet())if(!dynamic(entry.getKey()))result.add(RtGeometryStream.snapshot(entry.getKey(),entry.getValue().version));return List.copyOf(result);}
     public long sceneBytes(){return bytes;}
     public long terrainSignature(){long signature=0;for(var entry:sections.entrySet())if(!dynamic(entry.getKey())){long value=entry.getKey().hashCode()*0x9e3779b97f4a7c15L+entry.getValue().version;value=(value^(value>>>30))*0xbf58476d1ce4e5b9L;signature+=value^(value>>>27);}return signature;}
     public long generation() { return generation; }
@@ -102,7 +105,7 @@ public final class VulkanRtScene implements AutoCloseable {
         var ordered=new ArrayList<>(changes);
         ordered.sort(Comparator.<RtGeometryStream.Section>comparingInt(change->sections.containsKey(change.key())?0:1)
             .thenComparingDouble(change->distance(change.key(),x,y,z)));
-        Set<SectionKey> protectedKeys=new HashSet<>();changes.forEach(change->protectedKeys.add(change.key()));protectedKeys.addAll(requestedPages.keySet());
+        Set<SectionKey> protectedKeys=new HashSet<>();changes.forEach(change->protectedKeys.add(change.key()));protectedKeys.addAll(requestedPages.keySet());protectedKeys.addAll(benchmarkTerrain);
         long plannedBytes=bytes;int plannedCount=resident().size();
         for(var change:ordered) {
             if(!admitted(change.key(),x,y,z))continue;

@@ -39,6 +39,7 @@ final class VulkanPathTracer implements AutoCloseable {
     private final RtTerrainWarmup warmup=new RtTerrainWarmup();
     private VulkanRtContext context;
     private long executionRevision;
+    private boolean benchmarkTerrainLoaded;
     private GpuTexture texture;
     private GpuTextureView view;
     private boolean enabled,failed,transport,materials,displayedThisFrame;
@@ -53,6 +54,7 @@ final class VulkanPathTracer implements AutoCloseable {
     }
     void enableTransport() { enable(true);transport=true; }
     void enableMaterials(){enableTransport();materials=true;}
+    public java.util.List<RtGeometryStream.Section> benchmarkSnapshot(){return context==null?java.util.List.of():context.scene.benchmarkSnapshot();}
     com.voxellight.rt.RtBenchmarkState benchmarkState(){return context==null||!materials||failed?null:context.benchmarkState(realtime,history.frozen());}
     boolean enabled() {return enabled;}
     boolean active(){return enabled&&!failed;}
@@ -82,10 +84,18 @@ final class VulkanPathTracer implements AutoCloseable {
             }
             RenderPassProfile.workload(width,height,samplesPerFrame,context.scene.generation());
             var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;var pos=camera.pos;
-            context.scene.requestPages(warmup.requestPages(context.drainPageRequests()));
-            warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
+            var benchmarkTerrain=RtBenchmarkRunner.terrainSnapshot();
             var inverse=new Matrix4f(projection).mul(camera.viewRotationMatrix).invert();
-            context.prepareScene(encoder,RtGeometryStream.drain(16),pos.x(),pos.y(),pos.z());
+            if(benchmarkTerrain!=null){
+                context.drainPageRequests();
+                if(!benchmarkTerrainLoaded){context.scene.benchmarkTerrain(benchmarkTerrain.stream().map(RtGeometryStream.Section::key).collect(java.util.stream.Collectors.toSet()));context.prepareScene(encoder,benchmarkTerrain,pos.x(),pos.y(),pos.z());benchmarkTerrainLoaded=true;}
+            }else{
+                benchmarkTerrainLoaded=false;
+                context.scene.benchmarkTerrain(java.util.Set.of());
+                context.scene.requestPages(warmup.requestPages(context.drainPageRequests()));
+                warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
+                context.prepareScene(encoder,RtGeometryStream.drain(16),pos.x(),pos.y(),pos.z());
+            }
             if(materials&&(realtime||!history.frozen()||history.samples()==0))dynamic.prepare(encoder,context,pos.x(),pos.y(),pos.z());
             context.commitScene(encoder,pos.x(),pos.y(),pos.z());
             RenderPassProfile.workload(width,height,samplesPerFrame,context.scene.generation());
@@ -123,5 +133,5 @@ final class VulkanPathTracer implements AutoCloseable {
     }
     String status() {return ", vulkanRtPoc="+enabled+", vulkanRtState="+state+", vulkanRtGpuDiagnostic="+diagnostics.value()+", vulkanRtMaterialAssetBytes="+assets.bytes()+assets.status()+RtGeometryStream.status()+dynamic.status()+", renderMode="+(realtime?"realtime":"reference")+", internalScale="+internalScale+", requestedSppPerFrame="+samplesPerFrame+", stationaryAccumulation="+history.enabled()+", accumulationFrozen="+history.frozen()+", accumulatedSpp="+history.samples()+"/"+history.target()+", accumulationReset="+history.reason()+", vulkanRtPipelineStartupMs="+startupMs+(context==null?"":", "+context.status());}
     private void releaseTexture() {if(view!=null)view.close();if(texture!=null)texture.close();view=null;texture=null;}
-    @Override public void close() {displayedThisFrame=false;lightingChange.reset();history.reset("world/resources/backend");accumulation.close();dynamic.close();assets.close();reconstruction.close();if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnostics.reset();}
+    @Override public void close() {benchmarkTerrainLoaded=false;displayedThisFrame=false;lightingChange.reset();history.reset("world/resources/backend");accumulation.close();dynamic.close();assets.close();reconstruction.close();if(context!=null)context.close();context=null;releaseTexture();warmup.close();diagnostics.reset();}
 }

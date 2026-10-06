@@ -1,3 +1,7 @@
+## alpha.29 自动验收工作集修复
+
+针对用户 alpha.28 结果包及日志中 visibility B 场景重建后预热 30 秒超时，测试整轮保存并复用当前驻留地形快照，阻止 miss 页和动态扩容替换固定地形；动态模型/光照继续实时更新。新增逐秒 warmup.json 和细分超时原因。保留严格工作负载检查，未把无效采样放宽为成功。完整 RTX 跑完验收待用户实测。
+
 ## alpha.28 自动 A/B 验收
 
 新增 `rt_benchmark start/status/stop`，按设备能力执行两轮 ABBA，隔离采样帧并接收延迟 GPU 数据，导出原始 CSV、状态、汇总与 ZIP；工作负载变化或波动范围内不宣称收益。完整说明见 [自动验收](performance/RT-AUTOMATIC-BENCHMARK.md)。执行层算法保持 alpha.27，RTX 实测待用户运行。

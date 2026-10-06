@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.28**：新增一条命令自动完成执行层 A/B、GPU 采样、波动判定和 ZIP 导出。保留 Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.29**：修复自动 A/B 切换配置后实时换页导致工作集变化与预热超时：整轮复用固定地形快照，保留动态模型/光照，并导出详细预热诊断。保留 Vulkan RT 执行层第一轮，三类 section geometry、opaque visibility TraceRay/Query A/B、64B PathHot、共享 scratch、真实 alive 曲线队列标定，以及默认关闭的保守 OMM/SER。保持现有 estimator，GPU 性能与冻结验收待 RTX 实测。全新安装默认 effects off。
 
-[下载 alpha.28 安装包](https://temp.sh/qPSYq/voxellight-client-kit-26.2-0.39.0-alpha.28.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.29 安装包](https://temp.sh/Wzrgl/voxellight-client-kit-26.2-0.39.0-alpha.29.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
