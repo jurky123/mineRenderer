@@ -4,6 +4,7 @@
 #include "water_surface.slang"
 #include "environment.slang"
 #include "emissive.slang"
+float3 rtPreviousSurface(float3 a,float3 b,float3 c,float2 bary,float3 previousTranslation){return a*(1-bary.x-bary.y)+b*bary.x+c*bary.y+previousTranslation;}
 struct SurfacePayload {float distance;float2 bary;uint triangle;uint instance;};
 #ifndef RT_CPU_FIXTURE
 [[vk::binding(0, 0)]] RaytracingAccelerationStructure world;
@@ -21,15 +22,23 @@ struct PathState {
     uint mediumCount;float etaScale;uint previousDelta;uint padding;
     float4 diffuse,reflection,refraction;uint channel;uint reserved0,reserved1,reserved2;
 };
-[[vk::binding(4, 0)]] RWStructuredBuffer<PathState> paths;
-[[vk::binding(8,0)]] RWStructuredBuffer<PathState> paths1;
-[[vk::binding(9,0)]] RWStructuredBuffer<PathState> paths2;
-[[vk::binding(10,0)]] RWStructuredBuffer<PathState> paths3;
-[[vk::binding(11,0)]] RWStructuredBuffer<PathState> paths4;
-[[vk::binding(12,0)]] RWStructuredBuffer<PathState> paths5;
-[[vk::binding(13,0)]] RWStructuredBuffer<PathState> paths6;
-[[vk::binding(14,0)]] RWStructuredBuffer<PathState> paths7;
-PathState loadPath(uint index){uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
+// Hot continuation is 144 bytes. Eight nested media are fetched only for medium paths.
+struct PathHot {
+    float4 origin,direction,throughput,radiance;
+    uint mediumCount;float etaScale;uint previousDelta;uint padding;
+    float4 diffuse,reflection,refraction;uint channel;uint reserved0,reserved1,reserved2;
+};
+struct MediumStorage {float4 absorptionIor[8];float4 scatteringPhase[8];uint4 mediumIds[2];};
+[[vk::binding(4,0)]] RWStructuredBuffer<PathHot> paths;
+[[vk::binding(8,0)]] RWStructuredBuffer<PathHot> paths1;
+[[vk::binding(9,0)]] RWStructuredBuffer<PathHot> paths2;
+[[vk::binding(10,0)]] RWStructuredBuffer<PathHot> paths3;
+[[vk::binding(11,0)]] RWStructuredBuffer<PathHot> paths4;
+[[vk::binding(12,0)]] RWStructuredBuffer<PathHot> paths5;
+[[vk::binding(13,0)]] RWStructuredBuffer<PathHot> paths6;
+[[vk::binding(14,0)]] RWStructuredBuffer<PathHot> paths7;
+[[vk::binding(15,0)]] RWStructuredBuffer<MediumStorage> pathMedia;
+PathHot loadHot(uint index){uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
 case 0:return paths[local];
 case 1:return paths1[local];
 case 2:return paths2[local];
@@ -38,16 +47,59 @@ case 4:return paths4[local];
 case 5:return paths5[local];
 case 6:return paths6[local];
 case 7:return paths7[local];
-}return (PathState)0;}
-void storePath(uint index,PathState path){uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
-case 0:paths[local]=path;break;
-case 1:paths1[local]=path;break;
-case 2:paths2[local]=path;break;
-case 3:paths3[local]=path;break;
-case 4:paths4[local]=path;break;
-case 5:paths5[local]=path;break;
-case 6:paths6[local]=path;break;
-case 7:paths7[local]=path;break;
+}return (PathHot)0;}
+PathState loadPath(uint index){
+    PathHot hot=loadHot(index);PathState path=(PathState)0;
+    path.origin=hot.origin;
+    path.direction=hot.direction;
+    path.throughput=hot.throughput;
+    path.radiance=hot.radiance;
+    path.mediumCount=hot.mediumCount;
+    path.etaScale=hot.etaScale;
+    path.previousDelta=hot.previousDelta;
+    path.padding=hot.padding;
+    path.diffuse=hot.diffuse;
+    path.reflection=hot.reflection;
+    path.refraction=hot.refraction;
+    path.channel=hot.channel;
+    path.reserved0=hot.reserved0;
+    path.reserved1=hot.reserved1;
+    path.reserved2=hot.reserved2;
+    if(path.mediumCount>0){MediumStorage media=pathMedia[index];
+        for(uint i=0;i<path.mediumCount;i++){path.absorptionIor[i]=media.absorptionIor[i];path.scatteringPhase[i]=media.scatteringPhase[i];}
+        path.mediumIds[0]=media.mediumIds[0];path.mediumIds[1]=media.mediumIds[1];
+    }
+    return path;
+}
+void storePath(uint index,PathState path){PathHot hot;
+    hot.origin=path.origin;
+    hot.direction=path.direction;
+    hot.throughput=path.throughput;
+    hot.radiance=path.radiance;
+    hot.mediumCount=path.mediumCount;
+    hot.etaScale=path.etaScale;
+    hot.previousDelta=path.previousDelta;
+    hot.padding=path.padding;
+    hot.diffuse=path.diffuse;
+    hot.reflection=path.reflection;
+    hot.refraction=path.refraction;
+    hot.channel=path.channel;
+    hot.reserved0=path.reserved0;
+    hot.reserved1=path.reserved1;
+    hot.reserved2=path.reserved2;
+    if(path.mediumCount>0){MediumStorage media=(MediumStorage)0;
+        for(uint i=0;i<path.mediumCount;i++){media.absorptionIor[i]=path.absorptionIor[i];media.scatteringPhase[i]=path.scatteringPhase[i];}
+        media.mediumIds[0]=path.mediumIds[0];media.mediumIds[1]=path.mediumIds[1];pathMedia[index]=media;
+    }
+    uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
+case 0:paths[local]=hot;break;
+case 1:paths1[local]=hot;break;
+case 2:paths2[local]=hot;break;
+case 3:paths3[local]=hot;break;
+case 4:paths4[local]=hot;break;
+case 5:paths5[local]=hot;break;
+case 6:paths6[local]=hot;break;
+case 7:paths7[local]=hot;break;
 }}
 
 #ifndef RT_CPU_FIXTURE
@@ -63,13 +115,14 @@ void requestMissPages(float3 origin,float3 direction){
     }
 #endif
 }
-SurfacePayload traceSurface(float3 origin,float3 direction,float maximum=4096) {
+SurfacePayload traceSurface(float3 origin,float3 direction,float maximum=4096,uint mask=255,bool shadow=false) {
 #ifdef RT_CPU_FIXTURE
     return fixtureTrace(origin,direction,maximum);
 #else
+    if(shadow&&(uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[513].x,1,ignored);}
     RayDesc ray;ray.Origin=origin;ray.Direction=direction;ray.TMin=.001;ray.TMax=maximum;
     SurfacePayload hit;hit.distance=-1;hit.bary=0;hit.triangle=0;hit.instance=0;
-    TraceRay(world,RAY_FLAG_NONE,255,0,0,0,ray,hit);return hit;
+    TraceRay(world,RAY_FLAG_NONE,mask,0,0,0,ray,hit);return hit;
 #endif
 }
 // Guard finite light connections against rounding back onto the receiver.
@@ -105,7 +158,7 @@ float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum
     float3 sourceBlock=floor(origin+direction*maximum);
     float3 value=float3(1);
     for(int boundary=0;boundary<24;boundary++) {
-        SurfacePayload hit=traceSurface(origin,direction,max(.001,maximum));float distance=hit.distance>=0?hit.distance:maximum;
+        SurfacePayload hit=traceSurface(origin,direction,max(.001,maximum),254,true);float distance=hit.distance>=0?hit.distance:maximum;
         if(media.count>0){Medium m=media.entries[media.count-1];value*=expNeg(m.sigmaA+m.sigmaS,distance);}
         if(hit.distance<0)return value;
         TerrainSurface surface=terrainSurface(hit.triangle,hit.bary,hit.instance);Material m=surface.material;
@@ -142,11 +195,32 @@ float4 pathOutput(PathState path){return float4(path.padding==0&&finiteEnergy(pa
 uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)||dielectric(m)?1:0);}
 void advance(inout PathState path) {
     if(path.origin.w==0||path.padding!=0)return;
+#ifndef RT_CPU_FIXTURE
+    if((uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
+#endif
     uint seed=asuint(path.radiance.w);MediumStack media=loadMedia(path);
-    SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz);
+    SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);
     TerrainSurface surface=(TerrainSurface)0;bool entering=false;
     if(hit.distance>=0) {
         surface=terrainSurface(hit.triangle,hit.bary,hit.instance);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
+#ifndef RT_CPU_FIXTURE
+        if(path.throughput.w==0&&DispatchRaysIndex().z==0&&(uint(camera.origin.w)&1u)!=0){
+            uint local=DispatchRaysIndex().y*camera.width+DispatchRaysIndex().x;
+            uint base=camera.width*camera.height*max(1u,camera.padding)+4;
+            float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
+            output[base+local]=float4(surface.material.baseColor,float(surface.material.type+1));
+            output[base+camera.width*camera.height+local]=float4(entering?surface.geometryNormal:-surface.geometryNormal,surface.material.microfacetAlpha);
+            output[base+camera.width*camera.height*2+local]=float4(point,hit.distance);
+            float4 currentTranslation=normals[559240u+hit.instance*2],previousTranslation=normals[559240u+hit.instance*2+1];
+            float3 previousPoint=point;
+            if((surface.flags&128)!=0&&previousTranslation.w>0){
+                uint offset=67108864u+hit.triangle*120;
+                float3 a=asfloat(readWords3(geometry,offset)),b=asfloat(readWords3(geometry,offset+40)),c=asfloat(readWords3(geometry,offset+80));
+                previousPoint=rtPreviousSurface(a,b,c,hit.bary,previousTranslation.xyz);
+            }
+            output[base+camera.width*camera.height*6+local]=float4(previousPoint,(surface.flags&128)!=0?previousTranslation.w:abs(previousTranslation.w));
+        }
+#endif
         if(!entering&&dielectric(surface.material)&&surface.material.type!=THIN_DIELECTRIC&&media.count==0)media.enter(materialMedium(surface.material));
     }
     float distance=hit.distance>=0?hit.distance:128;
@@ -161,8 +235,9 @@ void advance(inout PathState path) {
             if(light.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,light.wi),m.g)/(sample.pdf*light.pdf))*light.radiance*visibility(event,light.wi,media,max(.001,light.distance-.002)));
             LightSample held=sampleHeldLight(event);
             if(held.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,held.wi),m.g)/sample.pdf)*held.radiance*visibility(event,held.wi,media,max(.001,held.distance-.002)));
+            uint firstFlame=nearestFlame(event,0xffffffffu),secondFlame=nearestFlame(event,firstFlame);
             for(uint index=0;index<min(3u,flameCount());index++){
-                LightSample flame=flameConnection(event,index,seed);
+                LightSample flame=flameConnection(event,index,seed,firstFlame,secondFlame);
                 if(flame.pdf>0)addRadiance(path,path.throughput.xyz*expNeg(extinction,sample.distance)*m.sigmaS*(hg(dot(path.direction.xyz,flame.wi),m.g)/sample.pdf)*flame.radiance*visibility(event,flame.wi,media,max(.001,flame.distance-.002),true));
             }
             LightSample emitter=sampleEmitter(event,seed);
@@ -186,8 +261,9 @@ void advance(inout PathState path) {
         float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,emitterHitPdf(hit.triangle,path.origin.xyz,point));
         addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
         // One stochastic sky/sun sample plus an independent held delta connection.
+        uint firstFlame=nearestFlame(point,0xffffffffu),secondFlame=nearestFlame(point,firstFlame);
         for(int connection=0;connection<2+int(min(3u,flameCount()));connection++){
-        LightSample light=connection==0?sampleOneLight(point,seed):connection==1?sampleHeldLight(point):flameConnection(point,uint(connection-2),seed);
+        LightSample light=connection==0?sampleOneLight(point,seed):connection==1?sampleHeldLight(point):flameConnection(point,uint(connection-2),seed,firstFlame,secondFlame);
         BsdfEval direct=(BsdfEval)0;if(light.pdf>0)direct=evalBsdf(m,frame,wo,light.wi,eta);
         if(connection==1){heldProbe(path,0,float4(light.radiance,light.distance));heldProbe(path,1,float4(direct.f,direct.pdf));heldProbe(path,2,float4(dot(n,light.wi),dot(surface.geometryNormal,light.wi),dot(n,wo),dot(surface.geometryNormal,wo)));}
         if(light.pdf>0&&direct.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,light.wi)) {
@@ -231,3 +307,15 @@ void advance(inout PathState path) {
     }
     storeMedia(path,media);path.radiance.w=asfloat(seed);
 }
+
+#ifndef RT_CPU_FIXTURE
+bool compactPaths(){return (uint(camera.origin.w)&4u)!=0;}
+void appendContinuation(uint pathIndex,PathState path){
+    uint bounce=uint(path.throughput.w);if(!compactPaths()||path.origin.w==0||path.padding!=0||bounce>=6)return;
+    uint slot;InterlockedAdd(pageFeedback[520u+bounce].w,1,slot);
+    uint capacity=camera.width*camera.height*max(1u,camera.padding);
+    // Each surviving path appends once: slot is bounded by capacity, with no dropping.
+    pageFeedback[544u+(bounce&1u)*capacity+slot]=uint4(pathIndex,0,0,0);
+    uint ignored;InterlockedMax(pageFeedback[520u+bounce].x,slot+1,ignored);
+}
+#endif

@@ -21,7 +21,8 @@
     "IndigoQuadMaterialMixin",
     "IndigoQuadResetMixin",
     "GpuDeviceMixin",
-    "VulkanRtxExtensionsMixin"
+    "VulkanRtxExtensionsMixin",
+    "VulkanTextureVersionsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

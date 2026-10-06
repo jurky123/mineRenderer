@@ -44,8 +44,11 @@ def validate_layout(reflection, transport=False, material=False):
         expected.pop('padding'); expected.update(frame=88, padding=92)
         path = parameters['paths']['type']['resultType']
         expected_path=dict(origin=0,direction=16,throughput=32,radiance=48)
-        if material: expected_path.update(absorptionIor=64,scatteringPhase=192,mediumIds=320,mediumCount=352,etaScale=356,previousDelta=360,padding=364,diffuse=368,reflection=384,refraction=400,channel=416,reserved0=420,reserved1=424,reserved2=428)
-        if path['sizes'][0]['value'] != (432 if material else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
+        if material:
+            expected_path.update(mediumCount=64,etaScale=68,previousDelta=72,padding=76,diffuse=80,reflection=96,refraction=112,channel=128,reserved0=132,reserved1=136,reserved2=140)
+            medium=parameters['pathMedia']['type']['resultType']
+            if parameters['pathMedia']['binding']['index']!=15 or medium['sizes'][0]['value']!=288 or {f['name']:f['binding']['offset'] for f in medium['fields']}!=dict(absorptionIor=0,scatteringPhase=128,mediumIds=256):raise ValueError('medium cold ABI mismatch')
+        if path['sizes'][0]['value'] != (144 if material else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
             raise ValueError('continuation ABI mismatch')
     if offsets != expected:
         raise ValueError(f'camera ABI mismatch: {offsets}')
@@ -69,5 +72,5 @@ def main():
         validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
         manifest['shaders'][entry] = {'stage': stage, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64/432 bytes')
+    print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64/144 bytes + 288-byte cold media')
 if __name__ == '__main__': main()

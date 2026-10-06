@@ -8,7 +8,9 @@ import java.util.List;
 
 /** Bounded CPU submission samples; GPU results may arrive several frames later. */
 public final class PassMetrics {
-    public record Sample(long frame, String mode, int width, int height, long cpuNanos, Long gpuNanos) { }
+    public record Sample(long frame, String mode, int width, int height, long cpuNanos, Long gpuNanos,
+            long scopeId, long parentScopeId, int spp, long sceneGeneration) { }
+    private boolean scoped;
 
     private final int capacity;
     private Sample newestGpu;
@@ -23,10 +25,16 @@ public final class PassMetrics {
     }
 
     public void record(long frame, String mode, int width, int height, long cpuNanos) {
-        samples.put(frame, new Sample(frame, mode, width, height, cpuNanos, null));
+        samples.put(frame, new Sample(frame, mode, width, height, cpuNanos, null, frame, 0, 0, 0));
         while (samples.size() > capacity) {
             samples.remove(samples.firstEntry().getKey());
         }
+    }
+
+    public void recordScope(long scopeId,long renderFrame,long parentScopeId,String mode,int width,int height,int spp,long sceneGeneration,long cpuNanos) {
+        scoped=true;
+        samples.put(scopeId,new Sample(renderFrame,mode,width,height,cpuNanos,null,scopeId,parentScopeId,spp,sceneGeneration));
+        while(samples.size()>capacity)samples.remove(samples.firstEntry().getKey());
     }
 
     public void completeGpu(long frame, long gpuNanos) {
@@ -34,8 +42,8 @@ public final class PassMetrics {
             return;
         }
         samples.computeIfPresent(frame, (key, sample) -> {
-            var completed=new Sample(sample.frame(),sample.mode(),sample.width(),sample.height(),sample.cpuNanos(),gpuNanos);
-            if(newestGpu==null||completed.frame()>newestGpu.frame())newestGpu=completed;
+            var completed=new Sample(sample.frame(),sample.mode(),sample.width(),sample.height(),sample.cpuNanos(),gpuNanos,sample.scopeId(),sample.parentScopeId(),sample.spp(),sample.sceneGeneration());
+            if(newestGpu==null||completed.scopeId()>newestGpu.scopeId())newestGpu=completed;
             return completed;
         });
     }
@@ -47,16 +55,17 @@ public final class PassMetrics {
     }
 
     public void clear() {
-        samples.clear();newestGpu=null;
+        samples.clear();newestGpu=null;scoped=false;
     }
 
     public void export(Path path) throws IOException {
         try (var writer = Files.newBufferedWriter(path)) {
-            writer.write("frame,mode,width,height,pass_cpu_submission_ns,pass_gpu_ns\n");
+            writer.write("frame,mode,width,height,pass_cpu_submission_ns,pass_gpu_ns"+(scoped?",schema_version,scope_id,parent_scope_id,spp,scene_generation":"")+"\n");
             for (Sample sample : samples.values()) {
                 writer.write(sample.frame() + "," + sample.mode() + "," + sample.width() + ","
                         + sample.height() + "," + sample.cpuNanos() + ","
-                        + (sample.gpuNanos() == null ? "" : sample.gpuNanos()) + "\n");
+                        + (sample.gpuNanos() == null ? "" : sample.gpuNanos())
+                        + (scoped?",2,"+sample.scopeId()+","+sample.parentScopeId()+","+sample.spp()+","+sample.sceneGeneration():"")+"\n");
             }
         }
     }

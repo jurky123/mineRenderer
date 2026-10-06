@@ -11,15 +11,22 @@ public final class RenderPassProfile {
     private static GpuQueryPool pool;
     private static boolean failed, enabled;
     private static final Scope OFF=new Scope((CommandEncoder)null,"",0,-1,0);
+    public static boolean enabled(){return enabled;}
     public static void setEnabled(boolean value){enabled=value;}
     private static float period;
     private static long frame, serial, skipped;
+    private static int width,height,spp;
+    private static long sceneGeneration;
+    private static final java.util.ArrayDeque<Scope> scopes=new java.util.ArrayDeque<>();
+    public static long frameId(){return frame;}
+    public static void workload(int w,int h,int samples,long generation){width=w;height=h;spp=samples;sceneGeneration=generation;}
     private static final long[] ids=new long[SLOTS], frames=new long[SLOTS];
     private static final boolean[] pending=new boolean[SLOTS];
+    private static final com.voxellight.debug.RtWorkMetrics workMetrics=new com.voxellight.debug.RtWorkMetrics();
     private static final PassMetrics metrics=new PassMetrics(14400);
     private RenderPassProfile() { }
     public static void nextFrame() {
-        frame++;
+        frame++;width=height=spp=0;sceneGeneration=0;scopes.clear();
         if(pool==null)return;
         try {
             for(int i=0;i<SLOTS;i++)if(pending[i] && frame-frames[i]>=2) {
@@ -68,20 +75,25 @@ public final class RenderPassProfile {
         skipped++;return OFF;
     }
     public static final class Scope implements AutoCloseable {
-        private final CommandEncoder encoder;private org.lwjgl.vulkan.VkCommandBuffer command;private final String name;private final long id,start;private final int slot;
-        Scope(CommandEncoder encoder,String name,long id,int slot,long start){this.encoder=encoder;this.name=name;this.id=id;this.slot=slot;this.start=start;}
+        private final CommandEncoder encoder;private org.lwjgl.vulkan.VkCommandBuffer command;private final String name;private final long id,start,parent,renderFrame,scene;private final int slot,w,h,samples;private boolean ended;
+        Scope(CommandEncoder encoder,String name,long id,int slot,long start){this.encoder=encoder;this.name=name;this.id=id;this.slot=slot;this.start=start;
+            parent=id==0||scopes.isEmpty()?0:scopes.peek().id;renderFrame=frame;scene=sceneGeneration;w=width;h=height;samples=spp;
+            if(id>0)scopes.push(this);
+        }
         Scope(org.lwjgl.vulkan.VkCommandBuffer command,String name,long id,int slot,long start){this((CommandEncoder)null,name,id,slot,start);this.command=command;}
         public void close(){
-            if(command!=null){metrics.record(id,name,0,0,System.nanoTime()-start);if(pool instanceof NativePool nativePool)org.lwjgl.vulkan.VK10.vkCmdWriteTimestamp(command,org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,nativePool.handle(),slot*2+1);return;}
+            if(ended)return;ended=true;if(id>0)scopes.remove(this);
+            if(command!=null){metrics.recordScope(id,renderFrame,parent,name,w,h,samples,scene,System.nanoTime()-start);if(pool instanceof NativePool nativePool)org.lwjgl.vulkan.VK10.vkCmdWriteTimestamp(command,org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,nativePool.handle(),slot*2+1);return;}
             if(encoder==null)return;
-            metrics.record(id,name,0,0,System.nanoTime()-start);
+            metrics.recordScope(id,renderFrame,parent,name,w,h,samples,scene,System.nanoTime()-start);
             if(pool!=null && slot>=0)try{encoder.writeTimestamp(pool,slot*2+1);}catch(RuntimeException e){disable();}
         }
     }
-    static void externalGpu(String name,long nanos){if(enabled){long id=++serial;metrics.record(id,name,0,0,0);metrics.completeGpu(id,nanos);}}
-    static void cpu(String name,long nanos){if(enabled)metrics.record(++serial,name,0,0,nanos);}
-    public static void export(Path path)throws IOException{metrics.export(path);}
+    static void externalGpu(String name,long nanos){if(enabled){long id=++serial;metrics.recordScope(id,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,0);metrics.completeGpu(id,nanos);}}
+    static void cpu(String name,long nanos){if(enabled)metrics.recordScope(++serial,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,nanos);}
+    public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit){workMetrics.record(frame,w,h,samples,scene,active,shadow,anyHit);}
+    public static void export(Path path)throws IOException{metrics.export(path);String name=path.getFileName().toString();workMetrics.export(path.resolveSibling(name.endsWith(".passes.csv")?name.substring(0,name.length()-11)+".rays.csv":name+".rays.csv"));}
     static String status(){return ", passProfile="+(!enabled?"off":failed?"CPU only":pool==null?"not observed":"delayed GPU timestamps")+", passProfileSamples="+metrics.size()+", passProfileSkipped="+skipped;}
     private static void disable(){failed=true;if(pool!=null){try{pool.close();}catch(RuntimeException ignored){}pool=null;}}
-    static void clear(){disable();failed=false;metrics.clear();java.util.Arrays.fill(pending,false);}
+    static void clear(){disable();failed=false;metrics.clear();workMetrics.clear();scopes.clear();java.util.Arrays.fill(pending,false);}
 }

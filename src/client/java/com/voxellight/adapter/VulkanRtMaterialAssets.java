@@ -40,7 +40,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     private VulkanRtBuffer buffer;
     private int[] widths,heights,offsets;
     private int environmentOffset,emitterOffset,flameOffset,dynamicOffset;
-    private long emitterGeneration=-1;
+    private long emitterGeneration=-1,albedoVersion=Long.MIN_VALUE;
     private String lightingStatus="";
     String status(){return lightingStatus;}
     private final VulkanRtEnvironmentAssets environment=new VulkanRtEnvironmentAssets();
@@ -86,16 +86,19 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
         lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
         encoder.writeToBuffer(buffer.slice(0,208),header);
-        if(emitterGeneration!=scene.generation()){if(scene.emitterCount()>0)encoder.writeToBuffer(buffer.slice(emitterOffset,scene.emitterCount()*64L),scene.emitterData());if(scene.flameCount()>0)encoder.writeToBuffer(buffer.slice(flameOffset,scene.flameCount()*64L),scene.flameData());emitterGeneration=scene.generation();}
+        if(emitterGeneration!=scene.emitterGeneration()){if(scene.emitterCount()>0)encoder.writeToBuffer(buffer.slice(emitterOffset,scene.emitterCount()*64L),scene.emitterData());if(scene.flameCount()>0)encoder.writeToBuffer(buffer.slice(flameOffset,scene.flameCount()*64L),scene.flameData());emitterGeneration=scene.emitterGeneration();}
         environment.prepare(encoder,device,buffer,environmentOffset,weather,shadows);
+        long version=NativeTextureVersions.version(atlas.texture());
+        if(albedoVersion!=version){
         try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan animated albedo copy")
             .withRenderArea(new RenderPass.RenderArea(0,0,widths[0],heights[0])).withColorAttachment(albedoView,Optional.empty()))) {
             pass.setPipeline(COPY);pass.bindTexture("Sampler0",atlas,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
         }
-        encoder.copyTextureToBuffer(albedo,buffer,offsets[0],()->{},0);
+        encoder.copyTextureToBuffer(albedo,buffer,offsets[0],()->{},0);albedoVersion=version;
+        }
         if(dynamic!=null)dynamic.uploadTextures(encoder,buffer,dynamicOffset);
         return buffer;
     }
     long bytes(){return buffer==null?0:buffer.size();}
-    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;emitterGeneration=-1;albedoView=null;albedo=null;}
+    @Override public void close(){environment.close();if(buffer!=null)buffer.close();if(albedoView!=null)albedoView.close();if(albedo!=null)albedo.close();buffer=null;emitterGeneration=-1;albedoVersion=Long.MIN_VALUE;albedoView=null;albedo=null;}
 }

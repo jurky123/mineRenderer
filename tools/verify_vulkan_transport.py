@@ -47,7 +47,9 @@ def main():
     reconstruction=(ROOT/'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh').read_text()
     functions=guides[guides.index('vec2 rtFlow'):guides.index('void main()')]
     assert functions==reconstruction[reconstruction.index('vec2 rtFlow'):reconstruction.index('void main()')], 'reconstruction/OptiX guide validation drift'
-    for glsl,slang in [('vec2','float2'),('vec4','float4')]:functions=functions.replace(glsl,slang)
+    for glsl,slang in [('vec2','float2'),('vec3','float3'),('vec4','float4')]:functions=functions.replace(glsl,slang)
+    transport=(ROOT/'shaders/rt/common/material_transport.slang').read_text()
+    functions+=next(line for line in transport.splitlines() if line.startswith('float3 rtPreviousSurface'))+'\n'
     (output/'reconstruction_fixture_functions.slang').write_text(functions)
     subprocess.run([compiler,str(ROOT/'shaders/rt/tests/reconstruction_fixture.slang'),'-I',str(output),'-target','cpp','-entry','reconstruction_fixture','-stage','compute','-o',str(output/'reconstruction_fixture.cpp')],check=True)
     executable=output/'reconstruction_fixture'

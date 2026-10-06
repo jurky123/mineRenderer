@@ -32,7 +32,7 @@ abstract class VulkanRtxExtensionsMixin {
             }
             if(!found)next=VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default().bufferDeviceAddress(true).pNext(next).address();
             var accel=VkPhysicalDeviceAccelerationStructureFeaturesKHR.calloc(stack).sType$Default().accelerationStructure(true).pNext(next);
-            var pipeline=VkPhysicalDeviceRayTracingPipelineFeaturesKHR.calloc(stack).sType$Default().rayTracingPipeline(true).pNext(accel.address());
+            var pipeline=VkPhysicalDeviceRayTracingPipelineFeaturesKHR.calloc(stack).sType$Default().rayTracingPipeline(true).rayTracingPipelineTraceRaysIndirect(VulkanRtCapabilities.indirectTracing(physical)).pNext(accel.address());
             long previous=info.pNext();info.pNext(pipeline.address());
             try{return original.call(physical,info,allocator,output);}finally{info.pNext(previous);}
         }

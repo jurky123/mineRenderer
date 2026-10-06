@@ -78,12 +78,15 @@ final class VulkanPathTracer implements AutoCloseable {
             if(texture==null||texture.getWidth(0)!=width||texture.getHeight(0)!=height) {
                 releaseTexture();texture=device.createTexture("VoxelLight Vulkan RT normal",GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,width,height,1,1);view=device.createTextureView(texture);
             }
+            RenderPassProfile.workload(width,height,samplesPerFrame,context.scene.generation());
             var camera=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState;var pos=camera.pos;
             context.scene.requestPages(warmup.requestPages(context.drainPageRequests()));
             warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
             var inverse=new Matrix4f(projection).mul(camera.viewRotationMatrix).invert();
             context.prepareScene(encoder,RtGeometryStream.drain(16),pos.x(),pos.y(),pos.z());
             if(materials&&(realtime||!history.frozen()||history.samples()==0))dynamic.prepare(encoder,context,pos.x(),pos.y(),pos.z());
+            context.commitScene(encoder,pos.x(),pos.y(),pos.z());
+            RenderPassProfile.workload(width,height,samplesPerFrame,context.scene.generation());
             double[] pose=new double[19];pose[0]=pos.x();pose[1]=pos.y();pose[2]=pos.z();
             float[] matrix=new float[16];inverse.get(matrix);for(int i=0;i<16;i++)pose[i+3]=matrix[i];
             if(materials&&realtime)reconstruction.lighting(assets.lightingSignature(shadows));
@@ -104,10 +107,10 @@ final class VulkanPathTracer implements AutoCloseable {
                 if(!context.renderBatch(encoder,java.util.List.of(),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets,budget)){state="waiting for terrain BLAS";return;}
                 displayed=useHistory?accumulation.add(encoder,view,history.samples(),history.target(),width,height):view;
                 if(useHistory)history.accepted(budget);
-                if(materials&&realtime)displayed=reconstruction.resolve(encoder,context,view,new Matrix4f(inverse).invert(),pos.x(),pos.y(),pos.z(),context.scene.historyGeneration()+com.voxellight.rt.RtInvalidationQueue.generation(),width,height,camera.viewRotationMatrix);
+                if(materials&&realtime)displayed=reconstruction.resolve(encoder,context,view,new Matrix4f(inverse).invert(),pos.x(),pos.y(),pos.z(),context.scene.historyGeneration()+com.voxellight.rt.RtInvalidationQueue.generation(),width,height,target.width,target.height,camera.viewRotationMatrix);
             }
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_pt_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan PT composite").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
-                pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",displayed,RenderSystem.getSamplerCache().getClampToEdge(materials&&realtime?FilterMode.LINEAR:FilterMode.NEAREST));pass.draw(3,1,0,0);
+                pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",displayed,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
             }
             displayedThisFrame=true;
             diagnostics.observe(encoder,context,texture,materials,width,height);

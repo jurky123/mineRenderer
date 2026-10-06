@@ -9,6 +9,13 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VulkanRtContractTest {
+    @Test void opaqueClassificationAndMotionTopologyUseMaterialLayoutInsteadOfWorldPose(){
+        var vertices=ByteBuffer.allocate(120).order(ByteOrder.nativeOrder());
+        long topology=VulkanRtScene.topologyVersion(vertices.array());
+        vertices.putFloat(0,20000);assertEquals(topology,VulkanRtScene.topologyVersion(vertices.array()));
+        assertFalse(VulkanRtScene.needsAnyHit(vertices.array()));
+        vertices.putInt(36,1);assertTrue(VulkanRtScene.needsAnyHit(vertices.array()));assertNotEquals(topology,VulkanRtScene.topologyVersion(vertices.array()));
+    }
     @Test void shippedArtifactContainsNoLegacyTracerOrNativeCompiler()throws Exception{
         try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))){
             for(var entry:Collections.list(jar.entries())){

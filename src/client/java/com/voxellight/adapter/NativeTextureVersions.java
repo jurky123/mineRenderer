@@ -1,0 +1,12 @@
+package com.voxellight.adapter;
+
+import com.mojang.blaze3d.textures.GpuTexture;
+import java.util.WeakHashMap;
+
+/** Observe native Vulkan writes without image readback. Only requested textures are tracked. */
+public final class NativeTextureVersions {
+    private static final WeakHashMap<GpuTexture,Long> versions=new WeakHashMap<>();
+    private NativeTextureVersions(){}
+    public static synchronized long version(GpuTexture texture){return versions.computeIfAbsent(texture,ignored->0L);}
+    public static synchronized void written(GpuTexture texture){if(versions.containsKey(texture))versions.put(texture,versions.get(texture)+1);}
+}

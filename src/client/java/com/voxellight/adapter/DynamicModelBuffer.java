@@ -21,8 +21,14 @@ import java.util.List;
 
 /** Bounded private native-model stream shared by entity and block-entity shadow owners. */
 final class DynamicModelBuffer implements AutoCloseable {
-    private record Draw(int baseVertex, int indices, PreparedRenderType.Texture texture) { }
-    record Checkpoint(int draws, int position) { }
+    private record Draw(int baseVertex,int indices,PreparedRenderType.Texture texture,Object owner,int feature,double x,double y,double z,boolean transientGeometry) { }
+    private Object owner;
+    private int feature;
+    private double ownerX,ownerY,ownerZ;
+    private boolean transientGeometry=true;
+    void owner(Object key,double x,double y,double z){owner=key;feature=0;ownerX=x;ownerY=y;ownerZ=z;transientGeometry=false;}
+    void transientOwner(Object key){owner(key,0,0,0);transientGeometry=true;}
+    record Checkpoint(int draws, int position,int feature) { }
     private final String label;
     private final List<Draw> draws = new ArrayList<>();
     private ByteBuffer frame;
@@ -32,7 +38,7 @@ final class DynamicModelBuffer implements AutoCloseable {
     private int bytes, maxIndices, skipped, modelAttempts;
     DynamicModelBuffer(String label) { this.label = label; }
     void begin() {
-        draws.clear(); bytes=maxIndices=skipped=modelAttempts=0;
+        draws.clear(); bytes=maxIndices=skipped=modelAttempts=0;owner=null;feature=0;ownerX=ownerY=ownerZ=0;transientGeometry=true;
         if (frame != null) frame.clear();
     }
     private void allocate() {
@@ -41,10 +47,10 @@ final class DynamicModelBuffer implements AutoCloseable {
             scratch=new ByteBufferBuilder(4096,DynamicCasterSelection.MODEL_BYTES);
         }
     }
-    Checkpoint checkpoint() { return new Checkpoint(draws.size(),frame==null ? 0 : frame.position()); }
+    Checkpoint checkpoint() { return new Checkpoint(draws.size(),frame==null ? 0 : frame.position(),feature); }
     void rollback(Checkpoint checkpoint) {
         draws.subList(checkpoint.draws(),draws.size()).clear();
-        if(frame!=null) frame.position(checkpoint.position());
+        if(frame!=null) frame.position(checkpoint.position());feature=checkpoint.feature();
     }
     void finish() {
         bytes=frame==null ? 0 : frame.position();
@@ -109,7 +115,7 @@ final class DynamicModelBuffer implements AutoCloseable {
         if(data.remaining()>frame.remaining()){skipped++;return false;}
         int base=frame.position()/DefaultVertexFormat.BLOCK.getVertexSize();
         frame.put(data);
-        draws.add(new Draw(base,mesh.drawState().indexCount(),texture));
+        draws.add(new Draw(base,mesh.drawState().indexCount(),texture,owner,feature++,ownerX,ownerY,ownerZ,transientGeometry));
         return true;
     }
 
@@ -142,10 +148,10 @@ final class DynamicModelBuffer implements AutoCloseable {
             pass.drawIndexed(draw.indices(), 1, 0, draw.baseVertex(), 0);
         }
     }
-    record RtModel(byte[] quads,PreparedRenderType.Texture texture){}
+    record RtModel(byte[] quads,PreparedRenderType.Texture texture,Object owner,int feature,double x,double y,double z,boolean transientGeometry){}
     List<RtModel> rtModels(){
         if(frame==null)return List.of();var result=new ArrayList<RtModel>();int stride=DefaultVertexFormat.BLOCK.getVertexSize();
-        for(var draw:draws){int count=draw.indices()/6*4;byte[] bytes=new byte[count*stride];var source=frame.duplicate();source.position(draw.baseVertex()*stride).limit((draw.baseVertex()+count)*stride);source.get(bytes);result.add(new RtModel(bytes,draw.texture()));}
+        for(var draw:draws){int count=draw.indices()/6*4;byte[] bytes=new byte[count*stride];var source=frame.duplicate();source.position(draw.baseVertex()*stride).limit((draw.baseVertex()+count)*stride);source.get(bytes);result.add(new RtModel(bytes,draw.texture(),draw.owner(),draw.feature(),draw.x(),draw.y(),draw.z(),draw.transientGeometry()));}
         return List.copyOf(result);
     }
     int modelCount() { return draws.size(); }

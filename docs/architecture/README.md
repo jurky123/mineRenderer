@@ -1,6 +1,6 @@
 # VoxelLight 系统架构调整设计
 
-日期：2026-10-06。基线：**0.39.0-alpha.23，提交 `52dd802`**，Minecraft 26.2 / Java 25 / Fabric / 原生 Vulkan。状态：**设计提案，未实施**。本组文档是当前 PT 路线的架构设计入口；旧 raster-primary / OptiX tracing 文档保留为历史。本文中的新增结构、配置及 ABI 均为目标合同，不表示当前代码已经提供。
+日期：2026-10-06。基线：**0.39.0-alpha.23，提交 `52dd802`**，Minecraft 26.2 / Java 25 / Fabric / 原生 Vulkan。状态：**设计与实施并行；alpha.24 已落实场景/资源、调度和运动重建的基础调整**。本组文档是当前 PT 路线的架构设计入口；旧 raster-primary / OptiX tracing 文档保留为历史。本文中的新增结构、配置及 ABI 均为目标合同；实际实现、ABI 差异和未完成项以 [alpha.24 实施记录](IMPLEMENTATION.md) 为准。现状审计保留 alpha.23 基线。
 
 ## 1. 核心决策
 

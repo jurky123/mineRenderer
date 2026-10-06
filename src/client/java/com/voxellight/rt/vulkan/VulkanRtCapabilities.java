@@ -33,6 +33,11 @@ public record VulkanRtCapabilities(boolean supported, Set<String> extensions, St
             return new VulkanRtCapabilities(supported, extensions, supported ? "supported" : "required RT feature unavailable");
         }
     }
+    public static boolean indirectTracing(VkPhysicalDevice physical){try(var stack=MemoryStack.stackPush()){
+        var pipeline=VkPhysicalDeviceRayTracingPipelineFeaturesKHR.calloc(stack).sType$Default();
+        VK11.vkGetPhysicalDeviceFeatures2(physical,VkPhysicalDeviceFeatures2.calloc(stack).sType$Default().pNext(pipeline.address()));
+        return pipeline.rayTracingPipelineTraceRaysIndirect();
+    }}
     static VkExtensionProperties.Buffer allocateExtensions(int count) { return VkExtensionProperties.calloc(count); }
     public static void check(int result) { if (result != VK_SUCCESS) throw new IllegalStateException("Vulkan RT result=" + result); }
 }

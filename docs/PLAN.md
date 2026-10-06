@@ -1,3 +1,7 @@
+## alpha.24 architecture implementation
+
+Core persistent scene/AS resources, stable allocation, per-object translation and previous-pose motion, native texture versions, hot/cold continuation, optional GPU active queues, descriptor reuse and independent HDR temporal output reconstruction are implemented. [Implementation ledger](architecture/IMPLEMENTATION.md) records exact limits, differences from the target design and remaining SDK/lighting/coverage work. Driver and quality/performance acceptance is pending; build results do not close these gates.
+
 ## alpha.23 后的系统架构调整（设计提案）
 
 当前 PT 路线的整体调整见 [系统架构设计](architecture/README.md)，细节覆盖持久场景与稳定实例、Minecraft 特性、路径追踪与光源/介质、运动信号与重建/放大，以及按代码文件拆分的迁移任务。

@@ -43,8 +43,7 @@ uint nearestFlame(float3 point,uint excluded){
     for(uint i=0;i<flameCount();i++)if(i!=excluded){LightSample l=sampleFlame(point,i);if(l.pdf>0&&l.distance<best){best=l.distance;chosen=i;}}
     return chosen;
 }
-LightSample flameConnection(float3 point,uint connection,inout uint seed){
-    uint first=nearestFlame(point,0xffffffffu),second=nearestFlame(point,first);
+LightSample flameConnection(float3 point,uint connection,inout uint seed,uint first,uint second){
     if(connection<2)return connection==0&&first!=0xffffffffu?sampleFlame(point,first):connection==1&&second!=0xffffffffu?sampleFlame(point,second):(LightSample)0;
     LightSample selected=(LightSample)0;uint count=flameCount();if(count<=2)return selected;
     float sum=0,selectedTarget=0;uint proposals=8;
@@ -57,4 +56,9 @@ LightSample flameConnection(float3 point,uint connection,inout uint seed){
     }
     if(selectedTarget>0)selected.radiance*=sum/(float(proposals)*selectedTarget);
     return selected;
+}
+
+LightSample flameConnection(float3 point,uint connection,inout uint seed){
+    uint first=nearestFlame(point,0xffffffffu),second=nearestFlame(point,first);
+    return flameConnection(point,connection,seed,first,second);
 }

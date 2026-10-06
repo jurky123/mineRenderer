@@ -55,6 +55,8 @@ final class EntityShadows implements AutoCloseable {
             // A failing renderer cannot retain a partially submitted entity or disable terrain lighting.
             var before = buffer.checkpoint();
             try {
+                var position=entity.getPosition(partial);
+                buffer.owner(entity.getUUID(),position.x,position.y,position.z);
                 var state = dispatcher.extractEntity(entity, partial);
                 if (state.isInvisible) continue;
                 dispatcher.submit(state, camera, state.x - camera.pos.x(), state.y - camera.pos.y(), state.z - camera.pos.z(), new PoseStack(), collector);

@@ -82,6 +82,17 @@ class MixinPackagingTest {
         }
     }
 
+    @Test void nativeTextureWriteCallbacksMatchTheActualVulkanArgumentLayout()throws Exception{
+        var mixin=new ClassNode(Opcodes.ASM9);new ClassReader("com.voxellight.mixin.client.VulkanTextureVersionsMixin").accept(mixin,0);
+        var target=new ClassNode(Opcodes.ASM9);new ClassReader("com.mojang.blaze3d.vulkan.VulkanCommandEncoder").accept(target,0);
+        for(var method:mixin.methods)if(method.visibleAnnotations!=null)for(var annotation:method.visibleAnnotations)if(annotation.desc.endsWith("/Inject;")){
+            @SuppressWarnings("unchecked") var selectors=(List<String>)annotationValue(annotation,"method");String selector=selectors.getFirst();int signature=selector.indexOf('(');String name=signature<0?selector:selector.substring(0,signature);
+            var original=target.methods.stream().filter(m->m.name.equals(name)&&(signature<0||m.desc.equals(selector.substring(signature)))).findFirst().orElseThrow();
+            var args=Type.getArgumentTypes(method.desc);var expected=Type.getArgumentTypes(original.desc);
+            assertEquals(expected.length+1,args.length,selector);for(int i=0;i<expected.length;i++)assertEquals(expected[i],args[i],selector+" argument "+i);
+        }
+    }
+
     @Test
     void nativeFormatFirstBuilderHookTargetsOnlyBlockLayout() throws Exception {
         var target=new ClassNode(Opcodes.ASM9);

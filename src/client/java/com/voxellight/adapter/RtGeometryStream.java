@@ -6,7 +6,10 @@ import java.nio.*;
 import java.util.*;
 /** Compilation-time snapshot: copies the native compiled triangles, never recompiles or re-rasterizes terrain. */
 public final class RtGeometryStream {
- public record Section(SectionKey key,long version,byte[] triangles){public int vertices(){return triangles.length/40;}}
+ public record Section(SectionKey key,long version,byte[] triangles,double x,double y,double z,boolean viewModel,boolean motionValid){
+  public Section(SectionKey key,long version,byte[] triangles){this(key,version,triangles,key.y()==Integer.MIN_VALUE?0:key.x()*16.,key.y()==Integer.MIN_VALUE?0:key.y()*16.,key.y()==Integer.MIN_VALUE?0:key.z()*16.,false,false);}
+  public int vertices(){return triangles.length/40;}
+ }
  private static boolean enabled;
 
  private record Snapshot(SectionKey key,long revision,long generation){}

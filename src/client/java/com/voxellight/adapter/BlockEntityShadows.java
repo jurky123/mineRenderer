@@ -64,6 +64,8 @@ final class BlockEntityShadows implements AutoCloseable {
         for(var blockEntity:values) {
             var before=buffer.checkpoint();
             try {
+                var worldPos=blockEntity.getBlockPos();
+                buffer.owner(worldPos,worldPos.getX(),worldPos.getY(),worldPos.getZ());
                 var renderer=dispatcher.getRenderer(blockEntity);
                 if(renderer==null)continue;
                 var state=dispatcher.tryExtractRenderState(blockEntity,partial,null,renderer.shouldRenderOffScreen());

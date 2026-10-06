@@ -10,13 +10,15 @@ import static com.voxellight.rt.vulkan.VulkanRtCapabilities.check;
 /** Device-local addressable allocation. MC's submission-index destruction queue protects in-flight work. */
 public final class VulkanRtBuffer extends VulkanGpuBuffer {
     private final VulkanDevice device;
-    private final long memory, address;
+    private final long memory,address,allocationBytes;
+    private static final java.util.concurrent.atomic.AtomicLong allocated=new java.util.concurrent.atomic.AtomicLong(),retiring=new java.util.concurrent.atomic.AtomicLong(),allocations=new java.util.concurrent.atomic.AtomicLong();
+    public static String memoryStatus(){return ", rtBufferAllocatedBytes="+allocated.get()+", rtBufferRetiringBytes="+retiring.get()+", rtBufferAllocations="+allocations.get();}
     private boolean closed;
-    private record Allocation(long buffer, long memory, long address) {}
+    private record Allocation(long buffer,long memory,long address,long bytes) {}
     public VulkanRtBuffer(VulkanDevice device, long bytes, int usage) { this(device, bytes, allocate(device, bytes, usage)); }
     private VulkanRtBuffer(VulkanDevice device, long bytes, Allocation allocation) {
         super(allocation.buffer, USAGE_COPY_SRC | USAGE_COPY_DST, bytes);
-        this.device = device; memory = allocation.memory; address = allocation.address;
+        this.device = device; memory = allocation.memory; address = allocation.address;allocationBytes=allocation.bytes;allocated.addAndGet(allocationBytes);allocations.incrementAndGet();
     }
     private static Allocation allocate(VulkanDevice device, long bytes, int usage) {
         if(bytes <= 0) throw new IllegalArgumentException("Empty RT allocation");
@@ -37,7 +39,7 @@ public final class VulkanRtBuffer extends VulkanGpuBuffer {
             check(vkAllocateMemory(vk, alloc, null, out)); memory=out.get(0); check(vkBindBufferMemory(vk, buffer, memory, 0));
             long address=VK12.vkGetBufferDeviceAddress(vk, VkBufferDeviceAddressInfo.calloc(stack).sType$Default().buffer(buffer));
             if(address==0)throw new IllegalStateException("RT buffer has no device address");
-            return new Allocation(buffer,memory,address);
+            return new Allocation(buffer,memory,address,requirements.size());
         } catch(RuntimeException error) {
             if(buffer!=0)vkDestroyBuffer(vk,buffer,null); if(memory!=0)vkFreeMemory(vk,memory,null); throw error;
         }
@@ -45,6 +47,6 @@ public final class VulkanRtBuffer extends VulkanGpuBuffer {
     long address() { return address; }
     @Override public boolean isClosed() { return closed; }
     @Override public GpuBufferSlice.MappedView map(long o,long n,boolean read,boolean write) { throw new UnsupportedOperationException("RT buffers are device-local"); }
-    @Override public void close() { if(!closed) { closed=true;device.createCommandEncoder().queueForDestroy(this); } }
-    @Override public void destroy() { vkDestroyBuffer(device.vkDevice(),vkBuffer(),null);vkFreeMemory(device.vkDevice(),memory,null); }
+    @Override public void close() { if(!closed) { closed=true;retiring.addAndGet(allocationBytes);device.createCommandEncoder().queueForDestroy(this); } }
+    @Override public void destroy() { vkDestroyBuffer(device.vkDevice(),vkBuffer(),null);vkFreeMemory(device.vkDevice(),memory,null);allocated.addAndGet(-allocationBytes);retiring.addAndGet(-allocationBytes); }
 }

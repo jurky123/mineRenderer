@@ -15,7 +15,7 @@ import java.util.Optional;
 
 /** Moving-camera reconstruction. History is validated using RT geometry, never raster visibility. */
 final class RtReconstruction implements AutoCloseable {
-    private static final String[] INPUTS={"Noisy","Previous","Albedo","Normal","Position","PreviousAlbedo","PreviousNormal","PreviousPosition"};
+    private static final String[] INPUTS={"Noisy","Previous","Albedo","Normal","Position","PreviousAlbedo","PreviousNormal","PreviousPosition","MotionPosition","PreviousMotionPosition"};
     private static RenderPipeline pipeline(String shader){
         var bindings=BindGroupLayout.builder();for(String name:INPUTS)bindings.withSampler(name);
         var builder=RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/"+shader))
@@ -25,6 +25,7 @@ final class RtReconstruction implements AutoCloseable {
         if(shader.equals("rt_denoiser_guides"))for(int i=1;i<3;i++)builder.withColorTargetState(i,new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL));
         return builder.build();
     }
+    private final RtTemporalUpscale upscale=new RtTemporalUpscale();
     private static final RenderPipeline PIPELINE=pipeline("rt_reconstruct");
     private static final RenderPipeline GUIDES=pipeline("rt_denoiser_guides");
     private com.voxellight.nvidia.OptixReconstruction optix;
@@ -36,8 +37,8 @@ final class RtReconstruction implements AutoCloseable {
     private String backend="Vulkan temporal/spatial";
     void optix(boolean value){close();useOptix=value;}
     String status(){return backend;}
-    private final GpuTexture[][] guides=new GpuTexture[2][3];
-    private final GpuTextureView[][] guideViews=new GpuTextureView[2][3];
+    private final GpuTexture[][] guides=new GpuTexture[2][4];
+    private final GpuTextureView[][] guideViews=new GpuTextureView[2][4];
     private final GpuTexture[] colors=new GpuTexture[2];
     private final GpuTextureView[] colorViews=new GpuTextureView[2];
     private GpuBuffer settings;
@@ -57,18 +58,18 @@ final class RtReconstruction implements AutoCloseable {
         }
         lighting=value.clone();
     }
-    GpuTextureView resolve(CommandEncoder encoder,VulkanRtContext context,GpuTextureView noisy,Matrix4f clip,double x,double y,double z,long epoch,int w,int h,Matrix4f viewRotation){
+    GpuTextureView resolve(CommandEncoder encoder,VulkanRtContext context,GpuTextureView noisy,Matrix4f clip,double x,double y,double z,long epoch,int w,int h,int outputWidth,int outputHeight,Matrix4f viewRotation){
         var device=RenderSystem.getDevice();
         if(settings==null||width!=w||height!=h){
             close();width=w;height=h;
             if(!device.precompilePipeline(PIPELINE,RenderProbe.SHADERS).isValid())throw new IllegalStateException("RT reconstruction shader unavailable");
             for(int bank=0;bank<2;bank++){
                 colors[bank]=device.createTexture("VoxelLight realtime HDR history",GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_RENDER_ATTACHMENT,GpuFormat.RGBA32_FLOAT,w,h,1,1);colorViews[bank]=device.createTextureView(colors[bank]);
-                for(int plane=0;plane<3;plane++){guides[bank][plane]=device.createTexture("VoxelLight RT guide "+plane,GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST,GpuFormat.RGBA32_FLOAT,w,h,1,1);guideViews[bank][plane]=device.createTextureView(guides[bank][plane]);}
+                for(int plane=0;plane<4;plane++){guides[bank][plane]=device.createTexture("VoxelLight RT guide "+plane,GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST,GpuFormat.RGBA32_FLOAT,w,h,1,1);guideViews[bank][plane]=device.createTextureView(guides[bank][plane]);}
             }
             settings=device.createBuffer(()->"VoxelLight RT reprojection settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,160);
         }
-        int write=1-read;for(int plane=0;plane<3;plane++)context.copyGuide(encoder,plane,guides[write][plane]);
+        int write=1-read;for(int plane=0;plane<4;plane++)context.copyGuide(encoder,plane==3?6:plane,guides[write][plane]);
         var data=ByteBuffer.allocateDirect(160).order(ByteOrder.nativeOrder());previousClip.get(0,data);data.position(64).putFloat((float)previousX).putFloat((float)previousY).putFloat((float)previousZ).putFloat(valid&&generation==epoch?1:0).putFloat(w).putFloat(h).putFloat(reactive?4:32).putFloat(0);viewRotation.get(96,data);data.position(160).flip();encoder.writeToBuffer(settings.slice(),data);
         GpuTextureView result=null;
         if(useOptix&&optix==null&&!backend.startsWith("fallback")){
@@ -85,7 +86,7 @@ final class RtReconstruction implements AutoCloseable {
             for(var guide:denoiserViews)descriptor.withColorAttachment(guide,Optional.empty());
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_denoiser_guides");var pass=encoder.createRenderPass(descriptor)){
                 pass.setPipeline(GUIDES);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-                GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2]};
+                GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2],guideViews[write][3],guideViews[read][3]};
                 for(int i=0;i<inputs.length;i++)pass.bindTexture(INPUTS[i],inputs[i],sampler);pass.setUniform("ReconstructionSettings",settings);pass.draw(3,1,0,0);
             }
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_optix_exchange")){optix.resolve(encoder,context,denoiserGuides[0],denoiserGuides[1],denoiserGuides[2],denoised,valid&&generation==epoch);result=denoisedView;}
@@ -94,12 +95,13 @@ final class RtReconstruction implements AutoCloseable {
         if(result==null){
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_reconstruction");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight RT temporal reconstruction").withRenderArea(new RenderPass.RenderArea(0,0,w,h)).withColorAttachment(colorViews[write],Optional.empty()))){
             pass.setPipeline(PIPELINE);var sampler=RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-            GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2]};
+            GpuTextureView[] inputs={noisy,colorViews[read],guideViews[write][0],guideViews[write][1],guideViews[write][2],guideViews[read][0],guideViews[read][1],guideViews[read][2],guideViews[write][3],guideViews[read][3]};
             for(int i=0;i<inputs.length;i++)pass.bindTexture(INPUTS[i],inputs[i],sampler);pass.setUniform("ReconstructionSettings",settings);pass.draw(3,1,0,0);
         }
             result=colorViews[write];
         }
+        result=upscale.resolve(encoder,result,guideViews[write],guideViews[read],settings,outputWidth,outputHeight);
         previousClip.set(clip);previousX=x;previousY=y;previousZ=z;generation=epoch;valid=true;read=write;return result;
     }
-    public void close(){if(optix!=null)optix.close();optix=null;for(int i=0;i<3;i++){if(denoiserViews[i]!=null)denoiserViews[i].close();if(denoiserGuides[i]!=null)denoiserGuides[i].close();denoiserViews[i]=null;denoiserGuides[i]=null;}if(denoisedView!=null)denoisedView.close();if(denoised!=null)denoised.close();denoisedView=null;denoised=null;backend="Vulkan temporal/spatial";for(int bank=0;bank<2;bank++){if(colorViews[bank]!=null)colorViews[bank].close();if(colors[bank]!=null)colors[bank].close();colorViews[bank]=null;colors[bank]=null;for(int p=0;p<3;p++){if(guideViews[bank][p]!=null)guideViews[bank][p].close();if(guides[bank][p]!=null)guides[bank][p].close();guideViews[bank][p]=null;guides[bank][p]=null;}}if(settings!=null)settings.close();settings=null;valid=false;lighting=null;generation=-1;read=0;}
+    public void close(){upscale.close();if(optix!=null)optix.close();optix=null;for(int i=0;i<3;i++){if(denoiserViews[i]!=null)denoiserViews[i].close();if(denoiserGuides[i]!=null)denoiserGuides[i].close();denoiserViews[i]=null;denoiserGuides[i]=null;}if(denoisedView!=null)denoisedView.close();if(denoised!=null)denoised.close();denoisedView=null;denoised=null;backend="Vulkan temporal/spatial";for(int bank=0;bank<2;bank++){if(colorViews[bank]!=null)colorViews[bank].close();if(colors[bank]!=null)colors[bank].close();colorViews[bank]=null;colors[bank]=null;for(int p=0;p<4;p++){if(guideViews[bank][p]!=null)guideViews[bank][p].close();if(guides[bank][p]!=null)guides[bank][p].close();guideViews[bank][p]=null;guides[bank][p]=null;}}if(settings!=null)settings.close();settings=null;valid=false;lighting=null;generation=-1;read=0;}
 }

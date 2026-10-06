@@ -28,6 +28,18 @@ class PassMetricsTest {
         assertNull(metrics.newestGpuSample());
     }
 
+    @Test void scopesShareRenderFramesAndDelayedResultsKeepTheirWorkload(@TempDir Path directory)throws Exception{
+        var metrics=new PassMetrics(3);
+        metrics.recordScope(10,4,0,"batch",320,180,2,9,100);
+        metrics.recordScope(11,4,10,"primary",320,180,2,9,20);
+        metrics.completeGpu(11,30);metrics.completeGpu(10,110);
+        assertEquals(4,metrics.snapshot().getLast().frame());assertEquals(10,metrics.snapshot().getLast().parentScopeId());
+        assertEquals(11,metrics.newestGpuSample().scopeId());
+        var csv=directory.resolve("scopes.csv");metrics.export(csv);
+        assertTrue(Files.readAllLines(csv).getFirst().contains("scope_id,parent_scope_id,spp,scene_generation"));
+        assertTrue(Files.readAllLines(csv).getLast().endsWith(",2,11,10,2,9"));
+    }
+
     @Test
     void missingAndInvalidGpuMeasurementsAreNotReportedAsZero(@TempDir Path directory) throws Exception {
         var metrics = new PassMetrics(2);

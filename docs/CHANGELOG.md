@@ -1,3 +1,13 @@
+# 0.39.0-alpha.24 — persistent scene, GPU continuation queues and motion reconstruction
+
+Terrain and dynamic changes are collected before one scene commit. Shader geometry uses stable free-list ranges; dynamic object identities and local mesh translations replace texture-only grouping. Same-layout BLAS/TLAS updates reuse AS storage, scratch and vertex/instance buffers. Native Vulkan texture-write versions avoid unchanged crop/albedo uploads; terrain-generation caching avoids rebuilding static emitter proposals for dynamic motion. Persistent fenced descriptor slots replace per-frame pools.
+
+Continuation storage separates 144-byte hot state from 288-byte cold media, retaining the 432-byte/path capacity. On devices supporting indirect tracing, workloads of at least 65,536 paths use two bounded GPU active queues with original path indices; smaller workloads keep fixed dispatches. This threshold is provisional. Primary guides use the actual jittered hit, eliminating a second visibility ray. Compatible dynamic surfaces map barycentrics through previous geometry/translation; stable identities reject replaced topology. View models appear in primary visibility and are excluded from world continuation/shadow rays.
+
+Realtime beauty denoising now feeds a separate output-resolution RGBA32F temporal upscaler. Pass exports contain real frame/scope/parent IDs, dimensions, spp and scene generation; sampled ray counters export separately. Buffer allocation/retirement counters cover owned Vulkan RT buffers only. See [implementation and remaining design work](architecture/IMPLEMENTATION.md) for exact ABI/memory contracts and limits.
+
+Build, shader-link, SPIR-V and CPU transport validation passed. No NVIDIA GPU is available on this host: driver synchronization, visual motion/upscale quality and matched-workload performance remain pending. NRD/DLSS RR, ReSTIR, complete separated-signal reconstruction, render-origin rebasing, advanced coverage/LOD/cache and caustics are not implemented by this release.
+
 # 0.39.0-alpha.23 — decouple cropped textures from dynamic BLAS groups
 
 Alpha.22 fixed sprite detail and terrain relocation but incorrectly used each cropped texture tile as a geometry group identity. The new profile showed 86 dynamic groups versus 7 previously, with BLAS CPU median rising from 1.296 to 8.874 ms. Dynamic groups now use the original native texture view plus hand/world category; each triangle retains its independent crop tile in its material flags. Animated source views keep stable group IDs, inactive IDs are reclaimed, and accepted triangle texture slots are tracked separately from geometry groups for uploads. Cropped sprite detail, HUD projection and terrain-first packing remain intact.

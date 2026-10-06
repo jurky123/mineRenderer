@@ -16,13 +16,14 @@ class DynamicModelBufferTest {
     @Test void rendererFailureRollsBackOnlyItsPartialSubmissionsAndNewFramesClearOldModels() {
         try(var buffer=new DynamicModelBuffer("test");var scratch=new ByteBufferBuilder(4096,DynamicCasterSelection.MODEL_BYTES);
             var mesh=quads(scratch,1)) {
-            buffer.begin();assertTrue(buffer.append(mesh,null));
+            buffer.begin();buffer.owner("entity",10,20,30);assertTrue(buffer.append(mesh,null));
             var checkpoint=buffer.checkpoint();
             assertTrue(buffer.append(mesh,null));assertTrue(buffer.append(mesh,null));
             buffer.rollback(checkpoint);buffer.finish();
             assertEquals(1,buffer.modelCount());assertEquals(4*28,buffer.bytes());
             assertTrue(buffer.append(mesh,null));buffer.finish();
             assertEquals(2,buffer.modelCount());assertEquals(8*28,buffer.bytes());
+            assertEquals(1,buffer.rtModels().get(1).feature());assertEquals("entity",buffer.rtModels().get(1).owner());assertEquals(20,buffer.rtModels().get(1).y());assertFalse(buffer.rtModels().get(1).transientGeometry());
             buffer.begin();buffer.finish();assertFalse(buffer.hasModels());assertEquals(0,buffer.bytes());
         }
     }

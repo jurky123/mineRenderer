@@ -38,7 +38,8 @@ def summarize(path):
     with path.open() as stream:
         rows = list(csv.DictReader(stream))
     stem = str(path)[:-len(".passes.csv")]
-    status = pathlib.Path(stem + ".txt").read_text()
+    statusPath=pathlib.Path(stem + ".txt")
+    status=statusPath.read_text() if statusPath.exists() else ""
     controls = {}
     for name in ("VoxelLight", "internalResolution", "requestedSppPerFrame",
                  "sppPerFrame", "renderMode", "rtDynamicModels", "rtDynamicGroups",
@@ -47,28 +48,37 @@ def summarize(path):
         match = re.search(r"\b" + name + r"=([^,\n]+)", status)
         if match:
             controls[name] = match.group(1)
-    # The passes.csv 'frame' column actually holds scope serial IDs. A scene
-    # preparation belongs to the following batch, not the same serial ID.
-    batches = sorted(int(row["frame"]) for row in rows
-                     if row["mode"] == "vulkan_rt_batch")
-    windows = collections.defaultdict(list)
-    for row in rows:
-        index = bisect.bisect_right(batches, int(row["frame"]))
-        if index < len(batches):
-            windows[batches[index]].append(row)
-    scene_cpu = []
-    for window in windows.values():
-        scenes = [row for row in window if row["mode"] == "vulkan_rt_scene"]
-        captures = [row for row in window if row["mode"] == "vulkan_rt_dynamic_capture"]
-        # Reject partial ring-buffer boundaries and nonstandard frame schedules.
-        if len(scenes) == 2 and len(captures) == 1:
-            scene_cpu.append(sum(int(row["pass_cpu_submission_ns"])
-                                 for row in scenes) / 1e6)
-    with pathlib.Path(stem + ".world.csv").open() as stream:
-        world = list(csv.DictReader(stream))
+    schema2=bool(rows and "scope_id" in rows[0])
+    scene_cpu=[]
+    if schema2:
+        windows=collections.defaultdict(list)
+        for row in rows:windows[int(row["frame"])].append(row)
+        for window in windows.values():
+            if any(row["mode"]=="vulkan_rt_batch" for row in window):
+                scenes=[row for row in window if row["mode"]=="vulkan_rt_scene_commit"]
+                if len(scenes)==1:scene_cpu.append(int(scenes[0]["pass_cpu_submission_ns"])/1e6)
+    else:
+        batches=sorted(int(row["frame"]) for row in rows if row["mode"]=="vulkan_rt_batch")
+        windows=collections.defaultdict(list)
+        for row in rows:
+            index=bisect.bisect_right(batches,int(row["frame"]))
+            if index<len(batches):windows[batches[index]].append(row)
+        for window in windows.values():
+            scenes=[row for row in window if row["mode"]=="vulkan_rt_scene"]
+            captures=[row for row in window if row["mode"]=="vulkan_rt_dynamic_capture"]
+            if len(scenes)==2 and len(captures)==1:scene_cpu.append(sum(int(row["pass_cpu_submission_ns"]) for row in scenes)/1e6)
+    worldPath=pathlib.Path(stem + ".world.csv")
+    world=list(csv.DictReader(worldPath.open())) if worldPath.exists() else []
+    raysPath=pathlib.Path(stem + ".rays.csv")
+    ray_workloads=[]
+    if raysPath.exists():
+        with raysPath.open() as stream:
+            ray_workloads=[{name:int(value) for name,value in row.items()} for row in csv.DictReader(stream)]
     return {"final_controls": controls, "passes": timings(rows),
+            "ray_workloads":ray_workloads,
             "world": timings(world),
-            "inferred_scene_cpu_per_batch": distribution(scene_cpu),
+            "scene_cpu_per_batch" if schema2 else "inferred_scene_cpu_per_batch": distribution(scene_cpu),
+            "workloads":sorted({(row["width"],row["height"],row.get("spp","unknown")) for row in rows if row["mode"]=="vulkan_rt_batch"}),
             "caveat": "Scope timings overlap; do not add parent and child passes. "
                       "Final controls do not prove settings throughout the captured window. "
                       "World and pass rings can cover different time windows."}
