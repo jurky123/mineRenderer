@@ -31,6 +31,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 - [安装与命令](docs/INSTALL.md)
 - [设置与静止累积](docs/SETTINGS.md)
 - [当前阶段](docs/CURRENT.md)
+- [alpha.21–23 性能分析与下一阶段设计](docs/performance/ALPHA-23-ANALYSIS.md)
 - [Vulkan 迁移与验收](docs/VULKAN-RT-MIGRATION.md)
 - [Material 3](docs/MATERIAL-3.md)
 - [输运数学](docs/RT-LIGHT-TRANSPORT.md)
