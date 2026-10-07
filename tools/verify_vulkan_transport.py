@@ -34,6 +34,11 @@ def main():
     executable=output/'environment_parity'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_environment_parity.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/realtime_policy.slang'
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','realtime_policy','-stage','compute','-o',str(output/'realtime_policy.cpp')],check=True)
+    executable=output/'realtime_policy'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_realtime_policy.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     # Execute the exact GLSL mean function through Slang's CPU target.
     glsl=(ROOT/'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh').read_text()
     functions=glsl[glsl.index('bool finiteRgb'):glsl.index('void main()')].replace('vec3','float3').replace('vec4','float4')

@@ -1,3 +1,11 @@
+## alpha.36 第三轮 realtime PT
+
+已接入 B1/B2 diffuse tail 的世界 L0/L1 SH 缓存，成熟/方差/平面/法线/epoch/TTL 校验，精确后缀训练与 bounded probe budget；加入首命中重投影校验后按置信度与方差进行 1/2/4 帧完整路径调度。Reference 强制旁路，镜面、玻璃、水、动态和不稳定表面继续 exact。默认 FULL，`rt_realtime cache_sparse` 显式开启；`rt_benchmark realtime` 自动测试三项独立 ABBA、24 段，schema 8 导出算法工作量。
+
+`build clientKit --offline` 最终通过：327 项测试零失败；24 个 RT stages、ABI 与生产 shader 数值测试通过，安装包 stage/source hashes 已核对。
+
+当前编辑/光照采取全局逻辑失效，粗糙镜面不会直接用 diffuse SH 替代，高方差每帧采样但不擅自增加 spp。首命中仍每帧检查，多 spp 不启用 sparse。构建/CPU 数值验证不代表 RTX 目标已实现；本版 GPU 性能和 reference 画质对照尚待客户端。[完整设计、近似边界与验收](REALTIME-PT-ROUND3.md)。
+
 ## alpha.35 BLAS 更新与 scratch 优化
 
 实机 BLAS ABBA：8 段有效，scene commit 3.155→0.377 ms，native BLAS 2.979→0.208 ms；refit 数不变、scratch barriers 每 commit 约157→3，属性-only 跳过未命中。保留 optimized。其他 scope 存在轮间变化，不能把 BLAS 的88%降幅当作整帧收益。[完整结果与限制](performance/ALPHA-35-BLAS-ANALYSIS.md)。

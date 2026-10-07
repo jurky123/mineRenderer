@@ -8,7 +8,7 @@ void material_indirect() {
         uint bounce=dispatchSettings.bounce;
         if(bounce==0||DispatchRaysIndex().x>=pageFeedback[520u+bounce].x)return;
         uint capacity=camera.width*camera.height*max(1u,camera.padding);
-        index=pageFeedback[1568u+(bounce&1u)*capacity+DispatchRaysIndex().x].x;
+        index=pageFeedback[1648u+(bounce&1u)*capacity+DispatchRaysIndex().x].x;
     }
     PathHot hot=loadHot(index);if(hot.origin.w==0||(hot.state&32u)!=0)return;
     PathState path=loadPath(index);

@@ -33,9 +33,20 @@ public final class VulkanRtContext implements AutoCloseable {
     private final com.voxellight.rt.RtQueueCalibration queueCalibration=new com.voxellight.rt.RtQueueCalibration();
     private final java.util.function.Consumer<com.voxellight.debug.PassMetrics.Sample> timingObserver=queueCalibration::timing;
     private String lastWorkload="unobserved";
-    private static final int FEEDBACK_HEADER=1568;
+    private static final int FEEDBACK_HEADER=1648;
     private VulkanRtPipeline visibilityTrace,visibilityQuery;
-    public long maxPixels(int spp){return Math.min(maxStorageRange/(material?spp*288:spp*64),1024L*1024*1024/(spp*(material?400:64)));}
+    public long maxPixels(int spp){long limit=Math.min(maxStorageRange/(material?spp*288:spp*64),1024L*1024*1024/(spp*(material?400:64)));if(runtimeFlags()!=0)limit=Math.min(limit,Math.min(com.voxellight.rt.RtRealtimeLayout.maxPixels(maxStorageRange,spp), (1024L*1024*1024-16L*(FEEDBACK_HEADER+655360)-64)/(spp*576L+368)));return Math.max(1,limit);}
+    private boolean realtime,runtimeAllocated,previousValid;
+    private int runtimeEpoch=1;
+    private long runtimeGeneration=Long.MIN_VALUE;
+    private final com.voxellight.rt.RtLightingChange runtimeLighting=new com.voxellight.rt.RtLightingChange();
+    private final Matrix4f previousClip=new Matrix4f();
+    private float previousX,previousY,previousZ;
+    private String runtimeMetrics="unobserved";
+    public void realtime(boolean value){if(realtime!=value){realtime=value;previousValid=false;runtimeEpoch++;}}
+    private int runtimeFlags(){if(!material||!realtime)return 0;return com.voxellight.rt.RtExecutionOptions.realtime().flags(realtime);}
+    public void runtimeLighting(float[] signature){long generation=scene.historyGeneration()+com.voxellight.rt.RtInvalidationQueue.generation();boolean changed=runtimeLighting.changed(signature);if(generation!=runtimeGeneration||changed){runtimeGeneration=generation;runtimeEpoch++;previousValid=false;}}
+    private long runtimeBytes(int w,int h,int spp){return com.voxellight.rt.RtRealtimeLayout.bytes((long)w*h,spp);}
     private int frame;
     private int width,height,samples=1;
     private boolean closed,reconstructionGuides=true;
@@ -89,9 +100,10 @@ public final class VulkanRtContext implements AutoCloseable {
         if(scene.tlas()==0)return false;
         RenderPassProfile.workload(width,height,spp,scene.generation());
         if(spp<1||spp>8)throw new IllegalArgumentException("Frame spp must be 1..8");
-        if(this.width!=width||this.height!=height||samples!=spp) {
+        if(this.width!=width||this.height!=height||samples!=spp||runtimeAllocated!=(runtimeFlags()!=0)) {
+            runtimeAllocated=runtimeFlags()!=0;previousValid=false;runtimeEpoch++;
             queueAvailable=material&&indirectTracing&&(FEEDBACK_HEADER+(long)width*height*spp*2)*16<=maxStorageRange;
-            if(material){if(feedback!=null)feedback.close();feedback=new VulkanRtBuffer(device,(FEEDBACK_HEADER+(queueAvailable?(long)width*height*spp*2:0))*16,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);}
+            if(material){if(feedback!=null)feedback.close();feedback=new VulkanRtBuffer(device,runtimeAllocated?runtimeBytes(width,height,spp):(FEEDBACK_HEADER+(queueAvailable?(long)width*height*spp*2:0))*16,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);encoder.writeToBuffer(feedback.slice(),ByteBuffer.allocateDirect(Math.toIntExact(feedback.size())));}
             if(output!=null)output.close();output=new VulkanRtBuffer(device,(long)width*height*spp*16+(material?64+(long)width*height*112:0),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);this.width=width;this.height=height;samples=spp;
             if(pathBanks!=null){for(var bank:pathBanks)bank.close();pathBanks=null;paths=null;}else if(paths!=null){paths.close();paths=null;}
             if(material){if(pathMedia!=null)pathMedia.close();pathMedia=new VulkanRtBuffer(device,(long)width*height*spp*288,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);pathBanks=new VulkanRtBuffer[spp];for(int lane=0;lane<spp;lane++)pathBanks[lane]=new VulkanRtBuffer(device,(long)width*height*64,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);paths=pathBanks[0];if(pathAovs!=null)pathAovs.close();pathAovs=new VulkanRtBuffer(device,(long)width*height*spp*48,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);}
@@ -113,11 +125,16 @@ public final class VulkanRtContext implements AutoCloseable {
                 var counters=ByteBuffer.allocateDirect((544-513)*16).order(ByteOrder.nativeOrder());
                 for(int bounce=1;bounce<6;bounce++){int offset=(520+bounce-513)*16;counters.putInt(offset,0).putInt(offset+4,1).putInt(offset+8,1);}
                 encoder.writeToBuffer(feedback.slice(513*16,(544-513)*16),counters);
+                var policy=ByteBuffer.allocateDirect(7*16).order(ByteOrder.nativeOrder());
+                policy.putInt(0,runtimeFlags()).putInt(4,runtimeEpoch).putInt(12,1024);
+                previousClip.get(2*16,policy);policy.putFloat(6*16,previousX).putFloat(6*16+4,previousY).putFloat(6*16+8,previousZ).putInt(6*16+12,previousValid?1:0);
+                encoder.writeToBuffer(feedback.slice(1568*16,7*16),policy);
+                encoder.writeToBuffer(feedback.slice(1600*16,5*16),ByteBuffer.allocateDirect(5*16));
             }
             var nativeEncoder=device.createCommandEncoder();
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_batch_"+(com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID?"hybrid":compact?"compact":"fixed"));var stack=MemoryStack.stackPush()) {
                 var command=nativeEncoder.allocateAndBeginTransientCommandBuffer();
-                VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_TRANSFER_READ_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR|VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_UNIFORM_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT|VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
+                VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_TRANSFER_BIT|VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_TRANSFER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR|VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_UNIFORM_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT|VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
                 pipeline.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks,pathMedia,pathAovs,scene.opaqueTlas());
                 try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_primary")){pipeline.dispatch(command,width,height,spp);}
                 if(transport){
@@ -136,6 +153,7 @@ public final class VulkanRtContext implements AutoCloseable {
             if(material&&sampledCounters&&scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY)benchmarkVisibility(assets);
             encoder.copyBufferToTexture(output.slice(),0,0,width,height,destination,0,0,width,height,0,0);
             if(material&&!feedbackPending&&((frame-1)%8)==0)readPageFeedback(encoder);
+            previousClip.set(inverseClip).invert();previousX=(float)x;previousY=(float)y;previousZ=(float)z;previousValid=true;
             return true;
         }
     }
@@ -161,15 +179,16 @@ public final class VulkanRtContext implements AutoCloseable {
         try(var pass=RenderPassProfile.beginNative(command,name)){replay.dispatch(command,256,1,1);}
     }
     private void readPageFeedback(CommandEncoder encoder){
-        feedbackPending=true;var read=com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(()->"VoxelLight RT page requests",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,544*16);
-        encoder.copyToBuffer(feedback.slice(0,544*16),read.slice());
+        feedbackPending=true;var read=com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(()->"VoxelLight RT page requests",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,1605*16);
+        encoder.copyToBuffer(feedback.slice(0,1605*16),read.slice());
         final int sampledWidth=width,sampledHeight=height,sampledSpp=samples;final long sampledFrame=RenderPassProfile.frameId(),sampledScene=scene.generation();final boolean measured=RenderPassProfile.enabled();final long sampledEmitterGeneration=scene.emitterGeneration();
         com.mojang.blaze3d.systems.RenderSystem.queueFencedTask(()->{try(var map=read.map(true,false)){if(!closed){var data=map.data().order(ByteOrder.nativeOrder());int count=Math.min(512,Math.max(0,data.getInt(0)));pageRequestCount+=count;for(int i=0;i<count;i++){int offset=(i+1)*16;pageRequests.add(new com.voxellight.world.SectionKey(data.getInt(offset),data.getInt(offset+4),data.getInt(offset+8)));}
                 var active=new long[6];for(int bounce=0;bounce<6;bounce++)active[bounce]=Integer.toUnsignedLong(data.getInt((514+bounce)*16));
                 var lightCount=new long[8];var lightVisible=new long[8];for(int i=0;i<8;i++){lightCount[i]=Integer.toUnsignedLong(data.getInt((528+i)*16));lightVisible[i]=Integer.toUnsignedLong(data.getInt((528+i)*16+4));}scene.proposalFeedback(sampledEmitterGeneration,lightCount,lightVisible);
                 queueCalibration.alive(sampledFrame,sampledWidth,sampledHeight,sampledSpp,sampledScene,active);
                 var direct=new long[6][4];for(int b=0;b<6;b++)for(int c=0;c<4;c++)direct[b][c]=Integer.toUnsignedLong(data.getInt((b<4?536+b:538+b)*16+c*4));
-                if(measured)RenderPassProfile.rayWorkload(sampledFrame,sampledWidth,sampledHeight,sampledSpp,sampledScene,active,Integer.toUnsignedLong(data.getInt(513*16)),Integer.toUnsignedLong(data.getInt(513*16+4)),Integer.toUnsignedLong(data.getInt(540*16)),Math.min(256,Integer.toUnsignedLong(data.getInt(541*16))),Integer.toUnsignedLong(data.getInt(541*16+4)),direct);
+                var runtime=new long[16];for(int i=0;i<16;i++)runtime[i]=Integer.toUnsignedLong(data.getInt(1600*16+i*4));runtimeMetrics=Arrays.toString(runtime).replace(',','/');
+                if(measured)RenderPassProfile.rayWorkload(sampledFrame,sampledWidth,sampledHeight,sampledSpp,sampledScene,active,Integer.toUnsignedLong(data.getInt(513*16)),Integer.toUnsignedLong(data.getInt(513*16+4)),Integer.toUnsignedLong(data.getInt(540*16)),Math.min(256,Integer.toUnsignedLong(data.getInt(541*16))),Integer.toUnsignedLong(data.getInt(541*16+4)),direct,runtime);
                 if(measured)lastWorkload="frame:"+sampledFrame+"/"+sampledWidth+"x"+sampledHeight+"/"+sampledSpp+"spp/active:"+Arrays.toString(active).replace(',','/')+"/shadow:"+Integer.toUnsignedLong(data.getInt(513*16))+"/anyHit:"+Integer.toUnsignedLong(data.getInt(513*16+4));
             }}catch(RuntimeException error){org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("RT page feedback unavailable",error);}finally{read.close();feedbackPending=false;}});
     }
@@ -200,8 +219,8 @@ public final class VulkanRtContext implements AutoCloseable {
         if(closed||!material||width==0)return null;
         return new com.voxellight.rt.RtBenchmarkState(width,height,samples,realtime,frozen,queryAvailable,queueAvailable,ommAvailable,serAvailable,
             com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY:queryEnabled?com.voxellight.rt.RtExecutionOptions.Visibility.QUERY:com.voxellight.rt.RtExecutionOptions.Visibility.TRACE,
-            com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID&&queueAvailable?com.voxellight.rt.RtExecutionOptions.Queue.HYBRID:compact?com.voxellight.rt.RtExecutionOptions.Queue.COMPACT:com.voxellight.rt.RtExecutionOptions.Queue.FIXED,ommEnabled,serEnabled,com.voxellight.adapter.RtMaterialCoverage.opacityValid(),scene.hasOpaque(),scene.terrainSignature(),scene.generation(),scene.resident().size(),scene.sceneBytes(),com.voxellight.rt.RtExecutionOptions.direct(),com.voxellight.rt.RtExecutionOptions.sceneUpdate());
+            com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID&&queueAvailable?com.voxellight.rt.RtExecutionOptions.Queue.HYBRID:compact?com.voxellight.rt.RtExecutionOptions.Queue.COMPACT:com.voxellight.rt.RtExecutionOptions.Queue.FIXED,ommEnabled,serEnabled,com.voxellight.adapter.RtMaterialCoverage.opacityValid(),scene.hasOpaque(),scene.terrainSignature(),scene.generation(),scene.resident().size(),scene.sceneBytes(),com.voxellight.rt.RtExecutionOptions.direct(),com.voxellight.rt.RtExecutionOptions.sceneUpdate(),runtimeFlags()==0?com.voxellight.rt.RtExecutionOptions.Realtime.FULL:com.voxellight.rt.RtExecutionOptions.realtime());
     }
-    public String status() { return (material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, environment=shared HDR 256x128, environmentSampling=GPU solid-angle CDF, lightNee=sun/moon+environment+held, lightMis=power heuristic, cameraWater=initialized, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=external frame reconstruction, internalResolution="+width+"x"+height+", recursion=1, sppPerFrame="+samples+", scheduling="+(compactMask==0?"fixed batch":compactMask==62?"GPU compact continuation":"hybrid fixed/compact continuation")+", compactBounceMask="+compactMask+", queuePolicy="+com.voxellight.rt.RtExecutionOptions.queue()+", queueCalibration="+queueCalibration.status()+", rayWorkload="+lastWorkload+", rtMissPageRequests="+pageRequestCount+", optionalAdvertised="+optionalCapabilities+", optionalEnabled="+(queryEnabled?"ray_query/":"")+(ommEnabled?"OMM/":"")+(serEnabled?"SER":"")+", visibility="+(com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?"legacy":queryEnabled?"query":"trace")+", pathHotBytes=64, optionalProfile=pending RTX measurements, cameraUploadsPerFrame=1, outputCopiesPerFrame=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size()*(material?samples:1)+(pathMedia==null?0:pathMedia.size())+(pathAovs==null?0:pathAovs.size()))+", "+scene.status()+VulkanRtBuffer.memoryStatus(); }
+    public String status() { return "rtRealtimePolicy="+(runtimeFlags()==0?"FULL":com.voxellight.rt.RtExecutionOptions.realtime())+", radianceCacheEpoch="+runtimeEpoch+", realtimeStateBytes="+(runtimeAllocated?feedback.size():0)+", realtimeCounters="+runtimeMetrics+", "+(material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, environment=shared HDR 256x128, environmentSampling=GPU solid-angle CDF, lightNee=sun/moon+environment+held, lightMis=power heuristic, cameraWater=initialized, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=external frame reconstruction, internalResolution="+width+"x"+height+", recursion=1, sppPerFrame="+samples+", scheduling="+(compactMask==0?"fixed batch":compactMask==62?"GPU compact continuation":"hybrid fixed/compact continuation")+", compactBounceMask="+compactMask+", queuePolicy="+com.voxellight.rt.RtExecutionOptions.queue()+", queueCalibration="+queueCalibration.status()+", rayWorkload="+lastWorkload+", rtMissPageRequests="+pageRequestCount+", optionalAdvertised="+optionalCapabilities+", optionalEnabled="+(queryEnabled?"ray_query/":"")+(ommEnabled?"OMM/":"")+(serEnabled?"SER":"")+", visibility="+(com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?"legacy":queryEnabled?"query":"trace")+", pathHotBytes=64, optionalProfile=pending RTX measurements, cameraUploadsPerFrame=1, outputCopiesPerFrame=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size()*(material?samples:1)+(pathMedia==null?0:pathMedia.size())+(pathAovs==null?0:pathAovs.size()))+", "+scene.status()+VulkanRtBuffer.memoryStatus(); }
     @Override public void close() {if(!closed){closed=true;RenderPassProfile.unobserve(timingObserver);scene.close();pipeline.close();if(indirect!=null)indirect.close();if(resolve!=null)resolve.close();camera.close();if(visibilityTrace!=null)visibilityTrace.close();if(visibilityQuery!=null)visibilityQuery.close();if(pathAovs!=null)pathAovs.close();if(pathMedia!=null)pathMedia.close();if(feedback!=null)feedback.close();pageRequests.clear();if(pathBanks!=null){for(var bank:pathBanks)if(bank!=null)bank.close();pathBanks=null;}else if(paths!=null)paths.close();if(output!=null)output.close();}}
 }

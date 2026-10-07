@@ -69,3 +69,7 @@ alpha.24：统一 scene commit、稳定几何范围、持久 BLAS/TLAS refit、�
 alpha.34：`rt_direct ris`（默认）/`legacy` 是会话执行控制，与 visibility/queue 控制一样不保存到 settings.json。统一局部光与环境 RIS，Sun/Moon 和可选手持灯独立；详见 [直接光第二轮](performance/RT-DIRECT-LIGHTING-ROUND-2.md)。
 
 alpha.35：`rt_scene_update optimized` 默认启用属性变化跳过 refit 和不重叠 scratch slices；`legacy` 保留旧更新策略用于 A/B。会话控制不保存。
+
+## 第三轮 realtime 输运
+
+`rt_realtime full|cache|sparse|cache_sparse`，默认 FULL。只影响 realtime；reference 强制 FULL。缓存未成熟继续完整路径，sparse 仅在 1 spp 开启。切换算法会清空缓存/历史。`rt_benchmark realtime [seconds]` 自动测试三组两轮 ABBA（24 段），恢复设置，导出 schema 8 和 `rt_*` 计数；详见 [第三轮设计](REALTIME-PT-ROUND3.md)。

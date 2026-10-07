@@ -75,6 +75,7 @@ tasks.register('clientKit', Zip) {
     archiveFileName = "voxellight-client-kit-${minecraft_version}-${project.version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
+    from('docs/REALTIME-PT-ROUND3.md')
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
     from('docs/RT-ENVIRONMENT.md')
     from('docs/SETTINGS.md')
@@ -106,7 +107,7 @@ processResources {
 // Numerical parity executes the actual Slang CPU target against existing native Material 3.
 tasks.register('verifyVulkanTransport', Exec) {
     dependsOn tasks.named('compileJava')
-    inputs.files('src/main/java/com/voxellight/rt/RtLightRuntime.java','src/main/java/com/voxellight/rt/RtEmitterTable.java','tools/native/GenerateLightRuntime.java','tools/native/vulkan_direct_lighting.cpp')
+    inputs.files('src/main/java/com/voxellight/rt/RtLightRuntime.java','src/main/java/com/voxellight/rt/RtEmitterTable.java','tools/native/GenerateLightRuntime.java','tools/native/vulkan_direct_lighting.cpp','tools/native/vulkan_realtime_policy.cpp')
     inputs.dir('shaders/rt/common')
     inputs.dir('shaders/rt/tests')
     inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/water_surface.h', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py', 'tools/native/vulkan_visibility_transport.cpp', 'tools/native/vulkan_path_storage.cpp', 'tools/native/vulkan_continuation_queue.cpp', 'tools/native/vulkan_numerical_edges.cpp', 'tools/native/vulkan_emitter_sampling.cpp', 'tools/native/vulkan_flame_sampling.cpp', 'tools/native/vulkan_reconstruction_fixture.cpp', 'src/main/resources/assets/voxellight/shaders/rt_denoiser_guides.fsh', 'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh', 'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh')

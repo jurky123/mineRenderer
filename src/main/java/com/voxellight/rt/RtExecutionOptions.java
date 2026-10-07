@@ -1,7 +1,11 @@
 package com.voxellight.rt;
 
-/** Execution-only A/B controls. Defaults leave optional OMM/SER disabled until measured. */
+/** Execution and realtime algorithm A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
+    public enum Realtime {FULL(0),CACHE(1),SPARSE(2),CACHE_SPARSE(3);private final int flags;Realtime(int flags){this.flags=flags;}public int flags(boolean realtime){return realtime?flags:0;}}
+    private static Realtime realtime=Realtime.FULL;
+    public static Realtime realtime(){return realtime;}
+    public static void realtime(Realtime value){if(realtime!=value){realtime=value;revision++;}}
     public enum SceneUpdate {LEGACY,OPTIMIZED}
     private static SceneUpdate sceneUpdate=SceneUpdate.OPTIMIZED;
     public static SceneUpdate sceneUpdate(){return sceneUpdate;}

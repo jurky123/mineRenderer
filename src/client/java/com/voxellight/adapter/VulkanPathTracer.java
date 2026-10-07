@@ -75,6 +75,7 @@ final class VulkanPathTracer implements AutoCloseable {
                 world=stats.worldGeneration();resources=stats.resourceGeneration();
                 org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT {} pipeline ready in {} ms; no OptiX tracing",materials?"material transport":transport?"geometry transport test":"normal POC",startupMs);
             }
+            context.realtime(realtime);
             int scale=internalScale==0?Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360)):internalScale;
             int width=Math.max(1,(target.width+scale-1)/scale),height=Math.max(1,(target.height+scale-1)/scale);
             long maxPixels=context.maxPixels(transport?samplesPerFrame:1);
@@ -112,6 +113,7 @@ final class VulkanPathTracer implements AutoCloseable {
                 if(materials)try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_material_assets")){
                     materialAssets=useHistory&&history.frozen()&&history.samples()>0?assets.buffer():assets.prepare(encoder,device,material,weather,shadows,context.scene,dynamic);
                 }
+                if(materials)context.runtimeLighting(assets.lightingSignature(shadows));
                 if(materials&&materialAssets==null){state="waiting for Material 3 atlases";return;}
                 context.reconstructionGuides(materials&&realtime);
                 int budget=transport?samplesPerFrame:1;

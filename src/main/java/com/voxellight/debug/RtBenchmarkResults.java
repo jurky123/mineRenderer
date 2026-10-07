@@ -40,7 +40,7 @@ public final class RtBenchmarkResults {
         }
         // Sampled alive curves must exist; throughput timing alone does not prove matched ray work.
         if(blocks.stream().anyMatch(b->b.aliveFraction.length!=6))reasons.add("missing alive-path counters");
-        else for(int i=1;i<6;i++){double min=1,max=0;for(var b:blocks){min=Math.min(min,b.aliveFraction[i]);max=Math.max(max,b.aliveFraction[i]);}if(max-min>.05){reasons.add("alive-path fraction drift > 5 percentage points");break;}}
+        else if(!name.startsWith("realtime_"))for(int i=1;i<6;i++){double min=1,max=0;for(var b:blocks){min=Math.min(min,b.aliveFraction[i]);max=Math.max(max,b.aliveFraction[i]);}if(max-min>.05){reasons.add("alive-path fraction drift > 5 percentage points");break;}}
         if(!reasons.isEmpty())return new Comparison(name,"not_comparable",null,null,List.of(),reasons.stream().distinct().toList());
         var gains=new ArrayList<Double>();double noise=0;
         for(int round=0;round<2;round++){

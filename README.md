@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.35**：动态 BLAS 区分位置与 shader 属性更新，独立 AS 更新使用共享 scratch slices，校准 native 计时并新增 BLAS 自动 A/B。保留 alpha.34 统一直接光 RIS（上一场景实测 transport 耗时下降 28.15%）与 64B PathHot。BLAS 新优化的 GPU 收益和动态视觉待客户端实测，全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.36**：新增 realtime 短路径、世界 SH radiance cache、时域稀疏调度和第三轮自动 A/B；reference 保留完整路径。第三轮默认 FULL，用命令启用新算法。保留统一直接光 RIS、优化 BLAS 与 64B PathHot；新算法的 RTX 收益与画质待客户端验收，全新安装默认 effects off。
 
-[下载 alpha.35 安装包](https://temp.sh/juUOx/voxellight-client-kit-26.2-0.39.0-alpha.35.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.36 安装包](https://temp.sh/idSoz/voxellight-client-kit-26.2-0.39.0-alpha.36.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -57,3 +57,5 @@ BLAS 专用验收：执行 `/voxellight rt_benchmark blas`（8 段，默认每�
 手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。
 
 alpha.21 验收：固定窗口大小、`rt_spp 1` / `rt_scale 0`，`profile on` 后静止/移动各测试约 20 秒，`export` 导出分阶段 GPU 时间。动态场景同拓扑 refit，shader 几何和纹理只复制变化区段/当前纹理 tile；去噪 guide 来自稳定中心射线，动态历史保守拒绝。OptiX 只降噪实际输出的 beauty 层，成功时不运行 Vulkan 滤波。性能与画质仍需 RTX 实测。
+
+第三轮 realtime PT：`/voxellight rt_realtime cache_sparse` 启用短 diffuse 路径 + 世界 SH 缓存 + 稀疏完整路径调度，`full` 恢复原完整输运。Reference 始终旁路这两项近似。自动验收使用 `/voxellight rt_benchmark realtime`，输出缓存/稀疏工作量及三组 ABBA；详见 [第三轮设计与验收](docs/REALTIME-PT-ROUND3.md)。性能目标仍待客户端实测，画质另以收敛 reference 对照。

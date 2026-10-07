@@ -15,4 +15,11 @@ class RtWorkMetricsTest {
         metrics.clear();metrics.export(path);assertEquals(1,Files.readAllLines(path).size());
         assertThrows(IllegalArgumentException.class,()->metrics.record(1,1,1,1,0,new long[5],0,0));
     }
+    @Test void realtimeCountersRetainTheirSnapshotAndExport()throws Exception{
+        var metrics=new RtWorkMetrics();var counters=new long[16];counters[0]=100;counters[1]=25;counters[2]=75;
+        metrics.record(1,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);counters[1]=99;
+        assertEquals(25,metrics.sample(1).realtime()[1]);var path=directory.resolve("runtime.csv");metrics.export(path);var lines=Files.readAllLines(path);
+        assertTrue(lines.getFirst().contains("rt_full_paths"));assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);assertTrue(lines.get(1).endsWith(",100,25,75,0,0,0,0,0,0,0,0,0,0,0,0,0"));
+    }
+
 }

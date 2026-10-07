@@ -1,3 +1,11 @@
+## 0.39.0-alpha.36
+
+- Realtime diffuse B1/B2 短路径与 section 对齐世界 SH 辐射缓存；精确训练、不成熟完整回退。
+- 首命中身份/重投影/方差历史验证，稳定 diffuse 1/2/4 帧完整路径调度，镜面与 transmission 保留 exact。
+- Reference 强制 FULL；缓存/历史跨帧同步与逻辑 epoch 失效；新状态保持 descriptor 和 64B PathHot ABI。
+- `rt_realtime` 四档与 `rt_benchmark realtime` 三组两轮 ABBA，导出十六项实际算法计数。
+- 当前属于需 RTX 画质/性能验收的有偏 realtime 近似；没有宣称 10ms→3–5ms 已实现。
+
 ## alpha.35 BLAS 更新与 scratch 优化
 
 动态位置/geometry ranges 不变时，shader 属性继续上传但跳过 BLAS refit；独立 AS 更新使用共享 arena 的对齐、不重叠 scratch slices，保留跨提交和空间复用依赖。校准 native BLAS 计时，保留外部 submit span；新增按类别/原因的累计 AS 与 scratch 计数。`/voxellight rt_benchmark blas` 8 段专用 ABBA，比较 scene commit、保持 RIS/Query/Fixed/OMM off/SER off，默认 optimized，可回退 legacy。具体收益与客户端视觉待实测。[实施与验收](performance/RT-BLAS-OPTIMIZATION.md)。
