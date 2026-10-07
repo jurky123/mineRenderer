@@ -1,3 +1,7 @@
+## alpha.39 最新实机结论
+
+最新 `rt-suite-1791359324298.zip` 完成 24 段：SPARSE 两轮 transport 改善约 6.79%，CACHE_SPARSE 约 6.33%；组合 cache 命中 21.69%、训练写入成功 99.41%、复用 15.40%，原始 LIGHT 事件未再触发 scene reset。CACHE 单独跨 SUN→NONE→MOON，不采用其总收益作为算法证据。修复有效，但原第三轮大幅提速与 Reference 画质目标尚未验收，FULL 默认继续保留。[完整分析](performance/ALPHA-39-REALTIME-ANALYSIS.md)。
+
 ## alpha.39 修复与复测
 
 [安装包](https://temp.sh/CxmJq/voxellight-client-kit-26.2-0.39.0-alpha.39.zip)。337 项 Java 测试、24 个 RT SPIR-V stage、生产 Slang 数值回归与最终 jar hash 校验通过；安装包 SHA-256：`d02043484ea3d6ca8e242b56eef8ffdcbe9775bb7852e9ddf3a94cb0d4064cd8`。
