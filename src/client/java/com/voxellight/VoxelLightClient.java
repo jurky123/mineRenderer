@@ -87,6 +87,12 @@ public final class VoxelLightClient implements ClientModInitializer {
                     }));
             command.then(literal("rt_benchmark")
                 .executes(context->com.voxellight.adapter.RtBenchmarkRunner.start(6,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                .then(literal("shader").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startShader(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                    .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.startShader(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
+                .then(literal("hot").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startHot(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                    .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.startHot(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
+                .then(literal("queues").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startQueues(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
+                    .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.startQueues(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
                 .then(literal("realtime").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startRealtime(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)
                     .then(argument("seconds",IntegerArgumentType.integer(4,30)).executes(context->com.voxellight.adapter.RtBenchmarkRunner.startRealtime(IntegerArgumentType.getInteger(context,"seconds"),message->context.getSource().sendFeedback(Component.literal(message)))?1:0)))
                 .then(literal("blas").executes(context->com.voxellight.adapter.RtBenchmarkRunner.startBlas(10,message->context.getSource().sendFeedback(Component.literal(message)))?1:0)

@@ -25,7 +25,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         value[3]=env.directR()*env.directStrength();value[4]=env.directG()*env.directStrength();value[5]=env.directB()*env.directStrength();
         var held=shadows.rtVirtualLight();System.arraycopy(held,0,value,6,8);
         value[14]=1-sky.rainBrightness;value[15]=Minecraft.getInstance().gameRenderer.mainCamera().getFluidInCamera()==net.minecraft.world.level.material.FogType.WATER?1:0;
-        return value;
+        return RtBenchmarkRunner.freeze("lightingSignature",value);
     }
     private static final RenderPipeline COPY=RenderPipeline.builder()
         .withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/vulkan_rt_atlas"))
@@ -75,14 +75,13 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         var header=ByteBuffer.allocateDirect(256).order(ByteOrder.LITTLE_ENDIAN);
         int[] extra={environmentOffset,environmentOffset+256*128*16,environmentOffset+256*128*32,96};
         for(int i=0;i<4;i++)header.putInt(widths[i]).putInt(heights[i]).putInt(offsets[i]).putInt(extra[i]);
-        var controls=weather.rtSettings();header.putFloat(WaterSurface.clock()).putFloat(controls[2]).putFloat(WaterSurface.waveStrength()).putFloat(controls[4])
-            .putFloat(controls[0]).putInt(256).putInt(128).putInt(Minecraft.getInstance().gameRenderer.mainCamera().getFluidInCamera()==net.minecraft.world.level.material.FogType.WATER?1:0);
-        var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;var light=shadows.light();
-        var env=com.voxellight.world.LightingEnvironment.polished(light,sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);var sun=light.direction();
-        header.putFloat(sun.x).putFloat(sun.y).putFloat(sun.z).putFloat(6.793e-5f);
-        header.putFloat(env.directR()*env.directStrength()*(float)Math.PI).putFloat(env.directG()*env.directStrength()*(float)Math.PI).putFloat(env.directB()*env.directStrength()*(float)Math.PI).putFloat(0);
-        for(float value:shadows.rtVirtualLight())header.putFloat(value);
-        var water=material.waterMedium();header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
+        var controls=weather.rtSettings();var lighting=lightingSignature(shadows);
+        var surface=RtBenchmarkRunner.freeze("surfaceControls",new float[]{WaterSurface.clock(),controls[2],WaterSurface.waveStrength(),controls[4],controls[0]});
+        for(float value:surface)header.putFloat(value);header.putInt(256).putInt(128).putInt((int)lighting[15]);
+        header.putFloat(lighting[0]).putFloat(lighting[1]).putFloat(lighting[2]).putFloat(6.793e-5f);
+        header.putFloat(lighting[3]*(float)Math.PI).putFloat(lighting[4]*(float)Math.PI).putFloat(lighting[5]*(float)Math.PI).putFloat(0);
+        for(int i=6;i<14;i++)header.putFloat(lighting[i]);
+        var water=RtBenchmarkRunner.freeze("waterMedium",material.waterMedium());header.putFloat(water[0]).putFloat(water[1]).putFloat(water[2]).putFloat(water[7]);
         header.putInt(124,scene.emitterCount());header.putInt(156,emitterOffset);
         header.putFloat(water[3]).putFloat(water[4]).putFloat(water[5]).putFloat(water[6]).putInt(scene.flameCount()).putInt(flameOffset).putInt(dynamicOffset).putInt(RtDynamicScene.CELL);
         var position=Minecraft.getInstance().gameRenderer.mainCamera().position();int cx=(int)Math.floor(position.x/16),cy=(int)Math.floor(position.y/16),cz=(int)Math.floor(position.z/16);long frame=RenderPassProfile.frameId();
@@ -95,7 +94,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
         header.putInt(runtimeOffset).putInt(runtimeBytes).putInt(8).putInt(4).putInt(1).putInt((int)runtimeProposalRevision).putInt(com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE);header.position(256);header.flip();
         var player=Minecraft.getInstance().player;
         String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
-        lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+sun.x+"/"+sun.y+"/"+sun.z;
+        lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+lighting[0]+"/"+lighting[1]+"/"+lighting[2];
         encoder.writeToBuffer(buffer.slice(0,256),header);
         if(emitterGeneration!=scene.emitterGeneration()){if(scene.emitterCount()>0)encoder.writeToBuffer(buffer.slice(emitterOffset,scene.emitterCount()*64L),scene.emitterData());if(scene.flameCount()>0)encoder.writeToBuffer(buffer.slice(flameOffset,scene.flameCount()*64L),scene.flameData());emitterGeneration=scene.emitterGeneration();}
         environment.prepare(encoder,device,buffer,environmentOffset,weather,shadows);

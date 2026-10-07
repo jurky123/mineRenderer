@@ -251,11 +251,15 @@ float4 pathOutput(PathState path){
 }
 uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)||dielectric(m)?1:0);}
 #include "light_runtime.slang"
+#if defined(RT_CLEAN_FULL)
+#include "realtime_bypass.slang"
+#else
 #include "realtime_policy.slang"
+#endif
 void advance(inout PathState path) {
     if(path.origin.w==0||path.padding!=0)return;
 #ifndef RT_CPU_FIXTURE
-    if((uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
+    if((uint(camera.origin.w)&2050u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
 #endif
     uint seed=asuint(path.radiance.w),lightingSeed=directHash(seed^0xc83a91e1u);MediumStack media=loadMedia(path);
     SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);

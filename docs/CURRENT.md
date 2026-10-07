@@ -1,3 +1,11 @@
+## alpha.40 Hot Shader Cleanup
+
+[alpha.40 安装包](https://temp.sh/JZalv/voxellight-client-kit-26.2-0.39.0-alpha.40.zip)；SHA-256：`4a42d0b2888539ccdfc1be6ec354ac1d3694c6cc6682fd143e5588184fac8303`。最终 jar 的 58 个 stage / 46 份 shader 源文件哈希已核对。
+
+实现独立 FULL/Realtime、RIS/Legacy SPIR-V 变体（58 stages），默认 CLEAN；原 runtime shader 专用于 footprint 对照。HYBRID profile off 只采 alive，八条有效曲线后冻结生产掩码。`rt_benchmark shader` 比较同场景 runtime FULL / clean FULL；`hot` 先按算法测队列后用稳定赢家比较 SPARSE/CACHE_SPARSE。Realtime 不再强制 COMPACT，所有 suite 固定整轮 renderer 光照/天气/手持灯/水面时钟，schema 11 导出快照和队列选择。
+
+本轮不改算法，不实现 Primary split / B0 cache / NRD。342 项 Java 测试、58 个 RT SPIR-V stage、Minecraft GLSL 链接和生产 Slang 数值回归通过；CPU/SPIR-V 通过不能替代 GPU 实测。[设计与操作](performance/HOT-SHADER-CLEANUP.md)。
+
 ## alpha.39 最新实机结论
 
 最新 `rt-suite-1791359324298.zip` 完成 24 段：SPARSE 两轮 transport 改善约 6.79%，CACHE_SPARSE 约 6.33%；组合 cache 命中 21.69%、训练写入成功 99.41%、复用 15.40%，原始 LIGHT 事件未再触发 scene reset。CACHE 单独跨 SUN→NONE→MOON，不采用其总收益作为算法证据。修复有效，但原第三轮大幅提速与 Reference 画质目标尚未验收，FULL 默认继续保留。[完整分析](performance/ALPHA-39-REALTIME-ANALYSIS.md)。

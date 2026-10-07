@@ -44,9 +44,10 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
         }
         var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
         var light=shadows.light();var env=LightingEnvironment.polished(light,sky.skybox==DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);var sun=light.direction();
+        var frozen=RtBenchmarkRunner.freeze("skyPalette",new float[]{env.directR(),env.directG(),env.directB(),env.directStrength(),
+            env.skyR(),env.skyG(),env.skyB(),env.skyStrength(),env.horizonR(),env.horizonG(),env.horizonB(),env.lowerHemisphere(),sun.x,sun.y,sun.z,0});
         try(var stack=MemoryStack.stackPush()) {
-            encoder.writeToBuffer(palette.slice(),Std140Builder.onStack(stack,64).putVec4(env.directR(),env.directG(),env.directB(),env.directStrength())
-                .putVec4(env.skyR(),env.skyG(),env.skyB(),env.skyStrength()).putVec4(env.horizonR(),env.horizonG(),env.horizonB(),env.lowerHemisphere()).putVec4(sun.x,sun.y,sun.z,0).get());
+            var data=stack.malloc(64).order(java.nio.ByteOrder.nativeOrder());for(float value:frozen)data.putFloat(value);data.flip();encoder.writeToBuffer(palette.slice(),data);
         }
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_environment_map");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan shared environment")
                 .withRenderArea(new RenderPass.RenderArea(0,0,WIDTH,HEIGHT)).withColorAttachment(mapView,Optional.empty()))) {

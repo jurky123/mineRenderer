@@ -1,6 +1,14 @@
 #pragma once
 // Fresh RIS only: no spatial/temporal reservoir reuse. All PMFs are frozen for this frame.
-bool directRis(){return (uint(camera.origin.w)&128u)!=0;}
+bool directRis(){
+#if defined(RT_DIRECT_RIS)
+    return true;
+#elif defined(RT_DIRECT_LEGACY)
+    return false;
+#else
+    return (uint(camera.origin.w)&128u)!=0;
+#endif
+}
 uint runtimeBase(){return assets.Load(208);}
 uint runtimeLoad(uint offset){return assets.Load(runtimeBase()+offset);}
 uint runtimeLights(){return runtimeLoad(4);}

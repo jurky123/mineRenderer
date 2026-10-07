@@ -2,7 +2,7 @@
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.39.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.40.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 
@@ -44,3 +44,5 @@ alpha.34 默认直接光 RIS。第二轮专用验收执行 `/voxellight rt_bench
 alpha.35：BLAS 优化专用测试执行 `/voxellight rt_benchmark blas`，约 2–4 分钟，上传自动导出的 zip。参见 [BLAS 实施与验收](performance/RT-BLAS-OPTIMIZATION.md)。
 
 第三轮算法显式启用：`/voxellight rt_realtime cache_sparse`。回退为 `rt_realtime full`；reference 强制完整路径。自动测试 `rt_benchmark realtime`（1 spp、realtime，24 段），完成后上传 zip；详见 REALTIME-PT-ROUND3.md。
+
+alpha.40 首先执行 `/voxellight rt_benchmark shader`（8 段）；完整调度/算法扫描用 `rt_benchmark hot`。保持窗口前台、镜头不动，上传自动导出的 zip。详见 HOT-SHADER-CLEANUP.md。

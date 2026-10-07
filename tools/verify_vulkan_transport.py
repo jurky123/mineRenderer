@@ -91,6 +91,16 @@ def main():
     executable=output/'direct_lighting'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_direct_lighting.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable),str(output)],text=True)
+    for defines,expected in [([],['0','1','1']),(['RT_CLEAN_FULL','RT_DIRECT_RIS'],['1','1','0']),(['RT_CLEAN_FULL','RT_DIRECT_LEGACY'],['0','0','0']),(['RT_DIRECT_RIS'],['1','1','1'])]:
+        subprocess.run([compiler,str(ROOT/'shaders/rt/tests/shader_specialization.slang'),*['-D'+d+'=1' for d in defines],'-target','cpp','-entry','shader_specialization','-stage','compute','-o',str(output/'shader_specialization.cpp')],check=True)
+        executable=output/'shader_specialization'
+        subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_shader_specialization.cpp'),'-o',str(executable)],check=True)
+        result+=subprocess.check_output([str(executable),*expected],text=True)
+    # The production clean RIS variant executes the same energy/PDF fixture as runtime RIS.
+    subprocess.run([compiler,str(ROOT/'shaders/rt/tests/direct_lighting.slang'),'-DRT_CLEAN_FULL=1','-DRT_DIRECT_RIS=1','-target','cpp','-entry','direct_lighting','-stage','compute','-o',str(output/'direct_lighting.cpp')],check=True)
+    executable=output/'direct_lighting_clean'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_direct_lighting.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable),str(output)],text=True)
     (output/'result.txt').write_text(result);print(result,end='')
 
 if __name__=='__main__':main()

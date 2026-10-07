@@ -13,7 +13,7 @@ final class EnvironmentPass implements AutoCloseable  {
     private boolean sky=true,clouds=true,shadows=true,underwater=true,caustics=true,ripples=true,composed,active;
     private boolean submerged;
     private float rtRain,rtCloud,rtRipples;
-    float[] rtSettings(){return new float[]{(float)wind,192,rtRain,rtCloud,rtRipples};}
+    float[] rtSettings(){return RtBenchmarkRunner.freeze("weatherControls",new float[]{(float)wind,192,rtRain,rtCloud,rtRipples});}
     boolean submerged() {
         return submerged;
     }
@@ -66,8 +66,13 @@ final class EnvironmentPass implements AutoCloseable  {
         wind=(wind+Math.clamp((now-clock)/1e9,0,.25)*.35)%16384;
         clock=now;
         if(settings==null)settings=RenderSystem.getDevice().createBuffer(()->"VoxelLight shared environment",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,64);
+        var frozen=RtBenchmarkRunner.freeze("environmentSettings",new float[]{
+            (float)(pos.x%16384),(float)(pos.z%16384),(float)pos.y,(float)wind,
+            active&&sky?1:0,active&&sky&&cloud?1:0,polished&&overworld&&shadows&&cloud?1:0,rtRain,
+            state.sunAngle,state.moonPhase==null?0:state.moonPhase.ordinal(),192,.48f,
+            inWater?1:0,caustics&&polished&&overworld?1:0,ripples?1:0,waterTop});
         try(var stack=MemoryStack.stackPush()) {
-            encoder.writeToBuffer(settings.slice(),Std140Builder.onStack(stack,64)                 .putVec4((float)(pos.x%16384),(float)(pos.z%16384),(float)pos.y,(float)wind)                 .putVec4(active&&sky?1:0,active&&sky&&cloud?1:0,polished&&overworld&&shadows&&cloud?1:0,1-Math.clamp(state.rainBrightness,0,1))                 .putVec4(state.sunAngle,state.moonPhase==null?0:state.moonPhase.ordinal(),192,.48f)                 .putVec4(inWater?1:0,caustics&&polished&&overworld?1:0,ripples?1:0,waterTop).get());
+            var data=stack.malloc(64).order(java.nio.ByteOrder.nativeOrder());for(float value:frozen)data.putFloat(value);data.flip();encoder.writeToBuffer(settings.slice(),data);
         }
     }
     void bind(RenderPass pass) {

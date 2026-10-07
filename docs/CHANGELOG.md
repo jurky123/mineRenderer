@@ -1,3 +1,11 @@
+## 0.39.0-alpha.40
+
+- FULL/Realtime、RIS/Legacy 使用编译期 SPIR-V 变体；默认 CLEAN，原 RUNTIME shader 留作同版本 footprint 对照，Reference 强制 FULL。
+- HYBRID profile off 只采样 alive，八条有效观测后冻结；不再每八帧开启全套诊断。
+- `rt_benchmark shader` 做 runtime FULL / clean FULL 两轮 ABBA；`hot` 按算法扫描队列后使用稳定赢家比较 sparse/cache，`queues` 可单独扫描。Realtime 不再强制 Compact。
+- 所有自动测试固定整轮 sun/sky/weather/held/water 控制，跨 context 重建保留快照；schema 11 导出输入和队列选择，停止/异常恢复原设置。
+- 58 个 SPIR-V stage；算法、六顶点 transport 与 reconstruction 不变。实际 GPU 收益待同场景客户端验收。[实施与操作](performance/HOT-SHADER-CLEANUP.md)。
+
 ## 0.39.0-alpha.39
 
 - 修复 RT section 失效队列半开边界与整列整数溢出，保留 reason 和独立消费游标；snapshot/backing page 过期保护不变。

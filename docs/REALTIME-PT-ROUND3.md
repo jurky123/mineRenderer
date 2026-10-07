@@ -1,3 +1,5 @@
+> alpha.40 更新：Realtime benchmark 不再强制 COMPACT；AUTO 用 FIXED，其余使用启动队列。所有 suite 固定整轮 renderer 光照/天气/水面时钟，动态实体和纹理仍 live。`rt_benchmark hot` 先按算法测队列再比较；见 [Hot Shader Cleanup](performance/HOT-SHADER-CLEANUP.md)。
+
 # 第三轮：短路径、世界辐射缓存与时域稀疏 PT
 
 ## 模式与估计器边界

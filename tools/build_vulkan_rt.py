@@ -5,6 +5,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_shadow_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss'}
 VARIANTS={name+suffix:(name,defines) for suffix,defines in [("_query",["RT_RAY_QUERY"]),("_ser",["RT_SER"]),("_query_ser",["RT_RAY_QUERY","RT_SER"])] for name in ["material_primary","material_indirect"]}
 VARIANTS.update(material_visibility_trace=('material_visibility_benchmark',['RT_VIS_BENCH']),material_visibility_query=('material_visibility_benchmark',['RT_VIS_BENCH','RT_RAY_QUERY']))
+# Production compile-time FULL/Realtime and direct-light specialization; the old
+# runtime family is retained exclusively for the footprint A/B experiment.
+for family,policy in [("full",["RT_CLEAN_FULL"]),("realtime",[])]:
+    for direct,lighting in [("",["RT_DIRECT_RIS"]),("_legacy",["RT_DIRECT_LEGACY"])]:
+        for suffix,features in [("",[]),("_query",["RT_RAY_QUERY"]),("_ser",["RT_SER"]),("_query_ser",["RT_RAY_QUERY","RT_SER"])]:
+            for stage in ["material_primary","material_indirect"]:
+                VARIANTS[stage+"_"+family+direct+suffix]=(stage,policy+lighting+features)
+    VARIANTS["material_resolve_"+family]=("material_resolve",policy+["RT_DIRECT_RIS"])
 STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)
@@ -76,7 +84,7 @@ def main():
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
         validate_byte_address_layout(spv.read_bytes())
         if entry != "material_visibility_miss":validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
-        manifest['shaders'][entry] = {'stage': stage, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
+        manifest['shaders'][entry] = {'stage': stage, 'defines':defines, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64 bytes + 288-byte cold media + 48-byte AOV accumulator')
 if __name__ == '__main__': main()

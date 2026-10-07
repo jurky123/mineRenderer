@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.39**：修复失效队列边界与原始事件误重置，采用同容量四路平面缓存、训练前去重、稳定 quad 历史与延迟 primary frame 准备；新增 schema 10 结构诊断，reference 保留完整路径与原累积规则。第三轮默认 FULL，用命令启用新算法。保留统一直接光 RIS、优化 BLAS 与 64B PathHot；新算法的 RTX 收益与画质待客户端验收，全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.40**：FULL/Realtime、RIS/Legacy 改为独立编译期 shader，生产 HYBRID 的 alive 校准与完整诊断分离并有界冻结；新增固定整轮光照输入的 clean FULL 对照和逐算法队列扫描。保留原 estimator、六顶点 transport、64B PathHot、RIS、优化 BLAS 和重建后端；第三轮默认 FULL。RTX 收益待同场景验收，全新安装默认 effects off。
 
-[下载 alpha.39 安装包](https://temp.sh/CxmJq/voxellight-client-kit-26.2-0.39.0-alpha.39.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.40 安装包](https://temp.sh/JZalv/voxellight-client-kit-26.2-0.39.0-alpha.40.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -18,6 +18,8 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 
 `rt_scale 0` 保留至少 4×、最高 640×360 的自动分辨率；`1..8` 指定线性缩放，实际尺寸受设备 buffer 范围和 1 GiB continuation 预算约束，stats 显示实际尺寸。场景有 256 MiB 压缩 CPU 页缓存、64 MiB GPU working set 和异步 miss 请求优先页；无法重建服务器尚未加载的区块。透明/加法粒子、动态 LabPBR 材质、DLSS RR、OMM/SER 性能验收仍未完成。此版本的 RTX 降噪、动态外观和性能需要实机验证。
 
+本轮先执行 `/voxellight rt_benchmark shader`：8 段同场景 runtime FULL / clean FULL ABBA，约 2–3 分钟。完整 `/voxellight rt_benchmark hot`：按 FULL/SPARSE/CACHE_SPARSE 分别扫描队列，再使用稳定赢家比较算法，支持间接 tracing 时 72 段、约 19 分钟。所有自动测试固定 renderer 光照/天气/水面时钟，结束恢复输入和原执行控制。[实施与验收](docs/performance/HOT-SHADER-CLEANUP.md)。
+
 BLAS 专用验收：执行 `/voxellight rt_benchmark blas`（8 段，默认每段 10 秒）。[实施与指标说明](docs/performance/RT-BLAS-OPTIMIZATION.md)。
 
 第二轮专用验收：执行 `/voxellight rt_benchmark direct`（8 段，默认每段 10 秒）。[设计与指标说明](docs/performance/RT-DIRECT-LIGHTING-ROUND-2.md)。
@@ -30,10 +32,11 @@ BLAS 专用验收：执行 `/voxellight rt_benchmark blas`（8 段，默认每�
 ./gradlew build clientKit
 ```
 
-构建工具需要 Slang 和 SPIR-V 验证工具，详见 [Vulkan 迁移记录](docs/VULKAN-RT-MIGRATION.md)。构建执行 Java 回归、真实 Minecraft GLSL pipeline 链接、24 个 RT SPIR-V stage 验证，以及实际 Slang CPU target 对原始 BSDF/材质/环境的数值校验。独立降噪 helper 需要 NVIDIA SDK 头文件和 Windows/Linux C++ 工具链，不需要 nvcc 或旧 tracing build。产物位于 `build/libs/` 和 `build/distributions/`；client kit 只含本 mod 和当前操作文档。
+构建工具需要 Slang 和 SPIR-V 验证工具，详见 [Vulkan 迁移记录](docs/VULKAN-RT-MIGRATION.md)。构建执行 Java 回归、真实 Minecraft GLSL pipeline 链接、58 个 RT SPIR-V stage 验证，以及实际 Slang CPU target 对原始 BSDF/材质/环境的数值校验。独立降噪 helper 需要 NVIDIA SDK 头文件和 Windows/Linux C++ 工具链，不需要 nvcc 或旧 tracing build。产物位于 `build/libs/` 和 `build/distributions/`；client kit 只含本 mod 和当前操作文档。
 
 ## 文档
 
+- [Hot Shader Cleanup、clean FULL 与按算法选队列](docs/performance/HOT-SHADER-CLEANUP.md)
 - [BLAS 更新、scratch slices 与专用验收](docs/performance/RT-BLAS-OPTIMIZATION.md)
 - [直接光第二轮设计、MIS 与自动验收](docs/performance/RT-DIRECT-LIGHTING-ROUND-2.md)
 - [一条命令自动 A/B 与结果判定](docs/performance/RT-AUTOMATIC-BENCHMARK.md)
@@ -52,16 +55,4 @@ BLAS 专用验收：执行 `/voxellight rt_benchmark blas`（8 段，默认每�
 
 旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.21。
 
-本轮验证：337 项 Java 测试通过；24 个 RT SPIR-V stage 与 Minecraft GLSL 链接通过；生产 Slang 统一 RIS 对彩色遮挡点光、面积光、环境、自适应 proposal、深层 roulette 与表面 NEE/BSDF MIS 做每 case 200,000 次数值回归，RGB 能量误差在 2% 验收阈值内。NVIDIA GPU 帧时间与实机场景视觉尚待验收。
-
-手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。
-
-alpha.21 验收：固定窗口大小、`rt_spp 1` / `rt_scale 0`，`profile on` 后静止/移动各测试约 20 秒，`export` 导出分阶段 GPU 时间。动态场景同拓扑 refit，shader 几何和纹理只复制变化区段/当前纹理 tile；去噪 guide 来自稳定中心射线，动态历史保守拒绝。OptiX 只降噪实际输出的 beauty 层，成功时不运行 Vulkan 滤波。性能与画质仍需 RTX 实测。
-
-第三轮 realtime PT：`/voxellight rt_realtime cache_sparse` 启用短 diffuse 路径 + 世界 SH 缓存 + 稀疏完整路径调度，`full` 恢复原完整输运。Reference 始终旁路这两项近似。自动验收使用 `/voxellight rt_benchmark realtime`，输出缓存/稀疏工作量及三组 ABBA；详见 [第三轮设计与验收](docs/REALTIME-PT-ROUND3.md)。性能目标仍待客户端实测，画质另以收敛 reference 对照。
-
-alpha.36 实机第三轮未达标：缓存查询/训练/命中全部为零，稀疏完整路径仅减少约 0.4–1.4%，无法抵消历史开销。alpha.37 修复准入与匹配问题，收益需要复测：[数据分析与修复边界](docs/performance/ALPHA-36-REALTIME-ANALYSIS.md)。
-
-alpha.37 复测仍没有净收益，第三轮尚未验收通过。alpha.38 保留 FULL 默认，需重新运行 `/voxellight rt_benchmark realtime` 并对照 reference 检查漏光/残影：[alpha.37 完整分析](docs/performance/ALPHA-37-REALTIME-ANALYSIS.md)。
-
-alpha.39 已修复最新审计确认的失效、平面争用与历史置信度问题，需运行 `/voxellight rt_benchmark realtime` 复测。[修复范围、正确性边界与验收](docs/performance/ALPHA-39-REALTIME-FIXES.md)。实际驻留静态内容变化仍保守失效；第三轮净收益与画质尚未确认。
+本轮 342 项 Java 测试、58 个 SPIR-V stage、Minecraft GLSL 链接与生产 Slang 数值回归通过；GPU 帧时间与实机场景视觉需客户端验收。

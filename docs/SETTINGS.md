@@ -77,3 +77,5 @@ alpha.35：`rt_scene_update optimized` 默认启用属性变化跳过 refit 和�
 alpha.37 realtime benchmark 每段附带 `.realtime.json`，summary 的 `realtimeCoverage` 汇总实际缓存查询/终止与完整路径密度；缓存零查询不构成算法成功。默认仍 FULL；新算法性能和画质需客户端验证。
 
 alpha.39 benchmark 为 schema 10，保留原二十八项并追加十六项结构诊断计数，`.realtime.json` 含具名 `reasonCounters`。正常日光渐变不再按原约 1° anchor 阈值清空整个 realtime 缓存；突变/累计漂移/实际提交的静态 RT 内容仍失效，原始 LIGHT/edit 事件不直接清空 realtime 历史。Reference 的原累积规则保持不变。详细门槛及有偏近似见第三轮设计。
+
+alpha.40 默认 CLEAN 编译期 shader；FULL 不包含 cache/history 实现，RIS/Legacy 分开编译，Reference 强制 FULL。`rt_benchmark shader` 比较原 runtime FULL 和 clean FULL；`hot` 自动扫描每种算法的队列后比较收益。生产 HYBRID 使用独立 alive-only 校准，八条有效曲线后冻结；profile on 才开启完整诊断。自动测试固定 renderer 光照/天气/水面时钟，结果 schema 11 报告快照，结束恢复正常动态输入。[操作与边界](performance/HOT-SHADER-CLEANUP.md)。

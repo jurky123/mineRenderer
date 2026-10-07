@@ -20,7 +20,12 @@ public final class RtBenchmarkRunner {
     private final boolean originalProfile=RenderPassProfile.enabled();
     private final Object level=Minecraft.getInstance().level;
     private final long resources=VoxelLightClient.scene().bridge().stats().resourceGeneration();
-    private final RtBenchmarkPlan.Plan plan;
+    private RtBenchmarkPlan.Plan plan;
+    private final boolean hot;
+    private boolean queuesSelected;
+    private final RtBenchmarkInputs inputs=new RtBenchmarkInputs();
+    private Map<RtExecutionOptions.Realtime,RtExecutionOptions.Queue> selectedQueues=Map.of();
+    public static float[] freeze(String key,float[] live){return running==null?live:running.inputs.freeze(key,live);}
     private final List<RtGeometryStream.Section> terrain=VoxelLightClient.probe().benchmarkSnapshot();
     public static List<RtGeometryStream.Section> terrainSnapshot(){return running==null?null:running.terrain;}
     private final List<Map<String,Object>> warmupDiagnostics=new ArrayList<>();
@@ -54,26 +59,30 @@ public final class RtBenchmarkRunner {
     private final long[][] directCounters=new long[6][4];
     private long shadow,anyHit,opaque,replay,mismatches,scopeCount;
     private final LinkedHashSet<String> invalid=new LinkedHashSet<>();
-    private RtBenchmarkRunner(int seconds,Consumer<String> feedback,boolean directOnly,boolean blasOnly,boolean realtimeOnly)throws IOException{
+    private RtBenchmarkRunner(int seconds,Consumer<String> feedback,boolean directOnly,boolean blasOnly,boolean realtimeOnly,String extra)throws IOException{
         if(terrain.isEmpty())throw new IllegalStateException("no resident terrain snapshot");
-        this.seconds=seconds;this.feedback=feedback;
-        plan=realtimeOnly?RtBenchmarkPlan.realtime(initial.querySupported()):blasOnly?RtBenchmarkPlan.blas(initial.querySupported()):directOnly?RtBenchmarkPlan.direct(initial.querySupported()):RtBenchmarkPlan.create(initial.querySupported(),initial.compactSupported(),initial.ommSupported()&&initial.opacityValid(),initial.serSupported());
+        this.seconds=seconds;this.feedback=feedback;hot="hot".equals(extra);
+        plan=hot?RtBenchmarkPlan.hot(initial.querySupported(),initial.compactSupported()):"shader".equals(extra)?RtBenchmarkPlan.shader(initial.querySupported()):"queues".equals(extra)?RtBenchmarkPlan.queues(initial.querySupported(),initial.compactSupported()):realtimeOnly?RtBenchmarkPlan.realtime(initial.querySupported(),initial.compactSupported()):blasOnly?RtBenchmarkPlan.blas(initial.querySupported()):directOnly?RtBenchmarkPlan.direct(initial.querySupported()):RtBenchmarkPlan.create(initial.querySupported(),initial.compactSupported(),initial.ommSupported()&&initial.opacityValid(),initial.serSupported());
         directory=FabricLoader.getInstance().getGameDir().resolve("benchmark-results/voxellight/rt-suite-"+System.currentTimeMillis());Files.createDirectories(directory);
     }
-    public static boolean start(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false);}
-    public static boolean startDirect(int seconds,Consumer<String> feedback){return start(seconds,feedback,true,false,false);}
-    public static boolean startBlas(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,true,false);}
-    public static boolean startRealtime(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,true);}
-    private static boolean start(int seconds,Consumer<String> feedback,boolean directOnly,boolean blasOnly,boolean realtimeOnly){
+    public static boolean start(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"");}
+    public static boolean startDirect(int seconds,Consumer<String> feedback){return start(seconds,feedback,true,false,false,"");}
+    public static boolean startBlas(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,true,false,"");}
+    public static boolean startRealtime(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,true,"");}
+    public static boolean startShader(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"shader");}
+    public static boolean startHot(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"hot");}
+    public static boolean startQueues(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"queues");}
+    private static boolean start(int seconds,Consumer<String> feedback,boolean directOnly,boolean blasOnly,boolean realtimeOnly,String extra){
         if(running!=null){feedback.accept("VoxelLight: RT benchmark already running; use rt_benchmark status / stop");return false;}
         var client=Minecraft.getInstance();var state=VoxelLightClient.probe().benchmarkState();
         if(client.level==null||state==null||!state.hasOpaque()||state.frozen()){feedback.accept("VoxelLight: enter a loaded Vulkan PT world with opaque geometry and rt_accumulate freeze off first");return false;}
-        if(realtimeOnly&&(!state.realtime()||!state.compactSupported()||state.spp()!=1)){feedback.accept("VoxelLight: realtime suite requires realtime mode, compact queue support and 1 spp");return false;}
+        if((realtimeOnly||extra.equals("shader")||extra.equals("hot")||extra.equals("queues"))&&(!state.realtime()||state.spp()!=1)){feedback.accept("VoxelLight: shader/realtime/queue suite requires realtime mode and 1 spp");return false;}
+        if(extra.equals("queues")&&!state.compactSupported()){feedback.accept("VoxelLight: indirect tracing unavailable; queue comparison skipped");return false;}
         if(seconds<4||seconds>30)throw new IllegalArgumentException("sample seconds must be 4..30");
         try{
-            var suite=new RtBenchmarkRunner(seconds,feedback,directOnly,blasOnly,realtimeOnly);running=suite;
+            var suite=new RtBenchmarkRunner(seconds,feedback,directOnly,blasOnly,realtimeOnly,extra);running=suite;
             RenderPassProfile.observe(suite.gpuObserver);RenderPassProfile.observeWork(suite.workObserver);RenderPassProfile.setEnabled(true);
-            suite.begin();feedback.accept("VoxelLight: automatic RT A/B started; stay still and close menus. "+suite.plan.blocks().size()+" blocks, about "+Math.ceil(suite.plan.blocks().size()*(seconds+6)/60.0)+" minutes plus driver pipeline initialization; SER initialization may pause rendering; stop restores settings");return true;
+            suite.begin();feedback.accept("VoxelLight: automatic RT A/B started; stay still and close menus. "+(suite.plan.blocks().size()+(suite.hot?16:0))+" blocks, about "+Math.ceil((suite.plan.blocks().size()+(suite.hot?16:0))*(seconds+6)/60.0)+" minutes plus driver pipeline initialization; SER initialization may pause rendering; stop restores settings");return true;
         }catch(IOException|RuntimeException error){if(running!=null)running.finish("start failed: "+error.getMessage());else feedback.accept("VoxelLight: benchmark start failed: "+error.getMessage());return false;}
     }
     public static String status(){return running==null?"VoxelLight: no RT benchmark running":running.progress();}
@@ -119,6 +128,12 @@ public final class RtBenchmarkRunner {
         if(now-phaseStart<2_000_000_000L)return;
         completeBlock();
         if(results.getLast().timings().keySet().stream().noneMatch(n->n.startsWith("vulkan_rt_batch"))){finish("no GPU RT batch timestamps; CPU time is not a substitute");return;}
+        if(hot&&!queuesSelected&&index+1==plan.blocks().size()){
+            var comparisons=plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().map(name->RtBenchmarkResults.compare(name,results)).toList();
+            selectedQueues=RtBenchmarkPlan.selectQueues(comparisons);queuesSelected=true;
+            var blocks=new ArrayList<>(plan.blocks());blocks.addAll(RtBenchmarkPlan.realtime(initial.querySupported(),selectedQueues,false).blocks());
+            plan=new RtBenchmarkPlan.Plan(List.copyOf(blocks),plan.skipped());feedback.accept("VoxelLight: measured queue choices "+selectedQueues+"; starting final algorithm ABBA");
+        }
         if(++index==plan.blocks().size()){index--;finish(null);}else begin();
     }
     private boolean owns(long frame){return RtBenchmarkResults.ownsFrame(frame,first,last);}
@@ -165,9 +180,9 @@ public final class RtBenchmarkRunner {
         try{
             if(reason!=null&&!blockExported&&first!=Long.MAX_VALUE){invalid.add("interrupted: "+reason);if(last==Long.MAX_VALUE)last=Math.max(first,currentFrame-1);completeBlock();}
             var comparisons=new ArrayList<RtBenchmarkResults.Comparison>();for(String name:plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().toList())comparisons.add(RtBenchmarkResults.compare(name,results));
-            var report=new LinkedHashMap<String,Object>();report.put("schema",10);report.put("comparisonMetrics",Map.of("blas","vulkan_rt_scene_commit","others","transport batch"));report.put("timingPolicy","GPU timestamps on counter-free frames; counters/replay every eighth frame; raw CSV includes both, see counter_frames.json");report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy","fixed nearest resident terrain snapshot within 60 MiB; 4 MiB dynamic headroom; exact count/signature required before sampling; dynamic models and lighting remain live");report.put("terrainSnapshotSignature",expectedTerrainSignature);report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);report.put("realtimeCoverage",realtimeCoverage);
+            var report=new LinkedHashMap<String,Object>();report.put("schema",11);report.put("comparisonMetrics",Map.of("blas","vulkan_rt_scene_commit","others","transport batch"));report.put("timingPolicy","GPU timestamps on counter-free frames; counters/replay every eighth frame; raw CSV includes both, see counter_frames.json");report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy","fixed nearest resident terrain snapshot within 60 MiB; 4 MiB dynamic headroom; exact count/signature required before sampling; dynamic models remain live; renderer sun/sky/weather/held/water controls fixed for the complete suite");report.put("terrainSnapshotSignature",expectedTerrainSignature);report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);report.put("realtimeCoverage",realtimeCoverage);report.put("frozenRendererInputs",inputs.snapshot());report.put("selectedQueues",selectedQueues);
             report.put("device",com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().toString());report.put("version",FabricLoader.getInstance().getModContainer("voxellight").orElseThrow().getMetadata().getVersion().getFriendlyString());
-            report.put("limitations",List.of("current-version execution controls only; not alpha.26 vs alpha.28 speedup","completed GPU timestamps; replay benchmarks outside transport batch","two ABBA rounds are descriptive, not a statistical confidence interval","alive drift threshold 5 percentage points for execution controls; realtime algorithm comparisons permit intentional path reduction; dynamic geometry/light changes may remain","no automatic image correctness, L1/L2 traffic or runtime spill validation"));
+            report.put("limitations",List.of("current-version execution controls only; not alpha.26 vs alpha.28 speedup","completed GPU timestamps; replay benchmarks outside transport batch","two ABBA rounds are descriptive, not a statistical confidence interval","alive drift threshold 5 percentage points for execution controls; realtime algorithm comparisons permit intentional path reduction; dynamic geometry and animated textures may remain","no automatic image correctness, L1/L2 traffic or runtime spill validation"));
             Files.writeString(directory.resolve("warmup.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(warmupDiagnostics));
             Files.writeString(directory.resolve("summary.json"),new GsonBuilder().setPrettyPrinting().create().toJson(report));
             StringBuilder text=new StringBuilder("VoxelLight automatic RT benchmark\nSettings restored. "+(reason==null?"Completed.":"Interrupted: "+reason)+"\n");

@@ -3,6 +3,16 @@ package com.voxellight.rt;
 /** Execution and realtime algorithm A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
     public enum Realtime {FULL(0),CACHE(1),SPARSE(2),CACHE_SPARSE(3);private final int flags;Realtime(int flags){this.flags=flags;}public int flags(boolean realtime){return realtime?flags:0;}}
+    public enum Shader {CLEAN,RUNTIME}
+    private static Shader shader=Shader.CLEAN;
+    public static Shader shader(){return shader;}
+    public static void shader(Shader value){if(shader!=value){shader=value;revision++;}}
+    public static String stage(String base,boolean realtime,boolean query,boolean ser){
+        if(shader==Shader.RUNTIME)return base+(base.equals("material_resolve")?"":(query?"_query":"")+(ser?"_ser":""));
+        String family=realtime&&RtExecutionOptions.realtime()!=Realtime.FULL?"realtime":"full";
+        if(base.equals("material_resolve"))return base+"_"+family;
+        return base+"_"+family+(direct==Direct.LEGACY?"_legacy":"")+(query?"_query":"")+(ser?"_ser":"");
+    }
     private static Realtime realtime=Realtime.FULL;
     public static Realtime realtime(){return realtime;}
     public static void realtime(Realtime value){if(realtime!=value){realtime=value;revision++;}}

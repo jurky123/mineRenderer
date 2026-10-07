@@ -29,7 +29,7 @@ final class VulkanPathTracer implements AutoCloseable {
     private boolean realtime=true;
     private final RtReconstruction reconstruction=new RtReconstruction();
     void optix(boolean value){reconstruction.optix(value);}
-    void realtime(boolean value){realtime=value;history.reset("render mode");reconstruction.close();}
+    void realtime(boolean value){if(realtime!=value)close();realtime=value;history.reset("render mode");reconstruction.close();}
     private int internalScale=0;
     void internalScale(int value){if(value<0||value>8)throw new IllegalArgumentException("Scale must be 0..8");internalScale=value;history.reset("resolution");}
     void samplesPerFrame(int value){if(value<1||value>8)throw new IllegalArgumentException("Samples per frame must be 1..8");samplesPerFrame=value;}
@@ -69,13 +69,12 @@ final class VulkanPathTracer implements AutoCloseable {
             if(context!=null&&(world!=stats.worldGeneration()||resources!=stats.resourceGeneration()||executionRevision!=com.voxellight.rt.RtExecutionOptions.revision())) {close();RtGeometryStream.enable(true);}
             if(context==null) {
                 if(!RtGeometryStream.enabled()){RtGeometryStream.enable(true);}
-                long start=System.nanoTime();context=new VulkanRtContext(device,transport,materials);executionRevision=com.voxellight.rt.RtExecutionOptions.revision();
+                long start=System.nanoTime();context=new VulkanRtContext(device,transport,materials,realtime);executionRevision=com.voxellight.rt.RtExecutionOptions.revision();
                 if(!RenderSystem.getDevice().precompilePipeline(materials?MATERIAL_DISPLAY:DISPLAY,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan RT debug display pipeline unavailable");
                 startupMs=(System.nanoTime()-start)/1_000_000;
                 world=stats.worldGeneration();resources=stats.resourceGeneration();
                 org.slf4j.LoggerFactory.getLogger("VoxelLight").info("Vulkan RT {} pipeline ready in {} ms; no OptiX tracing",materials?"material transport":transport?"geometry transport test":"normal POC",startupMs);
             }
-            context.realtime(realtime);
             int scale=internalScale==0?Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360)):internalScale;
             int width=Math.max(1,(target.width+scale-1)/scale),height=Math.max(1,(target.height+scale-1)/scale);
             long maxPixels=context.maxPixels(transport?samplesPerFrame:1);

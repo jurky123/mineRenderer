@@ -14,10 +14,17 @@ public final class RtQueueCalibration {
     private Curve latest;
     private long joined;
     private long[] latestActive;
+    private int observedAlive,sampledWidth,sampledHeight,sampledSpp,frozenMask;
+    /** Production calibration stops after eight valid alive curves, and resets on dimensions. */
+    public boolean sampleAlive(long frame,int width,int height,int spp){
+        if(width!=sampledWidth||height!=sampledHeight||spp!=sampledSpp){sampledWidth=width;sampledHeight=height;sampledSpp=spp;observedAlive=0;frozenMask=0;}
+        return observedAlive<8&&(frame&7)==0;
+    }
     public void alive(long frame,int width,int height,int spp,long scene,long[] active){
         if(active.length!=6||active[0]<=0)return;
         long sum=0;for(int i=1;i<6;i++){if(active[i]<0||active[i]>active[i-1])return;sum+=active[i];}
         var curve=new Curve(width,height,spp,scene,(int)Math.min(9,sum*10/(active[0]*5)));
+        if(width==sampledWidth&&height==sampledHeight&&spp==sampledSpp&&observedAlive<8){observedAlive++;if(observedAlive==8)frozenMask=hybridMask(active);}
         curves.put(frame,curve);latest=curve;latestActive=active.clone();trim(curves,256);join(frame);
     }
     public void timing(PassMetrics.Sample sample){
@@ -43,6 +50,7 @@ public final class RtQueueCalibration {
     /** Candidate scheduling policy, explicitly benchmarked rather than automatically assumed faster. */
     public int hybridMask(int width,int height,int spp){
         if(latest==null||latest.width!=width||latest.height!=height||latest.spp!=spp)return 0;
+        if(width==sampledWidth&&height==sampledHeight&&spp==sampledSpp&&observedAlive>=8)return frozenMask;
         return hybridMask(latestActive);
     }
     public static int hybridMask(long[] active){
@@ -51,5 +59,5 @@ public final class RtQueueCalibration {
     }
     private static long median(List<Long> values){var sorted=new ArrayList<>(values);sorted.sort(Long::compare);return sorted.get(sorted.size()/2);}
     private static void trim(LinkedHashMap<?,?> map,int size){while(map.size()>size)map.remove(map.firstEntry().getKey());}
-    public String status(){return "aliveBucket="+(latest==null?"unobserved":latest.bucket)+"/matchedGpuSamples="+joined+"/workloads="+costs.size();}
+    public String status(){return "productionAliveSamples="+observedAlive+"/frozen="+(observedAlive>=8)+"/aliveBucket="+(latest==null?"unobserved":latest.bucket)+"/matchedGpuSamples="+joined+"/workloads="+costs.size();}
 }
