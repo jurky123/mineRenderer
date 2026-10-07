@@ -25,6 +25,18 @@ public final class RtExecutionOptions {
     public static Direct direct(){return direct;}
     public static void direct(Direct value){if(direct!=value){direct=value;revision++;}}
     public enum Visibility {LEGACY,TRACE,QUERY}
+    public enum Integrator {WAVEFRONT,ITERATIVE}
+    private static Integrator integrator=Integrator.WAVEFRONT;
+    public static Integrator integrator(){return integrator;}
+    public static void integrator(Integrator value){if(integrator!=value){integrator=value;revision++;}}
+    public enum World {COMPOSITE,EXCLUSIVE}
+    private static World world=World.EXCLUSIVE;
+    public static World world(){return world;}
+    public static void world(World value){world=value;}
+    public enum Shadow {EXACT,FAST}
+    private static Shadow shadow=Shadow.FAST;
+    public static Shadow shadow(){return shadow;}
+    public static void shadow(Shadow value){if(shadow!=value){shadow=value;revision++;}}
     public enum Queue {AUTO,FIXED,COMPACT,HYBRID}
     private static Visibility visibility=Visibility.TRACE;
     private static Queue queue=Queue.AUTO;

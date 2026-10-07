@@ -1,3 +1,12 @@
+## 0.39.0-alpha.41：Caustica 式帧执行链
+
+- RT 输出成功后跳过原版世界 frame graph，保留 section 编译/上传/occlusion/加载维护；失败同帧继续原版。
+- Vulkan 原生 DLSS RR Performance、SDK 输入尺寸、8 平面 AOV/guide、Halton jitter；正常帧无 CUDA/OptiX exchange，无帧生成，失败回退原重建。
+- 实时单次遍历透明阴影；Reference 保留 EXACT。Iterative B1–B5 一次 dispatch 可 A/B，Wavefront 默认待实测。
+- `rt_benchmark frame` 三组双轮 ABBA，schema 12；世界总 GPU 时间与客户端墙钟耗时分开导出。
+- `build clientKit` 通过：348 项测试零失败，80 个 SPIR-V stages / 48 份 shader source hashes 核对；真实 GLSL RR motion/depth 数值 fixture 和打包的 Linux JNI extension query 通过。
+- RR 镜面运动向量、透射 endpoint guide 尚不完整；性能与画质待 RTX 实机确认。[实现、构建与验收](performance/CAUSTICA-FRAME-PIPELINE.md)。
+
 ## 0.39.0-alpha.40
 
 - FULL/Realtime、RIS/Legacy 使用编译期 SPIR-V 变体；默认 CLEAN，原 RUNTIME shader 留作同版本 footprint 对照，Reference 强制 FULL。

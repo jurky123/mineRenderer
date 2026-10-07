@@ -12,5 +12,10 @@ void material_indirect() {
     }
     PathHot hot=loadHot(index);if(hot.origin.w==0||(hot.state&32u)!=0)return;
     PathState path=loadPath(index);
+#ifdef RT_ITERATIVE
+    for(uint bounce=1;bounce<6&&path.origin.w!=0&&path.padding==0;bounce++)advance(path);
+    storePath(index,path);output[index]=pathOutput(path);
+#else
     advance(path);storePath(index,path);output[index]=pathOutput(path);appendContinuation(index,path);
+#endif
 }

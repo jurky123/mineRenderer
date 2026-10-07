@@ -298,7 +298,7 @@ public final class VulkanRtScene implements AutoCloseable {
     static VkAccelerationStructureGeometryKHR.Buffer rangeGeometry(MemoryStack stack,VulkanRtBuffer vertices,int[] counts){
         var geometry=VkAccelerationStructureGeometryKHR.calloc(counts.length,stack);int base=0;
         for(int i=0;i<counts.length;i++){
-            var g=geometry.get(i);g.sType$Default().geometryType(VK_GEOMETRY_TYPE_TRIANGLES_KHR).flags(i==0?VK_GEOMETRY_OPAQUE_BIT_KHR:0);
+            var g=geometry.get(i);g.sType$Default().geometryType(VK_GEOMETRY_TYPE_TRIANGLES_KHR).flags(i==0?VK_GEOMETRY_OPAQUE_BIT_KHR:VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR);
             g.geometry().triangles().sType$Default().vertexFormat(VK_FORMAT_R32G32B32_SFLOAT).vertexStride(40).maxVertex(Math.max(0,counts[i]*3-1)).indexType(VK_INDEX_TYPE_NONE_KHR).vertexData().deviceAddress(vertices.address()+(counts[i]==0?0:base*120L));base+=counts[i];
         }
         return geometry;

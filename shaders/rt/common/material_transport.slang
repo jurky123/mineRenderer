@@ -6,6 +6,7 @@
 #include "emissive.slang"
 float3 rtPreviousSurface(float3 a,float3 b,float3 c,float2 bary,float3 previousTranslation){return a*(1-bary.x-bary.y)+b*bary.x+c*bary.y+previousTranslation;}
 struct SurfacePayload {float distance;float2 bary;uint triangle;uint instance;};
+struct ShadowPayload {float3 transmission;uint visible;float3 sourceBlock;uint flame;float exitDistance;uint mediumId;};
 #ifndef RT_CPU_FIXTURE
 [[vk::binding(0, 0)]] RaytracingAccelerationStructure world;
 [[vk::binding(17,0)]] RaytracingAccelerationStructure opaqueWorld;
@@ -178,6 +179,18 @@ bool opaqueBlocked(float3 origin,float3 direction,float maximum){
 // Straight shadow visibility through bounded interfaces, with Fresnel and RGB extinction.
 // No secondary TraceRay call in any-hit/closest-hit; recursion remains one.
 float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum=4096,bool flameSource=false) {
+#ifndef RT_CPU_FIXTURE
+    if((uint(camera.origin.w)&262144u)!=0&&(!flameSource||(uint(camera.origin.w)&256u)==0)){
+        if((uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[513].x,1,ignored);}
+        RayDesc ray;ray.Origin=origin;ray.Direction=direction;ray.TMin=.001;ray.TMax=max(.001,maximum);
+        ShadowPayload payload;payload.transmission=1;payload.visible=0;payload.sourceBlock=floor(origin+direction*maximum);payload.flame=flameSource?1:0;payload.exitDistance=maximum;payload.mediumId=media.count>0?media.entries[media.count-1].id:0;
+        // Opaque geometry terminates in hardware. Cutout/transparent any-hit ignores
+        // passing interfaces; only miss marks the complete connection visible.
+        TraceRay(world,RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH|RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,254,7,1,2,ray,payload);
+        float3 extinction=1;if(media.count>0){Medium m=media.entries[media.count-1];extinction=expNeg(m.sigmaA+m.sigmaS,payload.exitDistance);}
+        return payload.visible!=0?payload.transmission*extinction:float3(0);
+    }
+#endif
 #if !defined(RT_CPU_FIXTURE)||defined(RT_VISIBILITY_FIXTURE)
     bool fast=!flameSource&&(uint(camera.origin.w)&8u)!=0;
     if(fast&&opaqueBlocked(origin,direction,maximum))return float3(0);
@@ -272,8 +285,9 @@ void advance(inout PathState path) {
             uint local=DispatchRaysIndex().y*camera.width+DispatchRaysIndex().x;
             uint base=camera.width*camera.height*max(1u,camera.padding)+4;
             float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
+            output[base+camera.width*camera.height*7+local]=float4(metal(surface.material)?conductorFresnel(surface.material,1):float3(dielectric(surface.material)?pow((surface.material.ior-1)/(surface.material.ior+1),2):surface.material.f0),sqrt(surface.material.microfacetAlpha));
             output[base+local]=float4(surface.material.baseColor,float(surface.material.type+1));
-            output[base+camera.width*camera.height+local]=float4(entering?surface.geometryNormal:-surface.geometryNormal,surface.material.microfacetAlpha);
+            output[base+camera.width*camera.height+local]=float4(entering?surface.frame.n:-surface.frame.n,surface.material.microfacetAlpha);
             output[base+camera.width*camera.height*2+local]=float4(point,hit.distance);
             float4 currentTranslation=normals[559240u+hit.instance*3],previousTranslation=normals[559240u+hit.instance*3+1];
             float3 previousPoint=point;

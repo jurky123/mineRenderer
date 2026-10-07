@@ -31,6 +31,9 @@ final class LightingResolvePass implements AutoCloseable {
     public java.util.List<RtGeometryStream.Section> benchmarkSnapshot(){return vulkanRt.benchmarkSnapshot();}
     com.voxellight.rt.RtBenchmarkState benchmarkState(){return vulkanRt.benchmarkState();}
     boolean rtActive(){return vulkanRt.active();}
+    boolean rtDisplayed(){return vulkanRt.displayed();}
+    void beginWorldFrame(){vulkanRt.beginWorldFrame();}
+    void prepareRtEnvironment(){weather.prepare(RenderSystem.getDevice().createCommandEncoder(),true);}
     void setVulkanMaterials(){vulkanRt.enableMaterials();}
     void setVulkanTransportTest(){vulkanRt.enableTransport();}
     void setVulkanRtPoc(){vulkanRt.enable(true);}
@@ -39,6 +42,7 @@ final class LightingResolvePass implements AutoCloseable {
     void probeLighting(){vulkanRt.probeLighting();}
     void accumulateFreeze(boolean value){vulkanRt.accumulateFreeze(value);}
     void rtOptix(boolean value){vulkanRt.optix(value);}
+    void rtDlss(){vulkanRt.dlss();}
     void rtRealtime(boolean value){vulkanRt.realtime(value);}
     void rtScale(int value){vulkanRt.internalScale(value);}
     void samplesPerFrame(int value){vulkanRt.samplesPerFrame(value);}

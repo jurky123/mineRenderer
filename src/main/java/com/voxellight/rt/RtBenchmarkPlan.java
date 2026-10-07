@@ -4,13 +4,15 @@ import java.util.*;
 
 /** Two repeated ABBA rounds per independent execution control; all changes are temporary. */
 public final class RtBenchmarkPlan {
-    public record Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct,RtExecutionOptions.SceneUpdate sceneUpdate,RtExecutionOptions.Realtime realtimePolicy,RtExecutionOptions.Shader shader){
+    public record Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct,RtExecutionOptions.SceneUpdate sceneUpdate,RtExecutionOptions.Realtime realtimePolicy,RtExecutionOptions.Shader shader,RtExecutionOptions.Shadow shadow,RtExecutionOptions.World world,RtExecutionOptions.Integrator integrator){
+        public Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct,RtExecutionOptions.SceneUpdate sceneUpdate,RtExecutionOptions.Realtime realtimePolicy,RtExecutionOptions.Shader shader,RtExecutionOptions.Shadow shadow,RtExecutionOptions.World world){this(visibility,queue,omm,ser,direct,sceneUpdate,realtimePolicy,shader,shadow,world,RtExecutionOptions.Integrator.WAVEFRONT);}
+        public Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct,RtExecutionOptions.SceneUpdate sceneUpdate,RtExecutionOptions.Realtime realtimePolicy,RtExecutionOptions.Shader shader){this(visibility,queue,omm,ser,direct,sceneUpdate,realtimePolicy,shader,RtExecutionOptions.Shadow.EXACT,RtExecutionOptions.World.EXCLUSIVE);}
         public Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct,RtExecutionOptions.SceneUpdate sceneUpdate,RtExecutionOptions.Realtime realtimePolicy){this(visibility,queue,omm,ser,direct,sceneUpdate,realtimePolicy,RtExecutionOptions.Shader.CLEAN);}
         public Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct,RtExecutionOptions.SceneUpdate sceneUpdate){this(visibility,queue,omm,ser,direct,sceneUpdate,RtExecutionOptions.Realtime.FULL);}
         public Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser,RtExecutionOptions.Direct direct){this(visibility,queue,omm,ser,direct,RtExecutionOptions.SceneUpdate.OPTIMIZED);}
         public Config(RtExecutionOptions.Visibility visibility,RtExecutionOptions.Queue queue,boolean omm,boolean ser){this(visibility,queue,omm,ser,RtExecutionOptions.Direct.LEGACY);}
-        public static Config current(){return new Config(RtExecutionOptions.visibility(),RtExecutionOptions.queue(),RtExecutionOptions.omm(),RtExecutionOptions.ser(),RtExecutionOptions.direct(),RtExecutionOptions.sceneUpdate(),RtExecutionOptions.realtime(),RtExecutionOptions.shader());}
-        public void apply(){RtExecutionOptions.visibility(visibility);RtExecutionOptions.queue(queue);RtExecutionOptions.omm(omm);RtExecutionOptions.ser(ser);RtExecutionOptions.direct(direct);RtExecutionOptions.sceneUpdate(sceneUpdate);RtExecutionOptions.realtime(realtimePolicy);RtExecutionOptions.shader(shader);}
+        public static Config current(){return new Config(RtExecutionOptions.visibility(),RtExecutionOptions.queue(),RtExecutionOptions.omm(),RtExecutionOptions.ser(),RtExecutionOptions.direct(),RtExecutionOptions.sceneUpdate(),RtExecutionOptions.realtime(),RtExecutionOptions.shader(),RtExecutionOptions.shadow(),RtExecutionOptions.world(),RtExecutionOptions.integrator());}
+        public void apply(){RtExecutionOptions.visibility(visibility);RtExecutionOptions.queue(queue);RtExecutionOptions.omm(omm);RtExecutionOptions.ser(ser);RtExecutionOptions.direct(direct);RtExecutionOptions.sceneUpdate(sceneUpdate);RtExecutionOptions.realtime(realtimePolicy);RtExecutionOptions.shader(shader);RtExecutionOptions.shadow(shadow);RtExecutionOptions.world(world);RtExecutionOptions.integrator(integrator);}
     }
     public record Block(String comparison,int round,int position,boolean candidate,Config config){}
     public record Plan(List<Block> blocks,Map<String,String> skipped){}
@@ -32,6 +34,13 @@ public final class RtBenchmarkPlan {
         directPair(blocks,query);blasPair(blocks,query);return new Plan(List.copyOf(blocks),Collections.unmodifiableMap(skipped));
     }
     private static Config policy(boolean query,RtExecutionOptions.Realtime mode,RtExecutionOptions.Queue queue){return new Config(query?RtExecutionOptions.Visibility.QUERY:RtExecutionOptions.Visibility.TRACE,queue,false,false,RtExecutionOptions.Direct.RIS,RtExecutionOptions.SceneUpdate.OPTIMIZED,mode);}
+    public static Plan frame(boolean query){var blocks=new ArrayList<Block>();var base=policy(query,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
+        var composite=new Config(base.visibility(),base.queue(),false,false,base.direct(),base.sceneUpdate(),base.realtimePolicy(),base.shader(),RtExecutionOptions.Shadow.EXACT,RtExecutionOptions.World.COMPOSITE);
+        pair(blocks,"world_takeover",composite,base);
+        var fast=new Config(base.visibility(),base.queue(),false,false,base.direct(),base.sceneUpdate(),base.realtimePolicy(),base.shader(),RtExecutionOptions.Shadow.FAST,RtExecutionOptions.World.EXCLUSIVE);
+        pair(blocks,"realtime_shadow",base,fast);
+        var iterative=new Config(fast.visibility(),fast.queue(),false,false,fast.direct(),fast.sceneUpdate(),fast.realtimePolicy(),fast.shader(),fast.shadow(),fast.world(),RtExecutionOptions.Integrator.ITERATIVE);
+        pair(blocks,"iterative_indirect",fast,iterative);return new Plan(List.copyOf(blocks),Map.of());}
     public static Plan shader(boolean query){var blocks=new ArrayList<Block>();var base=policy(query,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
         pair(blocks,"shader_clean_full",new Config(base.visibility(),base.queue(),false,false,base.direct(),base.sceneUpdate(),base.realtimePolicy(),RtExecutionOptions.Shader.RUNTIME),base);return new Plan(List.copyOf(blocks),Map.of());}
     public static Plan queues(boolean query,boolean supported){var blocks=new ArrayList<Block>();if(!supported)return new Plan(List.of(),Map.of("queues","indirect tracing unavailable"));

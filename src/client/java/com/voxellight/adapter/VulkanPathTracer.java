@@ -29,6 +29,7 @@ final class VulkanPathTracer implements AutoCloseable {
     private boolean realtime=true;
     private final RtReconstruction reconstruction=new RtReconstruction();
     void optix(boolean value){reconstruction.optix(value);}
+    void dlss(){reconstruction.dlss();history.reset("reconstruction backend");}
     void realtime(boolean value){if(realtime!=value)close();realtime=value;history.reset("render mode");reconstruction.close();}
     private int internalScale=0;
     void internalScale(int value){if(value<0||value>8)throw new IllegalArgumentException("Scale must be 0..8");internalScale=value;history.reset("resolution");}
@@ -58,6 +59,8 @@ final class VulkanPathTracer implements AutoCloseable {
     com.voxellight.rt.RtBenchmarkState benchmarkState(){return context==null||!materials||failed||executionRevision!=com.voxellight.rt.RtExecutionOptions.revision()?null:context.benchmarkState(realtime,history.frozen());}
     boolean enabled() {return enabled;}
     boolean active(){return enabled&&!failed;}
+    boolean displayed(){return displayedThisFrame;}
+    void beginWorldFrame(){displayedThisFrame=false;}
     void render(CommandEncoder encoder,RenderTarget target,Matrix4f projection,boolean observed,MaterialCapture material,EnvironmentPass weather,ShadowRenderer shadows) {
         displayedThisFrame=false;
         if(!enabled||failed)return;
@@ -78,6 +81,9 @@ final class VulkanPathTracer implements AutoCloseable {
             int scale=internalScale==0?Math.max(4,Math.max((target.width+639)/640,(target.height+359)/360)):internalScale;
             int width=Math.max(1,(target.width+scale-1)/scale),height=Math.max(1,(target.height+scale-1)/scale);
             long maxPixels=context.maxPixels(transport?samplesPerFrame:1);
+            int[] rrSize=materials&&realtime?reconstruction.optimalSize(target.width,target.height,maxPixels):null;
+            if(rrSize!=null){width=rrSize[0];height=rrSize[1];}
+            context.rrJitter(rrSize!=null);
             if((long)width*height>maxPixels){double reduction=Math.sqrt((double)width*height/maxPixels);width=Math.max(1,(int)(width/reduction));height=Math.max(1,(int)(height/reduction));}
             if(texture==null||texture.getWidth(0)!=width||texture.getHeight(0)!=height) {
                 releaseTexture();texture=device.createTexture("VoxelLight Vulkan RT normal",GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA32_FLOAT,width,height,1,1);view=device.createTextureView(texture);

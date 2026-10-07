@@ -4,6 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "GameRendererMixin",
+    "MinecraftFrameMixin",
+    "LevelRendererMixin",
     "CloudRendererMixin",
     "ClientLevelMixin",
     "ClientChunkCacheMixin",
@@ -22,6 +24,8 @@
     "IndigoQuadResetMixin",
     "GpuDeviceMixin",
     "VulkanRtxExtensionsMixin",
+    "VulkanNgxInstanceMixin",
+    "VulkanStorageImageMixin",
     "VulkanTextureVersionsMixin",
     "AtlasAnimationCoverageMixin"
   ],

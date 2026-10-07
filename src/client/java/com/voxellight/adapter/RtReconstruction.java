@@ -33,10 +33,21 @@ final class RtReconstruction implements AutoCloseable {
     private final GpuTextureView[] denoiserViews=new GpuTextureView[3];
     private GpuTexture denoised;
     private GpuTextureView denoisedView;
-    private boolean useOptix=true;
+    private boolean useOptix=true,useDlss=true;
+    private RtDlssReconstruction dlss;
+    private String dlssFailure;
+    void dlss(){close();useDlss=true;useOptix=true;dlssFailure=null;}
+    int[] optimalSize(int w,int h,long maxPixels){
+        if(!useDlss||dlssFailure!=null)return null;
+        try{if(dlss==null)dlss=new RtDlssReconstruction();var size=dlss.optimal(w,h);if((long)size[0]*size[1]>maxPixels)throw new IllegalStateException("NGX input exceeds RT path-storage budget");return size;}
+        catch(RuntimeException error){failDlss(error);return null;}
+    }
+    boolean dlssActive(){return useDlss&&dlssFailure==null&&dlss!=null;}
+    private void failDlss(RuntimeException error){if(dlss!=null)dlss.close();dlss=null;dlssFailure=error.getMessage();org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("DLSS RR unavailable; OptiX/Vulkan reconstruction retained: {}",dlssFailure);}
+
     private String backend="Vulkan temporal/spatial";
-    void optix(boolean value){close();useOptix=value;}
-    String status(){return backend;}
+    void optix(boolean value){close();useDlss=false;useOptix=value;dlssFailure=null;}
+    String status(){return backend+(dlssFailure==null?"":"; DLSS fallback: "+dlssFailure);}
     private final GpuTexture[][] guides=new GpuTexture[2][4];
     private final GpuTextureView[][] guideViews=new GpuTextureView[2][4];
     private final GpuTexture[] colors=new GpuTexture[2];
@@ -56,9 +67,13 @@ final class RtReconstruction implements AutoCloseable {
             for(int i=3;i<6;i++)if(Math.abs(value[i]-lighting[i])>Math.max(.002f,Math.abs(lighting[i])*.05f))valid=false;
             if(Math.abs(value[14]-lighting[14])>.02f||value[15]!=lighting[15])valid=false;
         }
+        if(!valid&&dlss!=null)dlss.invalidate();
         lighting=value.clone();
     }
     GpuTextureView resolve(CommandEncoder encoder,VulkanRtContext context,GpuTextureView noisy,Matrix4f clip,double x,double y,double z,long epoch,int w,int h,int outputWidth,int outputHeight,Matrix4f viewRotation){
+        if(dlssActive())try{
+            var result=dlss.resolve(encoder,context,noisy,clip,x,y,z,epoch,w,h,outputWidth,outputHeight,viewRotation);backend="DLSS RR Performance; Vulkan native; input="+w+"x"+h+"; output="+outputWidth+"x"+outputHeight;valid=true;return result;
+        }catch(RuntimeException error){failDlss(error);valid=false;}
         var device=RenderSystem.getDevice();
         if(settings==null||width!=w||height!=h){
             close();width=w;height=h;
@@ -103,5 +118,5 @@ final class RtReconstruction implements AutoCloseable {
         result=upscale.resolve(encoder,result,guideViews[write],guideViews[read],settings,outputWidth,outputHeight);
         previousClip.set(clip);previousX=x;previousY=y;previousZ=z;generation=epoch;valid=true;read=write;return result;
     }
-    public void close(){upscale.close();if(optix!=null)optix.close();optix=null;for(int i=0;i<3;i++){if(denoiserViews[i]!=null)denoiserViews[i].close();if(denoiserGuides[i]!=null)denoiserGuides[i].close();denoiserViews[i]=null;denoiserGuides[i]=null;}if(denoisedView!=null)denoisedView.close();if(denoised!=null)denoised.close();denoisedView=null;denoised=null;backend="Vulkan temporal/spatial";for(int bank=0;bank<2;bank++){if(colorViews[bank]!=null)colorViews[bank].close();if(colors[bank]!=null)colors[bank].close();colorViews[bank]=null;colors[bank]=null;for(int p=0;p<4;p++){if(guideViews[bank][p]!=null)guideViews[bank][p].close();if(guides[bank][p]!=null)guides[bank][p].close();guideViews[bank][p]=null;guides[bank][p]=null;}}if(settings!=null)settings.close();settings=null;valid=false;lighting=null;generation=-1;read=0;}
+    public void close(){if(dlss!=null)dlss.close();dlss=null;upscale.close();if(optix!=null)optix.close();optix=null;for(int i=0;i<3;i++){if(denoiserViews[i]!=null)denoiserViews[i].close();if(denoiserGuides[i]!=null)denoiserGuides[i].close();denoiserViews[i]=null;denoiserGuides[i]=null;}if(denoisedView!=null)denoisedView.close();if(denoised!=null)denoised.close();denoisedView=null;denoised=null;backend="Vulkan temporal/spatial";for(int bank=0;bank<2;bank++){if(colorViews[bank]!=null)colorViews[bank].close();if(colors[bank]!=null)colors[bank].close();colorViews[bank]=null;colors[bank]=null;for(int p=0;p<4;p++){if(guideViews[bank][p]!=null)guideViews[bank][p].close();if(guides[bank][p]!=null)guides[bank][p].close();guideViews[bank][p]=null;guides[bank][p]=null;}}if(settings!=null)settings.close();settings=null;valid=false;lighting=null;generation=-1;read=0;}
 }

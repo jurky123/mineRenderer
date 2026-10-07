@@ -101,7 +101,7 @@ public final class RenderPassProfile {
         }
     }
     static void externalGpu(String name,long nanos){if(enabled){long id=++serial;metrics.recordScope(id,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,0);metrics.completeGpu(id,nanos);}}
-    static void cpu(String name,long nanos){if(enabled)metrics.recordScope(++serial,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,nanos);}
+    public static void cpu(String name,long nanos){if(enabled){long id=++serial;metrics.recordScope(id,frame,scopes.isEmpty()?0:scopes.peek().id,name,width,height,spp,sceneGeneration,nanos);var sample=metrics.sample(id);for(var observer:observers)observer.accept(sample);}}
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit){workMetrics.record(frame,w,h,samples,scene,active,shadow,anyHit);}
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit,long opaque,long replay,long mismatches){rayWorkload(frame,w,h,samples,scene,active,shadow,anyHit,opaque,replay,mismatches,new long[6][4]);}
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit,long opaque,long replay,long mismatches,long[][] direct){rayWorkload(frame,w,h,samples,scene,active,shadow,anyHit,opaque,replay,mismatches,direct,new long[16]);}

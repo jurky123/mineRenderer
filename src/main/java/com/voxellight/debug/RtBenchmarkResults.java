@@ -22,7 +22,12 @@ public final class RtBenchmarkResults {
         for(var sample:samples)if(sample.gpuNanos()!=null&&!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.gpuNanos());
         var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
     }
-    private static Timing comparisonTiming(Block block){if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
+    public static Map<String,Timing> cpuTimings(List<PassMetrics.Sample> samples,Set<Long> counterFrames){
+        var grouped=new LinkedHashMap<String,List<Long>>();
+        for(var sample:samples)if(!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.cpuNanos());
+        var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
+    }
+    private static Timing comparisonTiming(Block block){if(block.plan.comparison().equals("world_takeover"))return block.timings.get("vulkan_world_total");if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
     public static Comparison compare(String name,List<Block> all){
         var blocks=all.stream().filter(b->b.plan.comparison().equals(name)).sorted(Comparator.comparingInt((Block b)->b.plan.round()).thenComparingInt(b->b.plan.position())).toList();
         var reasons=new ArrayList<String>();
@@ -40,7 +45,7 @@ public final class RtBenchmarkResults {
         }
         // Sampled alive curves must exist; throughput timing alone does not prove matched ray work.
         if(blocks.stream().anyMatch(b->b.aliveFraction.length!=6))reasons.add("missing alive-path counters");
-        else if((!name.startsWith("realtime_")||name.startsWith("realtime_queue_")))for(int i=1;i<6;i++){double min=1,max=0;for(var b:blocks){min=Math.min(min,b.aliveFraction[i]);max=Math.max(max,b.aliveFraction[i]);}if(max-min>.05){reasons.add("alive-path fraction drift > 5 percentage points");break;}}
+        else if((!name.equals("realtime_shadow")&&!name.startsWith("realtime_")||name.startsWith("realtime_queue_")))for(int i=1;i<6;i++){double min=1,max=0;for(var b:blocks){min=Math.min(min,b.aliveFraction[i]);max=Math.max(max,b.aliveFraction[i]);}if(max-min>.05){reasons.add("alive-path fraction drift > 5 percentage points");break;}}
         if(!reasons.isEmpty())return new Comparison(name,"not_comparable",null,null,List.of(),reasons.stream().distinct().toList());
         var gains=new ArrayList<Double>();double noise=0;
         for(int round=0;round<2;round++){

@@ -1,3 +1,9 @@
+## alpha.41 RT / DLSS
+
+实时优先 DLSS RR Performance，实际初始化与输入尺寸请看 stats。新增 `rt_reconstruction dlss`、`rt_world composite|exclusive`、`rt_shadow exact|fast`、`rt_integrator wavefront|iterative`；默认 exclusive / fast / wavefront。Reference 强制 exact / wavefront。运行 `/voxellight rt_benchmark frame` 导出世界接管、透明阴影和间接执行 ABBA。
+
+RR 活跃时 SDK 决定输入尺寸，`rt_scale` 仅用于 OptiX/Vulkan 原重建。性能/画质仍需客户端验收。[完整说明](performance/CAUSTICA-FRAME-PIPELINE.md)。
+
 # VoxelLight 设置与静止累积（alpha.20）
 
 暂停/Options → VoxelLight 或 `/voxellight settings` 打开原版控件界面。命令树提供可搜索的选择项，`rt_accumulate spp` 有独立数字输入。界面底部显示静止累积的完成样本数和目标，每秒刷新。

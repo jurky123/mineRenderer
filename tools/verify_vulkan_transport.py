@@ -60,6 +60,22 @@ def main():
     executable=output/'reconstruction_fixture'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_reconstruction_fixture.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    rr=(ROOT/'src/main/resources/assets/voxellight/shaders/rt_dlss_guides.fsh').read_text()
+    functions=rr[rr.index('vec2 rrMotion'):rr.index('void main()')]
+    for glsl,slang in [('vec2','float2'),('vec4','float4')]:functions=functions.replace(glsl,slang)
+    source=output/'dlss_fixture.slang'
+    source.write_text(functions+'''\n[[vk::binding(0,0)]] RWStructuredBuffer<float4> result;
+[shader("compute")] [numthreads(1,1,1)]
+void dlss_fixture(uint3 tid:SV_DispatchThreadID){
+    float4 current=float4(.2,.4,.8,2),previous=float4(.4,-.2,.8,2);
+    result[0]=float4(rrMotion(current,previous,float2(100,60),true),rrDepth(current,true),rrDepth(current,false));
+    result[1]=float4(rrMotion(current,current,float2(100,60),true),rrDepth(float4(0),true),rrDepth(float4(0,0,2,1),true));
+    result[2]=float4(rrMotion(current,previous,float2(100,60),false),rrMotion(current,float4(0),float2(100,60),true));
+}\n''')
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','dlss_fixture','-stage','compute','-o',str(output/'dlss_fixture.cpp')],check=True)
+    executable=output/'dlss_fixture'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_dlss_fixture.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     source=ROOT/'shaders/rt/tests/emitter_sampling.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','emitter_sampling','-stage','compute','-o',str(output/'emitter_sampling.cpp')],check=True)
     executable=output/'emitter_sampling'

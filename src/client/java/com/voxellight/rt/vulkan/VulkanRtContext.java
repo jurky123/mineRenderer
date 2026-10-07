@@ -36,9 +36,11 @@ public final class VulkanRtContext implements AutoCloseable {
     private String lastWorkload="unobserved";
     private static final int FEEDBACK_HEADER=1648;
     private VulkanRtPipeline visibilityTrace,visibilityQuery;
-    public long maxPixels(int spp){long limit=Math.min(maxStorageRange/(material?spp*288:spp*64),1024L*1024*1024/(spp*(material?400:64)));if(runtimeFlags()!=0)limit=Math.min(limit,Math.min(com.voxellight.rt.RtRealtimeLayout.maxPixels(maxStorageRange,spp), (1024L*1024*1024-16L*(FEEDBACK_HEADER+655360)-64)/(spp*576L+368)));return Math.max(1,limit);}
+    public long maxPixels(int spp){long limit=Math.min(maxStorageRange/(material?spp*288:spp*64),1024L*1024*1024/(material?448L*spp+128:80L*spp));if(runtimeFlags()!=0)limit=Math.min(limit,Math.min(com.voxellight.rt.RtRealtimeLayout.maxPixels(maxStorageRange,spp), (1024L*1024*1024-16L*(FEEDBACK_HEADER+655360)-64)/(spp*576L+384)));return Math.max(1,limit);}
     private final boolean realtime;
     private final com.voxellight.rt.RtExecutionOptions.Shader shaderMode;
+    private final com.voxellight.rt.RtExecutionOptions.Shadow shadowMode;
+    private final boolean iterative;
     private boolean runtimeAllocated,previousValid;
     private int runtimeEpoch=1;
     private long runtimeGeneration=Long.MIN_VALUE;
@@ -60,14 +62,16 @@ public final class VulkanRtContext implements AutoCloseable {
     private long runtimeBytes(int w,int h,int spp){return com.voxellight.rt.RtRealtimeLayout.bytes((long)w*h,spp);}
     private int frame;
     private int width,height,samples=1;
-    private boolean closed,reconstructionGuides=true;
+    private boolean closed,reconstructionGuides=true,rrJitter;
+    public void rrJitter(boolean value){rrJitter=value;}
+    public int lastFrame(){return Math.max(0,frame-1);}
     public void reconstructionGuides(boolean value){reconstructionGuides=value;}
     private final String optionalCapabilities;
     public VulkanRtContext(VulkanDevice device) {this(device,false);}
     public VulkanRtContext(VulkanDevice device,boolean transport) {this(device,transport,false);}
     public VulkanRtContext(VulkanDevice device,boolean transport,boolean material) {this(device,transport,material,false);}
     public VulkanRtContext(VulkanDevice device,boolean transport,boolean material,boolean realtime) {
-        this.realtime=realtime;shaderMode=com.voxellight.rt.RtExecutionOptions.shader();
+        this.realtime=realtime;iterative=material&&realtime&&com.voxellight.rt.RtExecutionOptions.integrator()==com.voxellight.rt.RtExecutionOptions.Integrator.ITERATIVE;shadowMode=realtime?com.voxellight.rt.RtExecutionOptions.shadow():com.voxellight.rt.RtExecutionOptions.Shadow.EXACT;shaderMode=com.voxellight.rt.RtExecutionOptions.shader();
         if(material&&!transport)throw new IllegalArgumentException("Material transport requires continuations");
         this.transport=transport;this.material=material;
         this.device=device;indirectTracing=material&&VulkanRtCapabilities.indirectTracing(device.vkDevice().getPhysicalDevice());
@@ -78,7 +82,7 @@ public final class VulkanRtContext implements AutoCloseable {
         serAvailable=material&&device.vkDevice().getCapabilities().VK_NV_ray_tracing_invocation_reorder&&capabilities.extensions().contains("VK_NV_ray_tracing_invocation_reorder")&&VulkanRtCapabilities.reorder(physical);serEnabled=serAvailable&&com.voxellight.rt.RtExecutionOptions.ser();
         ommAvailable=material&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&capabilities.extensions().contains("VK_EXT_opacity_micromap")&&VulkanRtCapabilities.micromap(physical);ommEnabled=ommAvailable&&com.voxellight.rt.RtExecutionOptions.omm();
         primaryStage=com.voxellight.rt.RtExecutionOptions.stage("material_primary",realtime,queryEnabled,serEnabled);
-        indirectStage=com.voxellight.rt.RtExecutionOptions.stage("material_indirect",realtime,queryEnabled,serEnabled);
+        indirectStage=com.voxellight.rt.RtExecutionOptions.stage("material_indirect",realtime,queryEnabled,serEnabled)+(iterative?"_iterative":"");
         resolveStage=com.voxellight.rt.RtExecutionOptions.stage("material_resolve",realtime,false,false);
         if(!capabilities.supported())throw new IllegalStateException(capabilities.reason());
         try(var stack=MemoryStack.stackPush()){var properties=VkPhysicalDeviceProperties.calloc(stack);vkGetPhysicalDeviceProperties(device.vkDevice().getPhysicalDevice(),properties);maxStorageRange=Integer.toUnsignedLong(properties.limits().maxStorageBufferRange());if(material&&maxStorageRange<128L*1024*1024)throw new IllegalStateException("Stable material geometry requires 128 MiB storage-buffer range");if(material&&properties.limits().maxPerStageDescriptorStorageBuffers()<15)throw new IllegalStateException("Material batch requires 15 storage-buffer bindings");}
@@ -119,23 +123,23 @@ public final class VulkanRtContext implements AutoCloseable {
             runtimeAllocated=runtimeFlags()!=0;previousValid=false;runtimeEpoch++;
             queueAvailable=material&&indirectTracing&&(FEEDBACK_HEADER+(long)width*height*spp*2)*16<=maxStorageRange;
             if(material){if(feedback!=null)feedback.close();feedback=new VulkanRtBuffer(device,runtimeAllocated?runtimeBytes(width,height,spp):(FEEDBACK_HEADER+(queueAvailable?(long)width*height*spp*2:0))*16,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);encoder.writeToBuffer(feedback.slice(),ByteBuffer.allocateDirect(Math.toIntExact(feedback.size())));}
-            if(output!=null)output.close();output=new VulkanRtBuffer(device,(long)width*height*spp*16+(material?64+(long)width*height*112:0),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);this.width=width;this.height=height;samples=spp;
+            if(output!=null)output.close();output=new VulkanRtBuffer(device,(long)width*height*spp*16+(material?64+(long)width*height*128:0),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);this.width=width;this.height=height;samples=spp;
             if(pathBanks!=null){for(var bank:pathBanks)bank.close();pathBanks=null;paths=null;}else if(paths!=null){paths.close();paths=null;}
             if(material){if(pathMedia!=null)pathMedia.close();pathMedia=new VulkanRtBuffer(device,(long)width*height*spp*288,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);pathBanks=new VulkanRtBuffer[spp];for(int lane=0;lane<spp;lane++)pathBanks[lane]=new VulkanRtBuffer(device,(long)width*height*64,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);paths=pathBanks[0];if(pathAovs!=null)pathAovs.close();pathAovs=new VulkanRtBuffer(device,(long)width*height*spp*48,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);}
             else if(transport)paths=new VulkanRtBuffer(device,(long)width*height*spp*64,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         }
-        compact=queueAvailable&&switch(com.voxellight.rt.RtExecutionOptions.queue()){
+        compact=!iterative&&queueAvailable&&switch(com.voxellight.rt.RtExecutionOptions.queue()){
             case FIXED->false;case COMPACT,HYBRID->true;case AUTO->queueCalibration.compact(RenderPassProfile.frameId(),width,height,spp,RenderPassProfile.enabled());
         };
         compactMask=compact?(com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID?queueCalibration.hybridMask(width,height,spp):62):0;
         {
             boolean lightFeedback=com.voxellight.rt.RtExecutionOptions.direct()==com.voxellight.rt.RtExecutionOptions.Direct.RIS&&(frame%32)==0;
             boolean sampledCounters=RenderPassProfile.enabled()&&(frame%8)==0;
-            boolean needAlive=com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID&&queueCalibration.sampleAlive(frame,width,height,spp);
+            boolean needAlive=!iterative&&com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID&&queueCalibration.sampleAlive(frame,width,height,spp);
             boolean sampledAlive=!sampledCounters&&needAlive;
             if(sampledCounters||lightFeedback)RenderPassProfile.markCounterFrame();
             var data=ByteBuffer.allocateDirect(96).order(ByteOrder.nativeOrder());inverseClip.get(0,data);
-            data.position(64).putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat((material&&reconstructionGuides?1:0)+(sampledCounters?2:0)+(sampledAlive?2048:0)+(lightFeedback?64:0)+(com.voxellight.rt.RtExecutionOptions.direct()==com.voxellight.rt.RtExecutionOptions.Direct.RIS?128:0)+(compactMask!=0?4:0)+(compactMask*4096)+(scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?8:0)+(scene.hasNonOpaque()?16:0)+(ommEnabled?256:0)+(sampledCounters?512:0)+(queryAvailable&&((RenderPassProfile.frameId()/8)&1)!=0?1024:0)).putInt(width).putInt(height).putInt(transport?frame++:0).putInt(spp).flip();
+            data.position(64).putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat((material&&reconstructionGuides?1:0)+(sampledCounters?2:0)+(rrJitter?524288:0)+(sampledAlive?2048:0)+(shadowMode==com.voxellight.rt.RtExecutionOptions.Shadow.FAST?262144:0)+(lightFeedback?64:0)+(com.voxellight.rt.RtExecutionOptions.direct()==com.voxellight.rt.RtExecutionOptions.Direct.RIS?128:0)+(compactMask!=0?4:0)+(compactMask*4096)+(scene.hasOpaque()&&com.voxellight.rt.RtExecutionOptions.visibility()!=com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?8:0)+(scene.hasNonOpaque()?16:0)+(ommEnabled?256:0)+(sampledCounters?512:0)+(queryAvailable&&((RenderPassProfile.frameId()/8)&1)!=0?1024:0)).putInt(width).putInt(height).putInt(transport?frame++:0).putInt(spp).flip();
             encoder.writeToBuffer(camera.slice(),data);
             if(material){
                 encoder.writeToBuffer(feedback.slice(0,16),ByteBuffer.allocateDirect(16));
@@ -156,7 +160,10 @@ public final class VulkanRtContext implements AutoCloseable {
                 try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_primary")){pipeline.dispatch(command,width,height,spp);}
                 if(transport){
                     indirect.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks,pathMedia,pathAovs,scene.opaqueTlas());
-                    for(int bounce=1;bounce<6;bounce++){
+                    if(iterative){
+                        VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
+                        try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_indirect_iterative")){indirect.dispatchBounce(command,width,height,spp,1);}
+                    }else for(int bounce=1;bounce<6;bounce++){
                         VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR|VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT|VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
                         try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_bounce_"+bounce)){if((compactMask&(1<<bounce))!=0)indirect.dispatchIndirect(command,feedback.address()+(520L+bounce)*16,bounce);else indirect.dispatchBounce(command,width,height,spp,bounce);}
                     }
@@ -211,12 +218,12 @@ public final class VulkanRtContext implements AutoCloseable {
     }
     public java.util.Set<com.voxellight.world.SectionKey> drainPageRequests(){var result=new java.util.LinkedHashSet<com.voxellight.world.SectionKey>();com.voxellight.world.SectionKey key;while((key=pageRequests.poll())!=null){if(result.size()<256)result.add(key);}return result;}
     public void copyGuide(CommandEncoder encoder,int plane,GpuTexture destination){
-        if(!material||plane<0||plane>=7)throw new IllegalArgumentException("Invalid guide plane");
+        if(!material||plane<0||plane>=8)throw new IllegalArgumentException("Invalid guide plane");
         long offset=((long)width*height*samples+4+(long)plane*width*height)*16;
         encoder.copyBufferToTexture(output.slice(offset,(long)width*height*16),0,0,width,height,destination,0,0,width,height,0,0);
     }
     public void copyGuideToBuffer(CommandEncoder encoder,int plane,com.mojang.blaze3d.buffers.GpuBufferSlice destination){
-        if(!material||plane<0||plane>=7)throw new IllegalArgumentException("Invalid guide plane");
+        if(!material||plane<0||plane>=8)throw new IllegalArgumentException("Invalid guide plane");
         long offset=((long)width*height*samples+4+(long)plane*width*height)*16;
         encoder.copyToBuffer(output.slice(offset,(long)width*height*16),destination);
     }
@@ -236,8 +243,8 @@ public final class VulkanRtContext implements AutoCloseable {
         if(closed||!material||width==0)return null;
         return new com.voxellight.rt.RtBenchmarkState(width,height,samples,realtime,frozen,queryAvailable,queueAvailable,ommAvailable,serAvailable,
             com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY:queryEnabled?com.voxellight.rt.RtExecutionOptions.Visibility.QUERY:com.voxellight.rt.RtExecutionOptions.Visibility.TRACE,
-            com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID&&queueAvailable?com.voxellight.rt.RtExecutionOptions.Queue.HYBRID:compact?com.voxellight.rt.RtExecutionOptions.Queue.COMPACT:com.voxellight.rt.RtExecutionOptions.Queue.FIXED,ommEnabled,serEnabled,com.voxellight.adapter.RtMaterialCoverage.opacityValid(),scene.hasOpaque(),scene.terrainSignature(),scene.generation(),scene.resident().size(),scene.sceneBytes(),com.voxellight.rt.RtExecutionOptions.direct(),com.voxellight.rt.RtExecutionOptions.sceneUpdate(),runtimeFlags()==0?com.voxellight.rt.RtExecutionOptions.Realtime.FULL:com.voxellight.rt.RtExecutionOptions.realtime(),shaderMode);
+            !iterative&&com.voxellight.rt.RtExecutionOptions.queue()==com.voxellight.rt.RtExecutionOptions.Queue.HYBRID&&queueAvailable?com.voxellight.rt.RtExecutionOptions.Queue.HYBRID:compact?com.voxellight.rt.RtExecutionOptions.Queue.COMPACT:com.voxellight.rt.RtExecutionOptions.Queue.FIXED,ommEnabled,serEnabled,com.voxellight.adapter.RtMaterialCoverage.opacityValid(),scene.hasOpaque(),scene.terrainSignature(),scene.generation(),scene.resident().size(),scene.sceneBytes(),com.voxellight.rt.RtExecutionOptions.direct(),com.voxellight.rt.RtExecutionOptions.sceneUpdate(),runtimeFlags()==0?com.voxellight.rt.RtExecutionOptions.Realtime.FULL:com.voxellight.rt.RtExecutionOptions.realtime(),shaderMode,shadowMode,com.voxellight.rt.RtExecutionOptions.world(),iterative?com.voxellight.rt.RtExecutionOptions.Integrator.ITERATIVE:com.voxellight.rt.RtExecutionOptions.Integrator.WAVEFRONT);
     }
-    public String status() { return "rtShader="+shaderMode+", rtPrimaryStage="+primaryStage+", rtIndirectStage="+indirectStage+", rtResolveStage="+resolveStage+", rtRealtimePolicy="+(runtimeFlags()==0?"FULL":com.voxellight.rt.RtExecutionOptions.realtime())+", radianceCacheEpoch="+runtimeEpoch+", realtimeLightingGradual="+runtimeLighting.gradual()+", realtimeResetReason="+runtimeResetReason+", realtimeSceneResets="+runtimeSceneResets+", realtimeRawEvents="+runtimeRawEvents+", realtimeLightOnlyEvents="+runtimeLightOnlyEvents+", realtimeEventOverflows="+runtimeEventOverflows+", realtimeLightResets="+runtimeLightResets+", realtimeStateBytes="+(runtimeAllocated?feedback.size():0)+", realtimeCounters="+runtimeMetrics+", "+(material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, environment=shared HDR 256x128, environmentSampling=GPU solid-angle CDF, lightNee=sun/moon+environment+held, lightMis=power heuristic, cameraWater=initialized, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=external frame reconstruction, internalResolution="+width+"x"+height+", recursion=1, sppPerFrame="+samples+", scheduling="+(compactMask==0?"fixed batch":compactMask==62?"GPU compact continuation":"hybrid fixed/compact continuation")+", compactBounceMask="+compactMask+", queuePolicy="+com.voxellight.rt.RtExecutionOptions.queue()+", queueCalibration="+queueCalibration.status()+", rayWorkload="+lastWorkload+", rtMissPageRequests="+pageRequestCount+", optionalAdvertised="+optionalCapabilities+", optionalEnabled="+(queryEnabled?"ray_query/":"")+(ommEnabled?"OMM/":"")+(serEnabled?"SER":"")+", visibility="+(com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?"legacy":queryEnabled?"query":"trace")+", pathHotBytes=64, optionalProfile=pending RTX measurements, cameraUploadsPerFrame=1, outputCopiesPerFrame=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size()*(material?samples:1)+(pathMedia==null?0:pathMedia.size())+(pathAovs==null?0:pathAovs.size()))+", "+scene.status()+VulkanRtBuffer.memoryStatus(); }
+    public String status() { return "rtIntegrator="+(iterative?"ITERATIVE":"WAVEFRONT")+", rtShadow="+shadowMode+", rtShader="+shaderMode+", rtPrimaryStage="+primaryStage+", rtIndirectStage="+indirectStage+", rtResolveStage="+resolveStage+", rtRealtimePolicy="+(runtimeFlags()==0?"FULL":com.voxellight.rt.RtExecutionOptions.realtime())+", radianceCacheEpoch="+runtimeEpoch+", realtimeLightingGradual="+runtimeLighting.gradual()+", realtimeResetReason="+runtimeResetReason+", realtimeSceneResets="+runtimeSceneResets+", realtimeRawEvents="+runtimeRawEvents+", realtimeLightOnlyEvents="+runtimeLightOnlyEvents+", realtimeEventOverflows="+runtimeEventOverflows+", realtimeLightResets="+runtimeLightResets+", realtimeStateBytes="+(runtimeAllocated?feedback.size():0)+", realtimeCounters="+runtimeMetrics+", "+(material?"vulkanRt=material transport experimental, material=Material 3/LabPBR, mediumStack=8, cutout=any-hit, bounces=6, environment=shared HDR 256x128, environmentSampling=GPU solid-angle CDF, lightNee=sun/moon+environment+held, lightMis=power heuristic, cameraWater=initialized, ":transport?"vulkanRt=geometry transport test, material=grey diffuse, bounces=6, ":"vulkanRt=normal POC, ")+"reconstruction=external frame reconstruction, internalResolution="+width+"x"+height+", recursion=1, sppPerFrame="+samples+", scheduling="+(compactMask==0?"fixed batch":compactMask==62?"GPU compact continuation":"hybrid fixed/compact continuation")+", compactBounceMask="+compactMask+", queuePolicy="+com.voxellight.rt.RtExecutionOptions.queue()+", queueCalibration="+queueCalibration.status()+", rayWorkload="+lastWorkload+", rtMissPageRequests="+pageRequestCount+", optionalAdvertised="+optionalCapabilities+", optionalEnabled="+(queryEnabled?"ray_query/":"")+(ommEnabled?"OMM/":"")+(serEnabled?"SER":"")+", visibility="+(shadowMode==com.voxellight.rt.RtExecutionOptions.Shadow.FAST?"single TraceRay (transparent approximation)":com.voxellight.rt.RtExecutionOptions.visibility()==com.voxellight.rt.RtExecutionOptions.Visibility.LEGACY?"legacy":queryEnabled?"query":"trace")+", pathHotBytes=64, optionalProfile=pending RTX measurements, cameraUploadsPerFrame=1, outputCopiesPerFrame=1, runtimePtCompiler=0, continuationBytes="+(paths==null?0:paths.size()*(material?samples:1)+(pathMedia==null?0:pathMedia.size())+(pathAovs==null?0:pathAovs.size()))+", "+scene.status()+VulkanRtBuffer.memoryStatus(); }
     @Override public void close() {if(!closed){closed=true;RenderPassProfile.unobserve(timingObserver);scene.close();pipeline.close();if(indirect!=null)indirect.close();if(resolve!=null)resolve.close();camera.close();if(visibilityTrace!=null)visibilityTrace.close();if(visibilityQuery!=null)visibilityQuery.close();if(pathAovs!=null)pathAovs.close();if(pathMedia!=null)pathMedia.close();if(feedback!=null)feedback.close();pageRequests.clear();if(pathBanks!=null){for(var bank:pathBanks)if(bank!=null)bank.close();pathBanks=null;}else if(paths!=null)paths.close();if(output!=null)output.close();}}
 }

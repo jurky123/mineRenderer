@@ -93,6 +93,7 @@ public final class RenderProbe {
     public void probeLighting(){RenderSystem.assertOnRenderThread();lighting.probeLighting();}
     public void accumulateFreeze(boolean value){RenderSystem.assertOnRenderThread();lighting.accumulateFreeze(value);}
     public void rtOptix(boolean value){lighting.rtOptix(value);}
+    public void rtDlss(){lighting.rtDlss();}
     public void rtRealtime(boolean value){lighting.rtRealtime(value);}
     public void rtScale(int value){lighting.rtScale(value);}
     public void samplesPerFrame(int value){RenderSystem.assertOnRenderThread();lighting.samplesPerFrame(value);}
@@ -118,8 +119,24 @@ public final class RenderProbe {
     public void setWorldProfiling(boolean value){adaptive.measured(value);}
     public void setAdaptiveQuality(boolean enabled){adaptive.enabled(enabled);}
     public void setGpuWorldTarget(float value){adaptive.target(value);}
-    public void beginWorldBudget(){if("Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName()))adaptive.begin(mode.name());}
-    public void endWorldBudget(RenderTarget target){var budget=adaptive.end(target.width,target.height);lighting.setQuality(budget);}
+    private boolean rtWorldAttempted,rtWorldReplaced;
+    private RenderPassProfile.Scope worldProfile;
+    public void beginWorldBudget(){RenderPassProfile.nextFrame();lighting.beginWorldFrame();rtWorldAttempted=rtWorldReplaced=false;if("Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName())){adaptive.begin(mode.name());worldProfile=RenderPassProfile.begin(RenderSystem.getDevice().createCommandEncoder(),"vulkan_world_total");}}
+    /** Commit PT before deciding whether to omit the vanilla world frame graph. */
+    public boolean tryReplaceWorld(RenderTarget target){
+        if(com.voxellight.rt.RtExecutionOptions.world()!=com.voxellight.rt.RtExecutionOptions.World.EXCLUSIVE||mode!=Mode.FOUNDATION||!lighting.rtActive()||net.minecraft.client.Minecraft.getInstance().wireframe)return false;
+        rtWorldAttempted=true;
+        var info=RenderSystem.getDevice().getDeviceInfo();backend=info.backendName();deviceName=info.name();driver=info.driverInfo();zZeroToOne=info.isZZeroToOne();
+        try{
+            if(target.width<=0||target.height<=0||target.getColorTexture()==null||target.getDepthTextureView()==null||!shadows.prepareRt()||!material.prepareRt())return false;
+            lighting.prepareRtEnvironment();
+            lighting.displayVulkanRt(target,material,shadows);
+            rtWorldReplaced=lighting.rtDisplayed();
+            if(rtWorldReplaced)state="exclusive Vulkan PT";
+            return rtWorldReplaced;
+        }catch(RuntimeException error){LOGGER.error("RT world preparation failed; vanilla world retained",error);return false;}
+    }
+    public void endWorldBudget(RenderTarget target){if(worldProfile!=null){worldProfile.close();worldProfile=null;}var budget=adaptive.end(target.width,target.height);lighting.setQuality(budget);}
     public void exportWorldBudget(java.nio.file.Path path)throws java.io.IOException{adaptive.export(path);}
     public void setVolumeFilter(boolean value){RenderSystem.assertOnRenderThread();lighting.setVolumeFilter(value);}
     public void setQuality(com.voxellight.world.VisualQuality value){RenderSystem.assertOnRenderThread();adaptive.ceiling(value);lighting.setQuality(value);}
@@ -172,7 +189,7 @@ public final class RenderProbe {
     public String status() {
         return "mode=" + mode + ", state=" + state + ", backend=" + backend + ", device=" + deviceName
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
-                + ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
+                + ", rtWorld="+(rtWorldReplaced?"exclusive PT":"vanilla world retained")+ ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
                 + (mode.isMaterial() ? entityMaterials.status() + ", entityMaterialPass=" + entityMaterialPass : "")
                 + RenderPassProfile.status() + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
                 + (mode == Mode.FOUNDATION ? ", " + lighting.status()+adaptive.status() + ", " + material.status() + ", " + shadows.status()
@@ -221,13 +238,12 @@ public final class RenderProbe {
     }
 
     public void render(RenderTarget target) {
-        RenderPassProfile.nextFrame();
         entityCaptureScope=false;
         entityMaterials.endFrame();
-        if(mode==Mode.FOUNDATION)lighting.displayVulkanRt(target,material,shadows);
+        if(mode==Mode.FOUNDATION&&!rtWorldAttempted)lighting.displayVulkanRt(target,material,shadows);
         lighting.endFrame();material.endFrame();
         if (mode.isMaterial()) {
-            if (!materialPointObserved) state = "opaque terrain hook not observed; vanilla retained";
+            if (!materialPointObserved&&!rtWorldReplaced) state = "opaque terrain hook not observed; vanilla retained";
             materialPointObserved = false;
             return;
         }

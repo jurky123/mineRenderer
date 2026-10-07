@@ -39,6 +39,23 @@ class VulkanRtContractTest {
         assertEquals(0,layout.missOffset()%64);assertEquals(0,layout.hitOffset()%64);
         assertTrue(layout.hitOffset()>=layout.missOffset()+2*layout.stride());assertEquals(layout.hitOffset()+7*layout.stride(),layout.bytes());
     }
+    @Test void realtimeTransmissionSbtHasDistinctMissAndTenNonoverlappingHitRecords(){
+        var layout=VulkanSbt.layout(32,32,64,4096,3,10);
+        assertEquals(0,layout.missOffset()%64);assertEquals(0,layout.hitOffset()%64);
+        assertTrue(layout.hitOffset()>=layout.missOffset()+3*layout.stride());
+        assertEquals(layout.hitOffset()+10*layout.stride(),layout.bytes());
+    }
+    @Test void packagedRrRuntimesAndExtensionQueryAreUsableWithoutInitializingAGpu()throws Exception{
+        try(var jar=new ZipFile(System.getProperty("voxellight.modJar"))){
+            for(String path:List.of("windows-x86_64/voxellight_dlss.dll","windows-x86_64/nvngx_dlssd.dll","linux-x86_64/libvoxellight_dlss.so","linux-x86_64/libnvidia-ngx-dlssd.so.310.9.1","NVIDIA-DLSS-LICENSE.txt","SDK.txt"))assertNotNull(jar.getEntry("voxellight/dlss/"+path),path);
+            assertTrue(jar.stream().noneMatch(e->e.getName().contains("dlssg")),"No frame-generation runtime");
+        }
+        com.voxellight.nvidia.DlssNative.load();
+        for(boolean device:new boolean[]{false,true}){
+            var extensions=com.voxellight.nvidia.DlssNative.extensions(device);assertNotNull(extensions);
+            for(String extension:extensions)assertTrue(extension.startsWith("VK_"),extension);
+        }
+    }
     @Test void allResizedRangesAreReleasedBeforeGrowingReplacements(){
         var allocator=new com.voxellight.rt.RtGeometryAllocator(100);
         var a=new com.voxellight.world.SectionKey(0,0,0);var b=new com.voxellight.world.SectionKey(1,0,0);

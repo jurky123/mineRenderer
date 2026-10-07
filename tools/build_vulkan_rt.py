@@ -2,7 +2,7 @@
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
 import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_shadow_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss'}
+STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_shadow_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss','material_shadow_transmission':'anyhit','material_transmission_miss':'miss'}
 VARIANTS={name+suffix:(name,defines) for suffix,defines in [("_query",["RT_RAY_QUERY"]),("_ser",["RT_SER"]),("_query_ser",["RT_RAY_QUERY","RT_SER"])] for name in ["material_primary","material_indirect"]}
 VARIANTS.update(material_visibility_trace=('material_visibility_benchmark',['RT_VIS_BENCH']),material_visibility_query=('material_visibility_benchmark',['RT_VIS_BENCH','RT_RAY_QUERY']))
 # Production compile-time FULL/Realtime and direct-light specialization; the old
@@ -13,6 +13,10 @@ for family,policy in [("full",["RT_CLEAN_FULL"]),("realtime",[])]:
             for stage in ["material_primary","material_indirect"]:
                 VARIANTS[stage+"_"+family+direct+suffix]=(stage,policy+lighting+features)
     VARIANTS["material_resolve_"+family]=("material_resolve",policy+["RT_DIRECT_RIS"])
+# A single raygen keeps B1..B5 state local; the estimator is unchanged.
+for name,(base,defines) in list(VARIANTS.items()):
+    if base=='material_indirect':VARIANTS[name+'_iterative']=(base,defines+['RT_ITERATIVE'])
+VARIANTS['material_indirect_iterative']=('material_indirect',['RT_ITERATIVE'])
 STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)

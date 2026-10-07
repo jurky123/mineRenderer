@@ -76,6 +76,7 @@ tasks.register('clientKit', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('docs/performance/HOT-SHADER-CLEANUP.md')
+    from('docs/performance/CAUSTICA-FRAME-PIPELINE.md')
     from('docs/REALTIME-PT-ROUND3.md')
     from('docs/performance/ALPHA-39-REALTIME-FIXES.md')
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
@@ -108,6 +109,7 @@ processResources {
 
 // Numerical parity executes the actual Slang CPU target against existing native Material 3.
 tasks.register('verifyVulkanTransport', Exec) {
+    inputs.files('tools/native/vulkan_dlss_fixture.cpp','src/main/resources/assets/voxellight/shaders/rt_dlss_guides.fsh')
     dependsOn tasks.named('compileJava')
     inputs.files('src/main/java/com/voxellight/rt/RtLightRuntime.java','src/main/java/com/voxellight/rt/RtEmitterTable.java','tools/native/GenerateLightRuntime.java','tools/native/vulkan_direct_lighting.cpp','tools/native/vulkan_realtime_policy.cpp')
     inputs.dir('shaders/rt/common')
@@ -128,4 +130,16 @@ tasks.register('compileOptixDenoiser', Exec) {
 processResources {
     dependsOn tasks.named('compileOptixDenoiser')
     from(layout.buildDirectory.dir('optix-denoiser')) { into 'voxellight/denoiser' }
+}
+
+// Official NGX runtime and our Vulkan RR bridge; no CUDA exchange or frame generation.
+tasks.register('compileDlss', Exec) {
+    inputs.dir('native/dlss')
+    inputs.file('tools/build_dlss.py')
+    outputs.dir(layout.buildDirectory.dir('dlss'))
+    commandLine 'python3', 'tools/build_dlss.py'
+}
+processResources {
+    dependsOn tasks.named('compileDlss')
+    from(layout.buildDirectory.dir('dlss')) { into 'voxellight/dlss' }
 }

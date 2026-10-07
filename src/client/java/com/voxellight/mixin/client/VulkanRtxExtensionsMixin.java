@@ -18,6 +18,10 @@ abstract class VulkanRtxExtensionsMixin {
         if(capabilities.supported())for(String extension:VulkanRtCapabilities.REQUIRED)if(!extensions.contains(extension))extensions.add(extension);
         if(capabilities.supported()){
             var vk=physical.vkPhysicalDevice();
+            try{
+                com.voxellight.nvidia.DlssNative.load();
+                for(String extension:com.voxellight.nvidia.DlssNative.extensions(true))if(physical.hasDeviceExtension(extension)&&!extensions.contains(extension))extensions.add(extension);
+            }catch(RuntimeException error){com.mojang.logging.LogUtils.getLogger().warn("NGX extensions unavailable; DLSS RR may fall back",error);}
             for(String extension:VulkanRtCapabilities.OPTIONAL)if(capabilities.extensions().contains(extension)&&switch(extension){case "VK_KHR_pipeline_executable_properties"->VulkanRtCapabilities.executableStatistics(vk);case "VK_KHR_ray_query"->VulkanRtCapabilities.rayQuery(vk);case "VK_EXT_opacity_micromap"->VulkanRtCapabilities.micromap(vk);case "VK_NV_ray_tracing_invocation_reorder"->VulkanRtCapabilities.reorder(vk);default->false;})if(!extensions.contains(extension))extensions.add(extension);
         }
         String suffix=System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")?"win32":"fd";
