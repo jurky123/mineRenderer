@@ -1,3 +1,7 @@
+## alpha.42 验收修正
+
+默认 EXACT + Wavefront。显式选 `rt_reconstruction dlss`，stats 检查实际 RR 后端、输入/输出尺寸与 rtWorldReason；alpha.41 的上传结果未运行 RR 或世界接管，不能直接作为两项验收。[分析与修正](performance/ALPHA-41-FRAME-ANALYSIS.md)。
+
 ## alpha.41 RT / DLSS
 
 实时优先 DLSS RR Performance，实际初始化与输入尺寸请看 stats。新增 `rt_reconstruction dlss`、`rt_world composite|exclusive`、`rt_shadow exact|fast`、`rt_integrator wavefront|iterative`；默认 exclusive / fast / wavefront。Reference 强制 exact / wavefront。运行 `/voxellight rt_benchmark frame` 导出世界接管、透明阴影和间接执行 ABBA。

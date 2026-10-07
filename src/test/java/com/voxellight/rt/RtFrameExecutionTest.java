@@ -45,4 +45,9 @@ class RtFrameExecutionTest {
         assertTrue(RtBenchmarkResults.timings(samples,Set.of()).isEmpty());
         assertEquals(2,RtBenchmarkResults.cpuTimings(samples,Set.of(2L)).get("wall").medianMs());
     }
+    @Test void exclusiveRequestedButVanillaExecutedMustFailReadiness(){
+        var c=RtBenchmarkPlan.frame(true).blocks().get(1).config();
+        var actual=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),c.omm(),c.ser(),true,true,12,50,20,1000,c.direct(),c.sceneUpdate(),c.realtimePolicy(),c.shader(),c.shadow(),RtExecutionOptions.World.COMPOSITE,c.integrator());
+        assertFalse(actual.matches(c));
+    }
 }

@@ -4,6 +4,12 @@ import com.voxellight.VoxelLightClient;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import org.joml.Matrix4fc;
+import org.joml.Vector4f;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import org.joml.Matrix4f;
 import net.minecraft.client.renderer.GameRenderer;
@@ -21,18 +27,15 @@ abstract class GameRendererMixin {
         return original.call(buffer,projection);
     }
 
-    @Inject(method = "renderLevel", at = @At(value = "INVOKE", target =
-            "Lnet/minecraft/client/renderer/LevelRenderer;render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lorg/joml/Matrix4fc;Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/joml/Vector4f;Z)V"))
-    private void voxellight$beginWorldMaterials(CallbackInfo ci) { VoxelLightClient.probe().beginWorldBudget();VoxelLightClient.probe().beginEntityMaterialFrame(); }
-
-    // The world depth is cleared immediately afterwards for the hand/3D HUD.
-    @Inject(method = "renderLevel", at = @At(value = "INVOKE", target =
-            "Lnet/minecraft/client/renderer/LevelRenderer;render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lorg/joml/Matrix4fc;Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/joml/Vector4f;Z)V",
-            shift = At.Shift.AFTER))
-    private void voxellight$afterWorld(CallbackInfo ci) {
-        var target=((GameRenderer)(Object)this).mainRenderTarget();
-        VoxelLightClient.probe().render(target);
-        VoxelLightClient.probe().endWorldBudget(target);
+    @WrapOperation(method="renderLevel",at=@At(value="INVOKE",target="Lnet/minecraft/client/renderer/LevelRenderer;render(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/renderer/state/level/CameraRenderState;Lorg/joml/Matrix4fc;Lcom/mojang/blaze3d/buffers/GpuBufferSlice;Lorg/joml/Vector4f;Z)V"))
+    private void voxellight$world(LevelRenderer renderer,GraphicsResourceAllocator allocator,DeltaTracker delta,boolean outline,CameraRenderState camera,Matrix4fc view,GpuBufferSlice fog,Vector4f fogColor,boolean sky,Operation<Void> original){
+        var probe=VoxelLightClient.probe();var target=((GameRenderer)(Object)this).mainRenderTarget();
+        probe.beginWorldBudget();probe.beginEntityMaterialFrame();
+        try{
+            if(probe.tryReplaceWorld(target))((com.voxellight.adapter.RtWorldMaintenance)renderer).voxellight$maintainWorld(camera);
+            else original.call(renderer,allocator,delta,outline,camera,view,fog,fogColor,sky);
+            probe.render(target);
+        }finally{probe.endWorldBudget(target);}
     }
 
     // Native hands are drawn after the PT composite; retain them when PT capture/display failed.

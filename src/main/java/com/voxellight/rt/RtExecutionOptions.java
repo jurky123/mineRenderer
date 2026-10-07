@@ -34,7 +34,7 @@ public final class RtExecutionOptions {
     public static World world(){return world;}
     public static void world(World value){world=value;}
     public enum Shadow {EXACT,FAST}
-    private static Shadow shadow=Shadow.FAST;
+    private static Shadow shadow=Shadow.EXACT;
     public static Shadow shadow(){return shadow;}
     public static void shadow(Shadow value){if(shadow!=value){shadow=value;revision++;}}
     public enum Queue {AUTO,FIXED,COMPACT,HYBRID}

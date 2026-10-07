@@ -1,3 +1,9 @@
+## 0.39.0-alpha.42：frame 实测与接管验收修正
+
+[alpha.42 安装包](https://temp.sh/vLvRh/voxellight-client-kit-26.2-0.39.0-alpha.42.zip)；SHA-256：`50d373ffc00e309208a6e5bebe15bee413d6847ca32d482d147903f210721924`。
+
+alpha.41 最新测试实际仍是 OptiX / 214×120，exclusive 请求未接管；FAST 慢约4%，Iterative 慢约24%。默认回到 EXACT + Wavefront。世界生命周期改为 GameRenderer 调用 wrapper，benchmark 记录实际 world 状态并拒绝未执行的 EXCLUSIVE；新增 rtWorldReason / requested reconstruction 与 acquire/extract/present/limiter 墙钟 scope。首段53.6 FPS、后续29.9–30.0 FPS与60秒AFK限30帧高度吻合，自动测试期间刷新输入计时器防止AFK；349项回归通过。GPU 生效与收益仍待客户端验收。[完整分析](performance/ALPHA-41-FRAME-ANALYSIS.md)。
+
 ## 0.39.0-alpha.41：Caustica 式帧执行链
 
 [alpha.41 安装包](https://temp.sh/AVRLK/voxellight-client-kit-26.2-0.39.0-alpha.41.zip)；SHA-256：`f1be056bead3f14f0d4afc51f22e1feca1a7f30b9a408cf06bb718435c28083a`。

@@ -5,7 +5,7 @@
 ## 执行链
 
 ```text
-LevelRenderer HEAD
+GameRenderer 的 LevelRenderer.render 调用 wrapper（alpha.42）
   → 准备 RT 场景/动态模型/环境
   → Primary → Wavefront 或 Iterative indirect → Resolve
   → DLSS RR Vulkan → display composite
@@ -15,7 +15,7 @@ LevelRenderer HEAD
 
 接管保留原版相机区块维护、脏 section 编译、GPU upload、occlusion 更新与加载完成 callback。HUD 路径保留；手持几何只有在 RT capture/display 成功后才替代原版。`rt_world composite` 保留旧世界绘制后覆盖，用于同版本 A/B。
 
-Realtime 默认 `rt_shadow fast`：单次 traversal，opaque 接受并终止，cutout alpha 检查，玻璃/水累计近似界面透射。保留当前介质到最近出口的吸收；带 OMM 的 flame 自遮挡例外使用原精确路径。它是有偏实时近似，不等价于 reference 的有序多界面输运。Reference 强制 EXACT。
+alpha.41 的 `rt_shadow fast`（alpha.42 默认回到 EXACT，实测 FAST 慢约4%）：单次 traversal，opaque 接受并终止，cutout alpha 检查，玻璃/水累计近似界面透射。保留当前介质到最近出口的吸收；带 OMM 的 flame 自遮挡例外使用原精确路径。它是有偏实时近似，不等价于 reference 的有序多界面输运。Reference 强制 EXACT。
 
 `rt_integrator iterative` 将 B1–B5 在一个 raygen invocation 内循环，复用同一个 advance、随机状态、MIS、介质和 RR，尾部一次存储。Wavefront 继续默认，避免未经 GPU 验证的寄存器压力回退；Reference 强制 Wavefront。材质/最大路径深度没有改成 Caustica 的完整算法，也没有实现新的 Primary visibility/shading split 或 B0 cache。
 
@@ -42,7 +42,7 @@ RR 活跃时以 SDK input dimensions 为准，`rt_scale` 不覆盖它。要使�
 /voxellight rt_spp 1
 /voxellight rt_reconstruction dlss
 /voxellight rt_world exclusive
-/voxellight rt_shadow fast
+/voxellight rt_shadow exact
 /voxellight rt_integrator wavefront
 /voxellight rt_realtime full
 /voxellight rt_omm off

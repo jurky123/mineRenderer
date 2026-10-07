@@ -1,3 +1,7 @@
+## 0.39.0-alpha.42：frame 实测与接管验收修正
+
+alpha.41 最新测试实际仍是 OptiX / 214×120，exclusive 请求未接管；FAST 慢约4%，Iterative 慢约24%。默认回到 EXACT + Wavefront。世界生命周期改为 GameRenderer 调用 wrapper，benchmark 记录实际 world 状态并拒绝未执行的 EXCLUSIVE；新增 rtWorldReason / requested reconstruction 与 acquire/extract/present/limiter 墙钟 scope。GPU 生效与收益仍待客户端验收。[完整分析](performance/ALPHA-41-FRAME-ANALYSIS.md)。
+
 ## 0.39.0-alpha.41：Caustica 式帧执行链
 
 - RT 输出成功后跳过原版世界 frame graph，保留 section 编译/上传/occlusion/加载维护；失败同帧继续原版。

@@ -120,21 +120,29 @@ public final class RenderProbe {
     public void setAdaptiveQuality(boolean enabled){adaptive.enabled(enabled);}
     public void setGpuWorldTarget(float value){adaptive.target(value);}
     private boolean rtWorldAttempted,rtWorldReplaced;
+    private String rtWorldReason="not observed";
+    public com.voxellight.rt.RtExecutionOptions.World actualRtWorld(){return rtWorldReplaced?com.voxellight.rt.RtExecutionOptions.World.EXCLUSIVE:com.voxellight.rt.RtExecutionOptions.World.COMPOSITE;}
     private RenderPassProfile.Scope worldProfile;
     public void beginWorldBudget(){RenderPassProfile.nextFrame();lighting.beginWorldFrame();rtWorldAttempted=rtWorldReplaced=false;if("Vulkan".equalsIgnoreCase(RenderSystem.getDevice().getDeviceInfo().backendName())){adaptive.begin(mode.name());worldProfile=RenderPassProfile.begin(RenderSystem.getDevice().createCommandEncoder(),"vulkan_world_total");}}
     /** Commit PT before deciding whether to omit the vanilla world frame graph. */
     public boolean tryReplaceWorld(RenderTarget target){
-        if(com.voxellight.rt.RtExecutionOptions.world()!=com.voxellight.rt.RtExecutionOptions.World.EXCLUSIVE||mode!=Mode.FOUNDATION||!lighting.rtActive()||net.minecraft.client.Minecraft.getInstance().wireframe)return false;
+        rtWorldReason="call-site reached";
+        if(com.voxellight.rt.RtExecutionOptions.world()!=com.voxellight.rt.RtExecutionOptions.World.EXCLUSIVE){rtWorldReason="composite requested";return false;}
+        if(mode!=Mode.FOUNDATION||!lighting.rtActive()){rtWorldReason="PT inactive";return false;}
+        if(net.minecraft.client.Minecraft.getInstance().wireframe){rtWorldReason="wireframe enabled";return false;}
         rtWorldAttempted=true;
         var info=RenderSystem.getDevice().getDeviceInfo();backend=info.backendName();deviceName=info.name();driver=info.driverInfo();zZeroToOne=info.isZZeroToOne();
         try{
-            if(target.width<=0||target.height<=0||target.getColorTexture()==null||target.getDepthTextureView()==null||!shadows.prepareRt()||!material.prepareRt())return false;
+            if(target.width<=0||target.height<=0||target.getColorTexture()==null){rtWorldReason="target unavailable";return false;}
+            if(!shadows.prepareRt()){rtWorldReason="RT lighting not ready";return false;}
+            if(!material.prepareRt()){rtWorldReason="RT material not ready";return false;}
             lighting.prepareRtEnvironment();
             lighting.displayVulkanRt(target,material,shadows);
             rtWorldReplaced=lighting.rtDisplayed();
+            rtWorldReason=rtWorldReplaced?"display committed":"PT display not ready";
             if(rtWorldReplaced)state="exclusive Vulkan PT";
             return rtWorldReplaced;
-        }catch(RuntimeException error){LOGGER.error("RT world preparation failed; vanilla world retained",error);return false;}
+        }catch(RuntimeException error){rtWorldReason="preparation failed: "+error.getMessage();LOGGER.error("RT world preparation failed; vanilla world retained",error);return false;}
     }
     public void endWorldBudget(RenderTarget target){if(worldProfile!=null){worldProfile.close();worldProfile=null;}var budget=adaptive.end(target.width,target.height);lighting.setQuality(budget);}
     public void exportWorldBudget(java.nio.file.Path path)throws java.io.IOException{adaptive.export(path);}
@@ -189,7 +197,7 @@ public final class RenderProbe {
     public String status() {
         return "mode=" + mode + ", state=" + state + ", backend=" + backend + ", device=" + deviceName
                 + ", driver=" + driver + ", depthZeroToOne=" + zZeroToOne + ", gpuTiming=" + timing
-                + ", rtWorld="+(rtWorldReplaced?"exclusive PT":"vanilla world retained")+ ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
+                + ", rtWorld="+(rtWorldReplaced?"exclusive PT":"vanilla world retained")+", rtWorldReason="+rtWorldReason+ ", skippedQueries=" + (timer == null ? 0 : timer.skipped())
                 + (mode.isMaterial() ? entityMaterials.status() + ", entityMaterialPass=" + entityMaterialPass : "")
                 + RenderPassProfile.status() + ", scratchBytes=" + scratchBytes() + ", samples=" + metrics.snapshot().size()
                 + (mode == Mode.FOUNDATION ? ", " + lighting.status()+adaptive.status() + ", " + material.status() + ", " + shadows.status()

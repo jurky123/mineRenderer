@@ -47,7 +47,7 @@ final class RtReconstruction implements AutoCloseable {
 
     private String backend="Vulkan temporal/spatial";
     void optix(boolean value){close();useDlss=false;useOptix=value;dlssFailure=null;}
-    String status(){return backend+(dlssFailure==null?"":"; DLSS fallback: "+dlssFailure);}
+    String status(){return backend+"; requested="+(useDlss?"DLSS":useOptix?"OptiX":"Vulkan")+(dlssFailure==null?"":"; DLSS fallback: "+dlssFailure);}
     private final GpuTexture[][] guides=new GpuTexture[2][4];
     private final GpuTextureView[][] guideViews=new GpuTextureView[2][4];
     private final GpuTexture[] colors=new GpuTexture[2];

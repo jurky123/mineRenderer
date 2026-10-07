@@ -77,6 +77,7 @@ tasks.register('clientKit', Zip) {
     from(tasks.named('jar')) { into 'mods' }
     from('docs/performance/HOT-SHADER-CLEANUP.md')
     from('docs/performance/CAUSTICA-FRAME-PIPELINE.md')
+    from('docs/performance/ALPHA-41-FRAME-ANALYSIS.md')
     from('docs/REALTIME-PT-ROUND3.md')
     from('docs/performance/ALPHA-39-REALTIME-FIXES.md')
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }

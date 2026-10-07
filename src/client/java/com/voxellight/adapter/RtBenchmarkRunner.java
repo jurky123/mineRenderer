@@ -16,9 +16,11 @@ import java.util.zip.*;
 public final class RtBenchmarkRunner {
     private enum Phase {INITIALIZING,WARMUP,SAMPLE,DRAIN}
     private static RtBenchmarkRunner running;
+    public static void keepBenchmarkActive(){if(running!=null)Minecraft.getInstance().getFramerateLimitTracker().onInputReceived();}
     private final RtBenchmarkPlan.Config original=RtBenchmarkPlan.Config.current();
     private final boolean originalProfile=RenderPassProfile.enabled();
     private final Object level=Minecraft.getInstance().level;
+    private final Map<String,Object> presentationControls=Map.of("vsyncRequested",Minecraft.getInstance().options.enableVsync().get(),"frameLimit",Minecraft.getInstance().gameRenderer.gameRenderState().framerateLimit);
     private final long resources=VoxelLightClient.scene().bridge().stats().resourceGeneration();
     private RtBenchmarkPlan.Plan plan;
     private final boolean hot;
@@ -167,6 +169,8 @@ public final class RtBenchmarkRunner {
         var fractions=alive[0]==0?new double[0]:new double[6];for(int i=0;i<fractions.length;i++)fractions[i]=alive[i]/(double)alive[0];
         var result=new RtBenchmarkResults.Block(plan.blocks().get(index),first,last,measuredState,invalid.isEmpty(),List.copyOf(invalid),times,fractions,alive[0]==0?null:anyHit/(double)alive[0],replay,mismatches,RenderPassProfile.skippedQueries()-querySkips);
         results.add(result);blockExported=true;String name=blockName();metrics.export(directory.resolve(name+".passes.csv"));rays.export(directory.resolve(name+".rays.csv"));
+        var client=Minecraft.getInstance();
+        Files.writeString(directory.resolve(name+".presentation.json"),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("vsyncRequested",client.options.enableVsync().get(),"frameLimit",client.getFramerateLimitTracker().getFramerateLimit(),"throttleReason",client.getFramerateLimitTracker().getThrottleReason().name())));
         Files.writeString(directory.resolve(name+".cpu_timings.json"),new GsonBuilder().setPrettyPrinting().create().toJson(RtBenchmarkResults.cpuTimings(metrics.snapshot(),counterFrames)));
         var coverage=rays.realtimeSummary();realtimeCoverage.put(name,coverage);
         Files.writeString(directory.resolve(name+".realtime.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(coverage));
@@ -187,6 +191,8 @@ public final class RtBenchmarkRunner {
             var comparisons=new ArrayList<RtBenchmarkResults.Comparison>();for(String name:plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().toList())comparisons.add(RtBenchmarkResults.compare(name,results));
             var report=new LinkedHashMap<String,Object>();report.put("schema",12);report.put("comparisonMetrics",Map.of("blas","vulkan_rt_scene_commit","world_takeover","vulkan_world_total","others","transport batch"));report.put("timingPolicy","GPU timestamps on counter-free frames; counters/replay every eighth frame; raw CSV includes both, see counter_frames.json");report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy","fixed nearest resident terrain snapshot within 60 MiB; 4 MiB dynamic headroom; exact count/signature required before sampling; dynamic models remain live; renderer sun/sky/weather/held/water controls fixed for the complete suite");report.put("terrainSnapshotSignature",expectedTerrainSignature);report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);report.put("realtimeCoverage",realtimeCoverage);report.put("frozenRendererInputs",inputs.snapshot());report.put("selectedQueues",selectedQueues);
             report.put("device",com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().toString());report.put("version",FabricLoader.getInstance().getModContainer("voxellight").orElseThrow().getMetadata().getVersion().getFriendlyString());
+            report.put("presentationControls",presentationControls);
+            report.put("afkPolicy","benchmark frames refresh the input timer; no movement or persistent FPS/VSync changes");
             report.put("limitations",List.of("current-version execution controls only; not alpha.26 vs alpha.28 speedup","completed GPU timestamps; replay benchmarks outside transport batch","two ABBA rounds are descriptive, not a statistical confidence interval","alive drift threshold 5 percentage points for execution controls; realtime algorithm comparisons permit intentional path reduction; dynamic geometry and animated textures may remain","no automatic image correctness, L1/L2 traffic or runtime spill validation"));
             Files.writeString(directory.resolve("warmup.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(warmupDiagnostics));
             Files.writeString(directory.resolve("summary.json"),new GsonBuilder().setPrettyPrinting().create().toJson(report));

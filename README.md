@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.41**：RT 成功输出后接管原版世界绘制；实时优先 Vulkan 原生 **DLSS Ray Reconstruction Performance**，由 SDK 查询输入尺寸；新增单次遍历透明阴影与 iterative indirect A/B。全新安装默认 effects off，实际帧率和画质待 RTX 验收。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.42**：RT 成功输出后接管原版世界绘制；实时优先 Vulkan 原生 **DLSS Ray Reconstruction Performance**，由 SDK 查询输入尺寸；新增单次遍历透明阴影与 iterative indirect A/B。全新安装默认 effects off，实际帧率和画质待 RTX 验收。
 
-[下载 alpha.41 安装包](https://temp.sh/AVRLK/voxellight-client-kit-26.2-0.39.0-alpha.41.zip)（只含本 mod；集成 RR runtime）。替换旧 jar 后：
+[下载 alpha.42 安装包](https://temp.sh/vLvRh/voxellight-client-kit-26.2-0.39.0-alpha.42.zip)（只含本 mod；集成 RR runtime）。alpha.41 实测未运行 RR 或世界接管；FAST / Iterative 稳定更慢。alpha.42 修正调用链和实际状态验收，默认 EXACT + Wavefront。[实测与修正](docs/performance/ALPHA-41-FRAME-ANALYSIS.md)。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -13,7 +13,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 /voxellight rt_benchmark frame
 ```
 
-实时默认 exclusive world / fast shadow / wavefront indirect，RR 失败回退 OptiX/Vulkan，stats 显示实际后端与输入尺寸。Reference 保留精确透明阴影和渐进累积；没有帧生成。[实现、限制与验收](docs/performance/CAUSTICA-FRAME-PIPELINE.md)。
+实时默认 exclusive world / exact shadow / wavefront indirect，RR 失败回退 OptiX/Vulkan，stats 显示实际后端与输入尺寸。Reference 保留精确透明阴影和渐进累积；没有帧生成。[实现、限制与验收](docs/performance/CAUSTICA-FRAME-PIPELINE.md)。
 
 多 spp 在同一套帧调度中批处理，相机只上传一次，末尾平均后复制一次 radiance。直接光默认采用统一 RIS，手持源保持独立；`rt_direct legacy` 可回退旧直接光用于对照。场景包含地形与原生实体/方块实体、手持/手臂、自定义 quad、cutout quad 粒子；动态模型目前使用原生纹理/tint 的漫反射材质。
 
