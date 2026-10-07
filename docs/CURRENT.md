@@ -1,3 +1,11 @@
+## alpha.38 调整 realtime 缓存与历史
+
+根据 alpha.37 的低命中/低复用结果：realtime 光照失效与 Reference 分离，日光渐变持续刷新，约 6°累计漂移/强度 25% 漂移、突变、编辑、手持灯/介质切换仍 hard reset；统计重置来源。缓存按均值误差准入、保留 24 次成熟门槛，TTL 128/256 帧，固定/渐变窗口 128/64 次；冷/未成熟 cells 刷新优先级提高，probe 仍最多 1024/帧，同生命周期锚点不漂移。
+
+Sparse 先保存真实 path 的颜色/AOV 均值，再用均值误差和真实更新数调度；渐变更新帧最多隔帧。镜面、动态、介质保留完整路径，不写无用 sparse 历史；几何距离检查去掉开方。Reference 的完整路径、原 RtLightingChange 和累积不变，默认仍 FULL。
+
+Benchmark schema 9、28 个兼容追加计数、具名 reasonCounters，区分成熟/过期/空间/误差、训练失败/锁/冲突、sparse 置信度/误差。`build clientKit --offline` 通过：332 项 Java 回归、24 个最终 RT stages 与生产 Slang fixture 通过，安装包所有 stage/source 哈希已核对；GPU 净收益和 reference 画质对照仍待新版实测。[设计与边界](REALTIME-PT-ROUND3.md)。
+
 ## alpha.37 复测：缓存入口已修复，第三轮仍未达标
 
 24 段有效完成。CACHE / SPARSE / CACHE_SPARSE transport 改善分别 -0.23% / -1.44% / -3.31%，均 within_variation，没有可确认净收益。缓存查询已发生，但单独缓存命中率约 0.197%、组合约 0.55%；sparse 完整路径仅减少约 1.25%、组合约 4.31%。primary/历史成本仍抵消省下的追踪工作。

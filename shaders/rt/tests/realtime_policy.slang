@@ -12,8 +12,8 @@ void realtime_policy(uint3 tid:SV_DispatchThreadID){
     for(uint i=0;i<128;i++){float u=(i+.5)/128,phi=2*Pi*i*.61803398875;float3 wi=float3(sqrt(1-u*u)*cos(phi),u,sqrt(1-u*u)*sin(phi));pageFeedback[p+3]=asuint(float4(wi,1/(2*Pi)));output[0]=float4(3.5,5.5,8,1);rtTrain(0);}
     uint address=rtCacheAddress(point,n);float3 value=rtShIrradiance(asfloat(pageFeedback[address+4]),asfloat(pageFeedback[address+5]),asfloat(pageFeedback[address+6]),asfloat(pageFeedback[address+7]),n);
     output[1]=float4(value,rtCacheValid(address,point,n)?1:0);
-    output[2]=float4(rtInterval(8,.01),rtInterval(4,.05),rtInterval(32,.5),rtCacheValid(address,point+float3(0,.1,0),n)?1:0);
-    pageFeedback[1568].y=8;output[3]=float4(rtCacheValid(address,point,n)?1:0,0,0,0);pageFeedback[1568].y=7;pageFeedback[address].z=51;output[3].y=rtCacheValid(address,point,n)?1:0;rtTrain(0);output[9]=float4(pageFeedback[address].w,0,0,0);
+    output[2]=float4(rtInterval(8,.01),rtInterval(4,.05),rtInterval(32,8),rtCacheValid(address,point+float3(0,.1,0),n)?1:0);
+    pageFeedback[1568].y=8;output[3]=float4(rtCacheValid(address,point,n)?1:0,0,0,0);pageFeedback[1568].y=7;pageFeedback[address].z=camera.frame-129;output[3].y=rtCacheValid(address,point,n)?1:0;rtTrain(0);output[9]=float4(pageFeedback[address].w,0,0,0);
     Material m=(Material)0;m.type=DIFFUSE;m.microfacetAlpha=.5;output[4]=float4(rtDiffuse(m)?1:0,0,0,0);m.type=CONDUCTOR;output[4].y=rtDiffuse(m)?1:0;m.type=WATER;output[4].z=rtDiffuse(m)?1:0;
     pageFeedback[1568].x=0;output[4].w=rtPolicy()?1:0;
     pageFeedback[1568]=uint4(3,7,0,1024);pageFeedback[1570]=asuint(float4(1,0,0,0));pageFeedback[1571]=asuint(float4(0,1,0,0));pageFeedback[1572]=asuint(float4(0,0,1,0));pageFeedback[1573]=asuint(float4(0,0,0,1));pageFeedback[1574]=uint4(asuint(float3(1,1,0)),1);
@@ -31,6 +31,18 @@ void realtime_policy(uint3 tid:SV_DispatchThreadID){
     uint neighbor=rtHistory(1,(camera.frame+1)&1);for(uint slot=0;slot<8;slot++)pageFeedback[neighbor+slot]=pageFeedback[previous+slot];pageFeedback[previous+6].x=99;
     output[14]=float4(rtPrevious(point,n,float3(.6),41,7,1)==neighbor?1:0,0,0,0);
     pageFeedback[neighbor+6].x=99;output[14].y=rtPrevious(point,n,float3(.6),41,7,1)==0?1:0;
+    // A noisy but sufficiently trained mean can be used; a cold or stale one cannot.
+    pageFeedback[address]=uint4(0,7,camera.frame,64);pageFeedback[address+8]=asuint(float4(1,2,0,0));
+    output[18]=float4(rtCacheStatus(address,point,n),0,0,0);pageFeedback[address].w=24;output[18].y=rtCacheStatus(address,point,n);pageFeedback[address].w=23;output[18].z=rtCacheStatus(address,point,n);pageFeedback[address].w=64;pageFeedback[address].z=camera.frame-129;output[18].w=rtCacheStatus(address,point,n);
+    // History stores the average of actual paths and moments of their noise.
+    uint guide=rtCapacity()+4;float4 savedNormal=output[guide+camera.width*camera.height];output[guide+camera.width*camera.height]=float4(n,.5);output[guide+camera.width*camera.height*2]=float4(point,1);
+    pageFeedback[previous]=asuint(float4(.2,.3,.4,8));pageFeedback[previous+1]=asuint(float4(.2,.3,.4,.01));pageFeedback[previous+2]=asuint(float4(0,0,0,.5));pageFeedback[previous+3]=0;pageFeedback[previous+6]=uint4(41,7,7,camera.frame-1);pageFeedback[previous+7]=asuint(float4(.6,.6,.6,ROUGH_DIFFUSE));
+    pageFeedback[p]=uint4(0,0,previous,0);pageFeedback[p+6]=uint4(41,7,7,0);pageFeedback[p+7]=asuint(float4(.6,.6,.6,ROUGH_DIFFUSE));
+    rtSaveHistory(0,float3(.8,.9,1),float3(.8,.9,1),float3(0),float3(0));uint current=rtHistory(0,camera.frame&1);output[17]=asfloat(pageFeedback[current]);
+    pageFeedback[p].x=2;rtSaveHistory(0,float3(.2,.3,.4),float3(.2,.3,.4),float3(0),float3(0));output[19]=float4(asfloat(pageFeedback[current]).w,pageFeedback[current+6].w,rtInterval(8,.1),rtInterval(3,0));
+    output[guide+camera.width*camera.height]=savedNormal;
+    surface.material.type=DIFFUSE;surface.material.baseColor=.6;surface.flags=0;pageFeedback[previous+7]=asuint(float4(.6,.6,.6,DIFFUSE));pageFeedback[previous+6].w=camera.frame-2;pageFeedback[p]=0;path.origin.w=1;
+    output[20]=float4(rtSparse(path,surface,hit,point,n,media)?1:0,0,0,0);pageFeedback[1568].z=1;pageFeedback[p]=0;path.origin.w=1;output[20].y=rtSparse(path,surface,hit,point,n,media)?1:0;pageFeedback[1568].z=0;
     uint corrupt=0;for(uint row=544;row<1568;row++)if(any(pageFeedback[row]!=uint4(0xdeadc0deu)))corrupt++;output[8]=float4(corrupt,0,0,0);
 
 }

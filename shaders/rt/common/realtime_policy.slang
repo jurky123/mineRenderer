@@ -26,14 +26,19 @@ float3 rtShIrradiance(float4 c0,float4 cx,float4 cy,float4 cz,float3 n){float4 b
 uint rtNormalBucket(float3 n){float3 a=abs(n);uint axis=a.x>a.y&&a.x>a.z?0:a.y>a.z?1:2;return axis*2+(n[axis]<0?1:0);}
 uint rtCacheAddress(float3 point,float3 normal){int3 cell=int3(floor(point/2));uint hash=directHash(asuint(cell.x)^directHash(asuint(cell.y))^directHash(asuint(cell.z))^rtNormalBucket(normal)*0x9e3779b9u);return rtCacheBase()+(hash&65535u)*10;}
 float rtRelativeVariance(float mean,float variance){return variance/max(.0001,mean*mean);}
-uint rtInterval(float confidence,float variance){return confidence>=8&&variance<.025?4:confidence>=4&&variance<.1?2:1;}
+// Error of the stored temporal mean, rather than the noise of one path.
+uint rtInterval(float confidence,float variance){float error=variance/max(1.,confidence);return confidence>=8&&error<.025?4:confidence>=4&&error<.1?2:1;}
+bool rtNear(float3 point){float3 delta=point-camera.origin.xyz;return dot(delta,delta)<1024;}
+uint rtTtl(float3 point){return rtNear(point)?128u:256u;}
 bool rtSameSurface(float3 point,float3 normal,float3 albedo,uint triangle,uint material,uint epoch,uint address,float distance){
     uint4 id=pageFeedback[address+6];if(id.x!=triangle||id.y!=material||id.z!=epoch)return false;
     float4 p=asfloat(pageFeedback[address+4]);float footprint=max(.025,distance*3/max(1u,camera.height));
-    if(!(p.w>0&&length(point-p.xyz)<footprint))return false;
+    float3 delta=point-p.xyz;if(!(p.w>0&&dot(delta,delta)<footprint*footprint))return false;
     float4 n=asfloat(pageFeedback[address+5]);if(!(dot(normal,n.xyz)>.97))return false;
     float4 a=asfloat(pageFeedback[address+7]);
-    return maxComponent(abs(albedo-a.xyz))<.08||(uint(a.w)==DIFFUSE&&all(albedo>=.02)&&all(a.xyz>=.02));
+    float difference=maxComponent(abs(albedo-a.xyz));
+    if(uint(a.w)==DIFFUSE)return (all(albedo>=.02)&&all(a.xyz>=.02))||difference<=1e-6;
+    return difference<.08;
 }
 uint rtPrevious(float3 point,float3 normal,float3 albedo,uint triangle,uint material,float distance){
     if(pageFeedback[1574].w==0)return 0;
@@ -53,15 +58,17 @@ uint rtPrevious(float3 point,float3 normal,float3 albedo,uint triangle,uint mate
 }
 bool rtSparse(inout PathState path,TerrainSurface surface,SurfacePayload hit,float3 point,float3 n,MediumStack media){
     if(!rtPolicy()||(pageFeedback[1568].x&2u)==0||camera.padding!=1||path.throughput.w!=0)return false;uint probe=rtProbe(path.reserved0);
-    pageFeedback[probe+6]=uint4(hit.triangle,surface.material.materialId,pageFeedback[1568].y,surface.flags);pageFeedback[probe+7]=asuint(float4(surface.material.baseColor,surface.material.type));
+    pageFeedback[probe+6]=uint4(hit.triangle,surface.material.materialId,pageFeedback[1568].y,surface.flags);
     if((surface.flags&128)!=0){rtCount(3,2);rtCount(0,1);return false;}
-    if(!rtDiffuse(surface.material)||media.count>0){rtCount(2,media.count>0?2:3);rtCount(0,1);return false;}
+    if(!rtDiffuse(surface.material)||media.count>0){pageFeedback[probe+6].w|=128u;rtCount(2,media.count>0?2:3);rtCount(0,1);return false;}
+    pageFeedback[probe+7]=asuint(float4(surface.material.baseColor,surface.material.type));
     uint previous=rtPrevious(point,n,surface.material.baseColor,hit.triangle,surface.material.materialId,hit.distance);pageFeedback[probe].z=previous;
     if(previous>0&&(abs(asfloat(pageFeedback[previous+5]).w-surface.material.microfacetAlpha)>.02||asfloat(pageFeedback[previous+7]).w!=surface.material.type))previous=0;pageFeedback[probe].z=previous;
     if(previous==0){rtCount(3,0);rtCount(0,1);return false;}
     float4 color=asfloat(pageFeedback[previous]),diffuse=asfloat(pageFeedback[previous+1]);uint interval=rtInterval(color.w,diffuse.w);
     uint age=camera.frame-pageFeedback[previous+6].w;
-    if(interval==1)rtCount(0,3);
+    if(interval==1){rtCount(0,3);rtCount(7,color.w<4?1:2);}
+    if(pageFeedback[1568].z!=0&&interval>2){interval=2;rtCount(7,3);}
     if((pageFeedback[1568].x&2u)==0||age>=interval||((directHash(path.reserved0)&(interval-1))==(camera.frame&(interval-1)))){rtCount(0,1);return false;}
     if(!all(isfinite(color.xyz))){rtCount(3,1);rtCount(0,1);return false;}
     float3 oldAlbedo=asfloat(pageFeedback[previous+7]).xyz;
@@ -72,20 +79,29 @@ bool rtSparse(inout PathState path,TerrainSurface surface,SurfacePayload hit,flo
     output[path.reserved0]=float4(color.xyz*ratio,1);PathAov aov;aov.diffuse=float4(diffuse.xyz*ratio,0);aov.reflection=float4(asfloat(pageFeedback[previous+2]).xyz,0);aov.refraction=float4(asfloat(pageFeedback[previous+3]).xyz,0);pathAovs[path.reserved0]=aov;
     pageFeedback[probe].x=2;path.origin.w=0;rtCount(0,2);return true;
 }
-bool rtCacheValid(uint address,float3 point,float3 n){
-    uint4 meta=pageFeedback[address],key=pageFeedback[address+1];int3 cell=int3(floor(point/2));float4 anchor=asfloat(pageFeedback[address+2]),normal=asfloat(pageFeedback[address+3]);
-    uint ttl=length(point-camera.origin.xyz)<32?16u:48u;
-    if(meta.y!=pageFeedback[1568].y||meta.w<24||camera.frame-meta.z>ttl||any(asint(key.xyz)!=cell)||key.w!=rtNormalBucket(n))return false;
-    if(dot(normal.xyz,n)<.97||abs(dot(point-anchor.xyz,n))>.08||length(point-anchor.xyz)>1.5)return false;
-    float4 stats=asfloat(pageFeedback[address+8]);return rtRelativeVariance(stats.x,stats.y)<.5;
+// One mutually exclusive reason per rejected query: epoch, count, age, geometry, mean error.
+uint rtCacheStatus(uint address,float3 point,float3 n){
+    uint4 meta=pageFeedback[address];
+    if(meta.y!=pageFeedback[1568].y)return 1;
+    if(meta.w<24)return 2;
+    if(camera.frame-meta.z>rtTtl(point))return 3;
+    uint4 key=pageFeedback[address+1];int3 cell=int3(floor(point/2));
+    if(any(asint(key.xyz)!=cell)||key.w!=rtNormalBucket(n))return 4;
+    float4 anchor=asfloat(pageFeedback[address+2]),normal=asfloat(pageFeedback[address+3]);float3 delta=point-anchor.xyz;
+    if(!(dot(normal.xyz,n)>=.97&&abs(dot(delta,n))<=.08&&dot(delta,delta)<=2.25))return 4;
+    float4 stats=asfloat(pageFeedback[address+8]);
+    if(!all(isfinite(stats.xy))||stats.y<0||rtRelativeVariance(stats.x,stats.y)/meta.w>=.05)return 5;
+    return 0;
 }
+bool rtCacheValid(uint address,float3 point,float3 n){return rtCacheStatus(address,point,n)==0;}
 // Query once per eligible B1/B2 hit; reserve a bounded number of exact training suffixes.
 // Pending training paths never query the cache, preventing recursive cache-only learning.
 bool rtTail(PathState path,Material m,float3 point,float3 n,MediumStack media,out float3 response,out bool training){
     response=0;training=false;if(!rtPolicy()||(pageFeedback[1568].x&1u)==0||path.throughput.w<1||path.throughput.w>2||media.count>0||!rtDiffuse(m))return false;
     uint probe=rtProbe(path.reserved0);if((pageFeedback[probe].x&1u)!=0)return false;
-    uint address=rtCacheAddress(point,n);rtCount(1,0);bool valid=rtCacheValid(address,point,n);
-    uint refresh=valid?(length(point-camera.origin.xyz)<32?8u:16u):2u;
+    uint address=rtCacheAddress(point,n);rtCount(1,0);uint status=rtCacheStatus(address,point,n);bool valid=status==0;
+    if(status>0){if(status<5)rtCount(5,status-1);else rtCount(6,0);}
+    uint refresh=valid?(rtNear(point)?8u:16u):1u;
     // Spread the bounded budget across the image instead of letting the first waves consume it.
     uint budget=max(1u,pageFeedback[1568].w);refresh*=max(1u,(rtCapacity()+budget-1)/budget);
     if((directHash(path.reserved0^camera.frame*1237u)%refresh)==0){
@@ -99,7 +115,7 @@ bool rtTail(PathState path,Material m,float3 point,float3 n,MediumStack media,ou
     }
     if(!valid){rtCount(1,3);return false;}
     response=rtShIrradiance(asfloat(pageFeedback[address+4]),asfloat(pageFeedback[address+5]),asfloat(pageFeedback[address+6]),asfloat(pageFeedback[address+7]),n);
-    if(!finiteEnergy(response))return false;rtCount(1,1);return true;
+    if(!finiteEnergy(response)){rtCount(6,1);return false;}rtCount(1,1);return true;
 }
 bool rtProbeFirst(PathState path){if(!rtPolicy())return false;return (pageFeedback[rtProbe(path.reserved0)].x&1u)!=0&&path.throughput.w==pageFeedback[rtProbe(path.reserved0)].y+1;}
 void rtRecordProbe(PathState path,float3 wi,float pdf){
@@ -108,26 +124,26 @@ void rtRecordProbe(PathState path,float3 wi,float pdf){
 void rtTrain(uint index){
     if(!rtPolicy())return;uint p=rtProbe(index);if((pageFeedback[p].x&1u)==0)return;
     float4 color=output[index],prefix=asfloat(pageFeedback[p+1]),beta=asfloat(pageFeedback[p+2]),direction=asfloat(pageFeedback[p+3]);
-    if(color.w<.5||any(beta.xyz<=1e-7)||direction.w<=0)return;float3 radiance=max(float3(0),(color.xyz-prefix.xyz)/beta.xyz);if(!finiteEnergy(radiance))return;
+    if(color.w<.5||any(beta.xyz<=1e-7)||direction.w<=0){rtCount(6,2);return;}float3 radiance=max(float3(0),(color.xyz-prefix.xyz)/beta.xyz);if(!finiteEnergy(radiance)){rtCount(6,2);return;}
     float3 point=asfloat(pageFeedback[p+4]).xyz,n=asfloat(pageFeedback[p+5]).xyz;uint address=rtCacheAddress(point,n),old;
 #ifdef RT_CPU_FIXTURE
     old=pageFeedback[address].x;pageFeedback[address].x=1;
 #else
     InterlockedCompareExchange(pageFeedback[address].x,0,1,old);
 #endif
-    if(old!=0)return;
+    if(old!=0){rtCount(6,3);return;}
 #ifndef RT_CPU_FIXTURE
     DeviceMemoryBarrier();
 #endif
     uint4 meta=pageFeedback[address],key=pageFeedback[address+1];int3 cell=int3(floor(point/2));float4 anchor=asfloat(pageFeedback[address+2]),normal=asfloat(pageFeedback[address+3]);
-    bool sameCell=meta.y==pageFeedback[1568].y&&all(asint(key.xyz)==cell)&&key.w==rtNormalBucket(n)&&dot(normal.xyz,n)>.97&&abs(dot(point-anchor.xyz,n))<=.08&&length(point-anchor.xyz)<=1.5;
-    uint ttl=length(point-camera.origin.xyz)<32?16u:48u;bool matching=sameCell&&camera.frame-meta.z<=ttl;
-    if(!sameCell&&meta.y==pageFeedback[1568].y&&camera.frame-meta.z<48&&meta.w>0){pageFeedback[address].x=0;return;}
-    uint count=matching?min(meta.w+1,128u):1u;float alpha=1.0/count;float4 basis=rtSh(direction.xyz)/direction.w;
+    bool sameCell=meta.y==pageFeedback[1568].y&&all(asint(key.xyz)==cell)&&key.w==rtNormalBucket(n)&&dot(normal.xyz,n)>.97&&abs(dot(point-anchor.xyz,n))<=.08&&dot(point-anchor.xyz,point-anchor.xyz)<=2.25;
+    uint ttl=rtTtl(point);bool matching=sameCell&&camera.frame-meta.z<=ttl;
+    if(!sameCell&&meta.y==pageFeedback[1568].y&&camera.frame-meta.z<48&&meta.w>0){pageFeedback[address].x=0;rtCount(7,0);return;}
+    uint count=matching?min(meta.w+1,pageFeedback[1568].z!=0?64u:128u):1u;float alpha=1.0/count;float4 basis=rtSh(direction.xyz)/direction.w;
     float3 sh[4]={radiance*basis.x,radiance*basis.y,radiance*basis.z,radiance*basis.w};
     for(uint i=0;i<4;i++){float3 previous=matching?asfloat(pageFeedback[address+4+i]).xyz:float3(0);pageFeedback[address+4+i]=asuint(float4(lerp(previous,sh[i],alpha),0));}
     float sample=luminance(rtShIrradiance(float4(sh[0],0),float4(sh[1],0),float4(sh[2],0),float4(sh[3],0),n));float4 stats=matching?asfloat(pageFeedback[address+8]):float4(0);float delta=sample-stats.x;
-    pageFeedback[address+8]=asuint(float4(stats.x+alpha*delta,(1-alpha)*(stats.y+alpha*delta*delta),0,0));pageFeedback[address+1]=uint4(asuint(cell),rtNormalBucket(n));pageFeedback[address+2]=asuint(float4(point,0));pageFeedback[address+3]=asuint(float4(n,0));
+    pageFeedback[address+8]=asuint(float4(stats.x+alpha*delta,(1-alpha)*(stats.y+alpha*delta*delta),0,0));pageFeedback[address+1]=uint4(asuint(cell),rtNormalBucket(n));if(!matching){pageFeedback[address+2]=asuint(float4(point,0));pageFeedback[address+3]=asuint(float4(n,0));}
 
     pageFeedback[address]=uint4(1,pageFeedback[1568].y,camera.frame,count);
 #ifndef RT_CPU_FIXTURE
@@ -140,7 +156,15 @@ void rtTrain(uint index){
 void rtSaveHistory(uint index,float3 color,float3 diffuse,float3 reflection,float3 refraction){
     if(!rtPolicy()||(pageFeedback[1568].x&2u)==0)return;uint p=rtProbe(index);uint type=uint(asfloat(pageFeedback[p+7]).w);if(pageFeedback[p+6].z==0||(pageFeedback[p+6].w&128u)!=0||(type!=DIFFUSE&&type!=ROUGH_DIFFUSE))return;uint address=rtHistory(index,camera.frame&1u),previous=pageFeedback[p].z;uint base=rtCapacity()+4;
     float4 position=output[base+camera.width*camera.height*2+index],normal=output[base+camera.width*camera.height+index];
-    float3 albedo=asfloat(pageFeedback[p+7]).xyz;float confidence=1,mean=luminance(type==DIFFUSE?color/max(float3(.02),albedo):color),variance=0;uint sampleFrame=camera.frame;
-    if(previous>0){float4 old=asfloat(pageFeedback[previous]),moments=asfloat(pageFeedback[previous+2]);if((pageFeedback[p].x&2u)!=0){confidence=old.w;variance=asfloat(pageFeedback[previous+1]).w;mean=moments.w;sampleFrame=pageFeedback[previous+6].w;}else{confidence=min(old.w+1,32.);float alpha=1/confidence;float delta=mean-moments.w;float oldVariance=asfloat(pageFeedback[previous+1]).w*max(.0001,moments.w*moments.w);float v=(1-alpha)*(oldVariance+alpha*delta*delta);mean=moments.w+alpha*delta;variance=rtRelativeVariance(mean,v);}}
+    float3 albedo=asfloat(pageFeedback[p+7]).xyz;float confidence=1,mean=luminance(type==DIFFUSE?color/max(float3(.02),albedo):color),variance=0;uint sampleFrame=camera.frame;float alpha=1;
+    if(previous>0){float4 old=asfloat(pageFeedback[previous]),moments=asfloat(pageFeedback[previous+2]);if((pageFeedback[p].x&2u)!=0){confidence=old.w;variance=asfloat(pageFeedback[previous+1]).w;mean=moments.w;sampleFrame=pageFeedback[previous+6].w;}else{confidence=min(old.w+1,32.);alpha=1/confidence;float delta=mean-moments.w;float oldVariance=asfloat(pageFeedback[previous+1]).w*max(.0001,moments.w*moments.w);float v=(1-alpha)*(oldVariance+alpha*delta*delta);mean=moments.w+alpha*delta;variance=rtRelativeVariance(mean,v);}}
+    if(previous>0&&(pageFeedback[p].x&2u)==0){
+        float3 oldAlbedo=asfloat(pageFeedback[previous+7]).xyz;
+        float3 ratio=type==DIFFUSE&&all(oldAlbedo>=.02)&&all(albedo>=.02)?albedo/oldAlbedo:float3(1);
+        color=lerp(asfloat(pageFeedback[previous]).xyz*ratio,color,alpha);
+        diffuse=lerp(asfloat(pageFeedback[previous+1]).xyz*ratio,diffuse,alpha);
+        reflection=lerp(asfloat(pageFeedback[previous+2]).xyz,reflection,alpha);
+        refraction=lerp(asfloat(pageFeedback[previous+3]).xyz,refraction,alpha);
+    }
     pageFeedback[address]=asuint(float4(color,confidence));pageFeedback[address+1]=asuint(float4(diffuse,variance));pageFeedback[address+2]=asuint(float4(reflection,mean));pageFeedback[address+3]=asuint(float4(refraction,0));pageFeedback[address+4]=asuint(position);pageFeedback[address+5]=asuint(normal);pageFeedback[address+6]=uint4(pageFeedback[p+6].xyz,sampleFrame);pageFeedback[address+7]=pageFeedback[p+7];rtCount(3,3);
 }

@@ -1,3 +1,11 @@
+## 0.39.0-alpha.38
+
+- 独立 realtime 光照策略，正常日光渐变持续刷新；累计漂移有界、突变/编辑/手持光变化仍失效，Reference 维持原规则。
+- Cache 使用均值误差准入，TTL 128/256 帧，冷 cells 优先刷新，保留成熟与平面校验、有限 probe budget、固定生命周期 anchor。
+- Sparse 存储真实样本 RGB/AOV 均值并以均值误差调度，复用不增加样本数，渐变更新帧最多隔帧；protected 材质/介质不保存无用历史。
+- Schema 9 追加十二项拒绝/训练/调度原因，导出具名计数和失效来源。
+- GPU 加速与有偏 realtime 画质仍需 RTX 客户端测试，不宣称目标已实现。
+
 ## 0.39.0-alpha.37
 
 - 修复默认 RG8 平面法线被 cache 准入阈值全部排除；保持原 BSDF 和 reference。
