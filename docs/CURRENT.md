@@ -1,3 +1,9 @@
+## alpha.40 上传结果与 Caustica 差距
+
+8 段有效完成，但第二轮 GPU 执行状态广泛改变、重复波动 55.22%，clean FULL 对照为 `not_comparable`；第一轮描述性改善约 1.33%，未证明大 footprint 收益。用户报告本项目二十多 FPS、Caustica 170–180 FPS，无 FG、DLSS 性能档、1 spp/4 bounce。
+
+源码确认本项目尚未取消原版 LevelRenderer，实际 PT 输入仅 214×120，OptiX beauty + 自研放大与 DLSS RR 不同；透明 visibility 有序最多 24 界面，而 Caustica 实时 shadow 使用单 traversal 透射近似；间接 dispatch/状态组织也不同。下一阶段应先全帧测量、RT world takeover 与 reconstruction 契约，再推进 cache，而非继续用 transport 小收益解释 FPS。[实测、源码依据与优先级](performance/ALPHA-40-CAUSTICA-ANALYSIS.md)。本次只写分析，不发布新 jar。
+
 ## alpha.40 Hot Shader Cleanup
 
 [alpha.40 安装包](https://temp.sh/JZalv/voxellight-client-kit-26.2-0.39.0-alpha.40.zip)；SHA-256：`4a42d0b2888539ccdfc1be6ec354ac1d3694c6cc6682fd143e5588184fac8303`。最终 jar 的 58 个 stage / 46 份 shader 源文件哈希已核对。
