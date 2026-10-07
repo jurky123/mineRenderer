@@ -17,11 +17,20 @@ void realtime_policy(uint3 tid:SV_DispatchThreadID){
     Material m=(Material)0;m.type=DIFFUSE;m.microfacetAlpha=.5;output[4]=float4(rtDiffuse(m)?1:0,0,0,0);m.type=CONDUCTOR;output[4].y=rtDiffuse(m)?1:0;m.type=WATER;output[4].z=rtDiffuse(m)?1:0;
     pageFeedback[1568].x=0;output[4].w=rtPolicy()?1:0;
     pageFeedback[1568]=uint4(3,7,0,1024);pageFeedback[1570]=asuint(float4(1,0,0,0));pageFeedback[1571]=asuint(float4(0,1,0,0));pageFeedback[1572]=asuint(float4(0,0,1,0));pageFeedback[1573]=asuint(float4(0,0,0,1));pageFeedback[1574]=uint4(asuint(float3(1,1,0)),1);
-    uint previous=rtHistory(0,(camera.frame+1)&1);pageFeedback[previous]=asuint(float4(.2,.3,.4,8));pageFeedback[previous+1]=asuint(float4(.2,.3,.4,.01));pageFeedback[previous+2]=asuint(float4(0,0,0,.3));pageFeedback[previous+3]=0;pageFeedback[previous+4]=asuint(float4(point,1));pageFeedback[previous+5]=asuint(float4(n,.5));pageFeedback[previous+6]=uint4(41,7,7,camera.frame-1);pageFeedback[previous+7]=asuint(float4(.6,.6,.6,DIFFUSE));pageFeedback[p]=0;
+    uint previous=rtHistory(camera.width*camera.height-1,(camera.frame+1)&1);pageFeedback[previous]=asuint(float4(.2,.3,.4,8));pageFeedback[previous+1]=asuint(float4(.2,.3,.4,.01));pageFeedback[previous+2]=asuint(float4(0,0,0,.3));pageFeedback[previous+3]=0;pageFeedback[previous+4]=asuint(float4(point,1));pageFeedback[previous+5]=asuint(float4(n,.5));pageFeedback[previous+6]=uint4(41,7,7,camera.frame-1);pageFeedback[previous+7]=asuint(float4(.6,.6,.6,DIFFUSE));pageFeedback[p]=0;
     PathState path=(PathState)0;path.origin.w=1;TerrainSurface surface=(TerrainSurface)0;surface.material=(Material)0;surface.material.type=DIFFUSE;surface.material.materialId=7;surface.material.microfacetAlpha=.5;surface.material.baseColor=.6;SurfacePayload hit=(SurfacePayload)0;hit.triangle=41;hit.distance=1;MediumStack media=(MediumStack)0;
     bool reused=rtSparse(path,surface,hit,point,n,media);output[5]=float4(output[0].xyz,reused?1:0);
     path.origin.w=1;surface.flags=128;output[6]=float4(rtSparse(path,surface,hit,point,n,media)?1:0,0,0,0);surface.flags=0;pageFeedback[1568].y=8;output[6].y=rtSparse(path,surface,hit,point,n,media)?1:0;pageFeedback[1568].y=7;hit.triangle=42;output[6].z=rtSparse(path,surface,hit,point,n,media)?1:0;
 
+    hit.triangle=41;surface.material.baseColor=float3(.3,.9,.6);path.origin.w=1;bool textured=rtSparse(path,surface,hit,point,n,media);output[10]=float4(output[0].xyz,textured?1:0);
+    float q=128/127.5-1;float3 neutral=safeNormalize(float3(q,sqrt(1-2*q*q),q));output[11]=float4(rtFlatNormal(neutral,n)?1:0,rtFlatNormal(safeNormalize(float3(.2,1,0)),n)?1:0,0,0);
+    surface.material.baseColor=float3(0,.9,.6);pageFeedback[p]=0;output[12]=float4(rtSparse(path,surface,hit,point,n,media)?1:0,0,0,0);
+    pageFeedback[previous+7]=asuint(float4(.01,.6,.6,DIFFUSE));surface.material.baseColor=float3(.015,.6,.6);output[13]=float4(rtSparse(path,surface,hit,point,n,media)?1:0,0,0,0);
+    // A rough diffuse BRDF includes uncolored specular: do not remodulate it.
+    surface.material.type=ROUGH_DIFFUSE;surface.material.baseColor=float3(.3,.9,.6);pageFeedback[previous+7]=asuint(float4(.6,.6,.6,ROUGH_DIFFUSE));output[15]=float4(rtSparse(path,surface,hit,point,n,media)?1:0,0,0,0);
+    uint neighbor=rtHistory(1,(camera.frame+1)&1);for(uint slot=0;slot<8;slot++)pageFeedback[neighbor+slot]=pageFeedback[previous+slot];pageFeedback[previous+6].x=99;
+    output[14]=float4(rtPrevious(point,n,float3(.6),41,7,1)==neighbor?1:0,0,0,0);
+    pageFeedback[neighbor+6].x=99;output[14].y=rtPrevious(point,n,float3(.6),41,7,1)==0?1:0;
     uint corrupt=0;for(uint row=544;row<1568;row++)if(any(pageFeedback[row]!=uint4(0xdeadc0deu)))corrupt++;output[8]=float4(corrupt,0,0,0);
 
 }

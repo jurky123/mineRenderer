@@ -73,3 +73,5 @@ alpha.35：`rt_scene_update optimized` 默认启用属性变化跳过 refit 和�
 ## 第三轮 realtime 输运
 
 `rt_realtime full|cache|sparse|cache_sparse`，默认 FULL。只影响 realtime；reference 强制 FULL。缓存未成熟继续完整路径，sparse 仅在 1 spp 开启。切换算法会清空缓存/历史。`rt_benchmark realtime [seconds]` 自动测试三组两轮 ABBA（24 段），恢复设置，导出 schema 8 和 `rt_*` 计数；详见 [第三轮设计](REALTIME-PT-ROUND3.md)。
+
+alpha.37 realtime benchmark 每段附带 `.realtime.json`，summary 的 `realtimeCoverage` 汇总实际缓存查询/终止与完整路径密度；缓存零查询不构成算法成功。默认仍 FULL；新算法性能和画质需客户端验证。

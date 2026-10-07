@@ -6,7 +6,7 @@ Reference 不读取缓存与稀疏历史，继续现有六个 surface vertex 上
 
 `/voxellight rt_realtime full|cache|sparse|cache_sparse` 切换 realtime 输运策略；reference 强制 FULL。切换策略重建 RT context，清空缓存和历史。旧执行优化 benchmark 强制 FULL，以免第三轮改变其工作量。
 
-Realtime 在 B1/B2 的稳定漫反射命中处查询缓存，成熟后在当前命中的精确直接光之后结束尾部。查询失败继续完整路径，不以天空或常量替代缺失光照。B1 可用即只保留一次精确间接命中；B1 未成熟时允许到 B2，再继续完整回退。镜面、金属、玻璃、水、介质、动态表面、带 clearcoat、法线贴图使 shading normal 偏离几何法线与发光表面保留精确路径。粗糙镜面也保守地继续追踪，在后续漫反射命中处才使用缓存；不直接用 diffuse SH 替代 glossy BRDF。
+Realtime 在 B1/B2 的稳定漫反射命中处查询缓存，成熟后在当前命中的精确直接光之后结束尾部。查询失败继续完整路径，不以天空或常量替代缺失光照。B1 可用即只保留一次精确间接命中；B1 未成熟时允许到 B2，再继续完整回退。镜面、金属、玻璃、水、介质、动态表面、带 clearcoat、明显法线贴图偏差（法线点积≤0.9999，允许默认 RG8 量化误差）与发光表面保留精确路径。粗糙镜面也保守地继续追踪，在后续漫反射命中处才使用缓存；不直接用 diffuse SH 替代 glossy BRDF。
 
 ## 世界空间缓存
 
@@ -22,7 +22,7 @@ Realtime 在 B1/B2 的稳定漫反射命中处查询缓存，成熟后在当前�
 
 ## 稀疏调度与历史
 
-每帧仍对每个 internal pixel 发 primary ray，获得当前真实表面。跳过的是后续完整 shading/transport，不是首命中遍历。上一帧 camera clip/位置重投影双缓冲历史；校验 triangle/material ID、epoch、世界位置、法线、反照率、材质类型与粗糙度。新暴露、动态表面、介质、锐利材质、无效历史每帧完整采样。
+每帧仍对每个 internal pixel 发 primary ray，获得当前真实表面。跳过的是后续完整 shading/transport，不是首命中遍历。上一帧 camera clip/位置重投影双缓冲历史；校验 triangle/material ID、epoch、世界位置、法线、反照率、材质类型与粗糙度。新暴露、动态表面、介质、锐利材质、无效历史每帧完整采样。alpha.37 最近像素失配时尝试投影周围 2×2 texels，仍校验身份/平面/法线/epoch。纯 DIFFUSE 的反照率各通道≥0.02 时，历史颜色按当前/旧反照率重调制，并对去调制亮度统计方差；暗通道变化回退完整路径。ROUGH_DIFFUSE 含未着色镜面分量，因此不对整个 RGB/AOV 做反照率缩放，继续原反照率差<0.08 的校验和原亮度统计。
 
 有效历史用亮度在线均值/方差和真实更新次数决定 1/2/4 帧间隔：confidence≥4 且相对方差<0.1 为隔帧，confidence≥8 且方差<0.025 为四帧；其余每帧。复用帧不增长 confidence、不篡改最后真实采样时间，固定像素 hash 错开相位；历史 RGB 与 diffuse/reflection/refraction AOV 一起复用。高方差恢复每帧完整路径与更频繁缓存训练，不额外提高用户设置的 spp。第一版 sparse 只在 1 spp 开启；多 spp 保留精确主路径及 cache 功能。
 
@@ -38,7 +38,7 @@ PathHot 仍为 64B；冷介质 288B、AOV 48B 与 descriptor ABI 不变。新状
 
 `/voxellight rt_benchmark realtime`（可追加采样秒数 4–30，默认 10）要求 realtime、1 spp 与 compact queue。三个独立比较：FULL→CACHE、FULL→SPARSE、FULL→CACHE_SPARSE，各两轮 ABBA，总 24 blocks，结束/取消恢复原设置。固定 RIS、优化 BLAS、同一 visibility、compact queue，OMM/SER 关闭。
 
-输出原有 zip，schema 8；每 block `.rays.csv` 新增 `rt_*` 十六项：eligible、full_paths、reused、high_variance、cache_queries、cache_hits、cache_trained、cache_rejected、probes、probe_dropped、medium_protected、sharp_protected、new_exposure、history_rejected、dynamic_protected、history_updates。密度=`full_paths/eligible`，缓存命中率=`cache_hits/cache_queries`。每八帧诊断 counters，与原策略相同，从性能聚合排除诊断帧。`warmup.json` 也记录实际策略及缓存 epoch/计数。
+输出原有 zip，schema 8；每 block `.rays.csv` 新增 `rt_*` 十六项：eligible、full_paths、reused、high_variance、cache_queries、cache_hits、cache_trained、cache_rejected、probes、probe_dropped、medium_protected、sharp_protected、new_exposure、history_rejected、dynamic_protected、history_updates。密度=`full_paths/eligible`，缓存命中率=`cache_hits/cache_queries`。每八帧诊断 counters，与原策略相同，从性能聚合排除诊断帧。`warmup.json` 也记录实际策略及缓存 epoch/计数。alpha.37 每段新增 `.realtime.json`，summary 新增 `realtimeCoverage`：完整路径密度、复用比例、缓存命中比例与是否有查询/终止；零分母为 null。候选 cache 零查询时发出提示。这些算法覆盖信息与 timing/workload valid 分开，完成测试并不意味着缓存生效。
 
 第三轮 alive 曲线应变化，比较不再要求 5% 曲线一致；前两轮仍保留该检查。检查 batch、primary、bounce1/2、resolve、重建及整帧成本；不能只统计省掉的后续射线。自动套件只能证明耗时和工作量，不能证明画质。
 

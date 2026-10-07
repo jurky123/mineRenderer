@@ -22,4 +22,14 @@ class RtWorkMetricsTest {
         assertTrue(lines.getFirst().contains("rt_full_paths"));assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);assertTrue(lines.get(1).endsWith(",100,25,75,0,0,0,0,0,0,0,0,0,0,0,0,0"));
     }
 
+    @Test void realtimeCoverageDistinguishesInactiveCacheFromMeasuredZeroHitRate(){
+        var metrics=new RtWorkMetrics();assertNull(metrics.realtimeSummary().get("cacheHitFraction"));assertNull(metrics.realtimeSummary().get("fullPathDensity"));
+        long[] counters=new long[16];counters[0]=100;counters[1]=99;counters[2]=1;
+        metrics.record(8,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);
+        assertEquals(.99,metrics.realtimeSummary().get("fullPathDensity"));assertEquals(.01,metrics.realtimeSummary().get("reuseFraction"));assertEquals(false,metrics.realtimeSummary().get("cacheQueried"));
+        counters[4]=20;counters[5]=0;metrics.record(8,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);
+        assertEquals(0.,metrics.realtimeSummary().get("cacheHitFraction"));assertEquals(true,metrics.realtimeSummary().get("cacheQueried"));assertEquals(false,metrics.realtimeSummary().get("cacheTerminatedPaths"));
+        counters[5]=10;metrics.record(16,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);
+        assertEquals(.25,metrics.realtimeSummary().get("cacheHitFraction"));assertEquals(true,metrics.realtimeSummary().get("cacheTerminatedPaths"));
+    }
 }

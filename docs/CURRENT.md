@@ -1,3 +1,13 @@
+## alpha.37 第三轮未生效定位与修复
+
+alpha.36 实机 24 段完成：cache 约慢 0.40%，sparse 约慢 2.05%，均判定 within_variation；组合组重复波动 17.68%，不可比较。缓存所有查询/训练/命中为零，稀疏仅复用 0.39–1.40% 的路径，第三轮未达到目标。
+
+默认 RG8 法线 (128,128) 解码后的法线点积约 0.9999846，原准入要求 >0.999999，导致普通平面被全部排除。改为量化容差 >0.9999，BSDF 解码保持原样。历史先检查最近像素，失败时查重投影附近 2×2 texels，身份/平面/epoch 校验保持；只有纯 diffuse 使用反照率去调制的亮度统计与颜色重调制，暗通道变化回退，ROUGH_DIFFUSE 保持原颜色检查和镜面能量。
+
+新增每段 `.realtime.json` 和 summary 的 `realtimeCoverage`，直接报告路径密度、复用率、缓存命中率及查询/终止是否发生，零分母为 unavailable。缓存候选段零查询时提示算法未得到验收。生产 shader 回归覆盖准入、邻域匹配、纹理 diffuse 和 rough specular 保护。当前没有 NVIDIA GPU 提速证据，必须复测 `rt_benchmark realtime` 并单独检查画质。[完整分析](performance/ALPHA-36-REALTIME-ANALYSIS.md)。
+
+本轮 `build clientKit --offline` 通过：328 项 Java 测试零失败；24 个最终 RT stages 与全部源码哈希已核对，生产 Slang 回归通过。安装包只含本 mod。
+
 ## alpha.36 第三轮 realtime PT
 
 已接入 B1/B2 diffuse tail 的世界 L0/L1 SH 缓存，成熟/方差/平面/法线/epoch/TTL 校验，精确后缀训练与 bounded probe budget；加入首命中重投影校验后按置信度与方差进行 1/2/4 帧完整路径调度。Reference 强制旁路，镜面、玻璃、水、动态和不稳定表面继续 exact。默认 FULL，`rt_realtime cache_sparse` 显式开启；`rt_benchmark realtime` 自动测试三项独立 ABBA、24 段，schema 8 导出算法工作量。

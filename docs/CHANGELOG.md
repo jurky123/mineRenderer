@@ -1,3 +1,11 @@
+## 0.39.0-alpha.37
+
+- 修复默认 RG8 平面法线被 cache 准入阈值全部排除；保持原 BSDF 和 reference。
+- sparse 重投影失败时搜索附近 2×2 历史像素，继续严格校验几何/身份/epoch。
+- 纯 diffuse 使用纹理去调制的方差与颜色重调制；rough diffuse 的镜面分量不缩放，暗通道变化完整回退。
+- 自动验收导出每段 realtime 覆盖汇总与零查询提示；避免将有效 GPU 计时当成缓存已生效。
+- alpha.36 第三轮未获合理收益，alpha.37 GPU 加速和视觉仍需客户端复测。
+
 ## 0.39.0-alpha.36
 
 - Realtime diffuse B1/B2 短路径与 section 对齐世界 SH 辐射缓存；精确训练、不成熟完整回退。
