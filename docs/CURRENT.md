@@ -1,3 +1,9 @@
+## alpha.38 深入审计
+
+确认失效入口重新合并了 LOAD/GEOMETRY/LIGHT/RESOURCE，甚至对未跟踪 section 也 record；缓存与重建同时使用全局 revision。实际 Java 审计确认 max+1 / <= 的边界不一致，以及整列 MAX_VALUE+1 溢出。局部失效之前必须先修复这些契约。
+
+Cache key 缺同 cell 多平面身份，训练结束后才丢弃约三成多提议；immature 在空间匹配前检查，不能把其 55% 全部解释成正确 cell 样本不足。Sparse 更主要卡在置信度和身份保留；受保护路径约39%，渐变时隔帧复用的理想全局密度下限约0.70，不能靠 sparse 单独兑现0.25–0.6。[深入定位、修复顺序与验收边界](performance/ALPHA-38-DEEP-ANALYSIS.md)。本轮没有修改渲染代码。
+
 ## alpha.38 复测：工作量改善，但尚无净提速
 
 24 段有效。CACHE / SPARSE 重复波动约 36%，不可比较；组合组两轮稳定，整体 -0.356%，处于 0.36% 波动范围内。组合 cache 命中约 2.74%、sparse 复用约 10.17%，完整路径密度仍约 0.898；primary 与历史成本抵消 B1/B2 节省。
