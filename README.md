@@ -2,7 +2,7 @@
 
 VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.41**：RT 成功输出后接管原版世界绘制；实时优先 Vulkan 原生 **DLSS Ray Reconstruction Performance**，由 SDK 查询输入尺寸；新增单次遍历透明阴影与 iterative indirect A/B。全新安装默认 effects off，实际帧率和画质待 RTX 验收。
 
-替换旧 jar 后：
+[下载 alpha.41 安装包](https://temp.sh/AVRLK/voxellight-client-kit-26.2-0.39.0-alpha.41.zip)（只含本 mod；集成 RR runtime）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt

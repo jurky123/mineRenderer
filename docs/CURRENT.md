@@ -1,5 +1,7 @@
 ## 0.39.0-alpha.41：Caustica 式帧执行链
 
+[alpha.41 安装包](https://temp.sh/AVRLK/voxellight-client-kit-26.2-0.39.0-alpha.41.zip)；SHA-256：`f1be056bead3f14f0d4afc51f22e1feca1a7f30b9a408cf06bb718435c28083a`。
+
 - RT 输出成功后跳过原版世界 frame graph，保留 section 编译/上传/occlusion/加载维护；失败同帧继续原版。
 - Vulkan 原生 DLSS RR Performance、SDK 输入尺寸、8 平面 AOV/guide、Halton jitter；正常帧无 CUDA/OptiX exchange，无帧生成，失败回退原重建。
 - 实时单次遍历透明阴影；Reference 保留 EXACT。Iterative B1–B5 一次 dispatch 可 A/B，Wavefront 默认待实测。
