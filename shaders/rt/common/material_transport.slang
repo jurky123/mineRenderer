@@ -259,9 +259,10 @@ void advance(inout PathState path) {
 #endif
     uint seed=asuint(path.radiance.w),lightingSeed=directHash(seed^0xc83a91e1u);MediumStack media=loadMedia(path);
     SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);
-    TerrainSurface surface=(TerrainSurface)0;bool entering=false;
+    TerrainSurface surface=(TerrainSurface)0;bool entering=false,deferred=false;
     if(hit.distance>=0) {
-        surface=terrainSurface(hit.triangle,hit.bary,hit.instance);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
+        bool sparseGuide=rtPolicy()&&(pageFeedback[1568].x&2u)!=0&&camera.padding==1&&path.throughput.w==0&&media.count==0;
+        surface=terrainSurface(hit.triangle,hit.bary,hit.instance,sparseGuide,deferred);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
 #ifndef RT_CPU_FIXTURE
         if(path.throughput.w==0&&DispatchRaysIndex().z==0&&(uint(camera.origin.w)&1u)!=0){
             uint local=DispatchRaysIndex().y*camera.width+DispatchRaysIndex().x;
@@ -285,7 +286,8 @@ void advance(inout PathState path) {
 #if defined(RT_SER) && !defined(RT_CPU_FIXTURE)
     ReorderThread(hit.distance>=0?surface.material.type:15,4);
 #endif
-    if(hit.distance>=0&&rtSparse(path,surface,hit,path.origin.xyz+path.direction.xyz*hit.distance,entering?surface.frame.n:-surface.frame.n,media))return;
+    if(hit.distance>=0&&rtSparse(path,surface,hit,path.origin.xyz+path.direction.xyz*hit.distance,entering?surface.frame.n:-surface.frame.n,media)){if(deferred)rtCount(11,1);return;}
+    if(deferred)surface.frame=terrainCompleteFrame(hit.triangle,hit.bary);
     float distance=hit.distance>=0?hit.distance:128;
     if(media.count>0) {
         Medium m=media.entries[media.count-1];float3 extinction=m.sigmaA+m.sigmaS;

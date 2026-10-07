@@ -1,3 +1,9 @@
+## alpha.39 修复与复测
+
+[安装包](https://temp.sh/CxmJq/voxellight-client-kit-26.2-0.39.0-alpha.39.zip)。337 项 Java 测试、24 个 RT SPIR-V stage、生产 Slang 数值回归与最终 jar hash 校验通过；安装包 SHA-256：`d02043484ea3d6ca8e242b56eef8ffdcbe9775bb7852e9ddf3a94cb0d4064cd8`。
+
+已落实 alpha.38 审计中的失效边界、原始事件误重置、同 cell 多平面争用、训练后才拒绝重复候选、quad 三角形历史失配与低置信度邻居选择。新增平坦 diffuse primary 的延迟 frame 准备和 schema 10 细分统计。实际驻留静态 RT 内容改变仍协调清空 cache/reconstruction，保留遮挡/间接光正确性；不是只失效被编辑 cell。FULL 默认不变，第三轮仍待 RTX 净收益和 Reference 画质验收。[实现、边界与操作](performance/ALPHA-39-REALTIME-FIXES.md)。
+
 ## alpha.38 深入审计
 
 确认失效入口重新合并了 LOAD/GEOMETRY/LIGHT/RESOURCE，甚至对未跟踪 section 也 record；缓存与重建同时使用全局 revision。实际 Java 审计确认 max+1 / <= 的边界不一致，以及整列 MAX_VALUE+1 溢出。局部失效之前必须先修复这些契约。

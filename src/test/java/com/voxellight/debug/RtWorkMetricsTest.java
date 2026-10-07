@@ -19,7 +19,7 @@ class RtWorkMetricsTest {
         var metrics=new RtWorkMetrics();var counters=new long[16];counters[0]=100;counters[1]=25;counters[2]=75;
         metrics.record(1,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);counters[1]=99;
         assertEquals(25,metrics.sample(1).realtime()[1]);var path=directory.resolve("runtime.csv");metrics.export(path);var lines=Files.readAllLines(path);
-        assertTrue(lines.getFirst().contains("rt_full_paths"));assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);assertTrue(lines.get(1).contains(",100,25,75,0,0,0,0,0,0,0,0,0,0,0,0,0"));assertEquals(28,metrics.sample(1).realtime().length);
+        assertTrue(lines.getFirst().contains("rt_full_paths"));assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);assertTrue(lines.get(1).contains(",100,25,75,0,0,0,0,0,0,0,0,0,0,0,0,0"));assertEquals(44,metrics.sample(1).realtime().length);
     }
 
     @Test void realtimeCoverageDistinguishesInactiveCacheFromMeasuredZeroHitRate(){
@@ -31,6 +31,12 @@ class RtWorkMetricsTest {
         assertEquals(0.,metrics.realtimeSummary().get("cacheHitFraction"));assertEquals(true,metrics.realtimeSummary().get("cacheQueried"));assertEquals(false,metrics.realtimeSummary().get("cacheTerminatedPaths"));
         counters[5]=10;metrics.record(16,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);
         assertEquals(.25,metrics.realtimeSummary().get("cacheHitFraction"));assertEquals(true,metrics.realtimeSummary().get("cacheTerminatedPaths"));
+    }
+    @Test void structuralDiagnosticsAreExportedAndDoNotAliasLegacyCounters()throws Exception{
+        var metrics=new RtWorkMetrics();long[] counters=new long[44];counters[28]=7;counters[39]=5;counters[41]=12;
+        metrics.record(16,2,2,1,0,new long[6],0,0,0,0,0,new long[6][4],counters);
+        var reasons=(java.util.Map<?,?>)metrics.realtimeSummary().get("reasonCounters");assertEquals(7L,reasons.get("train_duplicate"));assertEquals(5L,reasons.get("confidence_16_plus"));assertEquals(12L,reasons.get("primary_fast_guide"));
+        var path=directory.resolve("diagnostics.csv");metrics.export(path);var lines=Files.readAllLines(path);assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);
     }
     @Test void extendedReasonsAreNamedAndCopied(){
         var metrics=new RtWorkMetrics();long[] counters=new long[28];counters[17]=42;counters[25]=13;

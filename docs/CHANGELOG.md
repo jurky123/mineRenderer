@@ -1,3 +1,12 @@
+## 0.39.0-alpha.39
+
+- 修复 RT section 失效队列半开边界与整列整数溢出，保留 reason 和独立消费游标；snapshot/backing page 过期保护不变。
+- realtime cache/reconstruction 跟随实际提交的 RT 内容，移除原始 LIGHT/edit 事件直接全局重置；修正 scene 对未接受/同版本候选和动态删除的静态 epoch 判断。
+- 同容量四路多平面缓存，空间匹配先于成熟判断；训练前每槽每帧 claim，固定 pending 目标，减少重复 suffix 浪费。
+- 轴对齐 quad 使用稳定 owner/局部面 identity，保留薄墙/材质检查；低置信度历史有界比较更成熟邻居。
+- 平坦 diffuse primary 延迟 UV tangent/normal frame，失败补完整精确 frame；schema 10 新增十六项诊断。
+- Reference、完整路径与 FULL 默认保留；性能与画质需 RTX 复测。[实施说明](performance/ALPHA-39-REALTIME-FIXES.md)。
+
 ## 0.39.0-alpha.38
 
 - 独立 realtime 光照策略，正常日光渐变持续刷新；累计漂移有界、突变/编辑/手持光变化仍失效，Reference 维持原规则。

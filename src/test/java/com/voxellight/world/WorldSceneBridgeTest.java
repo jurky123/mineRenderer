@@ -14,6 +14,18 @@ class WorldSceneBridgeTest {
         return new SectionSnapshot(request, new short[4096], new int[]{0}, new byte[]{0}, new byte[]{0});
     }
 
+    @Test void rtMarkersUseHalfOpenLongSectionBoundsAndRetainReasons(){
+        com.voxellight.rt.RtInvalidationQueue.enabled(true);
+        try{
+            var scene=new WorldSceneBridge(1);scene.reconcile(List.of(A));long cursor=com.voxellight.rt.RtInvalidationQueue.generation();
+            scene.markDirty(A,WorldSceneBridge.LIGHT);assertEquals(cursor,com.voxellight.rt.RtInvalidationQueue.revision(B.x(),B.y(),B.z()));
+            assertTrue(com.voxellight.rt.RtInvalidationQueue.revision(A.x(),A.y(),A.z())>cursor);
+            assertEquals(WorldSceneBridge.LIGHT,com.voxellight.rt.RtInvalidationQueue.changesSince(cursor).changes().getFirst().reasons());
+            long neighbor=com.voxellight.rt.RtInvalidationQueue.revision(1,4,0);cursor=com.voxellight.rt.RtInvalidationQueue.generation();scene.markRangeDirty(0,Integer.MIN_VALUE,0,0,Integer.MAX_VALUE,0,WorldSceneBridge.LOAD);
+            assertTrue(com.voxellight.rt.RtInvalidationQueue.revision(0,4,0)>cursor);assertTrue(com.voxellight.rt.RtInvalidationQueue.revision(0,-4,0)>cursor);
+            assertEquals(neighbor,com.voxellight.rt.RtInvalidationQueue.revision(1,4,0));
+        }finally{com.voxellight.rt.RtInvalidationQueue.enabled(false);}
+    }
     @Test void directionalHistoryIgnoresLightOnlyButInvalidatesForGeometryAndSectionLifetimes() {
         var scene=new WorldSceneBridge(1);scene.reconcile(List.of(A));
         long geometry=scene.geometryChangeRevision();var token=scene.surfaceToken(A);

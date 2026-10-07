@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.38**：根据实机低命中率调整实时光照刷新、缓存均值误差和 sparse 历史均值，追加细分拒绝与失效原因；reference 保留完整路径与原累积规则。第三轮默认 FULL，用命令启用新算法。保留统一直接光 RIS、优化 BLAS 与 64B PathHot；新算法的 RTX 收益与画质待客户端验收，全新安装默认 effects off。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.39**：修复失效队列边界与原始事件误重置，采用同容量四路平面缓存、训练前去重、稳定 quad 历史与延迟 primary frame 准备；新增 schema 10 结构诊断，reference 保留完整路径与原累积规则。第三轮默认 FULL，用命令启用新算法。保留统一直接光 RIS、优化 BLAS 与 64B PathHot；新算法的 RTX 收益与画质待客户端验收，全新安装默认 effects off。
 
-[下载 alpha.38 安装包](https://temp.sh/RKxkS/voxellight-client-kit-26.2-0.39.0-alpha.38.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
+[下载 alpha.39 安装包](https://temp.sh/CxmJq/voxellight-client-kit-26.2-0.39.0-alpha.39.zip)（临时链接，只包含本 mod）。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -52,7 +52,7 @@ BLAS 专用验收：执行 `/voxellight rt_benchmark blas`（8 段，默认每�
 
 旧 REFERENCE、PATH-TRACING 和 RTX 文档保留为历史记录，其中旧后端和旧命令不再适用于 alpha.21。
 
-本轮验证：332 项 Java 测试通过；24 个 RT SPIR-V stage 与 Minecraft GLSL 链接通过；生产 Slang 统一 RIS 对彩色遮挡点光、面积光、环境、自适应 proposal、深层 roulette 与表面 NEE/BSDF MIS 做每 case 200,000 次数值回归，RGB 能量误差在 2% 验收阈值内。NVIDIA GPU 帧时间与实机场景视觉尚待验收。
+本轮验证：337 项 Java 测试通过；24 个 RT SPIR-V stage 与 Minecraft GLSL 链接通过；生产 Slang 统一 RIS 对彩色遮挡点光、面积光、环境、自适应 proposal、深层 roulette 与表面 NEE/BSDF MIS 做每 case 200,000 次数值回归，RGB 能量误差在 2% 验收阈值内。NVIDIA GPU 帧时间与实机场景视觉尚待验收。
 
 手持灯异常可运行 `/voxellight rt_lighting_probe`：拿着光源对准附近不透明墙面，约 30 帧后日志输出入射光、材质响应与遮挡结果。详见 [设置说明](docs/SETTINGS.md)。
 
@@ -63,3 +63,5 @@ alpha.21 验收：固定窗口大小、`rt_spp 1` / `rt_scale 0`，`profile on` 
 alpha.36 实机第三轮未达标：缓存查询/训练/命中全部为零，稀疏完整路径仅减少约 0.4–1.4%，无法抵消历史开销。alpha.37 修复准入与匹配问题，收益需要复测：[数据分析与修复边界](docs/performance/ALPHA-36-REALTIME-ANALYSIS.md)。
 
 alpha.37 复测仍没有净收益，第三轮尚未验收通过。alpha.38 保留 FULL 默认，需重新运行 `/voxellight rt_benchmark realtime` 并对照 reference 检查漏光/残影：[alpha.37 完整分析](docs/performance/ALPHA-37-REALTIME-ANALYSIS.md)。
+
+alpha.39 已修复最新审计确认的失效、平面争用与历史置信度问题，需运行 `/voxellight rt_benchmark realtime` 复测。[修复范围、正确性边界与验收](docs/performance/ALPHA-39-REALTIME-FIXES.md)。实际驻留静态内容变化仍保守失效；第三轮净收益与画质尚未确认。

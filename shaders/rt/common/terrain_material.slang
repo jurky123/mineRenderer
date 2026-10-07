@@ -30,7 +30,8 @@ uint dynamicTexel(uint flags,float2 uv){uint slot=flags>>20,dimension=assets.Loa
     return cutoutVisible(atlasTexel(0,uv)>>24,a.tint>>24,a.flags);
 }
 struct TerrainSurface {Material material;Frame frame;float3 geometryNormal;uint flags;};
-TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance) {
+TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred) {
+    deferred=false;
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
     float2 uv=terrainUv(a,b,c,bary);
     if((a.flags&128)!=0){Material m=(Material)0;m.type=DIFFUSE;m.baseColor=linearRgb(dynamicTexel(a.flags,uv))*linearRgb(a.tint);m.microfacetAlpha=.5;m.ior=1.5;m.mediumId=1+instance;float3 normal=safeNormalize(a.n*(1-bary.x-bary.y)+b.n*bary.x+c.n*bary.y);float3 ng=safeNormalize(cross(b.p-a.p,c.p-a.p));if(dot(normal,normal)<.1)normal=ng;if(dot(normal,ng)<0)normal=-normal;TerrainSurface result={m,makeFrame(normal),ng,a.flags};return result;}
@@ -38,15 +39,6 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance) {
     float3 e1=b.p-a.p,e2=c.p-a.p;float3 ng=safeNormalize(cross(e1,e2));
     float3 n=safeNormalize(a.n*(1-bary.x-bary.y)+b.n*bary.x+c.n*bary.y);
     if(dot(n,n)<.1)n=ng;if(dot(n,ng)<0)n=-n;
-    Frame base=makeFrame(n);float3 tangent=base.t,bitangent=base.b;
-    float2 du=b.uv-a.uv,dv=c.uv-a.uv;float determinant=du.x*dv.y-du.y*dv.x;
-    if(abs(determinant)>1e-10) {
-        tangent=(e1*dv.y-e2*du.y)/determinant;bitangent=(e2*du.x-e1*dv.x)/determinant;
-        tangent=safeNormalize(tangent-n*dot(tangent,n));bitangent=safeNormalize(bitangent-n*dot(bitangent,n));
-        uint packed=atlasTexel(2,uv);float2 xy=float2(packed&255,(packed>>8)&255)/127.5-1;
-        n=safeNormalize(tangent*xy.x+bitangent*xy.y+n*sqrt(max(0,1-dot(xy,xy))));
-    }
-    if(dot(n,ng)<=0)n=ng;
     float3 color=linearRgb(atlasTexel(0,uv))*linearRgb(a.tint);
     Material material=decodeMaterial(id,profile,color,a.flags,uint4(paletteWord(id,1),paletteWord(id,2),paletteWord(id,3),0),paletteWord(id,4),true);
     material.emission=color*((((id>>24)&4)!=0?((id>>16)&255)/254.0:(a.flags>>16)/15.0)*8.0);
@@ -66,5 +58,38 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance) {
         material.baseColor*=1-wet*material.porosity*.18;
         if(material.coatWeight>0)material.type=metal(material)?COATED_CONDUCTOR:COATED_DIFFUSE;
     }
+    // A reusable flat diffuse guide does not need UV tangent construction. Exact paths
+    // complete the original frame after the history decision; textured normals stay exact.
+    if(deferFrame&&(material.type==DIFFUSE||material.type==ROUGH_DIFFUSE)&&material.coatWeight==0&&material.transmission==0&&material.microfacetAlpha>=.15&&maxComponent(material.emission)==0&&dot(n,ng)>.99999){
+        uint packed=atlasTexel(2,uv);float2 xy=float2(packed&255,(packed>>8)&255)/127.5-1;deferred=dot(xy,xy)<.0001;
+    }
+    if(deferred){TerrainSurface result={material,makeFrame(n),ng,a.flags};return result;}
+    Frame base=makeFrame(n);float3 tangent=base.t,bitangent=base.b;
+    float2 du=b.uv-a.uv,dv=c.uv-a.uv;float determinant=du.x*dv.y-du.y*dv.x;
+    if(abs(determinant)>1e-10) {
+        tangent=(e1*dv.y-e2*du.y)/determinant;bitangent=(e2*du.x-e1*dv.x)/determinant;
+        tangent=safeNormalize(tangent-n*dot(tangent,n));bitangent=safeNormalize(bitangent-n*dot(bitangent,n));
+        uint packed=atlasTexel(2,uv);float2 xy=float2(packed&255,(packed>>8)&255)/127.5-1;
+        n=safeNormalize(tangent*xy.x+bitangent*xy.y+n*sqrt(max(0,1-dot(xy,xy))));
+    }
+    if(dot(n,ng)<=0)n=ng;
     TerrainSurface result={material,makeFrame(n,tangent,bitangent),ng,a.flags};return result;
+}
+
+TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance){bool deferred;return terrainSurface(triangle,bary,instance,false,deferred);}
+Frame terrainCompleteFrame(uint triangle,float2 bary){
+    TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
+    float2 uv=terrainUv(a,b,c,bary);float3 e1=b.p-a.p,e2=c.p-a.p;
+    float3 ng=safeNormalize(cross(e1,e2)),n=safeNormalize(a.n*(1-bary.x-bary.y)+b.n*bary.x+c.n*bary.y);
+    if(dot(n,n)<.1)n=ng;if(dot(n,ng)<0)n=-n;
+    Frame base=makeFrame(n);float3 tangent=base.t,bitangent=base.b;
+    float2 du=b.uv-a.uv,dv=c.uv-a.uv;float determinant=du.x*dv.y-du.y*dv.x;
+    if(abs(determinant)>1e-10) {
+        tangent=(e1*dv.y-e2*du.y)/determinant;bitangent=(e2*du.x-e1*dv.x)/determinant;
+        tangent=safeNormalize(tangent-n*dot(tangent,n));bitangent=safeNormalize(bitangent-n*dot(bitangent,n));
+        uint packed=atlasTexel(2,uv);float2 xy=float2(packed&255,(packed>>8)&255)/127.5-1;
+        n=safeNormalize(tangent*xy.x+bitangent*xy.y+n*sqrt(max(0,1-dot(xy,xy))));
+    }
+    if(dot(n,ng)<=0)n=ng;
+    return makeFrame(n,tangent,bitangent);
 }

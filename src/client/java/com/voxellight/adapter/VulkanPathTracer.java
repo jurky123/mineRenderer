@@ -121,7 +121,7 @@ final class VulkanPathTracer implements AutoCloseable {
                 if(!context.renderBatch(encoder,java.util.List.of(),inverse,pos.x(),pos.y(),pos.z(),texture,width,height,materialAssets,budget)){state="waiting for terrain BLAS";return;}
                 displayed=useHistory?accumulation.add(encoder,view,history.samples(),history.target(),width,height):view;
                 if(useHistory)history.accepted(budget);
-                if(materials&&realtime)displayed=reconstruction.resolve(encoder,context,view,new Matrix4f(inverse).invert(),pos.x(),pos.y(),pos.z(),context.scene.historyGeneration()+com.voxellight.rt.RtInvalidationQueue.generation(),width,height,target.width,target.height,camera.viewRotationMatrix);
+                if(materials&&realtime)displayed=reconstruction.resolve(encoder,context,view,new Matrix4f(inverse).invert(),pos.x(),pos.y(),pos.z(),context.scene.historyGeneration(),width,height,target.width,target.height,camera.viewRotationMatrix);
             }
             try(var profile=RenderPassProfile.begin(encoder,"vulkan_pt_composite");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan PT composite").withRenderArea(new RenderPass.RenderArea(0,0,target.width,target.height)).withColorAttachment(target.getColorTextureView(),Optional.empty()))) {
                 pass.setPipeline(materials?MATERIAL_DISPLAY:DISPLAY);pass.bindTexture("RtNormal",displayed,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);

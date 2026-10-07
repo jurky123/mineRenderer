@@ -76,6 +76,7 @@ tasks.register('clientKit', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('docs/REALTIME-PT-ROUND3.md')
+    from('docs/performance/ALPHA-39-REALTIME-FIXES.md')
     from('docs/INSTALL.md') { rename { 'INSTALL.md' } }
     from('docs/RT-ENVIRONMENT.md')
     from('docs/SETTINGS.md')

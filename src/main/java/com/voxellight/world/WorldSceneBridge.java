@@ -71,7 +71,7 @@ public final class WorldSceneBridge {
     }
 
     public synchronized void markDirty(SectionKey key, int reasons) {
-        if(reasons!=0)com.voxellight.rt.RtInvalidationQueue.record(key.x(),key.y(),key.z(),key.x()+1,key.y()+1,key.z()+1);
+        if(reasons!=0)com.voxellight.rt.RtInvalidationQueue.record(key.x(),key.y(),key.z(),(long)key.x()+1,(long)key.y()+1,(long)key.z()+1,reasons);
         Entry entry = entries.get(key);
         if (entry != null && reasons != 0) {
             invalidate(entry, reasons);
@@ -88,7 +88,7 @@ public final class WorldSceneBridge {
 
     public synchronized void markRangeDirty(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, int reasons) {
         if (reasons == 0) return;
-        com.voxellight.rt.RtInvalidationQueue.record(minX,minY,minZ,maxX+1,maxY+1,maxZ+1);
+        com.voxellight.rt.RtInvalidationQueue.record(minX,minY,minZ,(long)maxX+1,(long)maxY+1,(long)maxZ+1,reasons);
         for (var item : entries.entrySet()) {
             var key = item.getKey();
             if (key.x() >= minX && key.x() <= maxX && key.y() >= minY && key.y() <= maxY

@@ -76,4 +76,4 @@ alpha.35：`rt_scene_update optimized` 默认启用属性变化跳过 refit 和�
 
 alpha.37 realtime benchmark 每段附带 `.realtime.json`，summary 的 `realtimeCoverage` 汇总实际缓存查询/终止与完整路径密度；缓存零查询不构成算法成功。默认仍 FULL；新算法性能和画质需客户端验证。
 
-alpha.38 benchmark 为 schema 9，保留原十六项并追加十二项原因计数，`.realtime.json` 含具名 `reasonCounters`。正常日光渐变不再按原约 1° anchor 阈值清空整个 realtime 缓存；突变/累计漂移/编辑仍失效。Reference 的原累积规则保持不变。详细门槛及有偏近似见第三轮设计。
+alpha.39 benchmark 为 schema 10，保留原二十八项并追加十六项结构诊断计数，`.realtime.json` 含具名 `reasonCounters`。正常日光渐变不再按原约 1° anchor 阈值清空整个 realtime 缓存；突变/累计漂移/实际提交的静态 RT 内容仍失效，原始 LIGHT/edit 事件不直接清空 realtime 历史。Reference 的原累积规则保持不变。详细门槛及有偏近似见第三轮设计。

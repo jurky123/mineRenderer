@@ -43,6 +43,35 @@ void realtime_policy(uint3 tid:SV_DispatchThreadID){
     output[guide+camera.width*camera.height]=savedNormal;
     surface.material.type=DIFFUSE;surface.material.baseColor=.6;surface.flags=0;pageFeedback[previous+7]=asuint(float4(.6,.6,.6,DIFFUSE));pageFeedback[previous+6].w=camera.frame-2;pageFeedback[p]=0;path.origin.w=1;
     output[20]=float4(rtSparse(path,surface,hit,point,n,media)?1:0,0,0,0);pageFeedback[1568].z=1;pageFeedback[p]=0;path.origin.w=1;output[20].y=rtSparse(path,surface,hit,point,n,media)?1:0;pageFeedback[1568].z=0;
+    // Quad diagonal changes retain a face; separate parallel planes/owners do not.
+    float3 a=float3(0,0,0),b=float3(1,0,0),c=float3(1,0,1),d=float3(0,0,1),facePoint=float3(.49,0,.51);
+    uint face=rtFaceIdentity(19,1,a,b,c,facePoint);
+    output[21]=float4(face==rtFaceIdentity(19,2,c,d,a,facePoint)?1:0,face!=rtFaceIdentity(20,1,a,b,c,facePoint)?1:0,face!=rtFaceIdentity(19,1,a+float3(0,.01,0),b+float3(0,.01,0),c+float3(0,.01,0),facePoint)?1:0,0);
+    // Same cell, two heights with independent red/blue radiance.
+    float3 low=float3(8.5,.5,8.5),high=float3(8.5,1,8.5);pageFeedback[p]=uint4(1,1,0,0);
+    uint lowAddress=rtCacheAddress(low,n);pageFeedback[p+4]=asuint(float4(low,0));pageFeedback[p+3]=asuint(float4(n,1/Pi));pageFeedback[p+1]=asuint(float4(0,0,0,1));pageFeedback[p+2]=asuint(float4(1,1,1,0));
+    for(uint observation=0;observation<32;observation++){output[0]=float4(3,0,0,1);rtTrain(0);}
+    uint highAddress=rtCacheAddress(high,n);pageFeedback[p+4]=asuint(float4(high,0));
+    for(uint observation=0;observation<32;observation++){output[0]=float4(0,0,5,1);rtTrain(0);}
+    output[22]=float4(lowAddress!=highAddress?1:0,rtCacheStatus(lowAddress,low,n),rtCacheStatus(highAddress,high,n),rtCacheStatus(lowAddress,high,n));
+    float3 lowValue=rtShIrradiance(asfloat(pageFeedback[lowAddress+4]),asfloat(pageFeedback[lowAddress+5]),asfloat(pageFeedback[lowAddress+6]),asfloat(pageFeedback[lowAddress+7]),n);
+    float3 highValue=rtShIrradiance(asfloat(pageFeedback[highAddress+4]),asfloat(pageFeedback[highAddress+5]),asfloat(pageFeedback[highAddress+6]),asfloat(pageFeedback[highAddress+7]),n);
+    output[23]=float4(lowValue.x,lowValue.z,highValue.x,highValue.z);
+    // A matching training cell must not reserve a second same-frame suffix.
+    output[24]=float4(rtClaim(lowAddress,low,n)?1:0,0,0,0);output[24].y=rtClaim(lowAddress,low,n)?1:0;output[24].z=rtClaim(highAddress,high,n)?1:0;
+    pageFeedback[lowAddress].w=1;output[25]=float4(rtCacheStatus(lowAddress,high,n),rtCacheStatus(lowAddress,low,n),0,0);
+    // A mature neighbor can preserve confidence when the nearest matching history is cold.
+    for(uint slot=0;slot<8;slot++)pageFeedback[neighbor+slot]=pageFeedback[previous+slot];pageFeedback[neighbor+6].x=41;
+    pageFeedback[previous]=asuint(float4(.2,.3,.4,2));pageFeedback[neighbor]=asuint(float4(.2,.3,.4,8));
+    output[26]=float4(rtPrevious(point,n,float3(.6),41,7,1)==neighbor?1:0,0,0,0);
+    pageFeedback[previous]=asuint(float4(.2,.3,.4,16));output[26].y=rtPrevious(point,n,float3(.6),41,7,1)==previous?1:0;
+    // Exercise production tail scheduling: a duplicate must not consume another ticket.
+    m=(Material)0;m.type=DIFFUSE;m.microfacetAlpha=.5;
+    float3 fresh=float3(20.5,.5,20.5);pageFeedback[1568]=uint4(1,7,0,1024);pageFeedback[1604].x=0;pageFeedback[p]=0;
+    path.throughput.w=1;path.reserved0=0;float3 response;bool training;
+    rtTail(path,m,fresh,n,media,response,training);output[27]=float4(training?1:0,0,0,0);
+    path.reserved0=1;pageFeedback[rtProbe(1)]=0;rtTail(path,m,fresh,n,media,response,training);
+    output[27].y=training?1:0;output[27].z=pageFeedback[1604].x;output[27].w=pageFeedback[rtCacheAddress(fresh,n)].w;
     uint corrupt=0;for(uint row=544;row<1568;row++)if(any(pageFeedback[row]!=uint4(0xdeadc0deu)))corrupt++;output[8]=float4(corrupt,0,0,0);
 
 }

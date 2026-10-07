@@ -122,9 +122,10 @@ public final class VulkanRtScene implements AutoCloseable {
         while(iterator.hasNext()) {
             var entry=iterator.next();var k=entry.getKey();
             if(!admitted(k,x,y,z)||!benchmarkTerrain.isEmpty()&&!dynamic(k)&&!benchmarkTerrain.contains(k)) {
-                opacityClassification.remove(k);opacityCounts.remove(k);opacitySources.remove(k);release(entry.getValue());iterator.remove();dirty=true;terrainGeneration++;
+                opacityClassification.remove(k);opacityCounts.remove(k);opacitySources.remove(k);release(entry.getValue());iterator.remove();dirty=true;if(!dynamic(k))terrainGeneration++;
             }
         }
+        boolean terrainDirty=false;
         List<RtGeometryStream.Section> accepted=new ArrayList<>();
         var refresh=new LinkedHashMap<SectionKey,RtGeometryStream.Section>();if(opacityDirty)opacitySources.forEach((key,source)->{if(!Arrays.equals(opacityClassification.get(key),com.voxellight.adapter.RtMaterialCoverage.indices(source.triangles())))refresh.put(key,source);});for(var change:changes)refresh.put(change.key(),change);
         var ordered=new ArrayList<>(refresh.values());
@@ -144,7 +145,7 @@ public final class VulkanRtScene implements AutoCloseable {
                 continue;
             }
             if(change.vertices()==0) {
-                if(old!=null){sections.remove(change.key());opacityClassification.remove(change.key());opacityCounts.remove(change.key());opacitySources.remove(change.key());plannedBytes-=old.vertices.size();if(!dynamic(change.key()))plannedCount--;release(old);dirty=true;}
+                if(old!=null){sections.remove(change.key());opacityClassification.remove(change.key());opacityCounts.remove(change.key());opacitySources.remove(change.key());plannedBytes-=old.vertices.size();if(!dynamic(change.key()))plannedCount--;release(old);dirty=true;if(!dynamic(change.key()))terrainDirty=true;}
                 continue;
             }
             long oldBytes=old==null?0:old.vertices.size();
@@ -159,12 +160,12 @@ public final class VulkanRtScene implements AutoCloseable {
             for(var victim:victims) {
                 var removed=sections.remove(victim);opacityClassification.remove(victim);opacityCounts.remove(victim);opacitySources.remove(victim);plannedBytes-=removed.vertices.size();plannedCount--;release(removed);dirty=true;terrainGeneration++;
             }
-            accepted.add(change);plannedBytes=plannedBytes-oldBytes+change.triangles().length;
+            accepted.add(change);if(!dynamic(change.key()))terrainDirty=true;plannedBytes=plannedBytes-oldBytes+change.triangles().length;
             if(old==null&&!dynamic(change.key()))plannedCount++;
             dirty=true;
         }
         if(!dirty)return;
-        boolean terrainDirty=changes.stream().anyMatch(change->!dynamic(change.key()));
+        // Only accepted content changes reset realtime history; unrelated/stale events do not.
         // Upload commands precede build commands through MC's encoder.execute ordering.
         Map<SectionKey,VulkanRtBuffer> uploads=new HashMap<>();
         var layouts=new HashMap<SectionKey,com.voxellight.rt.RtGeometryRanges>();
