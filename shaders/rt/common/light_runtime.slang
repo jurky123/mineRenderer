@@ -87,18 +87,18 @@ void directVolumeCounter(uint component){
 }
 float3 volumeVisibility(float3 point,LightSample light,MediumStack media){directVolumeCounter(1);return visibility(point,light.wi,media,max(.001,light.distance-.002),light.kind==3);}
 struct DirectReservoir {LightSample light;float3 value;float target,sum;uint bucket;};
-float3 directIntegrand(LightSample light,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,bool volume,float phaseG,float3 incoming,bool terminal=false){
+float3 directIntegrand(LightSample light,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,bool volume,float phaseG,float3 incoming,bool terminal=false,bool diffuseCached=false){
     if(light.pdf<=0)return 0;if(volume)return light.radiance*hg(dot(incoming,light.wi),phaseG);
     BsdfEval e=evalBsdf(m,frame,wo,light.wi,eta);if(e.pdf<=0||!validShadingHemisphere(geometryNormal,frame.n,wo,light.wi))return 0;
     float mis=light.kind==3||bounce>=5||terminal?1:powerHeuristic(directSurvival(bounce)*directBudget(bounce)*light.pdf,e.pdf);
-    return light.radiance*e.f*(abs(dot(frame.n,light.wi))*mis);
+    return light.radiance*(diffuseCached?cacheDirectBsdf(m,frame,wo,light.wi,directSurvival(bounce)*directBudget(bounce)*light.pdf,light.kind==3||bounce>=5):e.f*mis)*abs(dot(frame.n,light.wi));
 }
-DirectReservoir selectDirect(float3 point,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,inout uint seed,bool volume=false,float phaseG=0,float3 incoming=float3(0),bool terminal=false){
+DirectReservoir selectDirect(float3 point,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,inout uint seed,bool volume=false,float phaseG=0,float3 incoming=float3(0),bool terminal=false,bool diffuseCached=false){
     DirectReservoir selected=(DirectReservoir)0;selected.bucket=0xffffffffu;float survival=directSurvival(bounce);if(rng(seed)>=survival)return selected;
     uint proposals=directBudget(bounce),cell=runtimeCell(point),scramble=directHash(seed);uint baseIndex=camera.frame*max(1u,proposals),reservoirSeed=directHash(seed^0xac564b05u);
     for(uint i=0;i<proposals;i++){
         directCounter(bounce,2);uint bucket;LightSample light=runtimeCandidate(point,cell,seed,bucket,directSequence(baseIndex+i,scramble));
-        float3 value=directIntegrand(light,m,frame,wo,geometryNormal,eta,bounce,volume,phaseG,incoming,terminal);float target=luminance(value);float weight=light.pdf>0?target/light.pdf:0;
+        float3 value=directIntegrand(light,m,frame,wo,geometryNormal,eta,bounce,volume,phaseG,incoming,terminal,diffuseCached);float target=luminance(value);float weight=light.pdf>0?target/light.pdf:0;
         if(!isfinite(weight)||weight<=0)continue;float next=selected.sum+weight;if(!isfinite(next))continue;selected.sum=next;
         if(rng(reservoirSeed)<weight/selected.sum){selected.light=light;selected.value=value;selected.target=target;selected.bucket=bucket;}
     }

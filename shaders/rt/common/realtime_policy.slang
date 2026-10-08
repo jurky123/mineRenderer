@@ -21,26 +21,26 @@ void rtCount(uint row,uint component){
 }
 // Neutral RG8 normal (127/128) is not exactly zero after signed decoding.
 bool rtFlatNormal(float3 shading,float3 geometric){return abs(dot(shading,geometric))>.9999;}
-bool rtDiffuse(Material m){return (m.type==DIFFUSE||m.type==ROUGH_DIFFUSE)&&m.coatWeight==0&&m.transmission==0&&m.microfacetAlpha>=.15&&maxComponent(m.emission)==0;}
+bool rtDiffuse(Material m){return (m.type==DIFFUSE||m.type==ROUGH_DIFFUSE)&&cacheLobes(m)&&m.microfacetAlpha>=.15&&maxComponent(m.emission)==0;}
 float4 rtSh(float3 wi){return float4(.2820947918,.4886025119*wi.x,.4886025119*wi.y,.4886025119*wi.z);}
 float4 rtIrradianceBasis(float3 n){return rtSh(n)*float4(Pi,2*Pi/3,2*Pi/3,2*Pi/3);}
 float3 rtShIrradiance(float4 c0,float4 cx,float4 cy,float4 cz,float3 n){float4 basis=rtIrradianceBasis(n);return max(float3(0),c0.xyz*basis.x+cx.xyz*basis.y+cy.xyz*basis.z+cz.xyz*basis.w)/Pi;}
 uint rtNormalBucket(float3 n){float3 a=abs(n);uint axis=a.x>a.y&&a.x>a.z?0:a.y>a.z?1:2;return axis*2+(n[axis]<0?1:0);}
 // Four slots per cell bucket, unchanged 65536-slot / 10 MiB allocation.
 // Plane coordinates are cell-local; normal-map quantization cannot perturb the key.
-uint rtPlaneKey(float3 point,float3 n){int3 cell=int3(floor(point/2));uint bucket=rtNormalBucket(n),axis=bucket/2;return (asuint(int(round((point[axis]-cell[axis]*2)*64)))<<3)|bucket;}
-uint rtCacheBucket(float3 point,float3 normal){int3 cell=int3(floor(point/2));uint hash=directHash(asuint(cell.x)^directHash(asuint(cell.y))^directHash(asuint(cell.z))^rtNormalBucket(normal)*0x9e3779b9u);return rtCacheBase()+(hash&16383u)*40;}
-bool rtCacheMatches(uint address,float3 point,float3 n){
+uint rtPlaneKey(float3 point,float3 n,uint bounce=0){int3 cell=int3(floor(point/2));uint bucket=rtNormalBucket(n),axis=bucket/2;return (asuint(int(round((point[axis]-cell[axis]*2)*64)))<<3)|bucket|(bounce<<24);}
+uint rtCacheBucket(float3 point,float3 normal,uint bounce=0){int3 cell=int3(floor(point/2));uint hash=directHash(asuint(cell.x)^directHash(asuint(cell.y))^directHash(asuint(cell.z))^rtNormalBucket(normal)*0x9e3779b9u^bounce*0x85ebca6bu);return rtCacheBase()+(hash&16383u)*40;}
+bool rtCacheMatches(uint address,float3 point,float3 n,uint bounce=0){
     uint4 key=pageFeedback[address+1];int3 cell=int3(floor(point/2));
-    if(any(asint(key.xyz)!=cell)||key.w!=rtPlaneKey(point,n))return false;
+    if(any(asint(key.xyz)!=cell)||key.w!=rtPlaneKey(point,n,bounce))return false;
     float4 anchor=asfloat(pageFeedback[address+2]),normal=asfloat(pageFeedback[address+3]);float3 delta=point-anchor.xyz;
     return dot(normal.xyz,n)>=.97&&abs(dot(delta,n))<=.08&&dot(delta,delta)<=2.25;
 }
-uint rtCacheAddress(float3 point,float3 normal){
-    uint base=rtCacheBucket(point,normal),choice=base,oldest=0;
+uint rtCacheAddress(float3 point,float3 normal,uint bounce=0){
+    uint base=rtCacheBucket(point,normal,bounce),choice=base,oldest=0;
     for(uint way=0;way<4;way++){
         uint address=base+way*10;uint4 meta=pageFeedback[address];
-        if(meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,normal))return address;
+        if(meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,normal,bounce))return address;
         uint age=meta.y!=pageFeedback[1568].y?0xffffffffu:camera.frame-meta.z;
         if(age>oldest){oldest=age;choice=address;}
     }
@@ -109,6 +109,7 @@ bool rtSparse(inout PathState path,TerrainSurface surface,SurfacePayload hit,flo
     pageFeedback[probe+2]=asuint(float4(surface.material.baseColor,surface.material.type));
     uint previous=rtPrevious(point,n,surface.material.baseColor,identity,surface.material.materialId,hit.distance);pageFeedback[probe].z=previous;
     if(previous>0&&(abs(asfloat(pageFeedback[previous+5]).w-surface.material.microfacetAlpha)>.02||asfloat(pageFeedback[previous+7]).w!=surface.material.type))previous=0;pageFeedback[probe].z=previous;
+    if(surface.material.type==ROUGH_DIFFUSE){rtCount(0,1);return false;}
     if(previous==0){rtCount(3,0);rtCount(0,1);return false;}
     float4 color=asfloat(pageFeedback[previous]),diffuse=asfloat(pageFeedback[previous+1]);uint interval=rtInterval(color.w,diffuse.w);
     rtCount(10,color.w<4?0:color.w<8?1:color.w<16?2:3);
@@ -126,10 +127,10 @@ bool rtSparse(inout PathState path,TerrainSurface surface,SurfacePayload hit,flo
     pageFeedback[probe].x=2;path.origin.w=0;rtCount(0,2);return true;
 }
 // One mutually exclusive reason per rejected query: epoch, count, age, geometry, mean error.
-uint rtCacheStatus(uint address,float3 point,float3 n){
+uint rtCacheStatus(uint address,float3 point,float3 n,uint bounce=0){
     uint4 meta=pageFeedback[address];
     if(meta.y!=pageFeedback[1568].y)return 1;
-    if(!rtCacheMatches(address,point,n))return 4;
+    if(!rtCacheMatches(address,point,n,bounce))return 4;
     if(meta.w<24)return 2;
     if(camera.frame-meta.z>rtTtl(point))return 3;
     if(meta.x!=0){rtCount(11,3);return 4;}
@@ -137,10 +138,10 @@ uint rtCacheStatus(uint address,float3 point,float3 n){
     if(!all(isfinite(stats.xy))||stats.y<0||rtRelativeVariance(stats.x,stats.y)/meta.w>=.05)return 5;
     return 0;
 }
-bool rtCacheValid(uint address,float3 point,float3 n){return rtCacheStatus(address,point,n)==0;}
+bool rtCacheValid(uint address,float3 point,float3 n,uint bounce=0){return rtCacheStatus(address,point,n,bounce)==0;}
 // Claim a cell/plane before tracing its suffix. Claim and coefficient publication use
 // separate words: same-frame duplicate paths neither reserve tickets nor train again.
-bool rtClaim(uint address,float3 point,float3 n){
+bool rtClaim(uint address,float3 point,float3 n,uint bounce=0){
     uint old,stamp=camera.frame+1;
     uint prior=pageFeedback[address+9].x;if(prior==stamp){rtCount(8,0);return false;}
 #ifdef RT_CPU_FIXTURE
@@ -152,11 +153,11 @@ bool rtClaim(uint address,float3 point,float3 n){
 #ifndef RT_CPU_FIXTURE
     DeviceMemoryBarrier();
 #endif
-    uint4 meta=pageFeedback[address];bool matching=meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,n);
+    uint4 meta=pageFeedback[address];bool matching=meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,n,bounce);
     bool claimed=pageFeedback[address+9].x==stamp;
     bool occupied=!matching&&meta.y==pageFeedback[1568].y&&meta.w>0&&camera.frame-meta.z<48;
     if(!claimed&&!occupied){
-        if(!matching){pageFeedback[address+1]=uint4(asuint(int3(floor(point/2))),rtPlaneKey(point,n));pageFeedback[address+2]=asuint(float4(point,0));pageFeedback[address+3]=asuint(float4(n,0));pageFeedback[address]=uint4(1,pageFeedback[1568].y,camera.frame,0);}
+        if(!matching){pageFeedback[address+1]=uint4(asuint(int3(floor(point/2))),rtPlaneKey(point,n,bounce));pageFeedback[address+2]=asuint(float4(point,0));pageFeedback[address+3]=asuint(float4(n,0));pageFeedback[address]=uint4(1,pageFeedback[1568].y,camera.frame,0);}
         pageFeedback[address+9].x=stamp;
     }
 #ifndef RT_CPU_FIXTURE
@@ -166,29 +167,64 @@ bool rtClaim(uint address,float3 point,float3 n){
 #endif
     if(claimed){rtCount(8,0);return false;}if(occupied){rtCount(8,1);return false;}rtCount(11,2);return true;
 }
-// Query once per eligible B1/B2 hit; reserve a bounded number of exact training suffixes.
+// Hemisphere moments, rather than a zero-extended full-sphere SH evaluation.
+// Inverting the hemisphere Gram matrix preserves constant/affine incident light.
+// The rough lobe uses its actual Fresnel/Oren-Nayar kernel, not Lambert irradiance.
+float3 rtDiffuseResponse(uint address,Material m,Frame frame,float3 wo){
+    float3 c0=asfloat(pageFeedback[address+4]).xyz/.2820947918;
+    float3 cx=asfloat(pageFeedback[address+5]).xyz/.4886025119;
+    float3 cy=asfloat(pageFeedback[address+6]).xyz/.4886025119;
+    float3 cz=asfloat(pageFeedback[address+7]).xyz/.4886025119;
+    if(m.type==DIFFUSE)return m.baseColor*rtShIrradiance(asfloat(pageFeedback[address+4]),asfloat(pageFeedback[address+5]),asfloat(pageFeedback[address+6]),asfloat(pageFeedback[address+7]),frame.n);
+    float3 mn=cx*frame.n.x+cy*frame.n.y+cz*frame.n.z;
+    float3 a=(2*c0-3*mn)/Pi,bn=(6*mn-3*c0)/Pi,result=0;
+    // Fixed cosine quadrature; constant/linear light and grazing rough BSDFs are
+    // covered by the numerical gate. This remains an approximate diffuse cache.
+    for(uint i=0;i<64;i++){
+        float z=sqrt(1-(i+.5)/64),r=sqrt(1-z*z),phi=2*Pi*frac(i*.61803398875);
+        float3 wi=frame.world(float3(r*cos(phi),r*sin(phi),z));
+        float3 tangent=wi-frame.n*z;
+        float3 li=max(float3(0),a+bn*z+3/(2*Pi)*(cx*tangent.x+cy*tangent.y+cz*tangent.z));
+        result+=evalDiffuseLobe(m,frame,wo,wi).f*li*(Pi/64);
+    }
+    return result;
+}
+// Query once per eligible B0/B1/B2 hit; reserve a bounded number of exact training suffixes.
 // Pending training paths never query the cache, preventing recursive cache-only learning.
 bool rtTail(PathState path,Material m,float3 point,float3 n,MediumStack media,out float3 response,out bool training){
-    response=0;training=false;if(!rtPolicy()||(pageFeedback[1568].x&1u)==0||(path.throughput.w==0&&((pageFeedback[1568].x&4u)==0||m.type!=DIFFUSE))||path.throughput.w>2||media.count>0||m.type!=DIFFUSE||!rtDiffuse(m))return false;
+    response=0;training=false;if(!rtPolicy()||(pageFeedback[1568].x&1u)==0||(path.throughput.w==0&&(pageFeedback[1568].x&4u)==0)||path.throughput.w>2||media.count>0||!rtDiffuse(m))return false;
     uint probe=rtProbe(path.reserved0);if((pageFeedback[probe].x&1u)!=0)return false;
-    uint address=rtCacheAddress(point,n);rtCount(1,0);uint status=rtCacheStatus(address,point,n);bool valid=status==0;
+    rtCount(12,uint(path.throughput.w));if(m.type==ROUGH_DIFFUSE)rtCount(12,3);
+    uint address=0,previous=pageFeedback[probe].z;
+    if(path.throughput.w==0&&m.type==ROUGH_DIFFUSE&&previous>0&&pageFeedback[previous+3].w==1u){
+        uint candidate=pageFeedback[previous+3].x;
+        if(candidate>=rtCacheBase()&&candidate<rtRequestBase()&&(candidate-rtCacheBase())%10==0&&rtCacheValid(candidate,point,n)){address=candidate;rtCount(14,0);}
+    }
+    uint bounce=uint(path.throughput.w);if(address==0)address=rtCacheAddress(point,n,bounce);rtCount(1,0);uint status=rtCacheStatus(address,point,n,bounce);if(status==0&&m.type==ROUGH_DIFFUSE&&pageFeedback[address].w<64)status=2;bool valid=status==0;
     if(status>0){if(status<5)rtCount(5,status-1);else rtCount(6,0);
         if(status==4){uint4 key=pageFeedback[address+1];rtCount(8,any(asint(key.xyz)!=int3(floor(point/2)))?2:3);}
     }
-    uint refresh=valid?(rtNear(point)?8u:16u):1u;
+    uint refresh=valid?(rtNear(point)?8u:16u):1u;if(valid)rtCount(13,0);
     // Spread the bounded budget across the image instead of letting the first waves consume it.
-    uint budget=max(1u,pageFeedback[1568].w);refresh*=max(1u,(rtCapacity()+budget-1)/budget);
-    if((directHash(path.reserved0^camera.frame*1237u)%refresh)==0&&rtClaim(address,point,n)){
+    uint budget=max(1u,pageFeedback[1568].w);if(valid)refresh*=max(1u,(rtCapacity()+budget-1)/budget); // Cold visible cells claim before random mature refresh.
+    if((directHash(path.reserved0^camera.frame*1237u)%refresh)==0&&rtClaim(address,point,n,bounce)){
         uint ticket;
 #ifdef RT_CPU_FIXTURE
         ticket=pageFeedback[1604].x++;
 #else
         InterlockedAdd(pageFeedback[1604].x,1,ticket);
 #endif
-        if(ticket<pageFeedback[1568].w){training=true;pageFeedback[probe].x|=1;pageFeedback[probe].y=uint(path.throughput.w);pageFeedback[probe].w=ticket+1;uint request=rtRequestBase()+ticket*6;pageFeedback[request]=uint4(address,path.reserved0,0,0);pageFeedback[request+4]=asuint(float4(point,0));pageFeedback[request+5]=asuint(float4(n,0));rtCount(2,0);return false;}rtCount(2,1);
+        if(ticket<pageFeedback[1568].w){
+#ifdef RT_CPU_FIXTURE
+            pageFeedback[1615].x++;
+#else
+            uint accepted;InterlockedAdd(pageFeedback[1615].x,1,accepted);
+#endif
+            training=true;pageFeedback[probe].x|=1;pageFeedback[probe].y=uint(path.throughput.w);pageFeedback[probe].w=ticket+1;uint request=rtRequestBase()+ticket*6;pageFeedback[request]=uint4(address,path.reserved0,0,0);pageFeedback[request+4]=uint4(asuint(point),bounce);pageFeedback[request+5]=asuint(float4(n,0));rtCount(2,0);return false;}rtCount(2,1);
     }
     if(!valid){rtCount(1,3);return false;}
-    response=rtShIrradiance(asfloat(pageFeedback[address+4]),asfloat(pageFeedback[address+5]),asfloat(pageFeedback[address+6]),asfloat(pageFeedback[address+7]),n);
+    Frame frame=makeFrame(n);response=rtDiffuseResponse(address,m,frame,-path.direction.xyz);
+    if(camera.padding==1&&path.throughput.w==0&&m.type==ROUGH_DIFFUSE){pageFeedback[rtHistory(path.reserved0,camera.frame&1u)+3]=uint4(address,0,0,1);rtCount(13,1);}else if(path.throughput.w>0)rtCount(13,2);
     if(!finiteEnergy(response)){rtCount(6,1);return false;}rtCount(1,1);return true;
 }
 bool rtProbeFirst(PathState path){if(!rtPolicy())return false;return (pageFeedback[rtProbe(path.reserved0)].x&1u)!=0&&path.throughput.w==pageFeedback[rtProbe(path.reserved0)].y+1;}
@@ -199,9 +235,9 @@ void rtTrain(uint index){
     if(!rtPolicy())return;uint p=rtProbe(index);if((pageFeedback[p].x&1u)==0)return;
     uint request=rtRequest(index);float4 color=output[index],prefix=asfloat(pageFeedback[request+1]),beta=asfloat(pageFeedback[request+2]),direction=asfloat(pageFeedback[request+3]);
     if(color.w<.5||any(beta.xyz<=1e-7)||direction.w<=0){rtCount(6,2);return;}float3 radiance=max(float3(0),(color.xyz-prefix.xyz)/beta.xyz);if(!finiteEnergy(radiance)){rtCount(6,2);return;}
-    float3 point=asfloat(pageFeedback[request+4]).xyz,n=asfloat(pageFeedback[request+5]).xyz;uint address=pageFeedback[request].x,old;
+    float3 point=asfloat(pageFeedback[request+4]).xyz,n=asfloat(pageFeedback[request+5]).xyz;uint address=pageFeedback[request].x,old,bounce=pageFeedback[request+4].w;
 #ifdef RT_CPU_FIXTURE
-    if(address==0)address=rtCacheAddress(point,n);
+    if(address==0)address=rtCacheAddress(point,n,bounce);
 #endif
 #ifdef RT_CPU_FIXTURE
     old=pageFeedback[address].x;pageFeedback[address].x=1;
@@ -213,14 +249,14 @@ void rtTrain(uint index){
     DeviceMemoryBarrier();
 #endif
     uint4 meta=pageFeedback[address],key=pageFeedback[address+1];int3 cell=int3(floor(point/2));float4 anchor=asfloat(pageFeedback[address+2]),normal=asfloat(pageFeedback[address+3]);
-    bool sameCell=meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,n);
+    bool sameCell=meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,n,bounce);
     uint ttl=rtTtl(point);bool matching=sameCell&&meta.w>0&&camera.frame-meta.z<=ttl;
     if(!sameCell&&meta.y==pageFeedback[1568].y&&camera.frame-meta.z<48&&meta.w>0){pageFeedback[address].x=0;rtCount(7,0);return;}
     uint count=matching?min(meta.w+1,pageFeedback[1568].z!=0?64u:128u):1u;float alpha=1.0/count;float4 basis=rtSh(direction.xyz)/direction.w;
     float3 sh[4]={radiance*basis.x,radiance*basis.y,radiance*basis.z,radiance*basis.w};
     for(uint i=0;i<4;i++){float3 previous=matching?asfloat(pageFeedback[address+4+i]).xyz:float3(0);pageFeedback[address+4+i]=asuint(float4(lerp(previous,sh[i],alpha),0));}
     float sample=luminance(rtShIrradiance(float4(sh[0],0),float4(sh[1],0),float4(sh[2],0),float4(sh[3],0),n));float4 stats=matching?asfloat(pageFeedback[address+8]):float4(0);float delta=sample-stats.x;
-    pageFeedback[address+8]=asuint(float4(stats.x+alpha*delta,(1-alpha)*(stats.y+alpha*delta*delta),0,0));pageFeedback[address+1]=uint4(asuint(cell),rtPlaneKey(point,n));if(!matching){pageFeedback[address+2]=asuint(float4(point,0));pageFeedback[address+3]=asuint(float4(n,0));}
+    pageFeedback[address+8]=asuint(float4(stats.x+alpha*delta,(1-alpha)*(stats.y+alpha*delta*delta),0,0));pageFeedback[address+1]=uint4(asuint(cell),rtPlaneKey(point,n,bounce));if(!matching){pageFeedback[address+2]=asuint(float4(point,0));pageFeedback[address+3]=asuint(float4(n,0));}
 
     pageFeedback[address]=uint4(1,pageFeedback[1568].y,camera.frame,count);
 #ifndef RT_CPU_FIXTURE
@@ -228,7 +264,7 @@ void rtTrain(uint index){
 #else
     pageFeedback[address].x=0;
 #endif
-    rtCount(1,2);
+    if(count==64&&(!matching||meta.w<64))rtCount(14,2);rtCount(14,3);rtCount(1,2);
 }
 void rtSaveHistory(uint index,float3 color,float3 diffuse,float3 reflection,float3 refraction){
     if(!rtPolicy()||(pageFeedback[1568].x&2u)==0)return;uint p=rtProbe(index);uint type=uint(asfloat(pageFeedback[p+2]).w);if(pageFeedback[p+1].z==0||(pageFeedback[p+1].w&128u)!=0||(type!=DIFFUSE&&type!=ROUGH_DIFFUSE))return;uint address=rtHistory(index,camera.frame&1u),previous=pageFeedback[p].z;uint base=rtCapacity()+4;
@@ -243,5 +279,5 @@ void rtSaveHistory(uint index,float3 color,float3 diffuse,float3 reflection,floa
         reflection=lerp(asfloat(pageFeedback[previous+2]).xyz,reflection,alpha);
         refraction=lerp(asfloat(pageFeedback[previous+3]).xyz,refraction,alpha);
     }
-    pageFeedback[address]=asuint(float4(color,confidence));pageFeedback[address+1]=asuint(float4(diffuse,variance));pageFeedback[address+2]=asuint(float4(reflection,mean));pageFeedback[address+3]=asuint(float4(refraction,0));pageFeedback[address+4]=asuint(position);pageFeedback[address+5]=asuint(normal);pageFeedback[address+6]=uint4(pageFeedback[p+1].xyz,sampleFrame);pageFeedback[address+7]=pageFeedback[p+2];rtCount(3,3);
+    pageFeedback[address]=asuint(float4(color,confidence));pageFeedback[address+1]=asuint(float4(diffuse,variance));pageFeedback[address+2]=asuint(float4(reflection,mean));if(type!=ROUGH_DIFFUSE)pageFeedback[address+3]=asuint(float4(refraction,0));pageFeedback[address+4]=asuint(position);pageFeedback[address+5]=asuint(normal);pageFeedback[address+6]=uint4(pageFeedback[p+1].xyz,sampleFrame);pageFeedback[address+7]=pageFeedback[p+2];rtCount(3,3);
 }

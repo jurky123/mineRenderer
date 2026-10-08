@@ -360,7 +360,7 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
             if(!rtProbeFirst(path)||hitPdf==0)addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
         }
         float3 cacheResponse;bool cacheTraining=false;bool cacheTerminal=false;cacheResponse=0;if((surface.flags&128u)==0&&rtFlatNormal(n,surface.geometryNormal))cacheTerminal=rtTail(path,m,point,n,media,cacheResponse,cacheTraining);
-        bool neeTerminal=cacheTerminal||cacheTraining;
+        bool cacheSpecular=cacheTerminal&&m.type==ROUGH_DIFFUSE;bool neeTerminal=(cacheTerminal&&!cacheSpecular)||cacheTraining;
         directCounter(uint(path.throughput.w),0);
         if(directRis()){
             path.reserved1=runtimeCell(point); // Stable discrete proposal token survives origin offset and continuation.
@@ -373,9 +373,9 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
                 if(visible&&maximum>.001){directCounter(uint(path.throughput.w),1);transmission=visibility(start,light.wi,shadowMedia,maximum);}
                 if(connection==1)heldProbe(path,3,float4(transmission,visible?1:0));
                 float mis=connection==1||path.throughput.w>=5||neeTerminal?1:powerHeuristic(light.pdf,e.pdf);
-                addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmission,int(directChannel(m,n,light.wi)));
+                addRadiance(path,path.throughput.xyz*(cacheSpecular?cacheDirectBsdf(m,frame,wo,light.wi,light.pdf,connection==1||path.throughput.w>=5):e.f*mis)*(abs(dot(n,light.wi))/light.pdf)*light.radiance*transmission,int(directChannel(m,n,light.wi)));
             }
-            DirectReservoir selected=selectDirect(point,m,frame,wo,surface.geometryNormal,eta,uint(path.throughput.w),lightingSeed,false,0,float3(0),neeTerminal);
+            DirectReservoir selected=selectDirect(point,m,frame,wo,surface.geometryNormal,eta,uint(path.throughput.w),lightingSeed,false,0,float3(0),neeTerminal,cacheSpecular);
             if(selected.target>0){MediumStack shadowMedia=media;bool visible=!dielectric(m)||m.type==THIN_DIELECTRIC||dot(n,selected.light.wi)>=0||crossMedium(shadowMedia,m,entering);
                 float3 start=connectionOrigin(point,surface.geometryNormal,selected.light.wi);float maximum=selected.light.distance-max(0,dot(start-point,selected.light.wi))-.002;float3 transmission=0;
                 if(visible&&maximum>.001){directCounter(uint(path.throughput.w),1);transmission=visibility(start,selected.light.wi,shadowMedia,maximum,selected.light.kind==3);}
@@ -397,7 +397,7 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
             if(visible&&maximum>.001)directCounter(uint(path.throughput.w),1);
             float3 transmittance=visible&&maximum>.001?visibility(start,light.wi,shadowMedia,maximum,connection>=2):float3(0);
             if(connection==1)heldProbe(path,3,float4(transmittance,visible?1:0));
-            if(visible)addRadiance(path,path.throughput.xyz*direct.f*(abs(dot(n,light.wi))*mis/light.pdf)*light.radiance*transmittance,int(directChannel(m,n,light.wi)));
+            if(visible)addRadiance(path,path.throughput.xyz*(cacheSpecular?cacheDirectBsdf(m,frame,wo,light.wi,light.pdf,light.kind==3||path.throughput.w>=5):direct.f*mis)*(abs(dot(n,light.wi))/light.pdf)*light.radiance*transmittance,int(directChannel(m,n,light.wi)));
         }
         }
         LightSample emitter=sampleEmitter(point,lightingSeed);
@@ -409,13 +409,13 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
                 float mis=emitter.kind==3||path.throughput.w>=5||neeTerminal?1:powerHeuristic(emitter.pdf,e.pdf);
                 float3 start=connectionOrigin(point,surface.geometryNormal,emitter.wi);
                 float maximum=emitter.distance-max(0,dot(start-point,emitter.wi))-.002;
-                if(maximum>.001){directCounter(uint(path.throughput.w),1);addRadiance(path,path.throughput.xyz*e.f*(abs(dot(n,emitter.wi))*mis/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3),int(directChannel(m,n,emitter.wi)));}
+                if(maximum>.001){directCounter(uint(path.throughput.w),1);addRadiance(path,path.throughput.xyz*(cacheSpecular?cacheDirectBsdf(m,frame,wo,emitter.wi,emitter.pdf,emitter.kind==3||path.throughput.w>=5):e.f*mis)*(abs(dot(n,emitter.wi))/emitter.pdf)*emitter.radiance*visibility(start,emitter.wi,shadowMedia,maximum,emitter.kind==3),int(directChannel(m,n,emitter.wi)));}
             }
         }
         }
-        if(cacheTerminal){addRadiance(path,path.throughput.xyz*m.baseColor*cacheResponse);path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}
+        if(cacheTerminal){addRadiance(path,path.throughput.xyz*cacheResponse,0);if(!cacheSpecular){rtCount(14,1);path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}rtCount(13,3);}
         if(path.throughput.w>=5) {path.origin.w=0;storeMedia(path,media);path.radiance.w=asfloat(seed);return;}
-        BsdfSample sample=sampleBsdf(m,frame,wo,seed,eta);
+        BsdfSample sample=cacheSpecular?sampleCachedSpecular(m,frame,wo,seed):sampleBsdf(m,frame,wo,seed,eta);
         if(cacheTraining){float u=rng(seed),phi=2*Pi*rng(seed);sample.wi=frame.world(float3(sqrt(1-u*u)*cos(phi),sqrt(1-u*u)*sin(phi),u));BsdfEval e=evalBsdf(m,frame,wo,sample.wi,eta);sample.pdf=1/(2*Pi);sample.weight=e.f*(u/sample.pdf);sample.flags=DIFFUSE_LOBE|REFLECTION;sample.eta=1;}
         bool valid=isfinite(sample.pdf)&&finiteEnergy(sample.weight)&&all(isfinite(sample.wi))&&sample.pdf>0&&validShadingHemisphere(surface.geometryNormal,n,wo,sample.wi);
         if(valid&&(sample.flags&TRANSMISSION)!=0&&dielectric(m)&&m.type!=THIN_DIELECTRIC) {

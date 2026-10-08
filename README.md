@@ -1,8 +1,8 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.44**：RT 成功输出后接管原版世界绘制；实时优先 Vulkan 原生 **DLSS Ray Reconstruction Performance**，由 SDK 查询输入尺寸；增加 shadow 快速材质读取、local alias PMF 复用、Primary Split/B0 diffuse cache、紧凑训练请求和动态几何复用。全新安装默认 effects off，alpha.44 专项三组均未证明可靠收益；B0/history 默认材质覆盖未验收。[实机分析](docs/performance/ALPHA-44-MATERIAL-ANALYSIS.md)。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.45**：默认 `ROUGH_DIFFUSE` 接入 B0/B1/B2 diffuse cache，保留精确镜面 continuation，修正 lobe PDF/MIS、方向性训练与 diffuse history；训练按实际请求间接调度，动态槽位回收带 generation。默认仍 FULL/MONOLITHIC/EXACT/Wavefront，alpha.45 RTX 同画质与生产性能待验收。[实现与验收](docs/performance/MATERIAL-AWARE-CACHE-21.md)。
 
-[下载 alpha.44 安装包](https://temp.sh/aPVgK/voxellight-client-kit-26.2-0.39.0-alpha.44.zip)（只含本 mod；集成 RR runtime）。alpha.42 已实测 DLSS RR 与世界接管运行；该场景 FAST 输运耗时降低 23.01%，Iterative 增加 32.76%。默认仍为 EXACT + Wavefront，FAST 按场景选择。[实测与本轮修改](docs/performance/ALPHA-42-FRAME-ANALYSIS.md)。替换旧 jar 后：
+[下载 alpha.45 安装包](https://temp.sh/PkwTT/voxellight-client-kit-26.2-0.39.0-alpha.45.zip)（只含本 mod；集成 RR runtime）。alpha.42 已实测 DLSS RR 与世界接管运行；该场景 FAST 输运耗时降低 23.01%，Iterative 增加 32.76%。默认仍为 EXACT + Wavefront，FAST 按场景选择。[实测与本轮修改](docs/performance/ALPHA-42-FRAME-ANALYSIS.md)。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt

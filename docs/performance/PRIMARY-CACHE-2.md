@@ -1,3 +1,5 @@
+> alpha.45 已实现默认 ROUGH_DIFFUSE 的 lobe-aware diffuse cache、精确镜面 continuation、diffuse history 和 bounded indirect training；以下为 alpha.44 的历史设计记录。当前实现与限制见 [Material-Aware Cache 2.1](MATERIAL-AWARE-CACHE-21.md)。
+
 # alpha.44：Material/Light 热路径与 Primary Split / Cache 2.0
 
 本轮落实 alpha.43 评审的两项主线，保留 section BLAS、Wavefront、Light Runtime/RIS、CLEAN 变体与 Vulkan DLSS RR。默认仍 FULL / MONOLITHIC / TAIL / OWEN / EXACT / Wavefront；新算法先用专项 A/B 和日常帧时间验收。没有新增 integrator，也没有将 FAST 宣称为 EXACT 的无损替代。

@@ -84,3 +84,39 @@ BsdfEval evalGlossy(Material m,Frame f,float3 woWorld,float3 wiWorld){
 BsdfSample sampleGlossy(Material m,Frame f,float3 woWorld,inout uint seed){
  float3 wo=f.local(woWorld);BsdfSample s = {float3(0,0,0),float3(0,0,0),0,1,0};if(m.type==DIFFUSE||m.type==EMISSIVE||m.type==DIFFUSE_TRANSMISSION)return s;if(wo.z<=0)return s;bool coat=m.type==COATED_DIFFUSE||rng(seed)<m.coatWeight*.5f;float ax=max(.0005f,coat?m.coatAlpha:m.microfacetAlpha);float ay=max(.0005f,coat?m.coatAlpha:m.alphaV);float3 wi;if(!coat&&rng(seed)<multiscatterMix(m,wo.z))wi=cosine(seed);else{float3 h=sampleNormal(wo,ax,ay,seed);wi=h*(2*dot(wo,h))-wo;}if(wi.z<=0)return s;s.wi=f.world(wi);BsdfEval e=evalGlossy(m,f,woWorld,s.wi);if(e.pdf<=0)return s;s.weight=e.f*(wi.z/e.pdf);s.pdf=e.pdf;s.flags=GLOSSY|REFLECTION;return s;
 }
+
+// Conditional lobe PDFs: never multiply a specular-only continuation by the
+// full mixture's branch probability. Protected layered/transmitting BSDFs use FULL.
+bool cacheLobes(Material m){return (m.type==DIFFUSE||m.type==ROUGH_DIFFUSE)&&m.coatWeight==0&&m.transmission==0;}
+BsdfEval evalSpecularLobe(Material m,Frame f,float3 wo,float3 wi){
+    if(m.type!=ROUGH_DIFFUSE||!cacheLobes(m))return (BsdfEval)0;
+    float3 o=f.local(wo),i=f.local(wi);if(o.z<=0||i.z<1e-7)return (BsdfEval)0;BsdfEval e=evalGlossy(m,f,wo,wi);float denominator=4*o.z*i.z;
+    // evalLocal clamps its single-scatter denominator. Match that boundary
+    // without attenuating the separate GGX multiple-scattering compensation.
+    if(o.z>0&&i.z>0&&denominator<1e-7){float3 multi=multiscatterF(m,o,i);e.f=(e.f-multi)*(denominator/1e-7)+multi;}
+    return e;
+}
+BsdfEval evalDiffuseLobe(Material m,Frame f,float3 woWorld,float3 wiWorld){
+    BsdfEval e=(BsdfEval)0;float3 wo=f.local(woWorld),wi=f.local(wiWorld);
+    if(!cacheLobes(m)||wo.z<=0||wi.z<1e-7)return e;
+    e.pdf=wi.z/Pi;e.f=m.baseColor/Pi;if(m.type==DIFFUSE)return e;
+    float root=sqrt(m.f0),ior=root>=.999f?1000:(1+root)/(1-root);
+    float s2=m.microfacetAlpha*.25,A=1-.5*s2/(s2+.33),B=.45*s2/(s2+.09);
+    float so=sqrt(max(0,1-wo.z*wo.z)),si=sqrt(max(0,1-wi.z*wi.z));
+    float az=dot(wo.xy,wi.xy)/max(1e-7,so*si);
+    e.f*=(1-fresnelDielectric(wo.z,ior))*(1-fresnelDielectric(wi.z,ior))*(A+B*max(0,az)*max(so,si)*min(so/max(wo.z,1e-5),si/max(wi.z,1e-5)));
+    return e;
+}
+// Cached diffuse has no BSDF continuation to compete with NEE. Only the exact
+// specular lobe receives the complementary NEE/BSDF MIS weights.
+float3 cacheDirectBsdf(Material m,Frame f,float3 wo,float3 wi,float neePdf,bool terminal){
+    BsdfEval d=evalDiffuseLobe(m,f,wo,wi),s=evalSpecularLobe(m,f,wo,wi);
+    s.pdf*=specProbability(m);
+    return d.f+s.f*(terminal?1:powerHeuristic(neePdf,s.pdf));
+}
+// Preserve FULL's specular branch frequency. The cached diffuse branch emits no
+// ray; surviving specular paths use the marginal PDF and inverse probability.
+BsdfSample sampleCachedSpecular(Material m,Frame f,float3 wo,inout uint seed){
+    float probability=specProbability(m);if(rng(seed)>=probability)return (BsdfSample)0;
+    BsdfSample s=sampleGlossy(m,f,wo,seed);if(s.pdf>0){BsdfEval e=evalSpecularLobe(m,f,wo,s.wi);s.pdf=e.pdf*probability;s.weight=e.f*(max(0,dot(f.n,s.wi))/max(1e-20,s.pdf));}return s;
+}

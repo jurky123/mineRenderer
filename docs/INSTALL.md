@@ -1,3 +1,7 @@
+## alpha.45：Material-Aware Cache 2.1 验收
+
+默认 ROUGH_DIFFUSE 已接入 diffuse cache，精确镜面继续追踪。默认仍 FULL/MONOLITHIC，不自动开启实验缓存。先执行 `/voxellight rt_benchmark material`，确认 query/training/hit 和 B1/B2 实际工作量，再做画质对照与三类场景 production。新增 56 列覆盖诊断、source-depth 隔离、实际请求间接训练和动态槽位 generation。[实现、数值边界与验收](performance/MATERIAL-AWARE-CACHE-21.md)。
+
 ## alpha.44：Primary / Cache 2.0 验收
 
 `rt_primary monolithic|split`、`rt_cache tail|primary`、`rt_sampling owen|shift` 为临时执行控制，默认 monolithic/tail/owen。`primary` 缓存需配合 `rt_realtime cache|cache_sparse`；Reference 强制完整路径。先运行 `/voxellight rt_benchmark material`（24 段专项 ABBA），再用 `/voxellight rt_benchmark production`（4 段保留日常 AUTO/实时/OMM/SER 配置的固定视角门禁）。结束恢复配置；production JSON 追加到 `benchmark-results/voxellight/production-history.jsonl`。性能、方差和画质分别验收，详见 [Primary / Cache 2.0](performance/PRIMARY-CACHE-2.md)。
@@ -16,24 +20,24 @@
 
 RR 活跃时 SDK 决定输入尺寸，`rt_scale` 仅用于 OptiX/Vulkan 原重建。性能/画质仍需客户端验收。[完整说明](performance/CAUSTICA-FRAME-PIPELINE.md)。
 
-# VoxelLight 0.39.0-alpha.44 安装
+# VoxelLight 0.39.0-alpha.45 安装
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.40.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.45.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 
 ```text
 /voxellight rt_backend vulkan_pt
 /voxellight rt_mode realtime
-/voxellight rt_reconstruction optix
+/voxellight rt_reconstruction dlss
 /voxellight rt_spp 1
 /voxellight held_lights on
 /voxellight status
 ```
 
-实时模式使用运动重投影、遮挡/材质校验和独立 OptiX Temporal AOV 去噪；OptiX 初始化失败时自动回退 Vulkan 时域滤波，状态会注明原因。安装包包含独立去噪 DLL/SO，无旧追踪器或 PTX runtime compiler；运行不需要安装 SDK。
+实时优先 Vulkan 原生 DLSS Ray Reconstruction；不可用时使用 OptiX / Vulkan 重建回退，实际后端和输入/输出尺寸以 status 为准。安装包包含独立去噪 DLL/SO，无旧追踪器或 PTX runtime compiler；运行不需要安装 SDK。
 
 截图/参考模式单独开启：`rt_mode reference`、`rt_accumulate on`、`rt_accumulate spp 256`。镜头移动、地形或光照变化会清空参考历史；`rt_accumulate freeze on` 显式冻结，`freeze off` 恢复动态更新。`rt_mode realtime` 返回实时重建。`rt_spp 1..8` 现为一帧批处理，不重复上传相机和复制输出。
 

@@ -67,10 +67,10 @@ int main(){
  }
  // Admit a real dry diffuse guide, then independently reject each protected class.
  unsigned i=31,index=65504+i;lut[index]=80|(50<<8)|(19<<16);lut[index+65536]=rt::DIFFUSE|(128<<8);lut[index+65536*3]=0;assets[24+w+2*i]=assets[24+w+2*i+1]=index;assets[24+2*w+2*i]=assets[24+2*w+2*i+1]=0xff808080;for(unsigned v=0;v<3;v++)geometry[i*3+v].flags=1;
- for(unsigned test=0;test<7;test++){
-  lut[index+65536]=(test==1?rt::DIELECTRIC:test==2?rt::WATER:test==3?rt::CONDUCTOR:rt::DIFFUSE)|(128<<8)|(test==4?128<<16:0);lut[index+65536*3]=test==5?255u<<24:0;assets[17]=test==6?0x3f000000:0;
+ for(unsigned test=0;test<8;test++){
+  lut[index+65536]=(test==1?rt::DIELECTRIC:test==2?rt::WATER:test==3?rt::CONDUCTOR:test==7?rt::ROUGH_DIFFUSE:rt::DIFFUSE)|(128<<8)|(test==4?128<<16:0);lut[index+65536*3]=test==5?255u<<24:0;assets[17]=test==6?0x3f000000:0;
   std::memcpy(assets.data()+24+w*3,lut.data(),lut.size()*4);terrain_material_parity(&varying,nullptr,&globals);
-  auto checks=actual[i*14+13];if(checks.w!=(test==0?1:0)){std::fprintf(stderr,"Primary guide admission wrong variant=%u\n",test);return 5;}for(unsigned j=0;j<3;j++)if(reinterpret_cast<float*>(&checks)[j]>1e-6){std::fprintf(stderr,"Primary guide parity/admission failure variant=%u\n",test);return 4;}
+  auto checks=actual[i*14+13];if(checks.w!=(test==0||test==7?1:0)){std::fprintf(stderr,"Primary guide admission wrong variant=%u\n",test);return 5;}for(unsigned j=0;j<3;j++)if(reinterpret_cast<float*>(&checks)[j]>1e-6){std::fprintf(stderr,"Primary guide parity/admission failure variant=%u\n",test);return 4;}
  }
  std::printf("Terrain Slang/native binding parity + emission-only + shadow fast decoder + protected primary guide + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
 }

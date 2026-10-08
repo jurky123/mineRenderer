@@ -151,7 +151,7 @@ public final class VulkanRtContext implements AutoCloseable {
                 policy.putInt(0,runtimeFlags()).putInt(4,runtimeEpoch).putInt(8,runtimeLighting.gradual()?1:0).putInt(12,1024);
                 previousClip.get(2*16,policy);policy.putFloat(6*16,previousX).putFloat(6*16+4,previousY).putFloat(6*16+8,previousZ).putInt(6*16+12,previousValid?1:0);
                 encoder.writeToBuffer(feedback.slice(1568*16,7*16),policy);
-                encoder.writeToBuffer(feedback.slice(1600*16,12*16),ByteBuffer.allocateDirect(12*16));
+                var policyCounters=ByteBuffer.allocateDirect(16*16).order(ByteOrder.nativeOrder());policyCounters.putInt(15*16+4,1).putInt(15*16+8,1);encoder.writeToBuffer(feedback.slice(1600*16,16*16),policyCounters);
             }
             if(primarySplit&&primaryVisibility==null)primaryVisibility=new VulkanRtPipeline(device,runtimeFlags()==0?"material_primary_visibility_full":"material_primary_visibility_realtime");
             if(primarySplit&&primaryShade==null)primaryShade=new VulkanRtPipeline(device,primaryStage.replace("material_primary","material_primary_shade"));
@@ -177,10 +177,10 @@ public final class VulkanRtContext implements AutoCloseable {
                         VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR|VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT|VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
                         try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_bounce_"+bounce)){if((compactMask&(1<<bounce))!=0)indirect.dispatchIndirect(command,feedback.address()+(520L+bounce)*16,bounce);else indirect.dispatchBounce(command,width,height,spp,bounce);}
                     }
-                    VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
+                    VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR|VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT|VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
                     if((runtimeFlags()&1)!=0){
                         cacheTrain.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks,pathMedia,pathAovs,scene.opaqueTlas());
-                        try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_cache_train")){cacheTrain.dispatch(command,1024,1,1);}
+                        try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_cache_train")){if(indirectTracing)cacheTrain.dispatchIndirect(command,feedback.address()+1615L*16,0);else cacheTrain.dispatch(command,1024,1,1);}
                         VulkanRtScene.barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
                     }
                     resolve.bind(command,scene.tlas(),output,scene.normals(),camera,paths,scene.geometry(),assets,feedback,pathBanks,pathMedia,pathAovs,scene.opaqueTlas());try(var pass=RenderPassProfile.beginNative(command,"vulkan_rt_sample_resolve")){resolve.dispatch(command,width,height,1);}
@@ -218,8 +218,8 @@ public final class VulkanRtContext implements AutoCloseable {
         try(var pass=RenderPassProfile.beginNative(command,name)){replay.dispatch(command,256,1,1);}
     }
     private void readPageFeedback(CommandEncoder encoder,boolean sampledAlive){
-        feedbackPending=true;var read=com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(()->"VoxelLight RT page requests",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,1612*16);
-        encoder.copyToBuffer(feedback.slice(0,1612*16),read.slice());
+        feedbackPending=true;var read=com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(()->"VoxelLight RT page requests",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,1616*16);
+        encoder.copyToBuffer(feedback.slice(0,1616*16),read.slice());
         final int sampledWidth=width,sampledHeight=height,sampledSpp=samples;final long sampledFrame=RenderPassProfile.frameId(),sampledScene=scene.generation();final boolean measured=RenderPassProfile.enabled();final long sampledEmitterGeneration=scene.emitterGeneration();
         com.mojang.blaze3d.systems.RenderSystem.queueFencedTask(()->{try(var map=read.map(true,false)){if(!closed){var data=map.data().order(ByteOrder.nativeOrder());int count=Math.min(512,Math.max(0,data.getInt(0)));pageRequestCount+=count;for(int i=0;i<count;i++){int offset=(i+1)*16;pageRequests.add(new com.voxellight.world.SectionKey(data.getInt(offset),data.getInt(offset+4),data.getInt(offset+8)));}
                 var active=new long[6];for(int bounce=0;bounce<6;bounce++)active[bounce]=Integer.toUnsignedLong(data.getInt((514+bounce)*16));

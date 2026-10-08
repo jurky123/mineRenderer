@@ -8,7 +8,7 @@ void material_primary_visibility(){
     uint record=primaryHit(index);pageFeedback[record]=uint4(asuint(hit.distance),asuint(hit.bary),hit.triangle);pageFeedback[record+1]=uint4(hit.instance,1,0,0);
     if(hit.distance>=0&&path.mediumCount==0&&rtPolicy()){
         TerrainSurface surface;if(terrainPrimaryGuide(hit.triangle,hit.bary,hit.instance,surface)){
-            bool entering=dot(surface.geometryNormal,path.direction.xyz)<0;writePrimaryGuides(path,surface,hit,entering);
+            pageFeedback[record+1].z=1;bool entering=dot(surface.geometryNormal,path.direction.xyz)<0;writePrimaryGuides(path,surface,hit,entering);
             if(rtSparse(path,surface,hit,path.origin.xyz+path.direction.xyz*hit.distance,entering?surface.frame.n:-surface.frame.n,loadMedia(path))){pageFeedback[record+1].y=0;storePath(index,path);return;}
         }
     }

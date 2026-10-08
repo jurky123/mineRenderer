@@ -1,3 +1,11 @@
+## 0.39.0-alpha.45：Material-Aware Cache 2.1
+
+默认 ROUGH_DIFFUSE 的 diffuse/specular lobe 分解、B0/B1/B2 diffuse cache 与精确 specular continuation、半球方向矩求值、源 bounce 隔离、diffuse history 与 56 列 GPU counter 已实现。训练由 accepted request counter 间接调度；动态 model slot 回收带 generation。默认仍 FULL/MONOLITHIC/TAIL/OWEN/EXACT/Wavefront。
+
+[实现、数值验证与验收门禁](performance/MATERIAL-AWARE-CACHE-21.md)。alpha.45 尚无 RTX 同画质、Nsight 或 production 实测，不宣称 FPS 提升；Adaptive Execution 自动选择与跨实体共享 BLAS 仍须完成后续实机阶段。
+
+[alpha.45 安装包](https://temp.sh/PkwTT/voxellight-client-kit-26.2-0.39.0-alpha.45.zip)；SHA-256：`281ccb998271de0b07240735b2923ed51f484f543b34cabfd62711b1aeb71c4b`。完整 `build clientKit` 通过：356 项 Java 测试零失败、真实 Slang/native 数值回归通过；最终 ZIP 内 103 个 SPIR-V stages / 53 份源码哈希与当前源码核对一致。
+
 ## 0.39.0-alpha.44：Material/Light 与 Primary Split / Cache 2.0
 
 实机专项：24 段完整，三组均为波动内；Primary Split −2.38%、B0 +1.59%、SHIFT +2.68% 均未证明可靠收益。B0/history 查询、训练与复用全零；默认 ROUGH_DIFFUSE 被 pure DIFFUSE 入口排除，算法覆盖未验收。[分析与实现缺口](performance/ALPHA-44-MATERIAL-ANALYSIS.md)。

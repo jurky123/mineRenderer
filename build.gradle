@@ -75,6 +75,7 @@ tasks.register('clientKit', Zip) {
     archiveFileName = "voxellight-client-kit-${minecraft_version}-${project.version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
+    from('docs/performance/MATERIAL-AWARE-CACHE-21.md')
     from('docs/performance/PRIMARY-CACHE-2.md')
     from('docs/performance/HOT-SHADER-CLEANUP.md')
     from('docs/performance/CAUSTICA-FRAME-PIPELINE.md')
@@ -117,7 +118,7 @@ tasks.register('verifyVulkanTransport', Exec) {
     inputs.files('src/main/java/com/voxellight/rt/RtLightRuntime.java','src/main/java/com/voxellight/rt/RtEmitterTable.java','tools/native/GenerateLightRuntime.java','tools/native/vulkan_direct_lighting.cpp','tools/native/vulkan_realtime_policy.cpp')
     inputs.dir('shaders/rt/common')
     inputs.dir('shaders/rt/tests')
-    inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/water_surface.h', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_shader_specialization.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py', 'tools/native/vulkan_visibility_transport.cpp', 'tools/native/vulkan_path_storage.cpp', 'tools/native/vulkan_continuation_queue.cpp', 'tools/native/vulkan_numerical_edges.cpp', 'tools/native/vulkan_emitter_sampling.cpp', 'tools/native/vulkan_flame_sampling.cpp', 'tools/native/vulkan_reconstruction_fixture.cpp', 'src/main/resources/assets/voxellight/shaders/rt_denoiser_guides.fsh', 'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh', 'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh')
+    inputs.files('native/rt/bsdf.h', 'native/rt/ggx_energy.h', 'native/rt/material.cuh', 'native/rt/surface.h', 'native/rt/water_surface.h', 'tools/verify_vulkan_transport.py', 'tools/native/vulkan_transport_parity.cpp', 'tools/native/vulkan_cache_lobes.cpp', 'tools/native/vulkan_shader_specialization.cpp', 'tools/native/vulkan_terrain_material_parity.cpp', 'native/rt/environment.h', 'tools/native/vulkan_environment_parity.cpp', 'tools/build_vulkan_rt.py', 'tools/native/vulkan_visibility_transport.cpp', 'tools/native/vulkan_path_storage.cpp', 'tools/native/vulkan_continuation_queue.cpp', 'tools/native/vulkan_numerical_edges.cpp', 'tools/native/vulkan_emitter_sampling.cpp', 'tools/native/vulkan_flame_sampling.cpp', 'tools/native/vulkan_reconstruction_fixture.cpp', 'src/main/resources/assets/voxellight/shaders/rt_denoiser_guides.fsh', 'src/main/resources/assets/voxellight/shaders/rt_reconstruct.fsh', 'src/main/resources/assets/voxellight/shaders/vulkan_rt_accumulate.fsh')
     outputs.file(layout.buildDirectory.file('vulkan-transport-parity/result.txt'))
     commandLine 'python3', 'tools/verify_vulkan_transport.py'
 }

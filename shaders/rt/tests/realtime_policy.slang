@@ -12,6 +12,12 @@ void realtime_policy(uint3 tid:SV_DispatchThreadID){
     for(uint i=0;i<128;i++){float u=(i+.5)/128,phi=2*Pi*i*.61803398875;float3 wi=float3(sqrt(1-u*u)*cos(phi),u,sqrt(1-u*u)*sin(phi));pageFeedback[request+3]=asuint(float4(wi,1/(2*Pi)));output[0]=float4(3.5,5.5,8,1);rtTrain(0);}
     uint address=rtCacheAddress(point,n);float3 value=rtShIrradiance(asfloat(pageFeedback[address+4]),asfloat(pageFeedback[address+5]),asfloat(pageFeedback[address+6]),asfloat(pageFeedback[address+7]),n);
     output[1]=float4(value,rtCacheValid(address,point,n)?1:0);
+    // Real production B0 query after a normalized incident-radiance training sequence.
+    Material rough=defaultMaterial();rough.type=ROUGH_DIFFUSE;rough.baseColor=float3(.7,.5,.3);rough.microfacetAlpha=.5;rough.alphaV=.3;
+    PathState cachedPath=(PathState)0;cachedPath.direction.xyz=-n;cachedPath.reserved0=0;MediumStack empty=(MediumStack)0;float3 roughResponse;bool roughTraining;
+    pageFeedback[1568].x=5;pageFeedback[p]=0;pageFeedback[address+9].x=camera.frame+1;
+    bool roughHit=rtTail(cachedPath,rough,point,n,empty,roughResponse,roughTraining);
+    output[31]=float4(roughHit?1:0,roughTraining?1:0,maxComponent(roughResponse),pageFeedback[rtHistory(0,camera.frame&1u)+3].x==address?1:0);pageFeedback[1568].x=1;pageFeedback[p]=uint4(1,1,0,1);
     output[2]=float4(rtInterval(8,.01),rtInterval(4,.05),rtInterval(32,8),rtCacheValid(address,point+float3(0,.1,0),n)?1:0);
     pageFeedback[1568].y=8;output[3]=float4(rtCacheValid(address,point,n)?1:0,0,0,0);pageFeedback[1568].y=7;pageFeedback[address].z=camera.frame-129;output[3].y=rtCacheValid(address,point,n)?1:0;rtTrain(0);output[9]=float4(pageFeedback[address].w,0,0,0);
     Material m=(Material)0;m.type=DIFFUSE;m.microfacetAlpha=.5;output[4]=float4(rtDiffuse(m)?1:0,0,0,0);m.type=CONDUCTOR;output[4].y=rtDiffuse(m)?1:0;m.type=WATER;output[4].z=rtDiffuse(m)?1:0;
@@ -72,14 +78,14 @@ void realtime_policy(uint3 tid:SV_DispatchThreadID){
     rtTail(path,m,fresh,n,media,response,training);output[27]=float4(training?1:0,0,0,0);
     path.reserved0=1;pageFeedback[rtProbe(1)]=0;rtTail(path,m,fresh,n,media,response,training);
     output[27].y=training?1:0;output[27].z=pageFeedback[1604].x;output[27].w=pageFeedback[rtCacheAddress(fresh,n)].w;
-    // Primary cache is opt-in and excludes every non-pure-diffuse lobe and medium.
+    // Primary cache is opt-in; rough diffuse trains incident radiance while protected lobes/medium stay exact.
     path.reserved0=0;path.throughput.w=0;pageFeedback[p]=0;pageFeedback[1604].x=0;pageFeedback[1568]=uint4(1,7,0,1024);
     rtTail(path,m,float3(30.5,.5,30.5),n,media,response,training);output[28]=float4(training?1:0,0,0,0);
     pageFeedback[1568].x=5;rtTail(path,m,float3(30.5,.5,30.5),n,media,response,training);output[28].y=training?1:0;output[28].z=pageFeedback[p].w;output[28].w=pageFeedback[rtRequest(0)].y;
     pageFeedback[p]=0;m.type=ROUGH_DIFFUSE;rtTail(path,m,float3(40.5,.5,40.5),n,media,response,training);output[29]=float4(training?1:0,0,0,0);
-    m.type=WATER;rtTail(path,m,float3(40.5,.5,40.5),n,media,response,training);output[29].y=training?1:0;
+    pageFeedback[p]=0;m.type=WATER;rtTail(path,m,float3(40.5,.5,40.5),n,media,response,training);output[29].y=training?1:0;
     m.type=DIFFUSE;media.count=1;rtTail(path,m,float3(40.5,.5,40.5),n,media,response,training);output[29].z=training?1:0;media.count=0;
-    pageFeedback[1604].x=1024;rtTail(path,m,float3(40.5,.5,40.5),n,media,response,training);output[29].w=training?1:0;
+    pageFeedback[1604].x=1024;rtTail(path,m,float3(42.5,.5,42.5),n,media,response,training);output[29].w=training?1:0;
     output[30]=float4(pageFeedback[1604].x,pageFeedback[p].w,rtRequestBase()-rtCacheBase(),rtHistory(0,0)-rtProbe(0));
     uint corrupt=0;for(uint row=544;row<1568;row++)if(any(pageFeedback[row]!=uint4(0xdeadc0deu)))corrupt++;output[8]=float4(corrupt,0,0,0);
 
