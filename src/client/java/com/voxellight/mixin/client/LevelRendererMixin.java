@@ -26,16 +26,19 @@ abstract class LevelRendererMixin implements com.voxellight.adapter.RtWorldMaint
         // These tasks previously lived after executeFrameGraph. Keep native dirty-section
         // compilation feeding RT, including edits, uploads and loading-screen completion.
         long start=System.nanoTime();
-        repositionCamera(camera);
-        compileSections(camera);
-        if(sectionRenderDispatcher!=null){
+        long stage=System.nanoTime();repositionCamera(camera);RenderPassProfile.cpu("rt_world_reposition",System.nanoTime()-stage);
+        stage=System.nanoTime();compileSections(camera);RenderPassProfile.cpu("rt_world_compile",System.nanoTime()-stage);
+        stage=System.nanoTime();if(sectionRenderDispatcher!=null){
             sectionRenderDispatcher.lock();
             try{sectionRenderDispatcher.uploadTerrainBuffersToGpu();}
             finally{sectionRenderDispatcher.unlock();}
         }
+        RenderPassProfile.cpu("rt_world_upload",System.nanoTime()-stage);stage=System.nanoTime();
         sectionOcclusionGraph.update(camera,optionsRenderState.fov,levelRenderState.chunkLoadingRenderState);
+        RenderPassProfile.cpu("rt_world_occlusion",System.nanoTime()-stage);stage=System.nanoTime();
         var ready=levelRenderState.playerCompiledSectionCallback;
         if(ready!=null&&isSectionCompiledAndVisible(camera.blockPos))ready.run();
+        RenderPassProfile.cpu("rt_world_callback",System.nanoTime()-stage);
         RenderPassProfile.cpu("rt_world_maintenance",System.nanoTime()-start);
     }
 }

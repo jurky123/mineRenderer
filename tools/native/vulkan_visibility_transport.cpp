@@ -46,5 +46,8 @@ int main(){
  assets[palette/4+65536]=(128<<8);for(unsigned i=3;i<6;i++)geometry[i].flags=1;assets[208/4]=0;
  if(!compare("transparent cutout"))return 1;assets[208/4]=0xffffffff;if(!compare("opaque cutout"))return 1;
  camera.frame_0=2;camera.padding_0=0;camera.origin_0.w=1;visibility_transport(&varying,nullptr,&globals);auto legacy=result;camera.origin_0.w=9;visibility_transport(&varying,nullptr,&globals);if(std::memcmp(&legacy,&result,sizeof(result))!=0)return 1;
- std::puts("Production Slang surface transport: held and placed flame irradiance, opaque/cutout/glass/water/foliage/extinction visibility legacy-fast parity and flame self-shell passed");
+ camera.frame_0=3;camera.padding_0=1;assets[192/4]=0;put(140,1);assets[palette/4+3*65536]=0;
+ for(unsigned type:{0u,1u,2u,3u,4u,9u}){assets[palette/4+65536]=type|(128<<8);assets[palette/4+3*65536]=(type==3||type==4||type==9)?255u<<24:0;visibility_transport(&varying,nullptr,&globals);if(result.x>1e-6||result.y>1e-6||result.z>1e-6||result.w!=0){std::fprintf(stderr,"Primary known-hit transport/RNG parity failed type=%u: %g/%g/%g/%g\n",type,result.x,result.y,result.z,result.w);return 3;}}
+ camera.padding_0=0;visibility_transport(&varying,nullptr,&globals);if(result.x>1e-6||result.y>1e-6||result.z>1e-6||result.w!=0)return 4;
+ std::puts("Production Slang surface transport: held and placed flame irradiance, opaque/cutout/glass/water/foliage/extinction visibility legacy-fast parity and flame self-shell plus split known-hit diffuse/metal/glass/water/miss RNG and continuation parity passed");
 }

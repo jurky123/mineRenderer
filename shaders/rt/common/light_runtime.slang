@@ -19,10 +19,11 @@ uint runtimeCell(float3 point){
     if(any(cell<0)||any(uint3(cell)>=size))return 0;
     return uint((cell.y*int(size.z)+cell.z)*int(size.x)+cell.x)+1;
 }
-uint runtimeAlias(uint base,uint count,float u){
+uint runtimeAliasPmf(uint base,uint count,float u,out float pmf){
     float value=min(u*float(count),float(count)-.00001);uint slot=uint(value);uint address=base+slot*16;
-    uint chosen=value-float(slot)<asfloat(assets.Load(address))?slot:assets.Load(address+4);return assets.Load(base+chosen*16+8);
+    uint chosen=value-float(slot)<asfloat(assets.Load(address))?slot:assets.Load(address+4);pmf=asfloat(assets.Load(base+chosen*16+12));return assets.Load(base+chosen*16+8);
 }
+uint runtimeAlias(uint base,uint count,float u){float pmf;return runtimeAliasPmf(base,count,u,pmf);}
 float runtimeSectionPdf(uint section,uint cell){
     float global=asfloat(assets.Load(runtimeBase()+runtimeLoad(48)+section*16+12));if(cell==0)return global;
     uint slots=runtimeLoad(52),base=runtimeBase()+runtimeLoad(56)+(cell-1)*slots*16;float local=0;
@@ -39,11 +40,11 @@ LightSample runtimeSun(inout uint seed){
 LightSample runtimeCandidate(float3 point,uint cell,inout uint seed,out uint bucket,float familyChoice){
     LightSample light=(LightSample)0;bucket=0xffffffffu;float env=runtimeEnvironmentProbability();
     if(familyChoice<env){light.wi=sampleEnvironment(seed);light.pdf=env*environmentDensity(light.wi);light.radiance=environmentRadiance(light.wi);light.kind=1;light.distance=4096;return light;}
-    uint g=runtimeLoad(8),section;
-    if(cell>0&&rng(seed)<.8){uint base=runtimeBase()+runtimeLoad(56)+(cell-1)*runtimeLoad(52)*16;section=runtimeAlias(base,runtimeLoad(52),rng(seed));}
-    else section=runtimeAlias(runtimeBase()+runtimeLoad(48),g,rng(seed));
+    uint g=runtimeLoad(8),section;float sectionPdf;
+    if(cell>0&&rng(seed)<.8){uint base=runtimeBase()+runtimeLoad(56)+(cell-1)*runtimeLoad(52)*16;float local;section=runtimeAliasPmf(base,runtimeLoad(52),rng(seed),local);sectionPdf=.2*asfloat(assets.Load(runtimeBase()+runtimeLoad(48)+section*16+12))+.8*local;}
+    else {section=runtimeAlias(runtimeBase()+runtimeLoad(48),g,rng(seed));sectionPdf=runtimeSectionPdf(section,cell);}
     uint node=runtimeNode(section),index=runtimeAlias(runtimeBase()+runtimeLoad(40)+assets.Load(node+16)*16,assets.Load(node+20),rng(seed));
-    uint address=runtimeRecord(index);bucket=assets.Load(node+24);float pmf=(1-env)*runtimeSectionPdf(section,cell)*asfloat(assets.Load(address+12));
+    uint address=runtimeRecord(index);bucket=assets.Load(node+24);float pmf=(1-env)*sectionPdf*asfloat(assets.Load(address+12));
     if(assets.Load(address+56)==1){float3 delta=asfloat(readWords3(assets,address))-point;light.distance=length(delta);if(light.distance<.025)return light;
         light.wi=delta/light.distance;light.pdf=pmf;light.radiance=asfloat(readWords3(assets,address+16))/(light.distance*light.distance);light.kind=3;return light;}
     float root=sqrt(rng(seed));float2 bary=float2(root*(1-rng(seed)),0);bary.y=root-bary.x;
@@ -70,6 +71,9 @@ float3 runtimeMiss(float3 direction,float bsdfPdf,bool delta,uint sourceBounce){
 // preserve uniform discrete marginals and stratify power-of-two candidate sets.
 uint directHash(uint value){value^=value>>16;value*=0x7feb352du;value^=value>>15;value*=0x846ca68bu;return value^(value>>16);}
 float owenRadical(uint index,uint scramble){uint bits=0,prefix=0;for(uint bit=0;bit<24;bit++){uint digit=(index>>bit)&1u;uint flipped=digit^(directHash(scramble^prefix^(bit*0x9e3779b9u))&1u);bits|=flipped<<(23-bit);prefix=(prefix<<1)|digit;}return float(bits)/16777216.;}
+// Uniform digital shift preserves stratification; opt-in comparison against nested Owen.
+float shiftedRadical(uint index,uint scramble){return float((reversebits(index)>>8)^(directHash(scramble)&0xffffffu))/16777216.;}
+float directSequence(uint index,uint scramble){return (uint(camera.origin.w)&1048576u)!=0?shiftedRadical(index,scramble):owenRadical(index,scramble);}
 uint directCounterAddress(uint bounce){return bounce<4?536u+bounce:538u+bounce;}
 void directCounter(uint bounce,uint component){
 #ifndef RT_CPU_FIXTURE
@@ -93,7 +97,7 @@ DirectReservoir selectDirect(float3 point,Material m,Frame frame,float3 wo,float
     DirectReservoir selected=(DirectReservoir)0;selected.bucket=0xffffffffu;float survival=directSurvival(bounce);if(rng(seed)>=survival)return selected;
     uint proposals=directBudget(bounce),cell=runtimeCell(point),scramble=directHash(seed);uint baseIndex=camera.frame*max(1u,proposals),reservoirSeed=directHash(seed^0xac564b05u);
     for(uint i=0;i<proposals;i++){
-        directCounter(bounce,2);uint bucket;LightSample light=runtimeCandidate(point,cell,seed,bucket,owenRadical(baseIndex+i,scramble));
+        directCounter(bounce,2);uint bucket;LightSample light=runtimeCandidate(point,cell,seed,bucket,directSequence(baseIndex+i,scramble));
         float3 value=directIntegrand(light,m,frame,wo,geometryNormal,eta,bounce,volume,phaseG,incoming,terminal);float target=luminance(value);float weight=light.pdf>0?target/light.pdf:0;
         if(!isfinite(weight)||weight<=0)continue;float next=selected.sum+weight;if(!isfinite(next))continue;selected.sum=next;
         if(rng(reservoirSeed)<weight/selected.sum){selected.light=light;selected.value=value;selected.target=target;selected.bucket=bucket;}

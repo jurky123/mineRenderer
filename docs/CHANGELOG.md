@@ -1,3 +1,12 @@
+## 0.39.0-alpha.44：Material/Light 与 Primary Split / Cache 2.0
+
+- Shadow Material Fast Decoder、local alias PMF 复用、Owen/digital-shift 同预算能量/方差对照；FAST 透明近似不变。
+- 32 B 首命中记录、提前 pure diffuse history 分类、GPU active shading queue；活跃路径复用 hit，受保护材质保持完整 BSDF。
+- 可选 B0 pure diffuse cache；紧凑 1024×96 B 训练请求、独立 train dispatch、3-slot/path metadata；427×240/1 spp policy 净减少约 4.60 MiB。
+- 动态 quad/triangle/hash 复用、同帧 rtModels 缓存；世界维护细分 CPU scopes。
+- `rt_benchmark material` 24 段专项 ABBA；`production` 保留当前 AUTO/实时/OMM/SER、live 场景，导出 client frame P50/P95、CPU/GPU/资源与长期 JSONL。schema 13。
+- 新算法保留 opt-in；本地构建与数值验收不替代 Nsight/RTX 实测，复杂 RR specular/refraction motion 尚未完成。[实现与操作](performance/PRIMARY-CACHE-2.md)。
+
 ## 0.39.0-alpha.43：输运与场景提交热路径
 
 减少非发光 MIS 查询、RIS 完整材质解码、动态更新驻留表与重复排序。保留 EXACT / Wavefront 默认，FAST 按场景验收。[实测及验收](performance/ALPHA-42-FRAME-ANALYSIS.md)。

@@ -269,20 +269,10 @@ uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)
 #else
 #include "realtime_policy.slang"
 #endif
-void advance(inout PathState path) {
-    if(path.origin.w==0||path.padding!=0)return;
+void writePrimaryGuides(PathState path,TerrainSurface surface,SurfacePayload hit,bool entering){
 #ifndef RT_CPU_FIXTURE
-    if((uint(camera.origin.w)&2050u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
-#endif
-    uint seed=asuint(path.radiance.w),lightingSeed=directHash(seed^0xc83a91e1u);MediumStack media=loadMedia(path);
-    SurfacePayload hit=traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);
-    TerrainSurface surface=(TerrainSurface)0;bool entering=false,deferred=false;
-    if(hit.distance>=0) {
-        bool sparseGuide=rtPolicy()&&(pageFeedback[1568].x&2u)!=0&&camera.padding==1&&path.throughput.w==0&&media.count==0;
-        surface=terrainSurface(hit.triangle,hit.bary,hit.instance,sparseGuide,deferred);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
-#ifndef RT_CPU_FIXTURE
-        if(path.throughput.w==0&&DispatchRaysIndex().z==0&&(uint(camera.origin.w)&1u)!=0){
-            uint local=DispatchRaysIndex().y*camera.width+DispatchRaysIndex().x;
+        if(path.throughput.w==0&&path.reserved0<camera.width*camera.height&&(uint(camera.origin.w)&1u)!=0){
+            uint local=path.reserved0;
             uint base=camera.width*camera.height*max(1u,camera.padding)+4;
             float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
             output[base+camera.width*camera.height*7+local]=float4(metal(surface.material)?conductorFresnel(surface.material,1):float3(dielectric(surface.material)?pow((surface.material.ior-1)/(surface.material.ior+1),2):surface.material.f0),sqrt(surface.material.microfacetAlpha));
@@ -299,12 +289,26 @@ void advance(inout PathState path) {
             output[base+camera.width*camera.height*6+local]=float4(previousPoint,(surface.flags&128)!=0?previousTranslation.w:abs(previousTranslation.w));
         }
 #endif
+}
+void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool sparseChecked) {
+    if(path.origin.w==0||path.padding!=0)return;
+#ifndef RT_CPU_FIXTURE
+    if((uint(camera.origin.w)&2050u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
+#endif
+    uint seed=asuint(path.radiance.w),lightingSeed=directHash(seed^0xc83a91e1u);MediumStack media=loadMedia(path);
+    SurfacePayload hit=knownHit?supplied:traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);
+    TerrainSurface surface=(TerrainSurface)0;bool entering=false,deferred=false;
+    if(hit.distance>=0) {
+        bool sparseGuide=rtPolicy()&&(pageFeedback[1568].x&2u)!=0&&camera.padding==1&&path.throughput.w==0&&media.count==0;
+        bool classified=knownHit&&media.count==0&&terrainPrimaryGuide(hit.triangle,hit.bary,hit.instance,surface);
+        if(!classified)surface=terrainSurface(hit.triangle,hit.bary,hit.instance,sparseGuide,deferred);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
+        writePrimaryGuides(path,surface,hit,entering);
         if(!entering&&dielectric(surface.material)&&surface.material.type!=THIN_DIELECTRIC&&media.count==0)media.enter(materialMedium(surface.material));
     }
 #if defined(RT_SER) && !defined(RT_CPU_FIXTURE)
     ReorderThread(hit.distance>=0?surface.material.type:15,4);
 #endif
-    if(hit.distance>=0&&rtSparse(path,surface,hit,path.origin.xyz+path.direction.xyz*hit.distance,entering?surface.frame.n:-surface.frame.n,media)){if(deferred)rtCount(11,1);return;}
+    if(!sparseChecked&&hit.distance>=0&&rtSparse(path,surface,hit,path.origin.xyz+path.direction.xyz*hit.distance,entering?surface.frame.n:-surface.frame.n,media)){if(deferred)rtCount(11,1);return;}
     if(deferred)surface.frame=terrainCompleteFrame(hit.triangle,hit.bary);
     float distance=hit.distance>=0?hit.distance:128;
     if(media.count>0) {
@@ -431,7 +435,10 @@ void advance(inout PathState path) {
     storeMedia(path,media);path.radiance.w=asfloat(seed);
 }
 
+void advance(inout PathState path){advanceHit(path,(SurfacePayload)0,false,false);}
+
 #if !defined(RT_CPU_FIXTURE)||defined(RT_QUEUE_FIXTURE)
+
 bool compactPaths(){return (uint(camera.origin.w)&4u)!=0;}
 bool compactBounce(uint bounce){uint mask=(uint(camera.origin.w)>>12)&63u;return compactPaths()&&(mask==0||(mask&(1u<<bounce))!=0);}
 void appendContinuation(uint pathIndex,PathState path){

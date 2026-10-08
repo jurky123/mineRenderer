@@ -46,7 +46,7 @@ int main(){
  }
  std::memcpy(assets.data()+24+w*3,lut.data(),lut.size()*4);
  params={lut.data(),256,12.5f,.09f,3.4f,.7f,1,v(0,65,0)};
- std::vector<Vector<float,4>> actual(cases*12);
+ std::vector<Vector<float,4>> actual(cases*14);
  GlobalParams_0 globals{};globals.geometry_0.data=reinterpret_cast<const uint32_t*>(geometry.data());globals.geometry_0.sizeInBytes=geometry.size()*40;
  globals.assets_0.data=assets.data();globals.assets_0.sizeInBytes=assets.size()*4;globals.result_0.data=actual.data();globals.result_0.count=actual.size();
  ComputeVaryingInput varying{};varying.endGroupID={cases,1,1};terrain_material_parity(&varying,nullptr,&globals);
@@ -61,8 +61,16 @@ int main(){
   bool visible=(ids[i]>>24&3)||rt::cutoutVisible(tex[i]>>24,a.tint>>24,a.flags);
   auto water=waterNormal(v(0,1,0),v(i*.03125f,64,-.125f*i));
   float expected[44]={m.baseColor.x,m.baseColor.y,m.baseColor.z,float(m.type),m.microfacetAlpha,m.alphaV,m.f0,m.ior,m.coatWeight,m.coatAlpha,m.coatIOR,m.transmission,m.sigmaA.x,m.sigmaA.y,m.sigmaA.z,m.phaseG,m.sigmaS.x,m.sigmaS.y,m.sigmaS.z,float(m.materialId),n.x,n.y,n.z,float(visible),m.emission.x,m.emission.y,m.emission.z,float(m.mediumId),a.p[0],a.p[1],a.p[2],float(a.flags),a.uv[0]+.00025f,.5f,0,0,m.eta.x,m.eta.y,m.eta.z,float(m.conductorId),water.x,water.y,water.z,0};
-  auto extra=actual[i*12+11];if(extra.y>1e-6||extra.z>1e-6||extra.w>1e-6||(i==31&&extra.x!=1)){std::fprintf(stderr,"Terrain emission/deferred frame mismatch case=%u: %g %g %g %g\n",i,extra.x,extra.y,extra.z,extra.w);return 2;}
-  for(unsigned j=0;j<44;j++){float value=reinterpret_cast<const float*>(&actual[i*12])[j];float error=std::abs(value-expected[j])/std::max(1.f,std::abs(expected[j]));largest=std::max(largest,error);if(!std::isfinite(value)||error>.001f){std::fprintf(stderr,"Terrain material mismatch case=%u component=%u actual=%g expected=%g\n",i,j,value,expected[j]);return 1;}}
+  auto extra=actual[i*14+11];if(extra.y>1e-6||extra.z>1e-6||extra.w>1e-6||(i==31&&extra.x!=1)){std::fprintf(stderr,"Terrain emission/deferred frame mismatch case=%u: %g %g %g %g\n",i,extra.x,extra.y,extra.z,extra.w);return 2;}
+  for(unsigned slot=12;slot<14;slot++){auto checks=actual[i*14+slot];for(unsigned j=0;j<(slot==13?3:4);j++)if(reinterpret_cast<float*>(&checks)[j]>1e-6){std::fprintf(stderr,"Shadow/primary decoder parity failure case=%u slot=%u component=%u value=%g\n",i,slot,j,reinterpret_cast<float*>(&checks)[j]);return 3;}}
+  for(unsigned j=0;j<44;j++){float value=reinterpret_cast<const float*>(&actual[i*14])[j];float error=std::abs(value-expected[j])/std::max(1.f,std::abs(expected[j]));largest=std::max(largest,error);if(!std::isfinite(value)||error>.001f){std::fprintf(stderr,"Terrain material mismatch case=%u component=%u actual=%g expected=%g\n",i,j,value,expected[j]);return 1;}}
  }
- std::printf("Terrain Slang/native binding parity + emission-only parity + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
+ // Admit a real dry diffuse guide, then independently reject each protected class.
+ unsigned i=31,index=65504+i;lut[index]=80|(50<<8)|(19<<16);lut[index+65536]=rt::DIFFUSE|(128<<8);lut[index+65536*3]=0;assets[24+w+2*i]=assets[24+w+2*i+1]=index;assets[24+2*w+2*i]=assets[24+2*w+2*i+1]=0xff808080;for(unsigned v=0;v<3;v++)geometry[i*3+v].flags=1;
+ for(unsigned test=0;test<7;test++){
+  lut[index+65536]=(test==1?rt::DIELECTRIC:test==2?rt::WATER:test==3?rt::CONDUCTOR:rt::DIFFUSE)|(128<<8)|(test==4?128<<16:0);lut[index+65536*3]=test==5?255u<<24:0;assets[17]=test==6?0x3f000000:0;
+  std::memcpy(assets.data()+24+w*3,lut.data(),lut.size()*4);terrain_material_parity(&varying,nullptr,&globals);
+  auto checks=actual[i*14+13];if(checks.w!=(test==0?1:0)){std::fprintf(stderr,"Primary guide admission wrong variant=%u\n",test);return 5;}for(unsigned j=0;j<3;j++)if(reinterpret_cast<float*>(&checks)[j]>1e-6){std::fprintf(stderr,"Primary guide parity/admission failure variant=%u\n",test);return 4;}
+ }
+ std::printf("Terrain Slang/native binding parity + emission-only + shadow fast decoder + protected primary guide + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
 }

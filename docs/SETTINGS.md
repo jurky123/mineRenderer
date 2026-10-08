@@ -1,3 +1,7 @@
+## alpha.44：Primary / Cache 2.0 验收
+
+`rt_primary monolithic|split`、`rt_cache tail|primary`、`rt_sampling owen|shift` 为临时执行控制，默认 monolithic/tail/owen。`primary` 缓存需配合 `rt_realtime cache|cache_sparse`；Reference 强制完整路径。先运行 `/voxellight rt_benchmark material`（24 段专项 ABBA），再用 `/voxellight rt_benchmark production`（4 段保留日常 AUTO/实时/OMM/SER 配置的固定视角门禁）。结束恢复配置；production JSON 追加到 `benchmark-results/voxellight/production-history.jsonl`。性能、方差和画质分别验收，详见 [Primary / Cache 2.0](performance/PRIMARY-CACHE-2.md)。
+
 ## 0.39.0-alpha.43：输运与场景提交热路径
 
 减少非发光 MIS 查询、RIS 完整材质解码、动态更新驻留表与重复排序。保留 EXACT / Wavefront 默认，FAST 按场景验收。[实测及验收](performance/ALPHA-42-FRAME-ANALYSIS.md)。

@@ -3,6 +3,12 @@ import org.junit.jupiter.api.Test;
 import java.nio.*;
 import static org.junit.jupiter.api.Assertions.*;
 class RtDynamicGeometryTest {
+ @Test void cachedGeometryAcceptsTranslationAndUnusedLightChangesButRejectsUvTintAndDeformation(){
+  int stride=com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK.getVertexSize();var a=ByteBuffer.allocate(4*stride).order(ByteOrder.nativeOrder());var b=ByteBuffer.allocate(4*stride).order(ByteOrder.nativeOrder());
+  for(int i=0;i<4;i++){int o=i*stride;a.putFloat(o,i).putFloat(o+4,2).putFloat(o+8,3).putInt(o+12,-1).putFloat(o+16,.5f).putFloat(o+20,.25f);b.putFloat(o,i-10).putFloat(o+4,2).putFloat(o+8,3).putInt(o+12,-1).putFloat(o+16,.5f).putFloat(o+20,.25f).putInt(o+24,1234);}
+  assertTrue(RtDynamicScene.sameGeometry(a.array(),b.array(),0,0,0,10,0,0));assertArrayEquals(RtDynamicScene.triangles(a.array(),3,0,0,0),RtDynamicScene.triangles(b.array(),3,10,0,0));
+  b.putFloat(16,.6f);assertFalse(RtDynamicScene.sameGeometry(a.array(),b.array(),0,0,0,10,0,0));b.putFloat(16,.5f);b.putInt(12,0xfffefefe);assertFalse(RtDynamicScene.sameGeometry(a.array(),b.array(),0,0,0,10,0,0));b.putInt(12,-1);b.putFloat(4,2.001f);assertFalse(RtDynamicScene.sameGeometry(a.array(),b.array(),0,0,0,10,0,0));assertFalse(RtDynamicScene.sameGeometry(a.array(),new byte[0],0,0,0,0,0,0));
+ }
  @Test void nativeQuadRetainsWorldPoseTextureSlotTintAndNormals(){
   int stride=com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK.getVertexSize();assertEquals(28,stride);
   var input=ByteBuffer.allocate(stride*4).order(ByteOrder.nativeOrder());

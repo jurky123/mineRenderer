@@ -7,6 +7,13 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RtFrameExecutionTest {
+    @Test void productionKeepsAllDailyControlsAndSpecializedSuiteRestoresExperimentalControls(){
+        var original=RtBenchmarkPlan.Config.current();try{
+            RtExecutionOptions.queue(RtExecutionOptions.Queue.AUTO);RtExecutionOptions.realtime(RtExecutionOptions.Realtime.CACHE_SPARSE);RtExecutionOptions.omm(true);RtExecutionOptions.ser(true);RtExecutionOptions.primary(RtExecutionOptions.Primary.SPLIT);RtExecutionOptions.cache(RtExecutionOptions.Cache.PRIMARY);RtExecutionOptions.sampling(RtExecutionOptions.Sampling.SHIFT);
+            var controls=RtBenchmarkPlan.Config.current();var production=RtBenchmarkPlan.production(controls);assertEquals(4,production.blocks().size());for(var b:production.blocks()){assertEquals(controls,b.config());assertFalse(b.candidate());}
+            var material=RtBenchmarkPlan.material(true);assertEquals(24,material.blocks().size());for(var b:material.blocks()){b.config().apply();assertEquals(b.config(),RtBenchmarkPlan.Config.current());}controls.apply();assertEquals(controls,RtBenchmarkPlan.Config.current());
+        }finally{original.apply();}assertEquals(original,RtBenchmarkPlan.Config.current());
+    }
     @Test void frameJitterUsesBoundedTwoDimensionalHaltonWithFixedPeriod(){
         assertEquals(0,RtJitter.x(0));assertEquals(-1f/6,RtJitter.y(0),1e-7);
         assertEquals(-.25f,RtJitter.x(1));assertEquals(1f/6,RtJitter.y(1),1e-7);

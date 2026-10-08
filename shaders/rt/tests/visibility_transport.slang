@@ -16,6 +16,11 @@ SurfacePayload fixtureTraceFiltered(float3 origin,float3 direction,float maximum
 SurfacePayload fixtureTrace(float3 origin,float3 direction,float maximum){return fixtureTraceFiltered(origin,direction,maximum,0);}
 [shader("compute")] [numthreads(1,1,1)]
 void visibility_transport(uint3 tid:SV_DispatchThreadID){
+    if(camera.frame==3){
+        PathState a=(PathState)0;a.origin=float4(0,0,.5,1);a.direction=float4(0,0,-1,0);a.throughput=float4(1,1,1,0);a.previousDelta=1;a.etaScale=1;a.radiance.w=asfloat(17u);PathState b=a;
+        SurfacePayload hit=fixtureTrace(a.origin.xyz,a.direction.xyz,4096);advance(a);advanceHit(b,hit,true,true);
+        output[0]=float4(max(maxComponent(abs(a.radiance.xyz-b.radiance.xyz)),maxComponent(abs(a.throughput.xyz-b.throughput.xyz))),maxComponent(abs(a.direction.xyz-b.direction.xyz)),maxComponent(abs(a.origin.xyz-b.origin.xyz)),asuint(a.radiance.w)==asuint(b.radiance.w)&&a.mediumCount==b.mediumCount&&a.channel==b.channel&&a.origin.w==b.origin.w?0:1);return;
+    }
     if(camera.frame>0){MediumStack media;media.count=0;if(camera.frame==2){Medium m={float3(.2,.3,.4),float3(.1,.2,.3),0,1.33,77};media.entries[0]=m;media.count=1;}output[0]=float4(visibility(float3(0,0,.5),float3(0,0,1),media,1.499),1);return;}
     PathState path=(PathState)0;path.origin=float4(0,0,.5,1);path.direction=float4(0,0,-1,0);path.throughput=float4(1,1,1,5);path.previousDelta=1;path.etaScale=1;path.radiance.w=asfloat(17u);
     advance(path);output[0]=pathOutput(path);

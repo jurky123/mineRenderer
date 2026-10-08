@@ -1,3 +1,9 @@
+## 0.39.0-alpha.44：Material/Light 与 Primary Split / Cache 2.0
+
+[alpha.44 安装包](https://temp.sh/aPVgK/voxellight-client-kit-26.2-0.39.0-alpha.44.zip)；SHA-256：`c13f42a7931b2c4f612799975de11ee2058e45418bb1c82745a50051f8a66e3f`。353 项 Java 测试、真实 Slang/native 数值回归与完整构建通过；包内 103 个 SPIR-V stages / 52 份源码哈希核对通过。
+
+Shadow 快速材质读取、local alias PMF、可切换 digital shift、32 B hit record + active shading queue、B0 pure diffuse cache、紧凑训练请求和动态几何复用已实现。新增保留日常配置的 production benchmark 与长期帧时间/CPU/GPU/内存报告。默认仍 FULL/MONOLITHIC/TAIL/OWEN/EXACT/Wavefront；实机性能和同画质验收待完成。[设计、限制与命令](performance/PRIMARY-CACHE-2.md)。
+
 ## 0.39.0-alpha.43：输运与场景提交热路径
 
 [alpha.43 安装包](https://temp.sh/cBoiG/voxellight-client-kit-26.2-0.39.0-alpha.43.zip)；SHA-256：`785703bbc4145b357b34864b84d3ffdab783e896e26394175b9d1656bf022f3c`。350 项 Java 测试与数值回归通过，包内 80 个 SPIR-V stages / 48 份源码哈希核对通过。

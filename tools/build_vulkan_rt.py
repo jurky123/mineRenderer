@@ -17,6 +17,12 @@ for family,policy in [("full",["RT_CLEAN_FULL"]),("realtime",[])]:
 for name,(base,defines) in list(VARIANTS.items()):
     if base=='material_indirect':VARIANTS[name+'_iterative']=(base,defines+['RT_ITERATIVE'])
 VARIANTS['material_indirect_iterative']=('material_indirect',['RT_ITERATIVE'])
+VARIANTS['material_primary_visibility_full']=('material_primary_visibility',['RT_CLEAN_FULL','RT_DIRECT_RIS'])
+VARIANTS['material_primary_visibility_realtime']=('material_primary_visibility',['RT_DIRECT_RIS'])
+VARIANTS['material_cache_train']=('material_cache_train',['RT_DIRECT_RIS'])
+for name,(base,defines) in list(VARIANTS.items()):
+    if base=='material_primary':VARIANTS[name.replace('material_primary','material_primary_shade')]=('material_primary_shade',defines)
+VARIANTS['material_primary_shade']=('material_primary_shade',[])
 STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)

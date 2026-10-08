@@ -23,5 +23,5 @@ void direct_lighting(uint3 tid:SV_DispatchThreadID){
     if(candidate.pdf>0&&candidate.kind==4){float q=runtimeHitPdf(candidate.wi.x+candidate.wi.y<=0?32u:33u,float3(0),candidate.wi*candidate.distance,runtimeCell(float3(0)),bounce);
         // Diagonal x+y=0 identifies the exact sampled emitter triangle.
         error=abs(q-directSurvival(bounce)*directBudget(bounce)*candidate.pdf)/max(1e-20,q);}
-    result[tid.x*2]=float4(color,selected.target>0?1:0);result[tid.x*2+1]=float4(error,owenRadical(tid.x,camera.frame),0,0);
+    result[tid.x*2]=float4(color,selected.target>0?1:0);result[tid.x*2+1]=float4(error,directSequence(tid.x,camera.frame),0,0);
 }

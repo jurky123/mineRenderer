@@ -22,6 +22,7 @@ import java.util.List;
 /** Bounded private native-model stream shared by entity and block-entity shadow owners. */
 final class DynamicModelBuffer implements AutoCloseable {
     private record Draw(int baseVertex,int indices,PreparedRenderType.Texture texture,Object owner,int feature,double x,double y,double z,boolean transientGeometry) { }
+    private List<RtModel> capturedRtModels;
     private Object owner;
     private int feature;
     private double ownerX,ownerY,ownerZ;
@@ -38,7 +39,7 @@ final class DynamicModelBuffer implements AutoCloseable {
     private int bytes, maxIndices, skipped, modelAttempts;
     DynamicModelBuffer(String label) { this.label = label; }
     void begin() {
-        draws.clear(); bytes=maxIndices=skipped=modelAttempts=0;owner=null;feature=0;ownerX=ownerY=ownerZ=0;transientGeometry=true;
+        capturedRtModels=null;draws.clear(); bytes=maxIndices=skipped=modelAttempts=0;owner=null;feature=0;ownerX=ownerY=ownerZ=0;transientGeometry=true;
         if (frame != null) frame.clear();
     }
     private void allocate() {
@@ -53,6 +54,7 @@ final class DynamicModelBuffer implements AutoCloseable {
         if(frame!=null) frame.position(checkpoint.position());feature=checkpoint.feature();
     }
     void finish() {
+        capturedRtModels=null;
         bytes=frame==null ? 0 : frame.position();
         maxIndices=draws.stream().mapToInt(Draw::indices).max().orElse(0);
     }
@@ -150,16 +152,16 @@ final class DynamicModelBuffer implements AutoCloseable {
     }
     record RtModel(byte[] quads,PreparedRenderType.Texture texture,Object owner,int feature,double x,double y,double z,boolean transientGeometry){}
     List<RtModel> rtModels(){
-        if(frame==null)return List.of();var result=new ArrayList<RtModel>();int stride=DefaultVertexFormat.BLOCK.getVertexSize();
+        if(capturedRtModels!=null)return capturedRtModels;if(frame==null)return List.of();var result=new ArrayList<RtModel>();int stride=DefaultVertexFormat.BLOCK.getVertexSize();
         for(var draw:draws){int count=draw.indices()/6*4;byte[] bytes=new byte[count*stride];var source=frame.duplicate();source.position(draw.baseVertex()*stride).limit((draw.baseVertex()+count)*stride);source.get(bytes);result.add(new RtModel(bytes,draw.texture(),draw.owner(),draw.feature(),draw.x(),draw.y(),draw.z(),draw.transientGeometry()));}
-        return List.copyOf(result);
+        return capturedRtModels=List.copyOf(result);
     }
     int modelCount() { return draws.size(); }
     int skipped() { return skipped; }
     int bytes() { return bytes; }
     int bufferBytes() { return vertices==null ? 0 : DynamicCasterSelection.FRAME_BYTES; }
     @Override public void close() {
-        draws.clear(); indices=null;indexType=null;
+        capturedRtModels=null;draws.clear(); indices=null;indexType=null;
         if(vertices!=null){vertices.close();vertices=null;}
         if(scratch!=null){scratch.close();scratch=null;}
         if(frame!=null){MemoryUtil.memFree(frame);frame=null;}

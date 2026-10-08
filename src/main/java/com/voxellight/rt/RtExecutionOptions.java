@@ -2,6 +2,18 @@ package com.voxellight.rt;
 
 /** Execution and realtime algorithm A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
+    public enum Primary {MONOLITHIC,SPLIT}
+    public enum Cache {TAIL,PRIMARY}
+    public enum Sampling {OWEN,SHIFT}
+    private static Primary primary=Primary.MONOLITHIC;
+    private static Cache cache=Cache.TAIL;
+    private static Sampling sampling=Sampling.OWEN;
+    public static Primary primary(){return primary;}
+    public static Cache cache(){return cache;}
+    public static Sampling sampling(){return sampling;}
+    public static void primary(Primary value){if(primary!=value){primary=value;revision++;}}
+    public static void cache(Cache value){if(cache!=value){cache=value;revision++;}}
+    public static void sampling(Sampling value){sampling=value;}
     public enum Realtime {FULL(0),CACHE(1),SPARSE(2),CACHE_SPARSE(3);private final int flags;Realtime(int flags){this.flags=flags;}public int flags(boolean realtime){return realtime?flags:0;}}
     public enum Shader {CLEAN,RUNTIME}
     private static Shader shader=Shader.CLEAN;

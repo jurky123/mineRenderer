@@ -75,6 +75,7 @@ tasks.register('clientKit', Zip) {
     archiveFileName = "voxellight-client-kit-${minecraft_version}-${project.version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
+    from('docs/performance/PRIMARY-CACHE-2.md')
     from('docs/performance/HOT-SHADER-CLEANUP.md')
     from('docs/performance/CAUSTICA-FRAME-PIPELINE.md')
     from('docs/performance/ALPHA-41-FRAME-ANALYSIS.md')

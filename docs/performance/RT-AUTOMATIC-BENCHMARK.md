@@ -89,3 +89,7 @@ alpha.32 实测的各段工作集一致，但 OMM coverage 全零、SER 大幅�
 alpha.34 新增 `/voxellight rt_benchmark direct [seconds]`：仅测 direct lighting，8 段、默认 10 秒；固定 Query/Fixed/OMM off/SER off，仅比较 legacy/RIS。summary schema 6 和每段 `.direct_lighting.json` 提供实际 Direct mode 与 per-bounce 连接计数。完整 start 追加 direct lighting pair。见 [第二轮设计](RT-DIRECT-LIGHTING-ROUND-2.md)。
 
 alpha.35：`rt_benchmark blas [seconds]` 只比较 scene-update legacy/optimized，8 段，默认 10 秒。summary schema 7 中 blas 比较目标为 scene commit，transport 保持 RIS；完整 start 追加 blas pair，最多 72 段。[BLAS 验收](RT-BLAS-OPTIMIZATION.md)。
+
+## alpha.44 专项与日常门禁
+
+`rt_benchmark material [4..30]` 比较 Primary Split、B0 cache 和 Owen/SHIFT，24 段双轮 ABBA。`rt_benchmark production [4..30]` 保留当前全部配置（含 AUTO/实时/OMM/SER）与 live 场景输入，固定视角连续采集 4 段，导出 client frame P50/P95、CPU/GPU/资源/内存，追加 production-history.jsonl；schema 13，不生成相同配置 A/B winner。详见 [实现与验收](PRIMARY-CACHE-2.md)。

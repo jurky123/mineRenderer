@@ -23,8 +23,8 @@ class DynamicModelBufferTest {
             assertEquals(1,buffer.modelCount());assertEquals(4*28,buffer.bytes());
             assertTrue(buffer.append(mesh,null));buffer.finish();
             assertEquals(2,buffer.modelCount());assertEquals(8*28,buffer.bytes());
-            assertEquals(1,buffer.rtModels().get(1).feature());assertEquals("entity",buffer.rtModels().get(1).owner());assertEquals(20,buffer.rtModels().get(1).y());assertFalse(buffer.rtModels().get(1).transientGeometry());
-            buffer.begin();buffer.finish();assertFalse(buffer.hasModels());assertEquals(0,buffer.bytes());
+            assertSame(buffer.rtModels(),buffer.rtModels());assertEquals(1,buffer.rtModels().get(1).feature());assertEquals("entity",buffer.rtModels().get(1).owner());assertEquals(20,buffer.rtModels().get(1).y());assertFalse(buffer.rtModels().get(1).transientGeometry());
+            buffer.begin();buffer.finish();assertTrue(buffer.rtModels().isEmpty());assertFalse(buffer.hasModels());assertEquals(0,buffer.bytes());
         }
     }
     @Test void frameAndModelCountCapsAreEnforcedByTheLiveAppendPath() {
