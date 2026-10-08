@@ -1,6 +1,6 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.44**：RT 成功输出后接管原版世界绘制；实时优先 Vulkan 原生 **DLSS Ray Reconstruction Performance**，由 SDK 查询输入尺寸；增加 shadow 快速材质读取、local alias PMF 复用、Primary Split/B0 diffuse cache、紧凑训练请求和动态几何复用。全新安装默认 effects off，新版提速幅度待 RTX 同场景验收。
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.44**：RT 成功输出后接管原版世界绘制；实时优先 Vulkan 原生 **DLSS Ray Reconstruction Performance**，由 SDK 查询输入尺寸；增加 shadow 快速材质读取、local alias PMF 复用、Primary Split/B0 diffuse cache、紧凑训练请求和动态几何复用。全新安装默认 effects off，alpha.44 专项三组均未证明可靠收益；B0/history 默认材质覆盖未验收。[实机分析](docs/performance/ALPHA-44-MATERIAL-ANALYSIS.md)。
 
 [下载 alpha.44 安装包](https://temp.sh/aPVgK/voxellight-client-kit-26.2-0.39.0-alpha.44.zip)（只含本 mod；集成 RR runtime）。alpha.42 已实测 DLSS RR 与世界接管运行；该场景 FAST 输运耗时降低 23.01%，Iterative 增加 32.76%。默认仍为 EXACT + Wavefront，FAST 按场景选择。[实测与本轮修改](docs/performance/ALPHA-42-FRAME-ANALYSIS.md)。替换旧 jar 后：
 
