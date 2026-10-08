@@ -290,7 +290,7 @@ void writePrimaryGuides(PathState path,TerrainSurface surface,SurfacePayload hit
         }
 #endif
 }
-void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool sparseChecked) {
+void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool sparseChecked,bool guideClassified=false) {
     if(path.origin.w==0||path.padding!=0)return;
 #ifndef RT_CPU_FIXTURE
     if((uint(camera.origin.w)&2050u)!=0){uint ignored;InterlockedAdd(pageFeedback[514u+uint(path.throughput.w)].x,1,ignored);}
@@ -300,9 +300,9 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
     TerrainSurface surface=(TerrainSurface)0;bool entering=false,deferred=false;
     if(hit.distance>=0) {
         bool sparseGuide=rtPolicy()&&(pageFeedback[1568].x&2u)!=0&&camera.padding==1&&path.throughput.w==0&&media.count==0;
-        bool classified=knownHit&&media.count==0&&terrainPrimaryGuide(hit.triangle,hit.bary,hit.instance,surface);
+        bool classified=knownHit&&media.count==0&&terrainPrimaryGuide(hit.triangle,hit.bary,hit.instance,surface,guideClassified);
         if(!classified)surface=terrainSurface(hit.triangle,hit.bary,hit.instance,sparseGuide,deferred);entering=dot(surface.geometryNormal,path.direction.xyz)<0;
-        writePrimaryGuides(path,surface,hit,entering);
+        if(!guideClassified)writePrimaryGuides(path,surface,hit,entering);
         if(!entering&&dielectric(surface.material)&&surface.material.type!=THIN_DIELECTRIC&&media.count==0)media.enter(materialMedium(surface.material));
     }
 #if defined(RT_SER) && !defined(RT_CPU_FIXTURE)

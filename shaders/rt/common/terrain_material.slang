@@ -132,18 +132,18 @@ ShadowSurface terrainShadow(uint triangle,float2 bary,uint instance){
 
 // Conservative first-hit classification: only dry, flat, non-emitting pure diffuse terrain.
 // Protected lobes and textured normals always fall back to the full Material 3 decoder.
-bool terrainPrimaryGuide(uint triangle,float2 bary,uint instance,out TerrainSurface surface){
+bool terrainPrimaryGuide(uint triangle,float2 bary,uint instance,out TerrainSurface surface,bool alreadyClassified=false){
     surface=(TerrainSurface)0;uint flags=geometry.Load(triangle*120+36);
-    if((flags&128u)!=0||asfloat(assets.Load(68))>0)return false;
+    if(!alreadyClassified&&((flags&128u)!=0||asfloat(assets.Load(68))>0))return false;
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
-    float2 uv=terrainUv(a,b,c,bary);uint id=atlasTexel(1,uv),packed=paletteWord(id,0),profile=paletteWord(id,1),transmission=paletteWord(id,3);
-    if(((profile&255)!=DIFFUSE&&(profile&255)!=ROUGH_DIFFUSE)||((profile>>16)&255)!=0||((transmission>>24)&255)!=0||((packed>>8)&255)>=230||((packed>>16)&255)>=65||(flags&16u)!=0||maxComponent(terrainEmission(triangle,bary))>0)return false;
-    uint normal=atlasTexel(2,uv);if((normal&255)<127||(normal&255)>128||((normal>>8)&255)<127||((normal>>8)&255)>128)return false;
-    float3 ng=safeNormalize(cross(b.p-a.p,c.p-a.p));float3 n=safeNormalize(a.n*(1-bary.x-bary.y)+b.n*bary.x+c.n*bary.y);
-    if(abs(dot(ng,n))<.99999||maxComponent(abs(ng))<.99999)return false;
+    float2 uv=terrainUv(a,b,c,bary);uint id=atlasTexel(1,uv),packed=paletteWord(id,0),profile=paletteWord(id,1);
+    if(!alreadyClassified&&(((profile&255)!=DIFFUSE&&(profile&255)!=ROUGH_DIFFUSE)||((profile>>16)&255)!=0||((paletteWord(id,3)>>24)&255)!=0||((packed>>8)&255)>=230||((packed>>16)&255)>=65||(flags&16u)!=0||maxComponent(terrainEmission(triangle,bary))>0))return false;
+    if(!alreadyClassified){uint normal=atlasTexel(2,uv);if((normal&255)<127||(normal&255)>128||((normal>>8)&255)<127||((normal>>8)&255)>128)return false;}
+    float3 ng=safeNormalize(cross(b.p-a.p,c.p-a.p));
+    if(!alreadyClassified){float3 n=safeNormalize(a.n*(1-bary.x-bary.y)+b.n*bary.x+c.n*bary.y);if(abs(dot(ng,n))<.99999||maxComponent(abs(ng))<.99999)return false;}
     Material m=defaultMaterial();m.type=profile&255;m.materialId=id&65535;
     m.baseColor=linearRgb(atlasTexel(0,uv))*linearRgb(a.tint);float roughness=1-(packed&255)/255.0;m.microfacetAlpha=roughness*roughness;m.alphaV=max(.0005,((paletteWord(id,4)>>8)&255)/255.0);
-    if(m.microfacetAlpha<.15)return false;
+    if(!alreadyClassified&&m.microfacetAlpha<.15)return false;
     m.f0=((packed>>8)&255)/255.0;m.ior=max(1,((profile>>8)&255)*3/255.0);
     m.mediumId=1+(instance<<16)+(m.type<<8)+(uint)round(m.ior*255/3);
     surface.material=m;surface.frame=terrainCompleteFrame(triangle,bary);surface.geometryNormal=ng;surface.flags=flags;return true;

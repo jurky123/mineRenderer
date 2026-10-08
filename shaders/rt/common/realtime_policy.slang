@@ -1,4 +1,5 @@
 #pragma once
+#include "diffuse_kernel.slang"
 // All realtime state lives after the existing continuation queues in pageFeedback.
 // Reference and CPU parity fixtures bypass the entire policy.
 bool rtPolicy(){
@@ -115,7 +116,7 @@ bool rtSparse(inout PathState path,TerrainSurface surface,SurfacePayload hit,flo
     rtCount(10,color.w<4?0:color.w<8?1:color.w<16?2:3);
     uint age=camera.frame-pageFeedback[previous+6].w;
     if(interval==1){rtCount(0,3);rtCount(7,color.w<4?1:2);}
-    if(pageFeedback[1568].z!=0&&interval>2){interval=2;rtCount(7,3);}
+    if((pageFeedback[1568].z&1u)!=0&&interval>2){interval=2;rtCount(7,3);}
     if((pageFeedback[1568].x&2u)==0||age>=interval||((directHash(path.reserved0)&(interval-1))==(camera.frame&(interval-1)))){rtCount(0,1);return false;}
     if(!all(isfinite(color.xyz))){rtCount(3,1);rtCount(0,1);return false;}
     float3 oldAlbedo=asfloat(pageFeedback[previous+7]).xyz;
@@ -170,7 +171,7 @@ bool rtClaim(uint address,float3 point,float3 n,uint bounce=0){
 // Hemisphere moments, rather than a zero-extended full-sphere SH evaluation.
 // Inverting the hemisphere Gram matrix preserves constant/affine incident light.
 // The rough lobe uses its actual Fresnel/Oren-Nayar kernel, not Lambert irradiance.
-float3 rtDiffuseResponse(uint address,Material m,Frame frame,float3 wo){
+float3 rtDiffuseResponseQuadrature(uint address,Material m,Frame frame,float3 wo){
     float3 c0=asfloat(pageFeedback[address+4]).xyz/.2820947918;
     float3 cx=asfloat(pageFeedback[address+5]).xyz/.4886025119;
     float3 cy=asfloat(pageFeedback[address+6]).xyz/.4886025119;
@@ -188,6 +189,26 @@ float3 rtDiffuseResponse(uint address,Material m,Frame frame,float3 wo){
         result+=evalDiffuseLobe(m,frame,wo,wi).f*li*(Pi/64);
     }
     return result;
+}
+// Linear kernels are valid only when hemisphere radiance needs no clipping.
+// Out-of-table materials and clipped light keep the 64-point reference path.
+float3 rtDiffuseResponse(uint address,Material m,Frame frame,float3 wo){
+    if((pageFeedback[1568].z&2u)!=0){rtCount(16,3);return rtDiffuseResponseQuadrature(address,m,frame,wo);}
+    if(m.type!=ROUGH_DIFFUSE||m.f0<.01||m.f0>.25){rtCount(16,2);return rtDiffuseResponseQuadrature(address,m,frame,wo);}
+    float cosine=dot(frame.n,wo);if(cosine<=0)return 0;
+    float3 c0=asfloat(pageFeedback[address+4]).xyz/.2820947918;
+    float3 cx=asfloat(pageFeedback[address+5]).xyz/.4886025119,cy=asfloat(pageFeedback[address+6]).xyz/.4886025119,cz=asfloat(pageFeedback[address+7]).xyz/.4886025119;
+    float3 mn=cx*frame.n.x+cy*frame.n.y+cz*frame.n.z;
+    float3 a=(2*c0-3*mn)/Pi,bn=(6*mn-3*c0)/Pi;
+    float3 tx=3/(2*Pi)*(cx-mn*frame.n.x),ty=3/(2*Pi)*(cy-mn*frame.n.y),tz=3/(2*Pi)*(cz-mn*frame.n.z);
+    float3 tangentLength=sqrt(tx*tx+ty*ty+tz*tz);
+    float3 minimum=a-select(bn<0,sqrt(tangentLength*tangentLength+bn*bn),tangentLength);
+    if(any(minimum<0)){rtCount(16,1);return rtDiffuseResponseQuadrature(address,m,frame,wo);}
+    rtCount(16,0);
+    float3 projected=wo-frame.n*cosine;float length=sqrt(max(0,1-cosine*cosine));
+    float3 t=length>1e-6?projected/length:float3(0);
+    float3 bt=tx*t.x+ty*t.y+tz*t.z,k=diffuseKernel(m,cosine);
+    return max(float3(0),m.baseColor*(a*k.x+bn*k.y+bt*k.z));
 }
 // Query once per eligible B0/B1/B2 hit; reserve a bounded number of exact training suffixes.
 // Pending training paths never query the cache, preventing recursive cache-only learning.
@@ -252,7 +273,7 @@ void rtTrain(uint index){
     bool sameCell=meta.y==pageFeedback[1568].y&&rtCacheMatches(address,point,n,bounce);
     uint ttl=rtTtl(point);bool matching=sameCell&&meta.w>0&&camera.frame-meta.z<=ttl;
     if(!sameCell&&meta.y==pageFeedback[1568].y&&camera.frame-meta.z<48&&meta.w>0){pageFeedback[address].x=0;rtCount(7,0);return;}
-    uint count=matching?min(meta.w+1,pageFeedback[1568].z!=0?64u:128u):1u;float alpha=1.0/count;float4 basis=rtSh(direction.xyz)/direction.w;
+    uint count=matching?min(meta.w+1,(pageFeedback[1568].z&1u)!=0?64u:128u):1u;float alpha=1.0/count;float4 basis=rtSh(direction.xyz)/direction.w;
     float3 sh[4]={radiance*basis.x,radiance*basis.y,radiance*basis.z,radiance*basis.w};
     for(uint i=0;i<4;i++){float3 previous=matching?asfloat(pageFeedback[address+4+i]).xyz:float3(0);pageFeedback[address+4+i]=asuint(float4(lerp(previous,sh[i],alpha),0));}
     float sample=luminance(rtShIrradiance(float4(sh[0],0),float4(sh[1],0),float4(sh[2],0),float4(sh[3],0),n));float4 stats=matching?asfloat(pageFeedback[address+8]):float4(0);float delta=sample-stats.x;

@@ -9,6 +9,7 @@ void terrain_material_parity(uint3 tid:SV_DispatchThreadID) {
     float shadowError=transparent?max(maxComponent(abs(shadow.sigmaA-surface.material.sigmaA)),max(maxComponent(abs(shadow.baseColor-surface.material.baseColor)),max(abs(shadow.ior-surface.material.ior),abs(shadow.transmission-surface.material.transmission)))):0;
     result[i*14+12]=float4(shadowError,transparent&&shadow.type!=surface.material.type?1:0,transparent&&shadow.mediumId!=surface.material.mediumId?1:0,transparent?maxComponent(abs(shadow.geometryNormal-surface.geometryNormal)):0);
     TerrainSurface primary;bool eligible=terrainPrimaryGuide(i,bary,i,primary);float guideError=eligible?max(maxComponent(abs(primary.material.baseColor-surface.material.baseColor)),maxComponent(abs(primary.frame.n-surface.frame.n))):0;
+    if(eligible){TerrainSurface trusted;terrainPrimaryGuide(i,bary,i,trusted,true);guideError=max(guideError,max(maxComponent(abs(trusted.material.baseColor-primary.material.baseColor)),maxComponent(abs(trusted.frame.n-primary.frame.n))));guideError=max(guideError,max(abs(trusted.material.f0-primary.material.f0),abs(trusted.material.alphaV-primary.material.alphaV)));}
     if(eligible)guideError=max(guideError,max(abs(primary.material.alphaV-surface.material.alphaV),abs(primary.material.f0-surface.material.f0)));
     result[i*14+13]=float4(guideError,eligible&&primary.material.type!=surface.material.type?1:0,eligible&&primary.material.mediumId!=surface.material.mediumId?1:0,eligible?1:0);
     Material m=surface.material;TerrainVertex v=terrainVertex(i,0);

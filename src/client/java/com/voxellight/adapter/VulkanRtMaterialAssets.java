@@ -39,7 +39,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     private GpuTextureView albedoView;
     private VulkanRtBuffer buffer;
     private int[] widths,heights,offsets;
-    private int environmentOffset,emitterOffset,flameOffset,dynamicOffset,runtimeOffset;
+    private int environmentOffset,emitterOffset,flameOffset,dynamicOffset,runtimeOffset,kernelOffset;
     private static final int RUNTIME_BYTES=2*1024*1024;
     private long runtimeGeneration=-1,runtimeProposalRevision=-1,runtimeFrame=-1;
     private int runtimeCellX=Integer.MIN_VALUE,runtimeCellY,runtimeCellZ,runtimeBytes,runtimeLights,runtimeSections;
@@ -58,7 +58,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             heights=new int[]{atlas.getHeight(0),ids.getHeight(0),normal.getHeight(0),palette.getHeight(0)};
             offsets=new int[4];long bytes=256;
             for(int i=0;i<4;i++){offsets[i]=Math.toIntExact(bytes);bytes=Math.addExact(bytes,Math.multiplyExact((long)widths[i]*heights[i],4));}
-            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;flameOffset=Math.toIntExact(bytes);bytes+=16*64;dynamicOffset=Math.toIntExact(bytes);bytes+=(long)RtDynamicScene.SIZE*RtDynamicScene.SIZE*4;runtimeOffset=Math.toIntExact(bytes);bytes+=RUNTIME_BYTES;
+            environmentOffset=Math.toIntExact(bytes);bytes+=VulkanRtEnvironmentAssets.BYTES;emitterOffset=Math.toIntExact(bytes);bytes+=8192*64;flameOffset=Math.toIntExact(bytes);bytes+=16*64;dynamicOffset=Math.toIntExact(bytes);bytes+=(long)RtDynamicScene.SIZE*RtDynamicScene.SIZE*4;runtimeOffset=Math.toIntExact(bytes);bytes+=RUNTIME_BYTES;kernelOffset=Math.toIntExact(bytes);bytes+=com.voxellight.rt.RtDiffuseKernel.BYTES;
             if(bytes>256L*1024*1024)throw new IllegalStateException("Vulkan material atlas budget exceeded (256 MiB)");
             try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
                 var properties=org.lwjgl.vulkan.VkPhysicalDeviceProperties.calloc(stack);
@@ -67,6 +67,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             }
             albedo=device.createTexture("VoxelLight Vulkan animated albedo",GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_TEXTURE_BINDING,GpuFormat.RGBA8_UNORM,widths[0],heights[0],1,1);
             albedoView=device.createTextureView(albedo);buffer=new VulkanRtBuffer(device,bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            encoder.writeToBuffer(buffer.slice(kernelOffset,com.voxellight.rt.RtDiffuseKernel.BYTES),com.voxellight.rt.RtDiffuseKernel.data());
             encoder.copyTextureToBuffer(ids.texture(),buffer,offsets[1],()->{},0);
             encoder.copyTextureToBuffer(normal.texture(),buffer,offsets[2],()->{},0);
             encoder.copyTextureToBuffer(palette.texture(),buffer,offsets[3],()->{},0);
@@ -91,7 +92,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             runtimeBytes=runtime.remaining();runtimeLights=runtime.getInt(4);runtimeSections=runtime.getInt(8);encoder.writeToBuffer(buffer.slice(runtimeOffset,runtimeBytes),runtime);
             runtimeGeneration=scene.emitterGeneration();runtimeProposalRevision=scene.proposalRevision();runtimeFrame=frame;runtimeCellX=cx;runtimeCellY=cy;runtimeCellZ=cz;
         }
-        header.putInt(runtimeOffset).putInt(runtimeBytes).putInt(8).putInt(4).putInt(1).putInt((int)runtimeProposalRevision).putInt(com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE);header.position(256);header.flip();
+        header.putInt(runtimeOffset).putInt(runtimeBytes).putInt(8).putInt(4).putInt(1).putInt((int)runtimeProposalRevision).putInt(com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE);header.putInt(240,kernelOffset);header.position(256);header.flip();
         var player=Minecraft.getInstance().player;
         String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
         lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+lighting[0]+"/"+lighting[1]+"/"+lighting[2];

@@ -19,7 +19,7 @@ class RtWorkMetricsTest {
         var metrics=new RtWorkMetrics();var counters=new long[16];counters[0]=100;counters[1]=25;counters[2]=75;
         metrics.record(1,10,10,1,1,new long[6],0,0,0,0,0,new long[6][4],counters);counters[1]=99;
         assertEquals(25,metrics.sample(1).realtime()[1]);var path=directory.resolve("runtime.csv");metrics.export(path);var lines=Files.readAllLines(path);
-        assertTrue(lines.getFirst().contains("rt_full_paths"));assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);assertTrue(lines.get(1).contains(",100,25,75,0,0,0,0,0,0,0,0,0,0,0,0,0"));assertEquals(56,metrics.sample(1).realtime().length);
+        assertTrue(lines.getFirst().contains("rt_full_paths"));assertEquals(lines.getFirst().split(",").length,lines.get(1).split(",").length);assertTrue(lines.get(1).contains(",100,25,75,0,0,0,0,0,0,0,0,0,0,0,0,0"));assertEquals(60,metrics.sample(1).realtime().length);
     }
 
     @Test void realtimeCoverageDistinguishesInactiveCacheFromMeasuredZeroHitRate(){
@@ -49,5 +49,15 @@ class RtWorkMetricsTest {
         metrics.record(8,1,1,1,0,new long[6],0,0,0,0,0,new long[6][4],counters);counters[17]=99;
         var reasons=(java.util.Map<?,?>)metrics.realtimeSummary().get("reasonCounters");assertEquals(42L,reasons.get("cache_immature"));assertEquals(13L,reasons.get("sparse_low_confidence"));
         assertThrows(IllegalArgumentException.class,()->metrics.record(8,1,1,1,0,new long[6],0,0,0,0,0,new long[6][4],new long[27]));
+    }
+    @Test void kernelCountersPreserveLegacyReportsAndDistinguishFallbacks(){
+        var metrics=new RtWorkMetrics();var legacy=new long[56];legacy[55]=9;
+        metrics.record(1,1,1,1,0,new long[6],0,0,0,0,0,new long[6][4],legacy);
+        assertEquals(9,metrics.sample(1).realtime()[55]);assertEquals(0,metrics.sample(1).realtime()[56]);
+        var counters=new long[60];counters[56]=17;counters[57]=3;counters[58]=2;counters[59]=5;
+        metrics.record(2,1,1,1,0,new long[6],0,0,0,0,0,new long[6][4],counters);
+        var reasons=(java.util.Map<?,?>)metrics.realtimeSummary().get("reasonCounters");
+        assertEquals(17L,reasons.get("kernel_preintegrated"));assertEquals(3L,reasons.get("kernel_clipped_fallback"));
+        assertEquals(2L,reasons.get("kernel_material_fallback"));assertEquals(5L,reasons.get("kernel_forced_quadrature"));
     }
 }

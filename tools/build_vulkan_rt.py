@@ -48,6 +48,18 @@ def validate_byte_address_layout(binary):
         if vectors.get(element)==3 and strides.get(array)!=12:
             raise ValueError('padded vec3 ByteAddressBuffer alias: 12-byte indexing with '+str(strides.get(array))+'-byte ArrayStride; use scalar word loads')
 
+def validate_kernel_storage(binary):
+    """The rough-diffuse LUT must live in the persistent assets buffer, not function arrays."""
+    words=struct.unpack('<'+'I'*(len(binary)//4),binary);constants={};arrays=[];i=5
+    while i<len(words):
+        count=words[i]>>16;opcode=words[i]&65535;args=words[i+1:i+count]
+        if opcode==43 and len(args)==3:constants[args[1]]=args[2]
+        elif opcode==28:arrays.append(args[2])
+        if count==0:raise ValueError('invalid SPIR-V instruction')
+        i+=count
+    if any(constants.get(length) in (2145,6435) for length in arrays):
+        raise ValueError('preintegrated diffuse LUT compiled as a per-invocation array; use asset-buffer loads')
+
 def validate_layout(reflection, transport=False, material=False):
     parameters = {p['name']: p for p in reflection['parameters']}
     for name, index in {'world': 0, 'output': 1, 'normals': 2, 'camera': 3}.items():
@@ -93,6 +105,7 @@ def main():
                         *(['-capability','spvShaderInvocationReorderNV'] if 'RT_SER' in defines else []), *(['-capability','spvRayQueryKHR'] if 'RT_RAY_QUERY' in defines else []), '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
         validate_byte_address_layout(spv.read_bytes())
+        validate_kernel_storage(spv.read_bytes())
         if entry != "material_visibility_miss":validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
         manifest['shaders'][entry] = {'stage': stage, 'defines':defines, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')

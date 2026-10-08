@@ -11,6 +11,7 @@ AGENTS.md
 
 # Build tools and IDEs
 .gradle/
+.xwin-cache/
 **/build/
 **/target/
 **/out/

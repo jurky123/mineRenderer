@@ -1,3 +1,11 @@
+## 0.39.0-alpha.47：Cache Cost Reduction
+
+ROUGH_DIFFUSE 预积分核、截断/材质范围回退、Primary 已验证分类和 guide 复用、四项 kernel 覆盖诊断已实现。`rt_benchmark cost`：16 段两轮 ABBA，隔离 kernel transport 成本，再比较 FULL/MONOLITHIC 与 SPLIT/PRIMARY/CACHE_SPARSE 的 GPU world。默认仍 FULL/MONOLITHIC；实机收益、画质和长停顿根因尚待验收。[实现与命令](performance/CACHE-COST-REDUCTION.md)。
+
+完整 `build clientKit` 通过：363 项 Java 测试零失败、Slang/native 数值回归通过；256 组预积分测试最大相对误差 0.406%，截断回退与原求值一致。包内 103 shader / 55 源码哈希和持久 LUT 资产核对通过。
+
+[alpha.47 安装包](https://temp.sh/ouqkP/voxellight-client-kit-26.2-0.39.0-alpha.47.zip)；SHA-256：`82cc0783d5aa900ff71286800534106d43b0496fe21ddd46f8e282bc72c8b3a5`。
+
 ## 0.39.0-alpha.46：修正 benchmark GPU 首次执行门禁
 
 等待首个 GPU 样本、收集样本与 GPU 耗时稳定性分开计时；断线/世界变化不再标为用户取消。默认仍 FULL/MONOLITHIC，缓存净性能和长停顿根因未宣称解决。[修复与剩余问题](performance/ALPHA-46-BENCHMARK-FIXES.md)。

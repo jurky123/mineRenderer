@@ -1,3 +1,7 @@
+## alpha.47 验收补充
+
+替换旧 VoxelLight jar，按下文启动 Vulkan PT / realtime / DLSS / 1 spp 后执行 `/voxellight rt_benchmark cost`。16 段结束后上传导出 ZIP；新 kernel 默认只影响已开启缓存的响应求值，FULL 默认不变。[完整验收](performance/CACHE-COST-REDUCTION.md)。
+
 ## alpha.46：Material-Aware Cache 2.1 验收
 
 默认 ROUGH_DIFFUSE 已接入 diffuse cache，精确镜面继续追踪。默认仍 FULL/MONOLITHIC，不自动开启实验缓存。先执行 `/voxellight rt_benchmark material`，确认 query/training/hit 和 B1/B2 实际工作量，再做画质对照与三类场景 production。新增 56 列覆盖诊断、source-depth 隔离、实际请求间接训练和动态槽位 generation。[实现、数值边界与验收](performance/MATERIAL-AWARE-CACHE-21.md)。
@@ -20,11 +24,11 @@
 
 RR 活跃时 SDK 决定输入尺寸，`rt_scale` 仅用于 OptiX/Vulkan 原重建。性能/画质仍需客户端验收。[完整说明](performance/CAUSTICA-FRAME-PIPELINE.md)。
 
-# VoxelLight 0.39.0-alpha.46 安装
+# VoxelLight 0.39.0-alpha.47 安装
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.46.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.47.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 

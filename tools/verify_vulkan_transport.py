@@ -41,6 +41,13 @@ def main():
     executable=output/'cache_lobes'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_cache_lobes.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/diffuse_kernel.slang'
+    subprocess.run([compiler,str(source),'-target','spirv','-profile','spirv_1_5','-entry','diffuse_kernel','-stage','compute','-o',str(output/'diffuse_kernel.spv')],check=True)
+    subprocess.run([tool('spirv-val','SPIRV_VAL'),'--target-env','vulkan1.2',str(output/'diffuse_kernel.spv')],check=True)
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','diffuse_kernel','-stage','compute','-o',str(output/'diffuse_kernel.cpp')],check=True)
+    executable=output/'diffuse_kernel'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_diffuse_kernel.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     source=ROOT/'shaders/rt/tests/realtime_policy.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','realtime_policy','-stage','compute','-o',str(output/'realtime_policy.cpp')],check=True)
     executable=output/'realtime_policy'

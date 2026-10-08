@@ -14,6 +14,10 @@ public final class RtExecutionOptions {
     public static void primary(Primary value){if(primary!=value){primary=value;revision++;}}
     public static void cache(Cache value){if(cache!=value){cache=value;revision++;}}
     public static void sampling(Sampling value){sampling=value;}
+    public enum Kernel {QUADRATURE,PREINTEGRATED}
+    private static Kernel kernel=Kernel.PREINTEGRATED;
+    public static Kernel kernel(){return kernel;}
+    public static void kernel(Kernel value){if(kernel!=value){kernel=value;revision++;}}
     public enum Realtime {FULL(0),CACHE(1),SPARSE(2),CACHE_SPARSE(3);private final int flags;Realtime(int flags){this.flags=flags;}public int flags(boolean realtime){return realtime?flags:0;}}
     public enum Shader {CLEAN,RUNTIME}
     private static Shader shader=Shader.CLEAN;

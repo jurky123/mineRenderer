@@ -27,7 +27,7 @@ public final class RtBenchmarkResults {
         for(var sample:samples)if(!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.cpuNanos());
         var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
     }
-    private static Timing comparisonTiming(Block block){if(block.plan.comparison().equals("world_takeover"))return block.timings.get("vulkan_world_total");if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
+    private static Timing comparisonTiming(Block block){if((block.plan.comparison().equals("world_takeover")||block.plan.comparison().equals("realtime_end_to_end")))return block.timings.get("vulkan_world_total");if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
     public static Comparison compare(String name,List<Block> all){
         var blocks=all.stream().filter(b->b.plan.comparison().equals(name)).sorted(Comparator.comparingInt((Block b)->b.plan.round()).thenComparingInt(b->b.plan.position())).toList();
         var reasons=new ArrayList<String>();

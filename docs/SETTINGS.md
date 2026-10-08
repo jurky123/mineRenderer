@@ -1,3 +1,7 @@
+## alpha.47 Cache 成本控制
+
+`/voxellight rt_kernel quadrature|preintegrated` 切换 64 点与预积分响应，默认 preintegrated；仅在 cache 实际响应时使用，超出范围或需要截断仍回退。`/voxellight rt_benchmark cost` 自动执行 16 段 ABBA（kernel 对照、FULL 对缓存 GPU world 对照），结束恢复原 kernel 和执行控制。[验收说明](performance/CACHE-COST-REDUCTION.md)。
+
 ## alpha.44：Primary / Cache 2.0 验收
 
 `rt_primary monolithic|split`、`rt_cache tail|primary`、`rt_sampling owen|shift` 为临时执行控制，默认 monolithic/tail/owen。`primary` 缓存需配合 `rt_realtime cache|cache_sparse`；Reference 强制完整路径。先运行 `/voxellight rt_benchmark material`（24 段专项 ABBA），再用 `/voxellight rt_benchmark production`（4 段保留日常 AUTO/实时/OMM/SER 配置的固定视角门禁）。结束恢复配置；production JSON 追加到 `benchmark-results/voxellight/production-history.jsonl`。性能、方差和画质分别验收，详见 [Primary / Cache 2.0](performance/PRIMARY-CACHE-2.md)。
