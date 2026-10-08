@@ -12,6 +12,6 @@ void initializePrimary(PathState path){
     uint index=path.reserved0;output[index]=0;pathAovs[index]=(PathAov)0;
     rtCount(0,0);if(rtPolicy()){uint p=rtProbe(index);pageFeedback[p]=0;pageFeedback[p+1]=0;pageFeedback[p+2]=0;if(camera.padding==1)pageFeedback[rtHistory(index,camera.frame&1u)+3]=0;}
     for(uint slot=0;slot<4;slot++)heldProbe(path,slot,float4(0));
-    if(index<camera.width*camera.height){uint base=(camera.width*camera.height*max(1u,camera.padding))+4;for(uint plane=0;plane<8;plane++)output[base+plane*camera.width*camera.height+index]=float4(0);output[base+camera.width*camera.height*2+index]=float4(path.direction.xyz,0);}
+    if(index<camera.width*camera.height){uint base=(camera.width*camera.height*max(1u,camera.padding))+4;for(uint plane=0;plane<10;plane++)output[base+plane*camera.width*camera.height+index]=float4(0);output[base+camera.width*camera.height*2+index]=float4(path.direction.xyz,0);}
 }
 uint primaryHit(uint index){return 1648u+camera.width*camera.height*max(1u,camera.padding)*2+index*2;}

@@ -21,8 +21,8 @@ import static org.lwjgl.vulkan.VK10.*;
 
 /** Vulkan-native joint denoising/upscaling; NGX writes the display-resolution image. */
 final class RtDlssReconstruction implements AutoCloseable {
-    private static final String[] INPUTS={"Albedo","Normal","Position","MotionPosition","Specular"};
-    private static final GpuFormat[] FORMATS={GpuFormat.R32_FLOAT,GpuFormat.RG32_FLOAT,GpuFormat.RGBA32_FLOAT,GpuFormat.RGBA32_FLOAT,GpuFormat.RGBA32_FLOAT};
+    private static final String[] INPUTS={"Albedo","Normal","Position","MotionPosition","Specular","ReflectionPosition","PreviousReflectionPosition"};
+    private static final GpuFormat[] FORMATS={GpuFormat.R32_FLOAT,GpuFormat.RG32_FLOAT,GpuFormat.RGBA32_FLOAT,GpuFormat.RGBA32_FLOAT,GpuFormat.RGBA32_FLOAT,GpuFormat.RG32_FLOAT};
     static final RenderPipeline GUIDES=guidePipeline();
     private static RenderPipeline guidePipeline(){
         var bindings=BindGroupLayout.builder();for(var name:INPUTS)bindings.withSampler(name);
@@ -35,14 +35,16 @@ final class RtDlssReconstruction implements AutoCloseable {
     private long session;
     private int width,height,outputWidth,outputHeight;
     private GpuBuffer settings;
-    private final GpuTexture[] raw=new GpuTexture[5],guides=new GpuTexture[5];
-    private final GpuTextureView[] rawViews=new GpuTextureView[5],guideViews=new GpuTextureView[5];
+    private final GpuTexture[] raw=new GpuTexture[7],guides=new GpuTexture[6];
+    private final GpuTextureView[] rawViews=new GpuTextureView[7],guideViews=new GpuTextureView[6];
     private GpuTexture result;
     private GpuTextureView resultView;
     private final Matrix4f previousClip=new Matrix4f();
     private double previousX,previousY,previousZ;
     private long epoch=Long.MIN_VALUE,lastTime;
     private boolean valid;
+    private com.voxellight.rt.RtExecutionOptions.Guides lastGuides;
+    private com.voxellight.rt.RtExecutionOptions.Roughness lastRoughness;
     private int quality=0; // NGX MaxPerf; no frame generation.
     void invalidate(){valid=false;}
     private void initialize(){
@@ -55,28 +57,29 @@ final class RtDlssReconstruction implements AutoCloseable {
     int[] optimal(int w,int h){initialize();var size=DlssNative.optimal(session,w,h,quality);if(size==null||size.length!=2||size[0]<=0||size[1]<=0||size[0]>w||size[1]>h)throw new IllegalStateException("Invalid NGX optimal input dimensions");return size;}
     GpuTextureView resolve(CommandEncoder encoder,VulkanRtContext context,GpuTextureView noisy,Matrix4f clip,double x,double y,double z,long generation,int w,int h,int ow,int oh,Matrix4f viewRotation){
         initialize();
+        if(lastGuides!=com.voxellight.rt.RtExecutionOptions.guides()||lastRoughness!=com.voxellight.rt.RtExecutionOptions.roughness()){valid=false;lastGuides=com.voxellight.rt.RtExecutionOptions.guides();lastRoughness=com.voxellight.rt.RtExecutionOptions.roughness();}
         if(settings==null||w!=width||h!=height||ow!=outputWidth||oh!=outputHeight){
             if(settings!=null){close();initialize();}
             width=w;height=h;outputWidth=ow;outputHeight=oh;
             var gpu=RenderSystem.getDevice();if(!gpu.precompilePipeline(GUIDES,RenderProbe.SHADERS).isValid())throw new IllegalStateException("DLSS guide pipeline unavailable");
             for(int i=0;i<raw.length;i++){
-                raw[i]=gpu.createTexture("VoxelLight DLSS raw guide "+i,GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST,GpuFormat.RGBA32_FLOAT,w,h,1,1);rawViews[i]=gpu.createTextureView(raw[i]);
-                guides[i]=gpu.createTexture("VoxelLight DLSS guide "+i,GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_RENDER_ATTACHMENT,FORMATS[i],w,h,1,1);guideViews[i]=gpu.createTextureView(guides[i]);
+                raw[i]=gpu.createTexture("VoxelLight DLSS raw guide "+i,GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA32_FLOAT,w,h,1,1);rawViews[i]=gpu.createTextureView(raw[i]);
+                if(i<guides.length){guides[i]=gpu.createTexture("VoxelLight DLSS guide "+i,GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC,FORMATS[i],w,h,1,1);guideViews[i]=gpu.createTextureView(guides[i]);}
             }
             // Minecraft currently has no public storage-image usage; our Vulkan-only bit
             // is translated by VulkanStorageImageMixin, leaving vanilla textures untouched.
-            result=gpu.createTexture("VoxelLight DLSS RR output",32|GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST,GpuFormat.RGBA16_FLOAT,ow,oh,1,1);resultView=gpu.createTextureView(result);
+            result=gpu.createTexture("VoxelLight DLSS RR output",32|GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA16_FLOAT,ow,oh,1,1);resultView=gpu.createTextureView(result);
             settings=gpu.createBuffer(()->"VoxelLight DLSS guide settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,192);
         }
-        for(int i=0;i<raw.length;i++)context.copyGuide(encoder,new int[]{0,1,2,6,7}[i],raw[i]);
+        for(int i=0;i<raw.length;i++)context.copyGuide(encoder,new int[]{0,1,2,6,7,8,9}[i],raw[i]);
         var data=ByteBuffer.allocateDirect(192).order(ByteOrder.nativeOrder());previousClip.get(0,data);clip.get(64,data);
         data.position(128).putFloat((float)previousX).putFloat((float)previousY).putFloat((float)previousZ).putFloat(valid&&epoch==generation?1:0);
-        data.putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat(0);data.putFloat(w).putFloat(h).putFloat(0).putFloat(0);data.position(192).flip();encoder.writeToBuffer(settings.slice(),data);
+        data.putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat(0);data.putFloat(w).putFloat(h).putFloat(0).putFloat(0);data.putFloat(com.voxellight.rt.RtExecutionOptions.roughness()==com.voxellight.rt.RtExecutionOptions.Roughness.ALPHA?1:0);data.position(192).flip();encoder.writeToBuffer(settings.slice(),data);
         var descriptor=RenderPassDescriptor.create(()->"VoxelLight DLSS RR guides").withRenderArea(new RenderPass.RenderArea(0,0,w,h));for(var view:guideViews)descriptor.withColorAttachment(view,Optional.empty());
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_dlss_guides");var pass=encoder.createRenderPass(descriptor)){
             pass.setPipeline(GUIDES);for(int i=0;i<raw.length;i++)pass.bindTexture(INPUTS[i],rawViews[i],RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.setUniform("DlssSettings",settings);pass.draw(3,1,0,0);
         }
-        long[] images=new long[21];GpuTextureView[] inputs={noisy,guideViews[0],guideViews[1],guideViews[2],guideViews[3],guideViews[4],resultView};
+        long[] images=new long[24];GpuTextureView[] inputs={noisy,guideViews[0],guideViews[1],guideViews[2],guideViews[3],guideViews[4],resultView,guideViews[5]};
         for(int i=0;i<inputs.length;i++){var view=(VulkanGpuTextureView)inputs[i];images[i*3]=view.vkImageView();images[i*3+1]=view.texture().vkImage();images[i*3+2]=VulkanConst.toVk(view.texture().getFormat());}
         float[] matrices=new float[32];new Matrix4f(viewRotation).translate((float)-x,(float)-y,(float)-z).get(matrices);new Matrix4f(clip).mul(new Matrix4f(viewRotation).invert()).get(matrices,16);
         long now=System.nanoTime();float frameMs=lastTime==0?16.67f:Math.clamp((now-lastTime)/1e6f,.1f,200);lastTime=now;
@@ -93,6 +96,7 @@ final class RtDlssReconstruction implements AutoCloseable {
         // Always close/submit the borrowed command before releasing the feature.
         if(vkEndCommandBuffer(command)!=VK_SUCCESS)throw new IllegalStateException("DLSS command end failed");nativeEncoder.execute(command);
         if(failure!=null)throw failure;
+        RtGuideCapture.capture(encoder,context,new GpuTextureView[]{noisy,guideViews[0],guideViews[1],guideViews[2],guideViews[3],guideViews[4],guideViews[5],resultView,rawViews[5],rawViews[6]},new String[]{"input-hdr","depth","motion","normal-roughness","diffuse-albedo","specular-albedo","specular-motion","rr-output","reflection-position","previous-reflection-position"},new int[]{4,1,2,4,4,4,2,4,4,4},new boolean[]{false,false,false,false,false,false,false,true,false,false},"RR frame="+context.lastFrame()+" epoch="+generation+" input="+w+"x"+h+" output="+ow+"x"+oh+" guides="+lastGuides+" roughness="+lastRoughness+" workingColor=linear-sRGB preExposure=1 depth=reverse-Z motion=previous-current-input-pixels jitter="+(-RtJitter.x(context.lastFrame()))+","+(-RtJitter.y(context.lastFrame()))+" reset="+(!valid||epoch!=generation)+" camera="+x+","+y+","+z+" clip="+clip);
         previousClip.set(clip);previousX=x;previousY=y;previousZ=z;epoch=generation;valid=true;return resultView;
     }
     private static void barrier(VkCommandBuffer command,MemoryStack stack,int source,int destination){
@@ -100,7 +104,7 @@ final class RtDlssReconstruction implements AutoCloseable {
     }
     public void close(){
         if(session!=0){device.createCommandEncoder().submit();vkDeviceWaitIdle(device.vkDevice());DlssNative.destroy(session);session=0;}
-        for(int i=0;i<raw.length;i++){if(rawViews[i]!=null)rawViews[i].close();if(raw[i]!=null)raw[i].close();if(guideViews[i]!=null)guideViews[i].close();if(guides[i]!=null)guides[i].close();rawViews[i]=null;raw[i]=null;guideViews[i]=null;guides[i]=null;}
+        for(int i=0;i<raw.length;i++){if(rawViews[i]!=null)rawViews[i].close();if(raw[i]!=null)raw[i].close();if(i<guides.length){if(guideViews[i]!=null)guideViews[i].close();if(guides[i]!=null)guides[i].close();guideViews[i]=null;guides[i]=null;}rawViews[i]=null;raw[i]=null;}
         if(resultView!=null)resultView.close();if(result!=null)result.close();if(settings!=null)settings.close();resultView=null;result=null;settings=null;valid=false;epoch=Long.MIN_VALUE;lastTime=0;
     }
 }

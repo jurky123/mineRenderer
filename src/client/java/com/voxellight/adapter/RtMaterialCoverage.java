@@ -34,11 +34,13 @@ public final class RtMaterialCoverage {
     private RtMaterialCoverage(){}
     static void publish(int w,int h,byte[] transmission,short[] opacity){grid=new Grid(w,h,transmission,opacity);knownOpacityTexels=0;for(short alpha:opacity)if(alpha>=0&&alpha<256)knownOpacityTexels++;opacityValid=knownOpacityTexels>0;opacityEpoch++;}
     static void clear(){grid=null;opacityValid=false;knownOpacityTexels=0;opacityEpoch++;watched.clear();}
-    public static boolean transmissive(byte[] triangles,int offset){
+    public static java.util.function.BiPredicate<byte[],Integer> transmissionSnapshot(){var snapshot=grid;return (triangles,offset)->transmissive(triangles,offset,snapshot);}
+    public static boolean transmissive(byte[] triangles,int offset){return transmissive(triangles,offset,grid);}
+    private static boolean transmissive(byte[] triangles,int offset,Grid current){
         var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());int flags=data.getInt(offset+36);
         if((flags&128)!=0)return false; // Current dynamic material contract is diffuse.
         if((flags&2)!=0)return true;
-        var current=grid;if(current==null)return true;
+        if(current==null)return true;
         int[] bounds=bounds(data,offset,current);if(bounds==null)return true;
         for(int y=bounds[1];y<=bounds[3];y++)for(int x=bounds[0];x<=bounds[2];x++)if(current.transmission[y*current.width+x]!=0)return true;
         return false;

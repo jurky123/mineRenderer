@@ -1,3 +1,7 @@
+## alpha.48
+
+新增 `rt_guides first_hit|endpoint`（默认 endpoint，仅实时 DLSS），`rt_roughness linear|alpha`（默认 sqrt(alpha) 的 linear），`rt_capture_guides`（下一个有效 DLSS 帧按需导出），`rt_transport full|simple|two_pass`（默认 full；实验强制 FULL），`rt_scene_update async_prep`（CPU 后台准备，默认 optimized）。`rt_benchmark transport` 与 `rt_benchmark scene` 独立验收并恢复控制。[实现与限制](performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。
+
 ## alpha.47 Cache 成本控制
 
 `/voxellight rt_kernel quadrature|preintegrated` 切换 64 点与预积分响应，默认 preintegrated；仅在 cache 实际响应时使用，超出范围或需要截断仍回退。`/voxellight rt_benchmark cost` 自动执行 16 段 ABBA（kernel 对照、FULL 对缓存 GPU world 对照），结束恢复原 kernel 和执行控制。[验收说明](performance/CACHE-COST-REDUCTION.md)。

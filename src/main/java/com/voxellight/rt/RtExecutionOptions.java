@@ -2,6 +2,18 @@ package com.voxellight.rt;
 
 /** Execution and realtime algorithm A/B controls. Defaults leave optional OMM/SER disabled until measured. */
 public final class RtExecutionOptions {
+    public enum Transport {FULL,SIMPLE,TWO_PASS}
+    private static Transport transport=Transport.FULL;
+    public static Transport transport(){return transport;}
+    public static void transport(Transport value){if(transport!=value){transport=value;revision++;}}
+    public enum Guides {FIRST_HIT,ENDPOINT}
+    public enum Roughness {LINEAR,ALPHA}
+    private static Guides guides=Guides.ENDPOINT;
+    private static Roughness roughness=Roughness.LINEAR;
+    public static Guides guides(){return guides;}
+    public static void guides(Guides value){guides=value;}
+    public static Roughness roughness(){return roughness;}
+    public static void roughness(Roughness value){roughness=value;}
     public enum Primary {MONOLITHIC,SPLIT}
     public enum Cache {TAIL,PRIMARY}
     public enum Sampling {OWEN,SHIFT}
@@ -32,7 +44,7 @@ public final class RtExecutionOptions {
     private static Realtime realtime=Realtime.FULL;
     public static Realtime realtime(){return realtime;}
     public static void realtime(Realtime value){if(realtime!=value){realtime=value;revision++;}}
-    public enum SceneUpdate {LEGACY,OPTIMIZED}
+    public enum SceneUpdate {LEGACY,OPTIMIZED,ASYNC_PREP}
     private static SceneUpdate sceneUpdate=SceneUpdate.OPTIMIZED;
     public static SceneUpdate sceneUpdate(){return sceneUpdate;}
     public static void sceneUpdate(SceneUpdate value){if(sceneUpdate!=value){sceneUpdate=value;revision++;}}

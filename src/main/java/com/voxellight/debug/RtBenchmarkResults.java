@@ -27,7 +27,7 @@ public final class RtBenchmarkResults {
         for(var sample:samples)if(!counterFrames.contains(sample.frame()))grouped.computeIfAbsent(sample.mode(),ignored->new ArrayList<>()).add(sample.cpuNanos());
         var result=new LinkedHashMap<String,Timing>();grouped.forEach((name,values)->result.put(name,timing(values)));return result;
     }
-    private static Timing comparisonTiming(Block block){if((block.plan.comparison().equals("world_takeover")||block.plan.comparison().equals("realtime_end_to_end")))return block.timings.get("vulkan_world_total");if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
+    private static Timing comparisonTiming(Block block){if(block.plan.comparison().equals("scene_cpu_preparation")){var cpu=block.timings.get("cpu:vulkan_rt_scene_commit");return cpu==null?null:new Timing(cpu.samples(),cpu.p95Ms(),cpu.p95Ms());}if((block.plan.comparison().equals("world_takeover")||block.plan.comparison().equals("realtime_end_to_end")))return block.timings.get("vulkan_world_total");if(block.plan.comparison().equals("blas"))return block.timings.get("vulkan_rt_scene_commit");return block.timings.get("vulkan_rt_batch_"+(block.plan.config().queue()==RtExecutionOptions.Queue.HYBRID?"hybrid":block.plan.config().queue()==RtExecutionOptions.Queue.COMPACT?"compact":"fixed"));}
     public static Comparison compare(String name,List<Block> all){
         var blocks=all.stream().filter(b->b.plan.comparison().equals(name)).sorted(Comparator.comparingInt((Block b)->b.plan.round()).thenComparingInt(b->b.plan.position())).toList();
         var reasons=new ArrayList<String>();
@@ -41,7 +41,7 @@ public final class RtBenchmarkResults {
             if(block.state==null||!block.state.matches(block.plan.config()))reasons.add("actual controls do not match requested variant");
             if(!block.valid)reasons.add("invalid block "+block.plan.round()+"/"+block.plan.position());
             if(reference==null||block.state==null||!reference.sameWorkload(block.state))reasons.add("resolution/spp/mode/terrain working set changed");
-            var time=comparisonTiming(block);if(time==null||time.samples<30||time.medianMs==null)reasons.add("insufficient GPU comparison timestamps");
+            var time=comparisonTiming(block);if(time==null||time.samples<30||time.medianMs==null)reasons.add("insufficient comparison timestamps");
         }
         // Sampled alive curves must exist; throughput timing alone does not prove matched ray work.
         if(blocks.stream().anyMatch(b->b.aliveFraction.length!=6))reasons.add("missing alive-path counters");

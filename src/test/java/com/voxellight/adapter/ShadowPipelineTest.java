@@ -132,9 +132,9 @@ class ShadowPipelineTest {
                                 "Native output rebinding order must match the actual MRT attachments");
                     }
                     if(field.equals("DLSS_GUIDES")){
-                        assertEquals(5,pipeline.getColorTargetStates().length);
+                        assertEquals(6,pipeline.getColorTargetStates().length);
                         var names=new ArrayList<String>();for(Object output:fragment.outputs()){var name=output.getClass().getDeclaredMethod("name");name.setAccessible(true);names.add((String)name.invoke(output));}
-                        assertEquals(List.of("depth","motion","normalsRoughness","diffuseAlbedo","specularAlbedo"),names);
+                        assertEquals(List.of("depth","motion","normalsRoughness","diffuseAlbedo","specularAlbedo","specularMotion"),names);
                         assertEquals(GpuFormat.R32_FLOAT,pipeline.getColorTargetStates()[0].format());
                         assertEquals(GpuFormat.RG32_FLOAT,pipeline.getColorTargetStates()[1].format());
                     }

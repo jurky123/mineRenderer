@@ -23,6 +23,12 @@ VARIANTS['material_cache_train']=('material_cache_train',['RT_DIRECT_RIS'])
 for name,(base,defines) in list(VARIANTS.items()):
     if base=='material_primary':VARIANTS[name.replace('material_primary','material_primary_shade')]=('material_primary_shade',defines)
 VARIANTS['material_primary_shade']=('material_primary_shade',[])
+VARIANTS['material_primary_simple']=('material_primary',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_SIMPLE_MATERIAL'])
+VARIANTS['material_indirect_simple']=('material_indirect',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_SIMPLE_MATERIAL'])
+VARIANTS['material_primary_visibility_compact']=('material_primary_visibility',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_COMPACT48'])
+VARIANTS['material_primary_shade_compact']=('material_primary_shade',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_COMPACT48','RT_TWO_PASS'])
+VARIANTS['material_resolve_compact']=('material_resolve',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_COMPACT48'])
+VARIANTS['material_guides']=('material_guides',['RT_CLEAN_FULL','RT_DIRECT_RIS'])
 STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)
@@ -60,7 +66,7 @@ def validate_kernel_storage(binary):
     if any(constants.get(length) in (2145,6435) for length in arrays):
         raise ValueError('preintegrated diffuse LUT compiled as a per-invocation array; use asset-buffer loads')
 
-def validate_layout(reflection, transport=False, material=False):
+def validate_layout(reflection, transport=False, material=False, compact=False):
     parameters = {p['name']: p for p in reflection['parameters']}
     for name, index in {'world': 0, 'output': 1, 'normals': 2, 'camera': 3}.items():
         if parameters[name]['binding']['index'] != index:
@@ -79,11 +85,12 @@ def validate_layout(reflection, transport=False, material=False):
         expected_path=dict(origin=0,direction=16,throughput=32,radiance=48)
         if material:
             expected_path=dict(origin=0,direction=16,throughput=32,state=48,etaScale=52,seed=56,reserved=60)
+            if compact:expected_path=dict(origin=0,direction=12,pdf=28,throughput=16,state=32,etaScale=36,seed=40,reserved=44)
             aov=parameters['pathAovs']['type']['resultType']
             if parameters['pathAovs']['binding']['index']!=16 or aov['sizes'][0]['value']!=48:raise ValueError('AOV accumulation ABI mismatch')
             medium=parameters['pathMedia']['type']['resultType']
             if parameters['pathMedia']['binding']['index']!=15 or medium['sizes'][0]['value']!=288 or {f['name']:f['binding']['offset'] for f in medium['fields']}!=dict(absorptionIor=0,scatteringPhase=128,mediumIds=256):raise ValueError('medium cold ABI mismatch')
-        if path['sizes'][0]['value'] != 64 or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
+        if path['sizes'][0]['value'] != (48 if compact else 64) or {f['name']: f['binding']['offset'] for f in path['fields']} != expected_path:
             raise ValueError('continuation ABI mismatch')
     if offsets != expected:
         raise ValueError(f'camera ABI mismatch: {offsets}')
@@ -106,7 +113,7 @@ def main():
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
         validate_byte_address_layout(spv.read_bytes())
         validate_kernel_storage(spv.read_bytes())
-        if entry != "material_visibility_miss":validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"))
+        if entry != "material_visibility_miss":validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"), "RT_COMPACT48" in defines)
         manifest['shaders'][entry] = {'stage': stage, 'defines':defines, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64 bytes + 288-byte cold media + 48-byte AOV accumulator')

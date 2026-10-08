@@ -85,10 +85,18 @@ void dlss_fixture(uint3 tid:SV_DispatchThreadID){
     result[0]=float4(rrMotion(current,previous,float2(100,60),true),rrDepth(current,true),rrDepth(current,false));
     result[1]=float4(rrMotion(current,current,float2(100,60),true),rrDepth(float4(0),true),rrDepth(float4(0,0,2,1),true));
     result[2]=float4(rrMotion(current,previous,float2(100,60),false),rrMotion(current,float4(0),float2(100,60),true));
+    result[3]=float4(rrRoughness(.3,false),rrRoughness(.3,true),rrRoughness(-1,false),rrRoughness(2,false));
 }\n''')
     subprocess.run([compiler,str(source),'-target','cpp','-entry','dlss_fixture','-stage','compute','-o',str(output/'dlss_fixture.cpp')],check=True)
     executable=output/'dlss_fixture'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_dlss_fixture.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/reconstruction_contract.slang';spv=output/'reconstruction_contract.spv'
+    subprocess.run([compiler,str(source),'-target','spirv','-profile','spirv_1_5','-entry','reconstruction_contract','-stage','compute','-o',str(spv)],check=True)
+    subprocess.run([tool('spirv-val','SPIRV_VAL'),'--target-env','vulkan1.2',str(spv)],check=True)
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','reconstruction_contract','-stage','compute','-o',str(output/'reconstruction_contract.cpp')],check=True)
+    executable=output/'reconstruction_contract'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_reconstruction_contract.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
     source=ROOT/'shaders/rt/tests/emitter_sampling.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','emitter_sampling','-stage','compute','-o',str(output/'emitter_sampling.cpp')],check=True)
@@ -110,6 +118,11 @@ void dlss_fixture(uint3 tid:SV_DispatchThreadID){
     executable=output/'path_storage'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_path_storage.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    subprocess.run([compiler,str(source),'-DRT_COMPACT48=1','-target','cpp','-entry','path_storage','-stage','compute','-o',str(output/'path_storage_compact.cpp')],check=True)
+    executable=output/'path_storage_compact'
+    subprocess.run([cxx,'-DVOXELLIGHT_COMPACT_TEST=1','-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_path_storage.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
+
     source=ROOT/'shaders/rt/tests/continuation_queue.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','continuation_queue','-stage','compute','-o',str(output/'continuation_queue.cpp')],check=True)
     executable=output/'continuation_queue'

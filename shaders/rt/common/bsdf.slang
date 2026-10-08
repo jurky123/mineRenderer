@@ -25,8 +25,15 @@ float specProbability(Material m){return m.type==COATED_DIFFUSE?0:metal(m)?1:cla
 
 
 #include "ggx_energy.slang"
-float multiscatterMix(Material m,float cosine){return m.multipleScattering?clamp(1-ggxEnergy(sqrt(m.microfacetAlpha*m.alphaV),cosine),0,.9f):0;}
-float3 multiscatterF(Material m,float3 wo,float3 wi){if(!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return float3(0,0,0);float alpha=sqrt(m.microfacetAlpha*m.alphaV);float eo=ggxEnergy(alpha,wo.z);float ei=ggxEnergy(alpha,wi.z);float average=ggxAverageEnergy(alpha);if(average>.99999f)return float3(0,0,0);float3 F=float3(0,0,0);
+bool simplifiedOrdinary(Material m){
+#ifdef RT_SIMPLE_MATERIAL
+ return m.type==ROUGH_DIFFUSE&&m.coatWeight==0&&m.transmission==0&&maxComponent(m.emission)==0;
+#else
+ return false;
+#endif
+}
+float multiscatterMix(Material m,float cosine){if(simplifiedOrdinary(m))return 0;return m.multipleScattering?clamp(1-ggxEnergy(sqrt(m.microfacetAlpha*m.alphaV),cosine),0,.9f):0;}
+float3 multiscatterF(Material m,float3 wo,float3 wi){if(simplifiedOrdinary(m)||!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return float3(0,0,0);float alpha=sqrt(m.microfacetAlpha*m.alphaV);float eo=ggxEnergy(alpha,wo.z);float ei=ggxEnergy(alpha,wi.z);float average=ggxAverageEnergy(alpha);if(average>.99999f)return float3(0,0,0);float3 F=float3(0,0,0);
 for(int i=0;i<8;i++){float c=(i+.5f)/8;F=F+(metal(m)?conductorFresnel(m,c):float3(1,1,1)*fresnelDielectric(c,(1+sqrt(m.f0))/(1-sqrt(m.f0))))*(2*c/8);}float3 factor=float3(F.x*F.x*average/max(1e-6f,1-F.x*(1-average)),F.y*F.y*average/max(1e-6f,1-F.y*(1-average)),F.z*F.z*average/max(1e-6f,1-F.z*(1-average)));return factor*((1-eo)*(1-ei)/(Pi*max(1e-6f,1-average)));}
 BsdfEval evalLocal(Material m,float3 wo,float3 wi,float eta=1.5f,int forced=0){
  BsdfEval result = {float3(0,0,0),0};if(wo.z<=0||abs(wi.z)<1e-7f)return result;
@@ -51,7 +58,7 @@ BsdfEval evalLocal(Material m,float3 wo,float3 wi,float eta=1.5f,int forced=0){
  float q=multiscatterMix(m,wo.z);spec=spec+multiscatterF(m,wo,wi);pdfSpec=pdfSpec*(1-q)+wi.z/Pi*q;
  float p=specProbability(m);float root=sqrt(m.f0);float baseIOR=root>=.999f?1000:(1+root)/(1-root);float3 diffuse=m.baseColor*((1-fresnelDielectric(wo.z,baseIOR))*(1-fresnelDielectric(wi.z,baseIOR))/Pi);
  if(m.type==COATED_DIFFUSE)diffuse=m.baseColor/Pi;
- if(m.type==ROUGH_DIFFUSE){float sigma=sqrt(m.microfacetAlpha)*.5f;float s2=sigma*sigma;float A=1-.5f*s2/(s2+.33f);float B=.45f*s2/(s2+.09f);float so=sqrt(max(0,1-wo.z*wo.z));float si=sqrt(max(0,1-wi.z*wi.z));float az=(wo.x*wi.x+wo.y*wi.y)/max(1e-7f,so*si);diffuse=diffuse*(A+B*max(0,az)*max(so,si)*min(so/max(wo.z,1e-5f),si/max(wi.z,1e-5f)));}
+ if(m.type==ROUGH_DIFFUSE&&!simplifiedOrdinary(m)){float sigma=sqrt(m.microfacetAlpha)*.5f;float s2=sigma*sigma;float A=1-.5f*s2/(s2+.33f);float B=.45f*s2/(s2+.09f);float so=sqrt(max(0,1-wo.z*wo.z));float si=sqrt(max(0,1-wi.z*wi.z));float az=(wo.x*wi.x+wo.y*wi.y)/max(1e-7f,so*si);diffuse=diffuse*(A+B*max(0,az)*max(so,si)*min(so/max(wo.z,1e-5f),si/max(wi.z,1e-5f)));}
  if(m.type==DIFFUSE||m.type==EMISSIVE){result={m.baseColor/Pi,wi.z/Pi};}
  else if(m.type==DIFFUSE_TRANSMISSION){result={m.baseColor*((1-m.transmission)/Pi),wi.z/Pi*(1-m.transmission)};}
  else result={metal(m)?spec:diffuse+spec,p*pdfSpec+(1-p)*wi.z/Pi};

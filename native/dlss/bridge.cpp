@@ -51,11 +51,12 @@ extern "C" JNIEXPORT void JNICALL Java_com_voxellight_nvidia_DlssNative_evaluate
         s->w=w;s->h=h;s->ow=ow;s->oh=oh;
     }
     if(w!=s->w||h!=s->h||ow!=s->ow||oh!=s->oh){env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),"DLSS feature dimensions changed without recreation");return;}
-    jlong handles[21];env->GetLongArrayRegion(images,0,21,handles);NVSDK_NGX_Resource_VK resources[7];
+    if(env->GetArrayLength(images)!=24||env->GetArrayLength(matrices)!=32){env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"),"Invalid DLSS resource/matrix ABI");return;}
+    jlong handles[24];env->GetLongArrayRegion(images,0,24,handles);NVSDK_NGX_Resource_VK resources[8];
     VkImageSubresourceRange range={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
-    for(int i=0;i<7;i++)resources[i]=NVSDK_NGX_Create_ImageView_Resource_VK((VkImageView)(uintptr_t)handles[i*3],(VkImage)(uintptr_t)handles[i*3+1],range,(VkFormat)handles[i*3+2],i==6?ow:w,i==6?oh:h,i==6);
+    for(int i=0;i<8;i++)resources[i]=NVSDK_NGX_Create_ImageView_Resource_VK((VkImageView)(uintptr_t)handles[i*3],(VkImage)(uintptr_t)handles[i*3+1],range,(VkFormat)handles[i*3+2],i==6?ow:w,i==6?oh:h,i==6);
     float matrix[32];env->GetFloatArrayRegion(matrices,0,32,matrix);
-    NVSDK_NGX_VK_DLSSD_Eval_Params params={};params.pInColor=&resources[0];params.pInDepth=&resources[1];params.pInMotionVectors=&resources[2];params.pInNormals=&resources[3];params.pInDiffuseAlbedo=&resources[4];params.pInSpecularAlbedo=&resources[5];params.pInOutput=&resources[6];
+    NVSDK_NGX_VK_DLSSD_Eval_Params params={};params.pInColor=&resources[0];params.pInDepth=&resources[1];params.pInMotionVectors=&resources[2];params.pInNormals=&resources[3];params.pInDiffuseAlbedo=&resources[4];params.pInSpecularAlbedo=&resources[5];params.pInOutput=&resources[6];params.pInMotionVectorsReflections=&resources[7];
     params.InRenderSubrectDimensions.Width=w;params.InRenderSubrectDimensions.Height=h;params.InJitterOffsetX=jx;params.InJitterOffsetY=jy;params.InMVScaleX=1;params.InMVScaleY=1;params.InReset=reset?1:0;params.InPreExposure=1;params.InExposureScale=1;params.InFrameTimeDeltaInMsec=frameMs;params.pInWorldToViewMatrix=matrix;params.pInViewToClipMatrix=matrix+16;
     check(env,NGX_VULKAN_EVALUATE_DLSSD_EXT(cmd,s->feature,s->params,&params),"evaluate");
 }

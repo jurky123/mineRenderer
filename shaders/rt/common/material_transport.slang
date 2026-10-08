@@ -4,6 +4,7 @@
 #include "water_surface.slang"
 #include "environment.slang"
 #include "emissive.slang"
+#include "reconstruction_math.slang"
 float3 rtPreviousSurface(float3 a,float3 b,float3 c,float2 bary,float3 previousTranslation){return a*(1-bary.x-bary.y)+b*bary.x+c*bary.y+previousTranslation;}
 struct SurfacePayload {float distance;float2 bary;uint triangle;uint instance;};
 struct ShadowPayload {float3 transmission;uint visible;float3 sourceBlock;uint flame;float exitDistance;uint mediumId;};
@@ -36,24 +37,34 @@ struct PathHot {
 struct PathAov {float4 diffuse,reflection,refraction;};
 [[vk::binding(16,0)]] RWStructuredBuffer<PathAov> pathAovs;
 struct MediumStorage {float4 absorptionIor[8];float4 scatteringPhase[8];uint4 mediumIds[2];};
-[[vk::binding(4,0)]] RWStructuredBuffer<PathHot> paths;
-[[vk::binding(8,0)]] RWStructuredBuffer<PathHot> paths1;
-[[vk::binding(9,0)]] RWStructuredBuffer<PathHot> paths2;
-[[vk::binding(10,0)]] RWStructuredBuffer<PathHot> paths3;
-[[vk::binding(11,0)]] RWStructuredBuffer<PathHot> paths4;
-[[vk::binding(12,0)]] RWStructuredBuffer<PathHot> paths5;
-[[vk::binding(13,0)]] RWStructuredBuffer<PathHot> paths6;
-[[vk::binding(14,0)]] RWStructuredBuffer<PathHot> paths7;
+#ifdef RT_COMPACT48
+#include "compact_state.slang"
+#define PathStored PackedPath48
+PathStored encodeHot(PathHot hot){PathStored p;p.origin=hot.origin.xyz;p.direction=packPathDirection(hot.direction.xyz);p.pdf=hot.direction.w;p.throughput=hot.throughput.xyz;p.state=hot.state|(hot.origin.w!=0?256u:0u)|(uint(hot.throughput.w)<<9);p.etaScale=hot.etaScale;p.seed=hot.seed;p.reserved=hot.reserved;return p;}
+PathHot decodeHot(PathStored p){PathHot hot;hot.origin=float4(p.origin,(p.state&256u)!=0?1:0);hot.direction=float4(unpackPathDirection(p.direction),p.pdf);hot.throughput=float4(p.throughput,(p.state>>9)&7u);hot.state=p.state&255u;hot.etaScale=p.etaScale;hot.seed=p.seed;hot.reserved=p.reserved;return hot;}
+#else
+#define PathStored PathHot
+PathStored encodeHot(PathHot hot){return hot;}
+PathHot decodeHot(PathStored hot){return hot;}
+#endif
+[[vk::binding(4,0)]] RWStructuredBuffer<PathStored> paths;
+[[vk::binding(8,0)]] RWStructuredBuffer<PathStored> paths1;
+[[vk::binding(9,0)]] RWStructuredBuffer<PathStored> paths2;
+[[vk::binding(10,0)]] RWStructuredBuffer<PathStored> paths3;
+[[vk::binding(11,0)]] RWStructuredBuffer<PathStored> paths4;
+[[vk::binding(12,0)]] RWStructuredBuffer<PathStored> paths5;
+[[vk::binding(13,0)]] RWStructuredBuffer<PathStored> paths6;
+[[vk::binding(14,0)]] RWStructuredBuffer<PathStored> paths7;
 [[vk::binding(15,0)]] RWStructuredBuffer<MediumStorage> pathMedia;
 PathHot loadHot(uint index){uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
-case 0:return paths[local];
-case 1:return paths1[local];
-case 2:return paths2[local];
-case 3:return paths3[local];
-case 4:return paths4[local];
-case 5:return paths5[local];
-case 6:return paths6[local];
-case 7:return paths7[local];
+case 0:return decodeHot(paths[local]);
+case 1:return decodeHot(paths1[local]);
+case 2:return decodeHot(paths2[local]);
+case 3:return decodeHot(paths3[local]);
+case 4:return decodeHot(paths4[local]);
+case 5:return decodeHot(paths5[local]);
+case 6:return decodeHot(paths6[local]);
+case 7:return decodeHot(paths7[local]);
 }return (PathHot)0;}
 PathState loadPath(uint index){
     PathHot hot=loadHot(index);PathState path=(PathState)0;
@@ -84,14 +95,14 @@ void storePath(uint index,PathState path){PathHot hot;
         media.mediumIds[0]=path.mediumIds[0];media.mediumIds[1]=path.mediumIds[1];pathMedia[index]=media;
     }
     uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
-case 0:paths[local]=hot;break;
-case 1:paths1[local]=hot;break;
-case 2:paths2[local]=hot;break;
-case 3:paths3[local]=hot;break;
-case 4:paths4[local]=hot;break;
-case 5:paths5[local]=hot;break;
-case 6:paths6[local]=hot;break;
-case 7:paths7[local]=hot;break;
+case 0:paths[local]=encodeHot(hot);break;
+case 1:paths1[local]=encodeHot(hot);break;
+case 2:paths2[local]=encodeHot(hot);break;
+case 3:paths3[local]=encodeHot(hot);break;
+case 4:paths4[local]=encodeHot(hot);break;
+case 5:paths5[local]=encodeHot(hot);break;
+case 6:paths6[local]=encodeHot(hot);break;
+case 7:paths7[local]=encodeHot(hot);break;
 }}
 
 [[vk::binding(7,0)]] RWStructuredBuffer<uint4> pageFeedback;
@@ -275,7 +286,7 @@ void writePrimaryGuides(PathState path,TerrainSurface surface,SurfacePayload hit
             uint local=path.reserved0;
             uint base=camera.width*camera.height*max(1u,camera.padding)+4;
             float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
-            output[base+camera.width*camera.height*7+local]=float4(metal(surface.material)?conductorFresnel(surface.material,1):float3(dielectric(surface.material)?pow((surface.material.ior-1)/(surface.material.ior+1),2):surface.material.f0),sqrt(surface.material.microfacetAlpha));
+            output[base+camera.width*camera.height*7+local]=float4(rrSpecularReflectance(metal(surface.material)?conductorFresnel(surface.material,1):float3(dielectric(surface.material)?pow((surface.material.ior-1)/(surface.material.ior+1),2):surface.material.f0),surface.material.microfacetAlpha,abs(dot(surface.frame.n,-path.direction.xyz))),sqrt(surface.material.microfacetAlpha));
             output[base+local]=float4(surface.material.baseColor,float(surface.material.type+1));
             output[base+camera.width*camera.height+local]=float4(entering?surface.frame.n:-surface.frame.n,surface.material.microfacetAlpha);
             output[base+camera.width*camera.height*2+local]=float4(point,hit.distance);

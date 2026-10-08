@@ -12,6 +12,9 @@ void material_primary_visibility(){
             if(rtSparse(path,surface,hit,path.origin.xyz+path.direction.xyz*hit.distance,entering?surface.frame.n:-surface.frame.n,loadMedia(path))){pageFeedback[record+1].y=0;storePath(index,path);return;}
         }
     }
+#ifdef RT_COMPACT48
+    storePath(index,path);
+#endif
     // Primary active queue uses the even bank; B0 shading writes B1 into the odd bank.
     if((uint(camera.origin.w)&2097152u)!=0){uint ticket;InterlockedAdd(pageFeedback[520].x,1,ticket);uint capacity=camera.width*camera.height*max(1u,camera.padding);if(ticket<capacity)pageFeedback[1648u+ticket]=uint4(index,0,0,0);}
 }

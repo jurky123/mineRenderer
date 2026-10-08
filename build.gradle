@@ -76,6 +76,7 @@ tasks.register('clientKit', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('docs/performance/ALPHA-46-BENCHMARK-FIXES.md')
+    from('docs/performance/RECONSTRUCTION-TRANSPORT-BASELINE.md')
     from('docs/performance/CACHE-COST-REDUCTION.md')
     from('docs/performance/MATERIAL-AWARE-CACHE-21.md')
     from('docs/performance/PRIMARY-CACHE-2.md')
@@ -115,7 +116,7 @@ processResources {
 
 // Numerical parity executes the actual Slang CPU target against existing native Material 3.
 tasks.register('verifyVulkanTransport', Exec) {
-    inputs.files('src/main/resources/assets/voxellight/rt/diffuse-kernel.bin','tools/native/vulkan_diffuse_kernel.cpp','tools/generate_diffuse_kernel.py','tools/native/vulkan_dlss_fixture.cpp','src/main/resources/assets/voxellight/shaders/rt_dlss_guides.fsh')
+    inputs.files('tools/native/vulkan_reconstruction_contract.cpp','src/main/resources/assets/voxellight/rt/diffuse-kernel.bin','tools/native/vulkan_diffuse_kernel.cpp','tools/generate_diffuse_kernel.py','tools/native/vulkan_dlss_fixture.cpp','src/main/resources/assets/voxellight/shaders/rt_dlss_guides.fsh')
     dependsOn tasks.named('compileJava')
     inputs.files('src/main/java/com/voxellight/rt/RtLightRuntime.java','src/main/java/com/voxellight/rt/RtEmitterTable.java','tools/native/GenerateLightRuntime.java','tools/native/vulkan_direct_lighting.cpp','tools/native/vulkan_realtime_policy.cpp')
     inputs.dir('shaders/rt/common')

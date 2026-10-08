@@ -1,3 +1,11 @@
+## 0.39.0-alpha.48：RR Guide 与 Transport 对照
+
+独立反射 motion、平滑透射终点近似、方向半球 specular albedo、roughness 编码 A/B、HDR/Guide/AOV/RR 导出已加入。新增 SIMPLE 材质与 48B TWO_PASS 实验以及有界异步 CPU 场景准备 P95 对照。默认仍 FULL Material 3 / Wavefront；完整后台 GPU AS、硬件纹理/ray-cone mip 和复杂折射/动态镜面正确性尚未完成。[实现与验收](performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。
+
+完整 `build clientKit` 通过：368 项 Java 测试零失败、原生 Slang/GLSL 数值回归通过；109 个 SPIR-V 和 59 个源码哈希核对通过。1024 组打包方向最大向量误差 6.05405e-05。
+
+[alpha.48 安装包](https://temp.sh/MjIkV/voxellight-client-kit-26.2-0.39.0-alpha.48.zip)；SHA-256：`4ca4764ecf4062389fd1957834ccffed56a462e736553d92e2a8e74ec8a57642`。
+
 ## 0.39.0-alpha.47：Cache Cost Reduction
 
 ROUGH_DIFFUSE 预积分核、截断/材质范围回退、Primary 已验证分类和 guide 复用、四项 kernel 覆盖诊断已实现。`rt_benchmark cost`：16 段两轮 ABBA，隔离 kernel transport 成本，再比较 FULL/MONOLITHIC 与 SPLIT/PRIMARY/CACHE_SPARSE 的 GPU world。默认仍 FULL/MONOLITHIC；实机收益、画质和长停顿根因尚待验收。[实现与命令](performance/CACHE-COST-REDUCTION.md)。
