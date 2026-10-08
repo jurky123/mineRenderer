@@ -42,9 +42,9 @@ public final class VoxelLightClient implements ClientModInitializer {
         LoggerFactory.getLogger("VoxelLight").info("VoxelLight 26.2 reference lighting prototype loaded; rendering effects are off by default");
         ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> { RenderProbe.invalidateCasterAdmission(); SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), false); });
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> { RenderProbe.invalidateCasterAdmission(); SCENE.chunkChanged(level, chunk.getPos().x(), chunk.getPos().z(), true); });
-        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {com.voxellight.adapter.RtBenchmarkRunner.stop();SCENE.changeLevel(level);});
+        ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {com.voxellight.adapter.RtBenchmarkRunner.worldChanged();SCENE.changeLevel(level);});
         ClientTickEvents.END_CLIENT_TICK.register(SCENE::tick);
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {com.voxellight.adapter.RtBenchmarkRunner.stop();SCENE.close();});
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {com.voxellight.adapter.RtBenchmarkRunner.clientStopping();SCENE.close();});
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             var command = literal("voxellight")
                     .then(literal("settings").executes(context->{context.getSource().getClient().execute(()->context.getSource().getClient().setScreenAndShow(new com.voxellight.ui.RendererSettingsScreen(null)));return 1;}))

@@ -1,3 +1,9 @@
+## 0.39.0-alpha.46：修正 benchmark GPU 首次执行门禁
+
+等待首个 GPU 样本、收集样本与 GPU 耗时稳定性分开计时；断线/世界变化不再标为用户取消。默认仍 FULL/MONOLITHIC，缓存净性能和长停顿根因未宣称解决。[修复与剩余问题](performance/ALPHA-46-BENCHMARK-FIXES.md)。
+
+[alpha.46 安装包](https://temp.sh/GPvcV/voxellight-client-kit-26.2-0.39.0-alpha.46.zip)。358 项 Java 测试零失败，完整构建通过，包内 103 shader / 53 源码哈希核对通过。SHA-256：`048575e1bb30342916eea08a69f60c93ee4bbd95055977138ad65a2b06c6995e`。
+
 ## 0.39.0-alpha.45：Material-Aware Cache 2.1
 
 默认 ROUGH_DIFFUSE 的 diffuse/specular lobe 分解、B0/B1/B2 diffuse cache 与精确 specular continuation、半球方向矩求值、源 bounce 隔离、diffuse history 与 56 列 GPU counter 已实现。训练由 accepted request counter 间接调度；动态 model slot 回收带 generation。默认仍 FULL/MONOLITHIC/TAIL/OWEN/EXACT/Wavefront。

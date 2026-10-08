@@ -94,6 +94,8 @@ public final class RtBenchmarkRunner {
     }
     public static String status(){return running==null?"VoxelLight: no RT benchmark running":running.progress();}
     public static void stop(){if(running!=null)running.finish("cancelled by user");}
+    public static void worldChanged(){if(running!=null)running.finish("world changed or disconnected");}
+    public static void clientStopping(){if(running!=null)running.finish("client stopping");}
     public static void nextFrame(long frame){if(running!=null)try{running.advance(frame);}catch(IOException|RuntimeException error){org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Automatic RT benchmark failed",error);running.finish("error: "+error.getMessage());}}
     private String progress(){var block=plan.blocks().get(index);return "VoxelLight: RT benchmark "+(index+1)+"/"+plan.blocks().size()+" "+block.comparison()+" "+(block.candidate()?"B":"A")+" round "+(block.round()+1)+" "+phase+"; elapsed "+(System.nanoTime()-start)/1_000_000_000L+"s";}
     private static double[] pose(){var client=Minecraft.getInstance();if(client.player==null)return null;var p=client.gameRenderer.mainCamera().position();return new double[]{p.x,p.y,p.z,client.player.getXRot(),client.player.getYRot()};}
@@ -113,8 +115,9 @@ public final class RtBenchmarkRunner {
             boolean snapshotLoaded=state!=null&&(production||(state.sections()==terrain.size()&&state.terrainSignature()==expectedTerrainSignature));
             boolean available=snapshotLoaded&&state.matches(block.config())&&!state.frozen()&&state.hasOpaque();
             var readiness=warmup.observe(now,available,production?0:state==null?0:state.terrainSignature());
+            var gpuReadiness=warmup.gpuStatus(now,warmGpu);
             if(now-lastDiagnostic>=1_000_000_000L){
-                var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("block",index+1);diagnostic.put("elapsedSeconds",(now-phaseStart)/1e9);diagnostic.put("expectedTerrainSignature",expectedTerrainSignature);diagnostic.put("expectedTerrainSections",terrain.size());diagnostic.put("snapshotLoaded",snapshotLoaded);diagnostic.put("warmGpuSamples",warmGpu.size());diagnostic.put("warmGpuStable",RtBenchmarkWarmup.gpuStable(warmGpu));diagnostic.put("actual",state);diagnostic.put("requested",block.config());diagnostic.put("readySeconds",warmup.readySeconds(now));diagnostic.put("stableSeconds",warmup.stableSeconds(now));diagnostic.put("readiness",readiness);diagnostic.put("renderer",VoxelLightClient.probe().status());warmupDiagnostics.add(diagnostic);lastDiagnostic=now;
+                var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("block",index+1);diagnostic.put("elapsedSeconds",(now-phaseStart)/1e9);diagnostic.put("expectedTerrainSignature",expectedTerrainSignature);diagnostic.put("expectedTerrainSections",terrain.size());diagnostic.put("snapshotLoaded",snapshotLoaded);diagnostic.put("warmGpuSamples",warmGpu.size());diagnostic.put("gpuReadiness",gpuReadiness);diagnostic.put("gpuDurationsNs",List.copyOf(warmGpu));diagnostic.put("warmGpuStable",RtBenchmarkWarmup.gpuStable(warmGpu));diagnostic.put("actual",state);diagnostic.put("requested",block.config());diagnostic.put("readySeconds",warmup.readySeconds(now));diagnostic.put("stableSeconds",warmup.stableSeconds(now));diagnostic.put("readiness",readiness);diagnostic.put("renderer",VoxelLightClient.probe().status());warmupDiagnostics.add(diagnostic);lastDiagnostic=now;
             }
 
             if(readiness==RtBenchmarkWarmup.Status.INITIALIZATION_TIMEOUT){finish("initialization: renderer/configuration unavailable for 180 seconds; see warmup.json");return;}
@@ -123,7 +126,15 @@ public final class RtBenchmarkRunner {
             if(phase==Phase.INITIALIZING){phase=Phase.WARMUP;warmFrame=frame;warmGpu.clear();feedback.accept(progress());}
             if(state.width()!=initial.width()||state.height()!=initial.height()||state.spp()!=initial.spp()||state.realtime()!=initial.realtime()){finish("resolution/spp/render mode changed");return;}
             if(readiness!=RtBenchmarkWarmup.Status.READY)return;
-            if(!production&&!RtBenchmarkWarmup.gpuStable(warmGpu)){if(warmup.readySeconds(now)>=30)finish("warmup: GPU batch durations did not settle within 30 seconds; see warmup.json");return;}
+            if(!production&&gpuReadiness!=RtBenchmarkWarmup.GpuStatus.READY){
+                switch(gpuReadiness){
+                    case FIRST_SAMPLE_TIMEOUT -> finish("warmup: no completed GPU batch timestamp within 180 seconds after renderer readiness; first execution/readback unavailable; see warmup.json");
+                    case COLLECTION_TIMEOUT -> finish("warmup: fewer than 30 GPU batch timestamps within 180 seconds after first sample; see warmup.json");
+                    case STABILITY_TIMEOUT -> finish("warmup: measured GPU batch durations did not settle within 30 seconds after collecting 30 samples; see warmup.json");
+                    default -> {}
+                }
+                return;
+            }
             measuredState=state;startStatus=VoxelLightClient.probe().status();first=frame;querySkips=RenderPassProfile.skippedQueries();phase=Phase.SAMPLE;phaseStart=now;feedback.accept(progress());return;
         }
         if(phase==Phase.SAMPLE){
