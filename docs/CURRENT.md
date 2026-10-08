@@ -4,6 +4,8 @@
 
 [alpha.46 安装包](https://temp.sh/GPvcV/voxellight-client-kit-26.2-0.39.0-alpha.46.zip)。358 项 Java 测试零失败，完整构建通过，包内 103 shader / 53 源码哈希核对通过。SHA-256：`048575e1bb30342916eea08a69f60c93ee4bbd95055977138ad65a2b06c6995e`。
 
+alpha.46 Material 实测 24 段全部 valid：首次样本等待超过 30 秒后仍能完成；PRIMARY 相对 TAIL transport 改善 8.62%，FULL Split 退化 7.07%，SHIFT 波动内。真实缓存 query/train/hit 与 B1/B2 路径减少已确认，FULL 对缓存 production 和画质仍待验收。[专项分析](performance/ALPHA-46-MATERIAL-ANALYSIS.md)。
+
 ## 0.39.0-alpha.45：Material-Aware Cache 2.1
 
 默认 ROUGH_DIFFUSE 的 diffuse/specular lobe 分解、B0/B1/B2 diffuse cache 与精确 specular continuation、半球方向矩求值、源 bounce 隔离、diffuse history 与 56 列 GPU counter 已实现。训练由 accepted request counter 间接调度；动态 model slot 回收带 generation。默认仍 FULL/MONOLITHIC/TAIL/OWEN/EXACT/Wavefront。
