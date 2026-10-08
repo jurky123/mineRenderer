@@ -17,6 +17,6 @@ void terrain_material_parity(uint3 tid:SV_DispatchThreadID) {
     result[i*12+8]=float4(terrainUv(v,terrainVertex(i,1),terrainVertex(i,2),bary),0,0);
     result[i*12+9]=float4(m.eta,m.conductorId);
     bool deferred;TerrainSurface guide=terrainSurface(i,bary,i,true,deferred);Frame completed=deferred?terrainCompleteFrame(i,bary):guide.frame;
-    result[i*12+11]=float4(deferred?1:0,maxComponent(abs(completed.n-surface.frame.n)),maxComponent(abs(completed.t-surface.frame.t)),maxComponent(abs(completed.b-surface.frame.b)));
+    result[i*12+11]=float4(deferred?1:0,max(maxComponent(abs(completed.n-surface.frame.n)),maxComponent(abs(terrainEmission(i,bary)-m.emission))),maxComponent(abs(completed.t-surface.frame.t)),maxComponent(abs(completed.b-surface.frame.b)));
     result[i*12+10]=float4(terrainWaterNormal(float3(0,1,0),float3(i*.03125,64,-.125*i),float3(0,65,0),12.5,.09,3.4,.7,1),0);
 }

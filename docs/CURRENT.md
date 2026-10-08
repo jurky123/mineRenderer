@@ -1,3 +1,9 @@
+## 0.39.0-alpha.43：输运与场景提交热路径
+
+[alpha.43 安装包](https://temp.sh/cBoiG/voxellight-client-kit-26.2-0.39.0-alpha.43.zip)；SHA-256：`785703bbc4145b357b34864b84d3ffdab783e896e26394175b9d1656bf022f3c`。350 项 Java 测试与数值回归通过，包内 80 个 SPIR-V stages / 48 份源码哈希核对通过。
+
+减少非发光 MIS 查询、RIS 完整材质解码、动态更新驻留表与重复排序。保留 EXACT / Wavefront 默认，FAST 按场景验收。[实测及验收](performance/ALPHA-42-FRAME-ANALYSIS.md)。
+
 ## 0.39.0-alpha.42：frame 实测与接管验收修正
 
 [alpha.42 安装包](https://temp.sh/vLvRh/voxellight-client-kit-26.2-0.39.0-alpha.42.zip)；SHA-256：`50d373ffc00e309208a6e5bebe15bee413d6847ca32d482d147903f210721924`。

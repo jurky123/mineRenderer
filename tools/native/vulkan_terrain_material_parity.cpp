@@ -61,8 +61,8 @@ int main(){
   bool visible=(ids[i]>>24&3)||rt::cutoutVisible(tex[i]>>24,a.tint>>24,a.flags);
   auto water=waterNormal(v(0,1,0),v(i*.03125f,64,-.125f*i));
   float expected[44]={m.baseColor.x,m.baseColor.y,m.baseColor.z,float(m.type),m.microfacetAlpha,m.alphaV,m.f0,m.ior,m.coatWeight,m.coatAlpha,m.coatIOR,m.transmission,m.sigmaA.x,m.sigmaA.y,m.sigmaA.z,m.phaseG,m.sigmaS.x,m.sigmaS.y,m.sigmaS.z,float(m.materialId),n.x,n.y,n.z,float(visible),m.emission.x,m.emission.y,m.emission.z,float(m.mediumId),a.p[0],a.p[1],a.p[2],float(a.flags),a.uv[0]+.00025f,.5f,0,0,m.eta.x,m.eta.y,m.eta.z,float(m.conductorId),water.x,water.y,water.z,0};
-  auto extra=actual[i*12+11];if(extra.y>1e-6||extra.z>1e-6||extra.w>1e-6||(i==31&&extra.x!=1)){std::fprintf(stderr,"Deferred terrain frame mismatch case=%u: %g %g %g %g\n",i,extra.x,extra.y,extra.z,extra.w);return 2;}
+  auto extra=actual[i*12+11];if(extra.y>1e-6||extra.z>1e-6||extra.w>1e-6||(i==31&&extra.x!=1)){std::fprintf(stderr,"Terrain emission/deferred frame mismatch case=%u: %g %g %g %g\n",i,extra.x,extra.y,extra.z,extra.w);return 2;}
   for(unsigned j=0;j<44;j++){float value=reinterpret_cast<const float*>(&actual[i*12])[j];float error=std::abs(value-expected[j])/std::max(1.f,std::abs(expected[j]));largest=std::max(largest,error);if(!std::isfinite(value)||error>.001f){std::fprintf(stderr,"Terrain material mismatch case=%u component=%u actual=%g expected=%g\n",i,j,value,expected[j]);return 1;}}
  }
- std::printf("Terrain Slang/native binding parity + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
+ std::printf("Terrain Slang/native binding parity + emission-only parity + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
 }

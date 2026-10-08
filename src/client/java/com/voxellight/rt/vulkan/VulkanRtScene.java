@@ -152,8 +152,12 @@ public final class VulkanRtScene implements AutoCloseable {
             if(change.triangles().length>64L*1024*1024)continue;
             // Plan the whole eviction before releasing anything. New arrivals may replace
             // strictly farther residents; edits retain priority and their previous BLAS.
-            var sizes=new LinkedHashMap<SectionKey,Long>();
-            sections.forEach((key,value)->sizes.put(key,value.vertices.size()));
+            // Most dynamic updates retain their byte size: no resident map or eviction sort.
+            Map<SectionKey,Long> sizes=Map.of();
+            if(!fits(plannedBytes,oldBytes,change.triangles().length,plannedCount,old!=null||dynamic(change.key()))){
+                sizes=new LinkedHashMap<>();
+                for(var entry:sections.entrySet())sizes.put(entry.getKey(),entry.getValue().vertices.size());
+            }
             var victims=evictions(sizes,protectedKeys,change.key(),plannedBytes,oldBytes,
                 change.triangles().length,plannedCount,old!=null||dynamic(change.key()),x,y,z,requestedPages.keySet());
             if(victims==null)continue;
@@ -293,7 +297,7 @@ public final class VulkanRtScene implements AutoCloseable {
             barrier(command,stack,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR|VK_ACCESS_SHADER_READ_BIT);
             VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);scratch.submitted();
         }
-        if(material)rebuildOpaqueTlas();
+        if(material)rebuildOpaqueTlas(entries);
     }
     static VkAccelerationStructureGeometryKHR.Buffer rangeGeometry(MemoryStack stack,VulkanRtBuffer vertices,int[] counts){
         var geometry=VkAccelerationStructureGeometryKHR.calloc(counts.length,stack);int base=0;
@@ -303,8 +307,8 @@ public final class VulkanRtScene implements AutoCloseable {
         }
         return geometry;
     }
-    private void rebuildOpaqueTlas(){
-        var entries=orderedSections().stream().filter(entry->!entry.getValue().viewModel&&entry.getValue().opaqueBlas!=null).toList();
+    private void rebuildOpaqueTlas(List<Map.Entry<SectionKey,Section>> ordered){
+        var entries=ordered.stream().filter(entry->!entry.getValue().viewModel&&entry.getValue().opaqueBlas!=null).toList();
         if(entries.isEmpty()){if(opaqueTlas!=null)opaqueTlas.close();opaqueTlas=null;opaqueTlasCount=0;return;}
         var encoder=device.createCommandEncoder();long bytes=(long)entries.size()*VkAccelerationStructureInstanceKHR.SIZEOF;
         if(opaqueInstanceBuffer==null||opaqueInstanceBuffer.size()<bytes){if(opaqueInstanceBuffer!=null)opaqueInstanceBuffer.close();opaqueInstanceBuffer=new VulkanRtBuffer(device,Math.max(bytes,1024L*VkAccelerationStructureInstanceKHR.SIZEOF),VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);}
@@ -344,7 +348,12 @@ public final class VulkanRtScene implements AutoCloseable {
         }
         return false;
     }
-    private List<Map.Entry<SectionKey,Section>> orderedSections(){return sections.entrySet().stream().sorted(Comparator.comparing(entry->dynamic(entry.getKey()))).toList();}
+    private List<Map.Entry<SectionKey,Section>> orderedSections(){
+        var entries=new ArrayList<Map.Entry<SectionKey,Section>>(sections.size());
+        for(var entry:sections.entrySet())if(!dynamic(entry.getKey()))entries.add(entry);
+        for(var entry:sections.entrySet())if(dynamic(entry.getKey()))entries.add(entry);
+        return entries;
+    }
     static boolean needsAnyHit(byte[] triangles){var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());for(int offset=36;offset<triangles.length;offset+=120)if((data.getInt(offset)&1)!=0)return true;return false;}
     static long topologyVersion(byte[] triangles){
         var data=ByteBuffer.wrap(triangles).order(ByteOrder.nativeOrder());long hash=0xcbf29ce484222325L;
@@ -368,6 +377,7 @@ public final class VulkanRtScene implements AutoCloseable {
     static List<SectionKey> evictions(Map<SectionKey,Long> sizes,Set<SectionKey> protectedKeys,SectionKey incoming,long residentBytes,long previousBytes,long incomingBytes,int count,boolean replacement,double x,double y,double z,Set<SectionKey> requested) {
         var victims=new ArrayList<SectionKey>();
         if(incomingBytes<=0||incomingBytes>64L*1024*1024)return null;
+        if(fits(residentBytes,previousBytes,incomingBytes,count,replacement))return List.of();
         var candidates=sizes.keySet().stream()
             .filter(key->!dynamic(key)).filter(key->!key.equals(incoming)&&!protectedKeys.contains(key))
             .filter(key->replacement||requested.contains(incoming)||distance(key,x,y,z)>distance(incoming,x,y,z))

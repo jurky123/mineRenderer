@@ -51,7 +51,7 @@ LightSample runtimeCandidate(float3 point,uint cell,inout uint seed,out uint buc
     float3 target=a*(1-root)+b*bary.x+c*bary.y;uint2 ids=assets.Load2(address+48);if(!visibleTexel(ids.x,bary))return light;
     float3 delta=target-point;light.distance=length(delta);light.wi=safeNormalize(delta);float cosine=abs(dot(safeNormalize(cross(b-a,c-a)),light.wi));
     if(cosine<=1e-7||light.distance<=.001)return light;
-    light.pdf=pmf/asfloat(assets.Load(address+28))*dot(delta,delta)/cosine;light.radiance=terrainSurface(ids.x,bary,ids.y).material.emission;light.kind=4;return light;
+    light.pdf=pmf/asfloat(assets.Load(address+28))*dot(delta,delta)/cosine;light.radiance=terrainEmission(ids.x,bary);light.kind=4;return light;
 }
 float runtimeHitPdf(uint triangle,float3 point,float3 target,uint token,uint sourceBounce){
     uint lo=0,hi=runtimeLights();while(lo<hi){uint mid=(lo+hi)/2;if(assets.Load(runtimeRecord(mid)+48)<triangle)lo=mid+1;else hi=mid;}

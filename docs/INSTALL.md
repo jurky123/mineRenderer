@@ -1,10 +1,14 @@
+## 0.39.0-alpha.43：输运与场景提交热路径
+
+减少非发光 MIS 查询、RIS 完整材质解码、动态更新驻留表与重复排序。保留 EXACT / Wavefront 默认，FAST 按场景验收。[实测及验收](performance/ALPHA-42-FRAME-ANALYSIS.md)。
+
 ## alpha.42 验收修正
 
 默认 EXACT + Wavefront。显式选 `rt_reconstruction dlss`，stats 检查实际 RR 后端、输入/输出尺寸与 rtWorldReason；alpha.41 的上传结果未运行 RR 或世界接管，不能直接作为两项验收。[分析与修正](performance/ALPHA-41-FRAME-ANALYSIS.md)。
 
 ## alpha.41 RT / DLSS
 
-实时优先 DLSS RR Performance，实际初始化与输入尺寸请看 stats。新增 `rt_reconstruction dlss`、`rt_world composite|exclusive`、`rt_shadow exact|fast`、`rt_integrator wavefront|iterative`；默认 exclusive / fast / wavefront。Reference 强制 exact / wavefront。运行 `/voxellight rt_benchmark frame` 导出世界接管、透明阴影和间接执行 ABBA。
+实时优先 DLSS RR Performance，实际初始化与输入尺寸请看 stats。新增 `rt_reconstruction dlss`、`rt_world composite|exclusive`、`rt_shadow exact|fast`、`rt_integrator wavefront|iterative`；当前默认 exclusive / exact / wavefront；fast 手动按场景选择。Reference 强制 exact / wavefront。运行 `/voxellight rt_benchmark frame` 导出世界接管、透明阴影和间接执行 ABBA。
 
 RR 活跃时 SDK 决定输入尺寸，`rt_scale` 仅用于 OptiX/Vulkan 原重建。性能/画质仍需客户端验收。[完整说明](performance/CAUSTICA-FRAME-PIPELINE.md)。
 

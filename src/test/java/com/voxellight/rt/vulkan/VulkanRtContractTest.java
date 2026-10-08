@@ -105,6 +105,14 @@ class VulkanRtContractTest {
         }
     }
 
+    @Test void fittingDynamicUpdateDoesNotEnumerateEvictionCandidates(){
+        Map<com.voxellight.world.SectionKey,Long> unvisited=new AbstractMap<>(){
+            @Override public Set<Entry<com.voxellight.world.SectionKey,Long>> entrySet(){throw new AssertionError("Resident map scanned on fitting update");}
+        };
+        var key=new com.voxellight.world.SectionKey(1,Integer.MIN_VALUE,0);
+        assertEquals(List.of(),VulkanRtScene.evictions(unvisited,Set.of(),key,64L*1024*1024,4096,4096,512,true,0,0,0));
+    }
+
     @Test void fullSceneAdmitsNearTerrainAndTracksCameraMovement() {
         long mib=1024L*1024;
         var near=new com.voxellight.world.SectionKey(0,0,0);

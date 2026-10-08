@@ -29,6 +29,15 @@ uint dynamicTexel(uint flags,float2 uv){uint slot=flags>>20,dimension=assets.Loa
     if(((atlasTexel(1,uv)>>24)&3)!=0)return true; // Glass/water alpha is transmission, not cutout.
     return cutoutVisible(atlasTexel(0,uv)>>24,a.tint>>24,a.flags);
 }
+// Light proposals need radiance only, not BSDF, wetness, normal maps or a tangent frame.
+float3 terrainEmission(uint triangle,float2 bary){
+    uint base=triangle*120,flags=geometry.Load(base+36);if((flags&128u)!=0)return float3(0);
+    float2 uv=asfloat(geometry.Load2(base+12))*(1-bary.x-bary.y)+asfloat(geometry.Load2(base+52))*bary.x+asfloat(geometry.Load2(base+92))*bary.y;
+    uint id=atlasTexel(1,uv);if((flags&32u)!=0&&((id>>24)&4u)==0)return float3(0);
+    float strength=(((id>>24)&4u)!=0?((id>>16)&255u)/254.0:(flags>>16)/15.0)*8.0;
+    if(strength==0)return float3(0);
+    return linearRgb(atlasTexel(0,uv))*linearRgb(geometry.Load(base+32))*strength;
+}
 struct TerrainSurface {Material material;Frame frame;float3 geometryNormal;uint flags;};
 TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred) {
     deferred=false;

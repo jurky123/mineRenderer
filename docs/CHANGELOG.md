@@ -1,3 +1,7 @@
+## 0.39.0-alpha.43：输运与场景提交热路径
+
+减少非发光 MIS 查询、RIS 完整材质解码、动态更新驻留表与重复排序。保留 EXACT / Wavefront 默认，FAST 按场景验收。[实测及验收](performance/ALPHA-42-FRAME-ANALYSIS.md)。
+
 ## 0.39.0-alpha.42：frame 实测与接管验收修正
 
 alpha.41 最新测试实际仍是 OptiX / 214×120，exclusive 请求未接管；FAST 慢约4%，Iterative 慢约24%。默认回到 EXACT + Wavefront。世界生命周期改为 GameRenderer 调用 wrapper，benchmark 记录实际 world 状态并拒绝未执行的 EXCLUSIVE；新增 rtWorldReason / requested reconstruction 与 acquire/extract/present/limiter 墙钟 scope。GPU 生效与收益仍待客户端验收。[完整分析](performance/ALPHA-41-FRAME-ANALYSIS.md)。

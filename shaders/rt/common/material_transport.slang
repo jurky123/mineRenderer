@@ -349,8 +349,12 @@ void advance(inout PathState path) {
         float3 wo=-path.direction.xyz;float3 n=dot(surface.frame.n,wo)>0?surface.frame.n:-surface.frame.n;
         Frame frame=makeFrame(n,surface.frame.t,surface.frame.b);
         float eta=entering?m.ior/media.ior():media.outside(m.mediumId)/media.ior();
-        float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,directRis()?runtimeHitPdf(hit.triangle,path.origin.xyz,point,path.reserved1,uint(max(0,path.throughput.w-1))):emitterHitPdf(hit.triangle,path.origin.xyz,point));
-        if(!rtProbeFirst(path)||(directRis()?runtimeHitPdf(hit.triangle,path.origin.xyz,point,path.reserved1,uint(max(0,path.throughput.w-1))):emitterHitPdf(hit.triangle,path.origin.xyz,point))==0)addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
+        // Non-emitting hits need no emitter binary search / spatial proposal PDF loads.
+        if(maxComponent(m.emission)>0){
+            float hitPdf=0;if((path.previousDelta==0&&path.throughput.w>0)||rtProbeFirst(path))hitPdf=directRis()?runtimeHitPdf(hit.triangle,path.origin.xyz,point,path.reserved1,uint(max(0,path.throughput.w-1))):emitterHitPdf(hit.triangle,path.origin.xyz,point);
+            float emissionMis=path.previousDelta!=0||path.throughput.w==0?1:powerHeuristic(path.direction.w,hitPdf);
+            if(!rtProbeFirst(path)||hitPdf==0)addRadiance(path,path.throughput.xyz*m.emission*emissionMis);
+        }
         float3 cacheResponse;bool cacheTraining=false;bool cacheTerminal=false;cacheResponse=0;if((surface.flags&128u)==0&&rtFlatNormal(n,surface.geometryNormal))cacheTerminal=rtTail(path,m,point,n,media,cacheResponse,cacheTraining);
         bool neeTerminal=cacheTerminal||cacheTraining;
         directCounter(uint(path.throughput.w),0);
