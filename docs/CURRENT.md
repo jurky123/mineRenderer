@@ -6,6 +6,8 @@
 
 [alpha.45 安装包](https://temp.sh/PkwTT/voxellight-client-kit-26.2-0.39.0-alpha.45.zip)；SHA-256：`281ccb998271de0b07240735b2923ed51f484f543b34cabfd62711b1aeb71c4b`。完整 `build clientKit` 通过：356 项 Java 测试零失败、真实 Slang/native 数值回归通过；最终 ZIP 内 103 个 SPIR-V stages / 53 份源码哈希与当前源码核对一致。
 
+alpha.45 已收到首份 production FULL 基线：4 段有效，GPU world P50 13.525–13.598 ms，client interval P95 25.888–36.748 ms。全部 FULL/MONOLITHIC，缓存未开启；material 专项、缓存对照和画质尚待验收。[基线分析](performance/ALPHA-45-PRODUCTION-BASELINE.md)。
+
 ## 0.39.0-alpha.44：Material/Light 与 Primary Split / Cache 2.0
 
 实机专项：24 段完整，三组均为波动内；Primary Split −2.38%、B0 +1.59%、SHIFT +2.68% 均未证明可靠收益。B0/history 查询、训练与复用全零；默认 ROUGH_DIFFUSE 被 pure DIFFUSE 入口排除，算法覆盖未验收。[分析与实现缺口](performance/ALPHA-44-MATERIAL-ANALYSIS.md)。
