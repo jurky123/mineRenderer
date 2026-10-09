@@ -11,6 +11,7 @@ struct {unsigned* lut;unsigned options;} params;
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <cstring>
 rt::Material fixture(unsigned kind,float alpha) {
  rt::Material m;m.type=kind;m.microfacetAlpha=alpha;m.alphaV=alpha;m.baseColor=rt::V(.7,.5,.3);
  m.transmission=.8;m.sigmaA=rt::V(.16,.06,.035);m.sigmaS=rt::V(.01,.02,.03);
@@ -26,6 +27,11 @@ int main() {
  constexpr unsigned cases=20*9*5*64;
  std::vector<Vector<float,4>> actual(cases*14);
  GlobalParams_0 globals{};globals.result_0.data=actual.data();globals.result_0.count=actual.size();
+#ifdef RT_GGX_ASSETS
+ std::vector<unsigned> energyAssets(64+1024);energyAssets[248/4]=256;
+ std::memcpy(energyAssets.data()+64,rt::GgxEnergy,4096);
+ globals.assets_0.data=energyAssets.data();globals.assets_0.sizeInBytes=energyAssets.size()*4;
+#endif
  ComputeVaryingInput varying{};varying.endGroupID={cases,1,1};transport_parity(&varying,nullptr,&globals);
  float largest=0;unsigned compared=0;
  for(unsigned index=0;index<cases;index++) {

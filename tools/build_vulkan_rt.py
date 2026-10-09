@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
-import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct
+import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct, sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_shadow_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss','material_shadow_transmission':'anyhit','material_transmission_miss':'miss'}
 VARIANTS={name+suffix:(name,defines) for suffix,defines in [("_query",["RT_RAY_QUERY"]),("_ser",["RT_SER"]),("_query_ser",["RT_RAY_QUERY","RT_SER"])] for name in ["material_primary","material_indirect"]}
@@ -56,7 +56,7 @@ def validate_byte_address_layout(binary):
             raise ValueError('padded vec3 ByteAddressBuffer alias: 12-byte indexing with '+str(strides.get(array))+'-byte ArrayStride; use scalar word loads')
 
 def validate_kernel_storage(binary):
-    """The rough-diffuse LUT must live in the persistent assets buffer, not function arrays."""
+    """Diffuse and GGX LUTs must live in the persistent assets buffer, not function arrays."""
     words=struct.unpack('<'+'I'*(len(binary)//4),binary);constants={};arrays=[];i=5
     while i<len(words):
         count=words[i]>>16;opcode=words[i]&65535;args=words[i+1:i+count]
@@ -64,8 +64,8 @@ def validate_kernel_storage(binary):
         elif opcode==28:arrays.append(args[2])
         if count==0:raise ValueError('invalid SPIR-V instruction')
         i+=count
-    if any(constants.get(length) in (2145,6435) for length in arrays):
-        raise ValueError('preintegrated diffuse LUT compiled as a per-invocation array; use asset-buffer loads')
+    if any(constants.get(length) in (1024,2145,6435) for length in arrays):
+        raise ValueError('preintegrated transport LUT compiled as a per-invocation array; use asset-buffer loads')
 
 def validate_layout(reflection, transport=False, material=False, compact=False):
     parameters = {p['name']: p for p in reflection['parameters']}
@@ -101,6 +101,7 @@ def validate_layout(reflection, transport=False, material=False, compact=False):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--output', default='build/vulkan-rt'); args = parser.parse_args()
     output = ROOT / args.output; output.mkdir(parents=True, exist_ok=True)
+    subprocess.run([sys.executable,str(ROOT/'tools/generate_ggx_asset.py'),'--check'],check=True)
     compiler, validator = tool('slangc', 'SLANGC'), tool('spirv-val', 'SPIRV_VAL')
     version = subprocess.check_output([compiler, '-version'], stderr=subprocess.STDOUT, text=True).strip()
     manifest = {'compiler': version, 'target': 'vulkan1.2', 'shaders': {}, 'sources': {}}
@@ -108,6 +109,7 @@ def main():
         manifest['sources'][str(source.relative_to(ROOT))] = hashlib.sha256(source.read_bytes()).hexdigest()
     for entry, stage in STAGES.items():
         base,defines=VARIANTS.get(entry,(entry,[]))
+        if entry.startswith('material_'):defines=defines+['RT_GGX_ASSETS']
         source = ROOT / f'shaders/rt/world/{base}.slang'; spv = output / f'{entry}.spv'; reflection = output / f'{entry}.json'
         subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', base, *['-D'+define+'=1' for define in defines],
                         *(['-capability','spvShaderInvocationReorderNV'] if 'RT_SER' in defines else []), *(['-capability','spvRayQueryKHR'] if 'RT_RAY_QUERY' in defines else []), '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)

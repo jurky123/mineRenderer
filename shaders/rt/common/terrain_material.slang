@@ -1,8 +1,8 @@
 #pragma once
+[[vk::binding(6, 0)]] ByteAddressBuffer assets;
 #include "bsdf.slang"
 #include "surface.slang"
 [[vk::binding(5, 0)]] ByteAddressBuffer geometry;
-[[vk::binding(6, 0)]] ByteAddressBuffer assets;
 // Native RtGeometryStream vertices: p@0, uv@12, n@20, tint@32, flags@36, stride 40.
 struct TerrainVertex {float3 p;float2 uv;float3 n;uint tint;uint flags;};
 TerrainVertex terrainVertex(uint triangle,uint vertex) {

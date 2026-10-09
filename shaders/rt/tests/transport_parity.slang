@@ -1,3 +1,6 @@
+#ifdef RT_GGX_ASSETS
+[[vk::binding(1,0)]] ByteAddressBuffer assets;
+#endif
 #include "../common/medium.slang"
 #include "../common/surface.slang"
 [[vk::binding(0,0)]] RWStructuredBuffer<float4> result;

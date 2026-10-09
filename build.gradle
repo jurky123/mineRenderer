@@ -107,6 +107,8 @@ jar { exclude 'voxellight/native/**' }
 tasks.register('compileVulkanRt', Exec) {
     inputs.dir('shaders/rt')
     inputs.file('tools/build_vulkan_rt.py')
+    inputs.file('tools/generate_ggx_asset.py')
+    inputs.file('src/main/resources/assets/voxellight/rt/ggx-energy.bin')
     inputs.property('slangc', System.getenv('SLANGC') ?: 'slangc')
     outputs.dir(layout.buildDirectory.dir('vulkan-rt'))
     commandLine 'python3', 'tools/build_vulkan_rt.py'

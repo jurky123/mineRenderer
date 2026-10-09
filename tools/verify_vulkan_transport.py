@@ -7,7 +7,7 @@ def main():
     output=ROOT/'build/vulkan-transport-parity';output.mkdir(parents=True,exist_ok=True)
     provenance=json.loads((ROOT/'shaders/rt/common/transport-port.json').read_text())
     for source,expected in provenance.items():
-        if hashlib.sha256((ROOT/source).read_bytes()).hexdigest()!=expected:
+        if hashlib.sha256((ROOT/source).read_bytes().replace(b'\r\n',b'\n')).hexdigest()!=expected:
             raise SystemExit(f'{source} changed; reconcile the Slang transport port and rerun numerical parity')
     compiler=tool('slangc','SLANGC');cxx=shutil.which('c++')
     if not cxx:raise SystemExit('C++ compiler required for native/Slang numerical parity')
@@ -18,6 +18,14 @@ def main():
     executable=output/'transport_parity'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_transport_parity.cpp'),'-o',str(executable)],check=True)
     result=subprocess.check_output([str(executable)],text=True)
+    # Exercise the production ByteAddressBuffer path against the same native BSDF.
+    subprocess.run([compiler,str(source),'-DRT_GGX_ASSETS=1','-target','spirv','-profile','spirv_1_5','-entry','transport_parity','-stage','compute','-o',str(output/'transport_parity_assets.spv')],check=True)
+    subprocess.run([tool('spirv-val','SPIRV_VAL'),'--target-env','vulkan1.2',str(output/'transport_parity_assets.spv')],check=True)
+    subprocess.run([compiler,str(source),'-DRT_GGX_ASSETS=1','-target','cpp','-entry','transport_parity','-stage','compute','-o',str(output/'transport_parity.cpp')],check=True)
+    executable=output/'transport_parity_assets'
+    subprocess.run([cxx,'-std=c++17','-O2','-DRT_GGX_ASSETS=1','-I'+str(output),str(ROOT/'tools/native/vulkan_transport_parity.cpp'),'-o',str(executable)],check=True)
+    result+='GGX persistent asset path: '+subprocess.check_output([str(executable)],text=True)
+
     (output/'water_fixture_native.h').write_text((ROOT/'native/rt/water_surface.h').read_text())
     source=ROOT/'shaders/rt/tests/terrain_material_parity.slang'
     spv=output/'terrain_material_parity.spv'
