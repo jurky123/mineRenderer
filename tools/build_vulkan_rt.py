@@ -29,6 +29,7 @@ VARIANTS['material_primary_visibility_compact']=('material_primary_visibility',[
 VARIANTS['material_primary_shade_compact']=('material_primary_shade',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_COMPACT48','RT_TWO_PASS'])
 VARIANTS['material_resolve_compact']=('material_resolve',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_COMPACT48'])
 VARIANTS['material_guides']=('material_guides',['RT_CLEAN_FULL','RT_DIRECT_RIS'])
+VARIANTS['material_guides_fast']=('material_guides',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_GUIDE_FAST'])
 STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)

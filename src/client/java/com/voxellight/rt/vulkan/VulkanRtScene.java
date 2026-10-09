@@ -182,11 +182,13 @@ public final class VulkanRtScene implements AutoCloseable {
                 barrier(command,stack,VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR|VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR|VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,VK_PIPELINE_STAGE_TRANSFER_BIT|VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
                 VulkanRtCapabilities.check(vkEndCommandBuffer(command));encoder.execute(command);scratch.submitted();
             }
+            com.voxellight.adapter.RtBenchmarkRunner.sceneAccepted(accepted);
             for(var change:accepted) {
                 var old=sections.get(change.key());
                 var buffer=old!=null&&old.vertices.size()==change.triangles().length?old.vertices:new VulkanRtBuffer(device,change.triangles().length,VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
                 com.voxellight.rt.RtGeometryRanges layout=null;
                 if(material&&com.voxellight.rt.RtExecutionOptions.sceneUpdate()==com.voxellight.rt.RtExecutionOptions.SceneUpdate.ASYNC_PREP)layout=preparation.publish(change.key(),change.version(),com.voxellight.adapter.RtMaterialCoverage.opacityEpoch(),change.triangles());
+                if(change.key().x()<0&&change.key().z()==Integer.MIN_VALUE)com.voxellight.adapter.RtBenchmarkRunner.scenePrepared(layout!=null);
                 if(layout==null)layout=material?com.voxellight.rt.RtGeometryRanges.split(change.triangles(),offset->com.voxellight.adapter.RtMaterialCoverage.transmissive(change.triangles(),offset)):new com.voxellight.rt.RtGeometryRanges(change.triangles(),new int[]{change.vertices()/3});
                 layouts.put(change.key(),layout);uploads.put(change.key(),buffer);
                 if(ommEnabled&&!dynamic(change.key())&&layout.counts()[1]>0){

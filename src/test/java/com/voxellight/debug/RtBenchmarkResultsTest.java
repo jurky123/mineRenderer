@@ -31,6 +31,15 @@ class RtBenchmarkResultsTest {
         var result=RtBenchmarkResults.compare("realtime_end_to_end",blocks);
         assertEquals("candidate_slower",result.verdict());assertEquals(-20.,result.improvementPercent(),1e-8);
     }
+    @Test void guideSavingsDoNotHidePrimaryOrWorldRegression(){
+        var blocks=new ArrayList<RtBenchmarkResults.Block>();
+        String name="guide_monolithic_fast";
+        for(var p:RtBenchmarkPlan.guides().blocks())if(p.comparison().equals(name)){
+            var c=p.config();var state=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),c.omm(),c.ser(),true,true,12,50,20,1000,c.direct(),c.sceneUpdate(),c.realtimePolicy(),c.shader(),c.shadow(),c.world(),c.integrator(),c.primary(),c.cache(),c.sampling(),c.kernel(),c.transport(),c.guides(),c.roughness());
+            blocks.add(new RtBenchmarkResults.Block(p,0,100,state,true,List.of(),Map.of("vulkan_rt_batch_fixed",new RtBenchmarkResults.Timing(100,8.,8.),"vulkan_rt_deterministic_guides",new RtBenchmarkResults.Timing(100,p.candidate()?1.:3.,3.),"vulkan_world_total",new RtBenchmarkResults.Timing(100,p.candidate()?12.:10.,12.)),new double[]{1,.6,.4,.2,.1,.05},.1,256,0,0));
+        }
+        var result=RtBenchmarkResults.compare(name,blocks);assertEquals("candidate_slower",result.verdict());assertEquals(-20.,result.improvementPercent(),1e-8);
+    }
     @Test void scenePreparationComparesCpuP95InsteadOfGpuOrCpuMedian(){
         var blocks=new ArrayList<RtBenchmarkResults.Block>();for(var p:RtBenchmarkPlan.scene().blocks()){
             var c=p.config();var state=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),c.omm(),c.ser(),true,true,12,50,20,1000,c.direct(),c.sceneUpdate(),c.realtimePolicy(),c.shader(),c.shadow(),c.world(),c.integrator(),c.primary(),c.cache(),c.sampling(),c.kernel(),c.transport());

@@ -20,7 +20,7 @@ void main(){
     vec4 current=currentClip*(surface?vec4(p.xyz-camera.xyz,1):vec4(p.xyz,0));
     vec4 before=previousClip*(surface?vec4(previous.xyz-previousCamera.xyz,1):vec4(p.xyz,0));
     depth=rrDepth(current,surface);
-    motion=rrMotion(current,before,size.xy,previousCamera.w>.5);
+    motion=rrMotion(current,before,size.xy,previousCamera.w>.5&&(!surface||previous.w>0));
     normalsRoughness=surface?vec4(normalize(n.xyz),rrRoughness(s.a,reserved.x>.5)):vec4(0,0,0,1);
     int type=int(a.a+.5)-1;bool specular=type==2||type==3||type==4||type==6||type==9;
     diffuseAlbedo=vec4(surface&&!specular?clamp(a.rgb,0,1):vec3(0),1);

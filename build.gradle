@@ -77,6 +77,8 @@ tasks.register('clientKit', Zip) {
     from(tasks.named('jar')) { into 'mods' }
     from('docs/performance/ALPHA-46-BENCHMARK-FIXES.md')
     from('docs/performance/RECONSTRUCTION-TRANSPORT-BASELINE.md')
+    from('docs/performance/ALPHA-49-ANALYSIS.md')
+    from('tools/acceptance') { include '*.py'; into 'acceptance' }
     from('docs/performance/CACHE-COST-REDUCTION.md')
     from('docs/performance/MATERIAL-AWARE-CACHE-21.md')
     from('docs/performance/PRIMARY-CACHE-2.md')
@@ -150,3 +152,10 @@ processResources {
     dependsOn tasks.named('compileDlss')
     from(layout.buildDirectory.dir('dlss')) { into 'voxellight/dlss' }
 }
+
+// Offline fixture/capture tooling; no server or client launch.
+tasks.register('verifyAlpha49Acceptance', Exec) {
+    inputs.dir('tools/acceptance')
+    commandLine 'python3', '-m', 'unittest', 'discover', '-s', 'tools/acceptance', '-p', 'test_*.py'
+}
+tasks.named('check') { dependsOn tasks.named('verifyAlpha49Acceptance') }

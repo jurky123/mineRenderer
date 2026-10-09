@@ -74,6 +74,15 @@ public final class RtBenchmarkPlan {
     }
     /** Preserve the user's daily controls, including AUTO and optional device features. */
     public static Plan production(Config current){var blocks=new ArrayList<Block>();for(int i=0;i<4;i++)blocks.add(new Block("production",0,i,false,current));return new Plan(List.copyOf(blocks),Map.of());}
+    public static Config guideConfig(Config c,RtExecutionOptions.Guides guides,RtExecutionOptions.Primary primary){return new Config(c.visibility(),c.queue(),c.omm(),c.ser(),c.direct(),c.sceneUpdate(),c.realtimePolicy(),c.shader(),c.shadow(),c.world(),c.integrator(),primary,c.cache(),c.sampling(),c.kernel(),c.transport(),guides,c.roughness());}
+    public static Plan guides(){
+        var blocks=new ArrayList<Block>();var base=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
+        for(var primary:RtExecutionOptions.Primary.values()){
+            Config first=guideConfig(base,RtExecutionOptions.Guides.FIRST_HIT,primary),original=guideConfig(base,RtExecutionOptions.Guides.ENDPOINT,primary),fast=guideConfig(base,RtExecutionOptions.Guides.ENDPOINT_FAST,primary);
+            pair(blocks,"guide_"+primary.name().toLowerCase(Locale.ROOT)+"_endpoint",first,original);
+            pair(blocks,"guide_"+primary.name().toLowerCase(Locale.ROOT)+"_fast",original,fast);
+        }return new Plan(List.copyOf(blocks),Map.of());
+    }
     public static Plan scene(){
         var blocks=new ArrayList<Block>();var full=new Config(RtExecutionOptions.Visibility.TRACE,RtExecutionOptions.Queue.FIXED,false,false,RtExecutionOptions.Direct.RIS,RtExecutionOptions.SceneUpdate.OPTIMIZED,RtExecutionOptions.Realtime.FULL);
         var async=new Config(full.visibility(),full.queue(),false,false,full.direct(),RtExecutionOptions.SceneUpdate.ASYNC_PREP,full.realtimePolicy());

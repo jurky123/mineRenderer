@@ -9,7 +9,7 @@ import static org.lwjgl.vulkan.KHRAccelerationStructure.*;
 final class VulkanRtScratch implements AutoCloseable {
     private final VulkanDevice device;
     private final int alignment;
-    private final boolean sliced=com.voxellight.rt.RtExecutionOptions.sceneUpdate()==com.voxellight.rt.RtExecutionOptions.SceneUpdate.OPTIMIZED;
+    private final boolean sliced=com.voxellight.rt.RtExecutionOptions.sceneUpdate()!=com.voxellight.rt.RtExecutionOptions.SceneUpdate.LEGACY;
     private VulkanRtBuffer buffer;
     private long cursor,barriers,slices;
     private boolean dependency=true;

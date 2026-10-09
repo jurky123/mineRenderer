@@ -23,7 +23,14 @@ public final class RtBenchmarkRunner {
     private final Map<String,Object> presentationControls=Map.of("vsyncRequested",Minecraft.getInstance().options.enableVsync().get(),"frameLimit",Minecraft.getInstance().gameRenderer.gameRenderState().framerateLimit);
     private final long resources=VoxelLightClient.scene().bridge().stats().resourceGeneration();
     private RtBenchmarkPlan.Plan plan;
-    private final boolean hot,production;
+    private final boolean hot,production,sceneLoad;
+    private long loadTick,loadSections,loadBytes,loadPrepared,loadFallback;
+    private final long[] guideCounts=new long[16];
+    private long guideFrames;
+    public static final java.util.List<String> GUIDE_COLUMNS=java.util.List.of("pixels","recordReused","invalidRecordFallback","sky","ordinarySkipped","cameraRays","reflectionRays","reflectionEndpoints","endpointMiss","transmissionRays","transmissionEndpoints","totalInternalReflection","roughDielectricFallback","materialDecodes","unresolvedInterfaces","reserved");
+    public static void guideSample(long frame,long[] values){if(running!=null&&running.owns(frame)){for(int i=0;i<16;i++)running.guideCounts[i]+=values[i];running.guideFrames++;}}
+    public static void scenePrepared(boolean prepared){if(running!=null&&running.sceneLoad&&running.phase==Phase.SAMPLE){if(prepared)running.loadPrepared++;else running.loadFallback++;}}
+    public static void sceneAccepted(java.util.List<RtGeometryStream.Section> accepted){if(running!=null&&running.sceneLoad&&running.phase==Phase.SAMPLE){for(var s:accepted)if(s.key().x()<0&&s.key().z()==Integer.MIN_VALUE){running.loadSections++;running.loadBytes+=s.triangles().length;}}}
     private boolean queuesSelected;
     private final RtBenchmarkInputs inputs=new RtBenchmarkInputs();
     private Map<RtExecutionOptions.Realtime,RtExecutionOptions.Queue> selectedQueues=Map.of();
@@ -64,8 +71,8 @@ public final class RtBenchmarkRunner {
     private final LinkedHashSet<String> invalid=new LinkedHashSet<>();
     private RtBenchmarkRunner(int seconds,Consumer<String> feedback,boolean directOnly,boolean blasOnly,boolean realtimeOnly,String extra)throws IOException{
         if(terrain.isEmpty())throw new IllegalStateException("no resident terrain snapshot");
-        this.seconds=seconds;this.feedback=feedback;hot="hot".equals(extra);production="production".equals(extra);
-        plan="scene".equals(extra)?RtBenchmarkPlan.scene():"transport".equals(extra)?RtBenchmarkPlan.transport():"cost".equals(extra)?RtBenchmarkPlan.cost(initial.querySupported()):production?RtBenchmarkPlan.production(original):"material".equals(extra)?RtBenchmarkPlan.material(initial.querySupported()):hot?RtBenchmarkPlan.hot(initial.querySupported(),initial.compactSupported()):"frame".equals(extra)?RtBenchmarkPlan.frame(initial.querySupported()):"shader".equals(extra)?RtBenchmarkPlan.shader(initial.querySupported()):"queues".equals(extra)?RtBenchmarkPlan.queues(initial.querySupported(),initial.compactSupported()):realtimeOnly?RtBenchmarkPlan.realtime(initial.querySupported(),initial.compactSupported()):blasOnly?RtBenchmarkPlan.blas(initial.querySupported()):directOnly?RtBenchmarkPlan.direct(initial.querySupported()):RtBenchmarkPlan.create(initial.querySupported(),initial.compactSupported(),initial.ommSupported()&&initial.opacityValid(),initial.serSupported());
+        this.seconds=seconds;this.feedback=feedback;hot="hot".equals(extra);sceneLoad="scene".equals(extra);production="production".equals(extra);
+        plan="guides".equals(extra)?RtBenchmarkPlan.guides():"scene".equals(extra)?RtBenchmarkPlan.scene():"transport".equals(extra)?RtBenchmarkPlan.transport():"cost".equals(extra)?RtBenchmarkPlan.cost(initial.querySupported()):production?RtBenchmarkPlan.production(original):"material".equals(extra)?RtBenchmarkPlan.material(initial.querySupported()):hot?RtBenchmarkPlan.hot(initial.querySupported(),initial.compactSupported()):"frame".equals(extra)?RtBenchmarkPlan.frame(initial.querySupported()):"shader".equals(extra)?RtBenchmarkPlan.shader(initial.querySupported()):"queues".equals(extra)?RtBenchmarkPlan.queues(initial.querySupported(),initial.compactSupported()):realtimeOnly?RtBenchmarkPlan.realtime(initial.querySupported(),initial.compactSupported()):blasOnly?RtBenchmarkPlan.blas(initial.querySupported()):directOnly?RtBenchmarkPlan.direct(initial.querySupported()):RtBenchmarkPlan.create(initial.querySupported(),initial.compactSupported(),initial.ommSupported()&&initial.opacityValid(),initial.serSupported());
         directory=FabricLoader.getInstance().getGameDir().resolve("benchmark-results/voxellight/rt-suite-"+System.currentTimeMillis());Files.createDirectories(directory);
     }
     public static boolean start(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"");}
@@ -76,6 +83,7 @@ public final class RtBenchmarkRunner {
     public static boolean startShader(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"shader");}
     public static boolean startHot(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"hot");}
     public static boolean startProduction(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"production");}
+    public static boolean startGuides(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"guides");}
     public static boolean startScene(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"scene");}
     public static boolean startTransport(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"transport");}
     public static boolean startCost(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"cost");}
@@ -85,7 +93,7 @@ public final class RtBenchmarkRunner {
         if(running!=null){feedback.accept("VoxelLight: RT benchmark already running; use rt_benchmark status / stop");return false;}
         var client=Minecraft.getInstance();var state=VoxelLightClient.probe().benchmarkState();
         if(client.level==null||state==null||!state.hasOpaque()||state.frozen()){feedback.accept("VoxelLight: enter a loaded Vulkan PT world with opaque geometry and rt_accumulate freeze off first");return false;}
-        if((realtimeOnly||extra.equals("frame")||extra.equals("shader")||extra.equals("hot")||extra.equals("queues")||extra.equals("material")||extra.equals("cost")||extra.equals("transport")||extra.equals("scene"))&&(!state.realtime()||state.spp()!=1)){feedback.accept("VoxelLight: shader/realtime/queue suite requires realtime mode and 1 spp");return false;}
+        if((realtimeOnly||extra.equals("frame")||extra.equals("shader")||extra.equals("hot")||extra.equals("queues")||extra.equals("material")||extra.equals("cost")||extra.equals("transport")||extra.equals("scene")||extra.equals("guides"))&&(!state.realtime()||state.spp()!=1)){feedback.accept("VoxelLight: shader/realtime/queue suite requires realtime mode and 1 spp");return false;}
         if(extra.equals("production")&&!state.realtime()){feedback.accept("VoxelLight: production baseline requires realtime mode; reference forces different execution controls");return false;}
         if(extra.equals("queues")&&!state.compactSupported()){feedback.accept("VoxelLight: indirect tracing unavailable; queue comparison skipped");return false;}
         if(seconds<4||seconds>30)throw new IllegalArgumentException("sample seconds must be 4..30");
@@ -101,10 +109,19 @@ public final class RtBenchmarkRunner {
     public static void clientStopping(){if(running!=null)running.finish("client stopping");}
     public static void nextFrame(long frame){if(running!=null)try{running.advance(frame);}catch(IOException|RuntimeException error){org.slf4j.LoggerFactory.getLogger("VoxelLight").error("Automatic RT benchmark failed",error);running.finish("error: "+error.getMessage());}}
     private String progress(){var block=plan.blocks().get(index);return "VoxelLight: RT benchmark "+(index+1)+"/"+plan.blocks().size()+" "+block.comparison()+" "+(block.candidate()?"B":"A")+" round "+(block.round()+1)+" "+phase+"; elapsed "+(System.nanoTime()-start)/1_000_000_000L+"s";}
+    private static boolean loadNeedsCleanup;
+    public static java.util.List<RtGeometryStream.Section> sceneUpdates(double x,double y,double z){
+        if(running==null||!running.sceneLoad){if(!loadNeedsCleanup)return java.util.List.of();loadNeedsCleanup=false;var removed=new java.util.ArrayList<RtGeometryStream.Section>();for(int i=0;i<16;i++)removed.add(new RtGeometryStream.Section(new com.voxellight.world.SectionKey(-1-i,Integer.MIN_VALUE,Integer.MIN_VALUE),0,new byte[0]));return removed;}
+        loadNeedsCleanup=true;var out=new java.util.ArrayList<RtGeometryStream.Section>();long tick=++running.loadTick;
+        // Reuse a real captured material/tint/UV triangle. Fixed topology, every frame positions change.
+        byte[] source=running.terrain.stream().filter(s->s.triangles().length>=120).findFirst().orElseThrow().triangles();
+        for(int i=0;i<16;i++){byte[] bytes=com.voxellight.rt.RtSceneLoad.geometry(source,tick,i);out.add(new RtGeometryStream.Section(new com.voxellight.world.SectionKey(-1-i,Integer.MIN_VALUE,Integer.MIN_VALUE),tick,bytes,x+8192+i*2,y,z,false,true));}return out;
+    }
     private static double[] pose(){var client=Minecraft.getInstance();if(client.player==null)return null;var p=client.gameRenderer.mainCamera().position();return new double[]{p.x,p.y,p.z,client.player.getXRot(),client.player.getYRot()};}
     private boolean moved(){var p=pose();if(p==null||pose==null)return true;for(int i=0;i<5;i++)if(Math.abs(p[i]-pose[i])>(i<3?.03:.1))return true;return false;}
     private void begin(){
         plan.blocks().get(index).config().apply();phase=Phase.INITIALIZING;phaseStart=System.nanoTime();warmup=new RtBenchmarkWarmup(phaseStart);lastDiagnostic=0;warmFrame=Long.MAX_VALUE;warmGpu.clear();first=last=Long.MAX_VALUE;measuredState=null;blockExported=false;invalid.clear();counterFrames.clear();
+        loadTick=loadSections=loadBytes=loadPrepared=loadFallback=guideFrames=0;Arrays.fill(guideCounts,0);
         lastFrameWall=lastResourceSample=0;resourceSamples.clear();metrics=new PassMetrics(production?256000:64000);rays=new RtWorkMetrics();Arrays.fill(alive,0);for(var row:directCounters)Arrays.fill(row,0);shadow=anyHit=opaque=replay=mismatches=scopeCount=0;
         feedback.accept(progress());
     }
@@ -138,10 +155,11 @@ public final class RtBenchmarkRunner {
                 }
                 return;
             }
+            if(sceneLoad)loadTick=0;
             measuredState=state;startStatus=VoxelLightClient.probe().status();first=frame;querySkips=RenderPassProfile.skippedQueries();phase=Phase.SAMPLE;phaseStart=now;feedback.accept(progress());return;
         }
         if(phase==Phase.SAMPLE){
-            if(production&&now-lastResourceSample>=1_000_000_000L){var sample=new LinkedHashMap<String,Object>();sample.put("frame",frame);sample.put("elapsedSeconds",(now-phaseStart)/1e9);sample.put("state",state);sample.put("renderer",VoxelLightClient.probe().status());resourceSamples.add(sample);lastResourceSample=now;}
+            if(now-lastResourceSample>=1_000_000_000L){var sample=new LinkedHashMap<String,Object>();sample.put("frame",frame);sample.put("elapsedSeconds",(now-phaseStart)/1e9);sample.put("state",state);sample.put("renderer",VoxelLightClient.probe().status());resourceSamples.add(sample);lastResourceSample=now;}
             if(state==null||!state.matches(block.config()))invalid.add("actual execution configuration changed/unavailable");
             else if(production?(state.width()!=measuredState.width()||state.height()!=measuredState.height()||state.spp()!=measuredState.spp()||state.realtime()!=measuredState.realtime()):!measuredState.sameWorkload(state))invalid.add("resolution/spp/mode/terrain working set changed during block");
             if(now-phaseStart>=seconds*1_000_000_000L){last=frame-1;phase=Phase.DRAIN;phaseStart=now;}
@@ -187,9 +205,14 @@ public final class RtBenchmarkRunner {
         if(batches<30||batches<frames*.8)invalid.add("GPU batch timestamp coverage below 80% or fewer than 30 samples");
         if(scopeCount>metrics.size())invalid.add("raw GPU sample ring overflow");
         var fractions=alive[0]==0?new double[0]:new double[6];for(int i=0;i<fractions.length;i++)fractions[i]=alive[i]/(double)alive[0];
+        if(plan.blocks().get(index).comparison().startsWith("guide_")&&plan.blocks().get(index).config().guides()!=RtExecutionOptions.Guides.FIRST_HIT&&guideCounts[0]==0)invalid.add("no endpoint guide counter samples; active successful DLSS required");
+        if(sceneLoad&&loadSections<frames*8)invalid.add("controlled Scene load not committed on at least half of 16-section updates per frame");
+        if(sceneLoad&&plan.blocks().get(index).config().sceneUpdate()==RtExecutionOptions.SceneUpdate.ASYNC_PREP&&loadPrepared==0)invalid.add("controlled Scene load never published asynchronous preparation; all synchronous fallback");
         var result=new RtBenchmarkResults.Block(plan.blocks().get(index),first,last,measuredState,invalid.isEmpty(),List.copyOf(invalid),times,fractions,alive[0]==0?null:anyHit/(double)alive[0],replay,mismatches,RenderPassProfile.skippedQueries()-querySkips);
         results.add(result);blockExported=true;String name=blockName();metrics.export(directory.resolve(name+".passes.csv"));rays.export(directory.resolve(name+".rays.csv"));
         var client=Minecraft.getInstance();
+        Files.writeString(directory.resolve(name+".guides.json"),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("columns",GUIDE_COLUMNS,"sampledFrames",guideFrames,"counts",guideCounts)));
+        Files.writeString(directory.resolve(name+".scene_load.json"),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("enabled",sceneLoad,"acceptedSections",loadSections,"acceptedBytes",loadBytes,"asyncPreparedSections",loadPrepared,"synchronousSections",loadFallback,"sectionsPerFrame",16,"trianglesPerSection",128,"emittedFrames",loadTick,"scope","offscreen RT-only geometry deformation; world unchanged")));
         Files.writeString(directory.resolve(name+".presentation.json"),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("vsyncRequested",client.options.enableVsync().get(),"frameLimit",client.getFramerateLimitTracker().getFramerateLimit(),"throttleReason",client.getFramerateLimitTracker().getThrottleReason().name())));
         Files.writeString(directory.resolve(name+".cpu_timings.json"),new GsonBuilder().setPrettyPrinting().create().toJson(RtBenchmarkResults.cpuTimings(metrics.snapshot(),counterFrames)));
         if(production){
@@ -197,6 +220,7 @@ public final class RtBenchmarkRunner {
             var json=new GsonBuilder().serializeNulls().create().toJson(baseline);Files.writeString(directory.resolve(name+".production.json"),json);
             Files.writeString(directory.getParent().resolve("production-history.jsonl"),json+"\n",StandardOpenOption.CREATE,StandardOpenOption.APPEND);
         }
+        Files.writeString(directory.resolve(name+".resources.json"),new GsonBuilder().setPrettyPrinting().create().toJson(resourceSamples));
         var coverage=rays.realtimeSummary();realtimeCoverage.put(name,coverage);
         Files.writeString(directory.resolve(name+".realtime.json"),new GsonBuilder().setPrettyPrinting().serializeNulls().create().toJson(coverage));
         if(plan.blocks().get(index).candidate()&&plan.blocks().get(index).comparison().startsWith("realtime_cache")&&!Boolean.TRUE.equals(coverage.get("cacheQueried")))feedback.accept("VoxelLight: "+name+" cache received zero queries; timing alone does not validate the cache algorithm");
@@ -214,7 +238,7 @@ public final class RtBenchmarkRunner {
         try{
             if(reason!=null&&!blockExported&&first!=Long.MAX_VALUE){invalid.add("interrupted: "+reason);if(last==Long.MAX_VALUE)last=Math.max(first,currentFrame-1);completeBlock();}
             var comparisons=new ArrayList<RtBenchmarkResults.Comparison>();if(!production)for(String name:plan.blocks().stream().map(RtBenchmarkPlan.Block::comparison).distinct().toList())comparisons.add(RtBenchmarkResults.compare(name,results));
-            var report=new LinkedHashMap<String,Object>();report.put("schema",13);report.put("suite",production?"production":"controlled-ab");report.put("comparisonMetrics",Map.of("blas","vulkan_rt_scene_commit","world_takeover","vulkan_world_total","realtime_end_to_end","vulkan_world_total","scene_cpu_preparation","CPU vulkan_rt_scene_commit P95","others","transport batch"));report.put("timingPolicy","GPU timestamps on counter-free frames; counters/replay every eighth frame; raw CSV includes both, see counter_frames.json");report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy",production?"live terrain, dynamic models, sky/weather and AUTO queue; stationary camera, unchanged user controls":"fixed nearest resident terrain snapshot within 60 MiB; 4 MiB dynamic headroom; exact count/signature required before sampling; dynamic models remain live; renderer sun/sky/weather/held/water controls fixed for the complete suite");report.put("terrainSnapshotSignature",expectedTerrainSignature);report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);report.put("realtimeCoverage",realtimeCoverage);report.put("frozenRendererInputs",inputs.snapshot());report.put("selectedQueues",selectedQueues);
+            var report=new LinkedHashMap<String,Object>();report.put("schema",14);report.put("suite",production?"production":"controlled-ab");report.put("comparisonMetrics",Map.of("guide_*","vulkan_world_total (includes primary record and Guide cost)","blas","vulkan_rt_scene_commit","world_takeover","vulkan_world_total","realtime_end_to_end","vulkan_world_total","scene_cpu_preparation","CPU vulkan_rt_scene_commit P95","others","transport batch"));report.put("timingPolicy","GPU timestamps on counter-free frames; counters/replay every eighth frame; raw CSV includes both, see counter_frames.json");report.put("initializationLimitSeconds",RtBenchmarkWarmup.INITIALIZATION_LIMIT_SECONDS);report.put("terrainPolicy",production?"live terrain, dynamic models, sky/weather and AUTO queue; stationary camera, unchanged user controls":"fixed nearest resident terrain snapshot within 60 MiB; 4 MiB dynamic headroom; exact count/signature required before sampling; dynamic models remain live; renderer sun/sky/weather/held/water controls fixed for the complete suite");report.put("terrainSnapshotSignature",expectedTerrainSignature);report.put("terrainSnapshotSections",terrain.size());report.put("terrainSnapshotBytes",terrain.stream().mapToLong(section->section.triangles().length).sum());report.put("completed",reason==null);report.put("interruption",reason);report.put("sampleSeconds",seconds);report.put("warmupMinimumSeconds",4);report.put("drainSeconds",2);report.put("originalControls",original);report.put("skipped",plan.skipped());report.put("comparisons",comparisons);report.put("blocks",results);report.put("realtimeCoverage",realtimeCoverage);report.put("frozenRendererInputs",inputs.snapshot());report.put("selectedQueues",selectedQueues);
             report.put("device",com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().toString());report.put("version",FabricLoader.getInstance().getModContainer("voxellight").orElseThrow().getMetadata().getVersion().getFriendlyString());
             report.put("presentationControls",presentationControls);
             report.put("afkPolicy","benchmark frames refresh the input timer; no movement or persistent FPS/VSync changes");

@@ -6,7 +6,7 @@ public final class RtExecutionOptions {
     private static Transport transport=Transport.FULL;
     public static Transport transport(){return transport;}
     public static void transport(Transport value){if(transport!=value){transport=value;revision++;}}
-    public enum Guides {FIRST_HIT,ENDPOINT}
+    public enum Guides {FIRST_HIT,ENDPOINT,ENDPOINT_FAST}
     public enum Roughness {LINEAR,ALPHA}
     private static Guides guides=Guides.ENDPOINT;
     private static Roughness roughness=Roughness.LINEAR;

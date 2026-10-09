@@ -102,6 +102,8 @@ final class VulkanPathTracer implements AutoCloseable {
                 warmup.prepare(context.scene.resident(),pos.x(),pos.y(),pos.z());
                 context.prepareScene(encoder,RtGeometryStream.drain(16),pos.x(),pos.y(),pos.z());
             }
+            var benchmarkUpdates=RtBenchmarkRunner.sceneUpdates(pos.x(),pos.y(),pos.z());
+            if(!benchmarkUpdates.isEmpty())context.prepareScene(encoder,benchmarkUpdates,pos.x(),pos.y(),pos.z());
             if(materials&&(realtime||!history.frozen()||history.samples()==0))dynamic.prepare(encoder,context,pos.x(),pos.y(),pos.z());
             context.commitScene(encoder,pos.x(),pos.y(),pos.z());
             RenderPassProfile.workload(width,height,samplesPerFrame,context.scene.generation());

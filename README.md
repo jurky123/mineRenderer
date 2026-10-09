@@ -1,8 +1,10 @@
 # mineRenderer / VoxelLight
 
-VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.48**：加入独立反射 motion、平滑透射终点 Guide、roughness A/B 与 HDR/Guide/AOV/RR 导出；提供简化普通材质、48B 两遍 Transport 和后台 CPU 场景准备的独立对照。默认仍 FULL Material 3 / Wavefront，RTX 性能及复杂反射折射画质尚待验收。[实现、验收与边界](docs/performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。
+alpha.49：帧内 32B Guide 命中复用（`endpoint_fast`）、三条 Guide 配对、受控 Scene 更新负载和 scratch 分片修复。默认保留原始 endpoint / FULL / Wavefront；本轮没有 RTX 性能结论。[详细分析与验收](docs/performance/ALPHA-49-ANALYSIS.md)。
 
-[下载 alpha.48 安装包](https://temp.sh/MjIkV/voxellight-client-kit-26.2-0.39.0-alpha.48.zip)（只含本 mod；集成 RR runtime）。alpha.42 已实测 DLSS RR 与世界接管运行；该场景 FAST 输运耗时降低 23.01%，Iterative 增加 32.76%。默认仍为 EXACT + Wavefront，FAST 按场景选择。[实测与本轮修改](docs/performance/ALPHA-42-FRAME-ANALYSIS.md)。替换旧 jar 后：
+VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.49**：复用 Primary 命中减少 endpoint Guide 的重复工作，新增 Guide 配对、真实 Scene 更新负载及图像差异工具；保留反射 motion、透射终点、HDR/AOV 导出和三种 Transport 对照。默认仍 FULL Material 3 / Wavefront / 原始 ENDPOINT，优化路径的 RTX 净收益及重建质量尚待验收。[实现、验收与边界](docs/performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。
+
+[下载 alpha.49 安装包](https://temp.sh/fRTQH/voxellight-client-kit-26.2-0.39.0-alpha.49.zip)（只含本 mod；集成 RR runtime）。alpha.42 已实测 DLSS RR 与世界接管运行；该场景 FAST 输运耗时降低 23.01%，Iterative 增加 32.76%。默认仍为 EXACT + Wavefront，FAST 按场景选择。[实测与本轮修改](docs/performance/ALPHA-42-FRAME-ANALYSIS.md)。替换旧 jar 后：
 
 ```text
 /voxellight rt_backend vulkan_pt
@@ -11,6 +13,7 @@ VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型�
 /voxellight rt_spp 1
 /voxellight stats
 /voxellight rt_capture_guides
+/voxellight rt_benchmark guides
 /voxellight rt_benchmark transport
 /voxellight rt_benchmark scene
 ```

@@ -1,3 +1,5 @@
+alpha.49 增加 `rt_guides endpoint_fast` 和 `rt_benchmark guides [4..30]`；原 `endpoint` 与 `first_hit` 保留。Scene suite 现在包含固定 RT-only 变形负载与提交量门禁，不能与旧版 idle/natural Scene 测试直接比较。
+
 ## alpha.48
 
 新增 `rt_guides first_hit|endpoint`（默认 endpoint，仅实时 DLSS），`rt_roughness linear|alpha`（默认 sqrt(alpha) 的 linear），`rt_capture_guides`（下一个有效 DLSS 帧按需导出），`rt_transport full|simple|two_pass`（默认 full；实验强制 FULL），`rt_scene_update async_prep`（CPU 后台准备，默认 optimized）。`rt_benchmark transport` 与 `rt_benchmark scene` 独立验收并恢复控制。[实现与限制](performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。

@@ -280,10 +280,22 @@ uint directChannel(Material m,float3 n,float3 wi){return dot(n,wi)<0?2:(metal(m)
 #else
 #include "realtime_policy.slang"
 #endif
+// Frame-local primary record aliases endpoint pages until the guide consumer runs.
+void writeGuideHit(PathState path,SurfacePayload hit,uint flags){
+#ifndef RT_CPU_FIXTURE
+    if(path.throughput.w==0&&path.reserved0<camera.width*camera.height&&(uint(camera.origin.w)&4194304u)!=0){
+        uint count=camera.width*camera.height,base=count*max(1u,camera.padding)+4,index=path.reserved0;
+        GuideHitRecord record=rrHitRecord(hit.distance,hit.bary,hit.triangle,hit.instance,camera.frame,flags);
+        output[base+8*count+index]=asfloat(record.hit);output[base+9*count+index]=asfloat(record.meta);
+    }
+#endif
+}
 void writePrimaryGuides(PathState path,TerrainSurface surface,SurfacePayload hit,bool entering){
 #ifndef RT_CPU_FIXTURE
         if(path.throughput.w==0&&path.reserved0<camera.width*camera.height&&(uint(camera.origin.w)&1u)!=0){
             uint local=path.reserved0;
+            uint eligibility=rrEligibility(surface.material.microfacetAlpha,metal(surface.material),dielectric(surface.material),surface.material.f0);
+            writeGuideHit(path,hit,eligibility);
             uint base=camera.width*camera.height*max(1u,camera.padding)+4;
             float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
             output[base+camera.width*camera.height*7+local]=float4(rrSpecularReflectance(metal(surface.material)?conductorFresnel(surface.material,1):float3(dielectric(surface.material)?pow((surface.material.ior-1)/(surface.material.ior+1),2):surface.material.f0),surface.material.microfacetAlpha,abs(dot(surface.frame.n,-path.direction.xyz))),sqrt(surface.material.microfacetAlpha));
@@ -308,6 +320,7 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
 #endif
     uint seed=asuint(path.radiance.w),lightingSeed=directHash(seed^0xc83a91e1u);MediumStack media=loadMedia(path);
     SurfacePayload hit=knownHit?supplied:traceSurface(path.origin.xyz,path.direction.xyz,4096,path.throughput.w==0?255:254);
+    if(hit.distance<0)writeGuideHit(path,hit,1u);
     TerrainSurface surface=(TerrainSurface)0;bool entering=false,deferred=false;
     if(hit.distance>=0) {
         bool sparseGuide=rtPolicy()&&(pageFeedback[1568].x&2u)!=0&&camera.padding==1&&path.throughput.w==0&&media.count==0;

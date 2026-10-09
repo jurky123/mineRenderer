@@ -1,3 +1,11 @@
+## 0.39.0-alpha.49：Guide Fast Path 与受控负载
+
+复用 endpoint Buffer 页的帧内 32B Primary Hit Record、三条 Guide 模式、采样计数与 GPU World ABBA、16 Section 固定变形更新门禁、scratch 分片修复、固定质量场景与原始 float 图像对照工具。默认仍原始 ENDPOINT / FULL / Wavefront / OPTIMIZED；没有 alpha.49 RTX 收益或图像等价结论。[详细分析](performance/ALPHA-49-ANALYSIS.md)。
+
+完整构建通过：371 项 Java 测试零失败、2 项 Python 验收测试、原生 Slang/GLSL 数值回归；110 个 SPIR-V / 59 个 Slang 源码哈希核对通过。最终透射历史收紧后两个 Guide 变体重新编译和 ABI/SPIR-V 验证。
+
+[alpha.49 安装包](https://temp.sh/fRTQH/voxellight-client-kit-26.2-0.39.0-alpha.49.zip)。SHA-256：`387b69af9388f6895119b4aa28a0f1defbafa51aaf6670f8a3f4ec98a3631dfe`。
+
 ## 0.39.0-alpha.48：RR Guide 与 Transport 对照
 
 独立反射 motion、平滑透射终点近似、方向半球 specular albedo、roughness 编码 A/B、HDR/Guide/AOV/RR 导出已加入。新增 SIMPLE 材质与 48B TWO_PASS 实验以及有界异步 CPU 场景准备 P95 对照。默认仍 FULL Material 3 / Wavefront；完整后台 GPU AS、硬件纹理/ray-cone mip 和复杂折射/动态镜面正确性尚未完成。[实现与验收](performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。

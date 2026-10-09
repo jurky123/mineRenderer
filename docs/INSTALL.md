@@ -1,3 +1,5 @@
+alpha.49 验收：先运行 `rt_benchmark guides`，再分别运行 `transport` / `scene`；图像捕获须在性能测量外执行。详情见包内 `ALPHA-49-ANALYSIS.md`。默认没有启用实验 fast Guide。
+
 ## alpha.48 验收补充
 
 替换旧 jar，进入单人世界启动 Vulkan PT / realtime / DLSS / 1 spp。`rt_capture_guides` 导出 HDR、运动、AOV 与 RR 图像；`rt_guides first_hit|endpoint` 和 `rt_roughness linear|alpha` 分别对照。`rt_benchmark transport` 为 16 段材质/两遍实验，`rt_benchmark scene` 为 8 段 CPU P95 对照。后台 CPU 准备不等于异步 GPU AS 提交。性能和复杂反射/折射画质未作 RTX 验收。[完整步骤与限制](performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。
@@ -32,7 +34,7 @@ RR 活跃时 SDK 决定输入尺寸，`rt_scale` 仅用于 OptiX/Vulkan 原重�
 
 Minecraft Java 26.2 / Java 25 / Fabric Loader 0.19.5 / Fabric API 0.160.0+26.2。安装包只含本 mod，不重复打包已有前置。
 
-1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.48.jar` 放进客户端 `mods/`。
+1. 删除旧 VoxelLight jar，将 `mods/voxellight-client-26.2-0.39.0-alpha.49.jar` 放进客户端 `mods/`。
 2. 视频设置选择原生 Vulkan 图形 API，然后重启。
 3. 进入世界，执行以下命令。
 
