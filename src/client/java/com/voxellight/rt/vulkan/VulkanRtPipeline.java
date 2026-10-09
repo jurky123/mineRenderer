@@ -19,10 +19,17 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
     private VulkanSbt packing;
     private Path cacheFile;
     private boolean closed;
+    private boolean destroyed;
+    private final String stageName;
+    private final long diagnosticId=IDS.incrementAndGet();
+    private static final java.util.concurrent.atomic.AtomicLong IDS=new java.util.concurrent.atomic.AtomicLong();
+    private static final org.slf4j.Logger LOG=org.slf4j.LoggerFactory.getLogger("VoxelLight");
+    private static final boolean LIFECYCLE=Boolean.getBoolean("voxellight.rt.lifecycleDiagnostics");
     private final boolean transport,material;
     private final int bindingCount;
     VulkanRtPipeline(VulkanDevice device) { this(device,null); }
     VulkanRtPipeline(VulkanDevice device,String raygen) {
+        stageName=raygen==null?"primary":raygen;
         transport=raygen!=null;material=transport&&raygen.startsWith("material_");bindingCount=material?18:transport?5:4;
         this.device=device;
         try(var stack=MemoryStack.stackPush()) {
@@ -75,11 +82,11 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
                     groups.get(9).anyHitShader(5);groups.get(10).anyHitShader(5);
                     groups.get(12).anyHitShader(7);groups.get(13).anyHitShader(7);
                 }else groups.get(2).type(VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR).closestHitShader(2);
-                boolean statistics=device.vkDevice().getCapabilities().VK_KHR_pipeline_executable_properties&&VulkanRtCapabilities.executableStatistics(device.vkDevice().getPhysicalDevice());
+                boolean statistics=Boolean.getBoolean("voxellight.rt.pipelineStatistics")&&device.vkDevice().getCapabilities().VK_KHR_pipeline_executable_properties&&VulkanRtCapabilities.executableStatistics(device.vkDevice().getPhysicalDevice());
                 var create=VkRayTracingPipelineCreateInfoKHR.calloc(1,stack);create.get(0).sType$Default().flags(material&&com.voxellight.rt.RtExecutionOptions.omm()&&device.vkDevice().getCapabilities().VK_EXT_opacity_micromap&&VulkanRtCapabilities.micromap(device.vkDevice().getPhysicalDevice())?org.lwjgl.vulkan.EXTOpacityMicromap.VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT:0).pStages(stagesInfo).pGroups(groups).maxPipelineRayRecursionDepth(1).layout(layout);
                 if(statistics)create.get(0).flags(create.get(0).flags()|KHRPipelineExecutableProperties.VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR);
                 check(vkCreateRayTracingPipelinesKHR(device.vkDevice(),0,cache,create,null,out));pipeline=out.get(0);
-                if(statistics)VulkanPipelineDiagnostics.capture(device,pipeline,raygen==null?"primary":raygen);else VulkanPipelineDiagnostics.unavailable(raygen==null?"primary":raygen,"pipeline executable properties or statistics feature unavailable");
+                if(statistics)VulkanPipelineDiagnostics.capture(device,pipeline,stageName);else VulkanPipelineDiagnostics.unavailable(stageName,Boolean.getBoolean("voxellight.rt.pipelineStatistics")?"pipeline executable properties or statistics feature unavailable":"pipeline statistics capture disabled; enable -Dvoxellight.rt.pipelineStatistics=true for compiler diagnostics");
                 sbt=new VulkanRtBuffer(device,packing.bytes()+properties.shaderGroupBaseAlignment(),VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR);
                 var handles=stack.malloc(properties.shaderGroupHandleSize()*groupCount);check(vkGetRayTracingShaderGroupHandlesKHR(device.vkDevice(),pipeline,0,groupCount,handles));
                 var data=ByteBuffer.allocateDirect((int)sbt.size());long base=VulkanSbt.align(sbt.address(),properties.shaderGroupBaseAlignment())-sbt.address();
@@ -179,6 +186,20 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
             finally {MemoryUtil.memFree(data);}
         } catch(IOException|RuntimeException error) {org.slf4j.LoggerFactory.getLogger("VoxelLight").debug("Vulkan RT cache unavailable",error);}
     }
-    @Override public void close() {if(!closed){closed=true;device.createCommandEncoder().queueForDestroy(this);if(sbt!=null)sbt.close();}}
-    @Override public void destroy() {var vk=device.vkDevice();for(var slot:descriptorSlots)vkDestroyDescriptorPool(vk,slot.pool,null);descriptorSlots.clear();recordedDescriptors.clear();if(pipeline!=0)vkDestroyPipeline(vk,pipeline,null);if(cache!=0)vkDestroyPipelineCache(vk,cache,null);if(layout!=0)vkDestroyPipelineLayout(vk,layout,null);if(setLayout!=0)vkDestroyDescriptorSetLayout(vk,setLayout,null);}
+    private void lifecycle(String operation){if(LIFECYCLE)LOG.info("RT lifecycle id={} stage={} operation={} pipeline={} descriptors={} thread={}",diagnosticId,stageName,operation,pipeline,descriptorSlots.size(),Thread.currentThread().getName());}
+    @Override public void close() {if(!closed){closed=true;lifecycle("retire");device.createCommandEncoder().queueForDestroy(this);if(sbt!=null)sbt.close();}}
+    @Override public void destroy() {
+        if(destroyed)return;
+        lifecycle("destroy.begin");
+        var vk=device.vkDevice();
+        for(var slot:descriptorSlots)vkDestroyDescriptorPool(vk,slot.pool,null);
+        descriptorSlots.clear();recordedDescriptors.clear();
+        lifecycle("pipeline.begin");
+        if(pipeline!=0){vkDestroyPipeline(vk,pipeline,null);pipeline=0;}
+        lifecycle("pipeline.end");
+        if(cache!=0){vkDestroyPipelineCache(vk,cache,null);cache=0;}
+        if(layout!=0){vkDestroyPipelineLayout(vk,layout,null);layout=0;}
+        if(setLayout!=0){vkDestroyDescriptorSetLayout(vk,setLayout,null);setLayout=0;}
+        destroyed=true;lifecycle("destroy.end");
+    }
 }

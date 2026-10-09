@@ -12,4 +12,13 @@ class RtScenePreparationTest {
   }
  }
  @Test void budgetAndClosedWorkerFallBackWithoutQueuing(){var p=new RtScenePreparation<String>(0);assertFalse(p.stage("a",1,1,new byte[]{1},b->new RtGeometryRanges(b,new int[]{1})));p.close();assertFalse(p.stage("a",1,1,new byte[0],b->new RtGeometryRanges(b,new int[]{0})));}
+ @Test void discardedInFlightWorkCannotPublishAfterModeSwitch() throws Exception {
+  try(var p=new RtScenePreparation<String>(32)){
+   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);byte[] old={1};
+   assertTrue(p.stage("a",1,1,old,copy->{entered.countDown();try{release.await();}catch(InterruptedException e){throw new RuntimeException(e);}return new RtGeometryRanges(copy,new int[]{1});}));
+   try{assertTrue(entered.await(5,java.util.concurrent.TimeUnit.SECONDS));p.discardUnpublished();assertNull(p.publish("a",1,1,old));}finally{release.countDown();}
+   byte[] current={9};assertTrue(p.stage("a",2,1,current,copy->new RtGeometryRanges(copy,new int[]{1})));
+   assertEquals(9,p.publish("a",2,1,current).triangles()[0]);
+  }
+ }
 }

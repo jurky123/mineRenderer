@@ -47,7 +47,13 @@ public final class RtExecutionOptions {
     public enum SceneUpdate {LEGACY,OPTIMIZED,ASYNC_PREP}
     private static SceneUpdate sceneUpdate=SceneUpdate.OPTIMIZED;
     public static SceneUpdate sceneUpdate(){return sceneUpdate;}
-    public static void sceneUpdate(SceneUpdate value){if(sceneUpdate!=value){sceneUpdate=value;revision++;}}
+    public static void sceneUpdate(SceneUpdate value){
+        if(sceneUpdate!=value){
+            // The two sliced modes share GPU resources; only the LEGACY boundary changes scratch layout.
+            boolean layoutChanged=sceneUpdate==SceneUpdate.LEGACY||value==SceneUpdate.LEGACY;
+            sceneUpdate=value;if(layoutChanged)revision++;
+        }
+    }
     public enum Direct {LEGACY,RIS}
     private static Direct direct=Direct.RIS;
     public static Direct direct(){return direct;}
