@@ -53,3 +53,26 @@ Next performance targets are repeated multiscatter/Fresnel evaluations,
 Wavefront dispatch/state traffic, and sampling overhead. Avoid trading quality
 for speed during this phase. Exact mirror delta handling and material/display
 changes remain separate acceptance work.
+
+## Local validation on RTX 4060 Laptop (2026-10-09)
+
+Slang 2026.19 compiled all 110 variants; SPIRV-Tools validated Vulkan 1.2,
+descriptor/camera ABI checks passed, and no production table arrays remained.
+Native/Slang transport passed 57,600 cases / 3,225,600 components per GGX path,
+with the same maximum normalized error 0.000381917. The broader transport,
+material, environment, queue and RIS fixtures passed through a local MSVC
+adapter. Java compilation and the new asset/integrator tests passed.
+
+The selected Java/shader overlay retained the installed native libraries.
+Isolated terrain/mirror captures completed normally: four HDR/Guide exports,
+zero nonfinite float values. Static captures establish resource/readback sanity,
+not temporal quality equivalence or a resolved mirror model.
+
+A separate launch after all compilation/regression tasks finished produced
+8/8 valid integrator blocks. Wavefront / Iterative GPU medians (median of four
+block medians): World 9.977344 / 11.424352 ms; RT batch 7.894184 / 9.314224 ms.
+ABBA reports Iterative 18.0895% slower, repeat variation 1.1306%; CPU batch
+medians 0.08190 / 0.06635 ms. Keep Wavefront. These results do not isolate GGX
+storage benefit, prove the register/spill cause, or establish Caustica parity.
+An earlier exploratory launch overlapped native regression work and is not
+the formal measurement, despite passing the built-in block gates.
