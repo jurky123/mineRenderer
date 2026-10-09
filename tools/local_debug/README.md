@@ -15,6 +15,8 @@ python tools/local_debug/local_debug.py prepare
 python tools/local_debug/local_debug.py launch --suites production
 # Full acceptance, default per-block sample durations:
 python tools/local_debug/local_debug.py launch --suites guides,transport,scene
+# Same-quality scheduling comparison (FULL, EXACT; Wavefront versus Iterative):
+python tools/local_debug/local_debug.py launch --suites integrator
 ```
 
 The harness creates its runtime under `work/automation`. It sets a fixed 1048x672 window, Vulkan, VSync off and an independent test identity, creates the fixture, positions the camera, configures FULL/Wavefront/Monolithic/ENDPOINT/OPTIMIZED and DLSS, then waits 60 seconds. Production preserves the copied daily visibility/queue/OMM/SER controls; the paired suites apply their own controlled configuration. Requested DLSS is not proof of actual RR: inspect exported state and GPU timing scopes.

@@ -90,7 +90,7 @@ def launch(suites,cameras):
     ensure_idle()
     identity=HERE/'renderer.json'
     renderer=json.loads(identity.read_text())['renderer'] if identity.exists() else 'voxellight'
-    allowed_suites={'production','guides','transport','scene','capture'}
+    allowed_suites={'production','guides','transport','scene','capture','integrator'}
     if not set(suites.split(','))<=allowed_suites:raise ValueError('Unsupported suite')
     if 'capture' in suites.split(',') and suites!='capture':raise ValueError('Quality-only capture must run separately from performance suites')
     if not set(cameras.split(','))<={'terrain','foliage','mirror','glass_water','entity'}:raise ValueError('Unsupported fixture camera')

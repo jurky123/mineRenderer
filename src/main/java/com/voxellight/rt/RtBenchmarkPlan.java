@@ -41,6 +41,12 @@ public final class RtBenchmarkPlan {
         directPair(blocks,query);blasPair(blocks,query);return new Plan(List.copyOf(blocks),Collections.unmodifiableMap(skipped));
     }
     private static Config policy(boolean query,RtExecutionOptions.Realtime mode,RtExecutionOptions.Queue queue){return new Config(query?RtExecutionOptions.Visibility.QUERY:RtExecutionOptions.Visibility.TRACE,queue,false,false,RtExecutionOptions.Direct.RIS,RtExecutionOptions.SceneUpdate.OPTIMIZED,mode);}
+    /** Isolate scheduling with FULL/EXACT quality held fixed; do not inherit the frame suite's FAST shadow. */
+    public static Plan integrator(){
+        var blocks=new ArrayList<Block>();var base=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
+        var iterative=new Config(base.visibility(),base.queue(),base.omm(),base.ser(),base.direct(),base.sceneUpdate(),base.realtimePolicy(),base.shader(),base.shadow(),base.world(),RtExecutionOptions.Integrator.ITERATIVE,base.primary(),base.cache(),base.sampling(),base.kernel(),base.transport(),base.guides(),base.roughness());
+        pair(blocks,"integrator_exact",base,iterative);return new Plan(List.copyOf(blocks),Map.of());
+    }
     public static Plan frame(boolean query){var blocks=new ArrayList<Block>();var base=policy(query,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
         var composite=new Config(base.visibility(),base.queue(),false,false,base.direct(),base.sceneUpdate(),base.realtimePolicy(),base.shader(),RtExecutionOptions.Shadow.EXACT,RtExecutionOptions.World.COMPOSITE);
         pair(blocks,"world_takeover",composite,base);
