@@ -25,6 +25,7 @@ AGENTS.md
 # Minecraft development runtime and measurements
 run/
 runs/
+/work/
 logs/
 crash-reports/
 saves/

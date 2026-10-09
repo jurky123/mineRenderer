@@ -13,4 +13,13 @@ class AcceptanceTest(unittest.TestCase):
  def test_five_scene_fixture(self):
   with tempfile.TemporaryDirectory() as directory:
    d=pathlib.Path(directory);fixture(d);self.assertEqual(5,len(json.loads((d/'scenes.json').read_text())['camera']));self.assertIn('water',(d/'setup.mcfunction').read_text());self.assertIn('tp @e[tag=vl49_mirror] 36 99 0',(d/'pose-1.mcfunction').read_text());self.assertIn('tp @e[tag=vl49_entity] 68 99 3',(d/'pose-1.mcfunction').read_text())
+ def test_fixture_fill_commands_fit_vanilla_limit(self):
+  with tempfile.TemporaryDirectory() as directory:
+   d=pathlib.Path(directory);fixture(d)
+   for line in (d/'setup.mcfunction').read_text().splitlines():
+    if not line.startswith('fill '):continue
+    coordinates=list(map(int,line.split()[1:7]));a,b=coordinates[:3],coordinates[3:]
+    volume=1
+    for start,end in zip(a,b):volume*=abs(end-start)+1
+    self.assertLessEqual(volume,32768,line)
 if __name__=='__main__':unittest.main()

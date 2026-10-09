@@ -4,7 +4,8 @@ import argparse, array, json, math, pathlib, re, sys, zipfile
 
 def fixture(directory):
     directory.mkdir(parents=True,exist_ok=True)
-    commands=['time set noon','weather clear','difficulty peaceful','fill -8 98 -8 72 110 24 air','fill -8 98 -8 72 98 24 stone']
+    # Keep each cleanup below the vanilla 32768-block fill limit.
+    commands=['time set noon','weather clear','difficulty peaceful','fill -8 98 -8 32 110 24 air','fill 33 98 -8 72 110 24 air','fill -8 98 -8 72 98 24 stone']
     scenes=[('terrain',0,'stone'),('foliage',16,'oak_leaves[persistent=true]'),('mirror',32,'gold_block'),('glass_water',48,'glass'),('entity',64,'iron_block')]
     for name,x,block in scenes:
         commands+= [f'fill {x} 99 6 {x+6} 103 6 {block}',f'setblock {x+3} 100 4 sea_lantern']
