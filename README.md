@@ -1,6 +1,6 @@
 # mineRenderer / VoxelLight
 
-alpha.49：帧内 32B Guide 命中复用（`endpoint_fast`）、三条 Guide 配对、受控 Scene 更新负载和 scratch 分片修复。默认保留原始 endpoint / FULL / Wavefront；本轮没有 RTX 性能结论。[详细分析与验收](docs/performance/ALPHA-49-ANALYSIS.md)。
+alpha.49：帧内 32B Guide 命中复用（`endpoint_fast`）、三条 Guide 配对、受控 Scene 更新负载和 scratch 分片修复。默认保留原始 endpoint / FULL / Wavefront；本轮没有 RTX 性能结论。[详细分析与验收](docs/performance/ALPHA-49-ANALYSIS.md) · [本地 agent 调试交接](docs/performance/ALPHA-49-LOCAL-AGENT-HANDOFF.md)。
 
 VoxelLight 是 Minecraft 26.2 / Java 25 的客户端 Fabric 路径追踪原型，支持原生 Vulkan。当前版本 **0.39.0-alpha.49**：复用 Primary 命中减少 endpoint Guide 的重复工作，新增 Guide 配对、真实 Scene 更新负载及图像差异工具；保留反射 motion、透射终点、HDR/AOV 导出和三种 Transport 对照。默认仍 FULL Material 3 / Wavefront / 原始 ENDPOINT，优化路径的 RTX 净收益及重建质量尚待验收。[实现、验收与边界](docs/performance/RECONSTRUCTION-TRANSPORT-BASELINE.md)。
 
