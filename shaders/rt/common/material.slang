@@ -19,11 +19,17 @@ static const uint TRANSMISSION=16;
 static const uint DELTA=32;
 static const uint DISPERSIVE=64;
 struct Material {
+#ifdef RT_GGX_PREPARED
+ float energyAverage;float3 energyFactor;bool energyPrepared;
+#endif
  float3 baseColor;float3 eta;float3 k;float3 emission;float3 sigmaA;float3 sigmaS;
  float microfacetAlpha;float alphaV;float f0;float ior;float transmission;float coatWeight;float coatAlpha;float coatIOR;float porosity;float sss;float phaseG;float thickness;float abbeNumber;bool multipleScattering;
  uint type;uint conductorId;uint materialId;uint mediumId;
 };
 Material defaultMaterial() { Material m;
+#ifdef RT_GGX_PREPARED
+ m.energyPrepared=false;m.energyAverage=1;m.energyFactor=0;
+#endif
     m.baseColor=float3(.5f,.5f,.5f);
     m.eta=float3(1.5f,1.5f,1.5f);
     m.k=float3(0,0,0);

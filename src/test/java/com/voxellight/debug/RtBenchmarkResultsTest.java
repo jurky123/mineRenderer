@@ -17,6 +17,16 @@ class RtBenchmarkResultsTest {
         return out;
     }
     private String verdict(double... times){return RtBenchmarkResults.compare("visibility",blocks(times)).verdict();}
+    @Test void environmentUsesWorldScopeAndDoesNotInventMissingTiming(){
+        var blocks=new ArrayList<RtBenchmarkResults.Block>();
+        for(var p:RtBenchmarkPlan.environment().blocks()){
+            var c=p.config();var state=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),c.omm(),c.ser(),true,true,12,50,20,1000,c.direct(),c.sceneUpdate(),c.realtimePolicy(),c.shader(),c.shadow(),c.world(),c.integrator(),c.primary(),c.cache(),c.sampling(),c.kernel(),c.transport(),c.guides(),c.roughness());
+            blocks.add(new RtBenchmarkResults.Block(p,0,100,state,true,List.of(),Map.of("vulkan_rt_batch_fixed",new RtBenchmarkResults.Timing(100,8.,8.),"vulkan_world_total",new RtBenchmarkResults.Timing(100,p.candidate()?9.:10.,10.),"vulkan_rt_environment_prepare",new RtBenchmarkResults.Timing(100,p.candidate()?.001:.2,.2)),new double[]{1,.6,.4,.2,.1,.05},.1,256,0,0));
+        }
+        var result=RtBenchmarkResults.compare("environment_world_exact_cache",blocks);assertEquals("candidate_faster",result.verdict());assertEquals(10.,result.improvementPercent(),1e-8);
+        var missing=blocks.stream().map(b->new RtBenchmarkResults.Block(b.plan(),b.firstFrame(),b.lastFrame(),b.state(),b.valid(),b.reasons(),Map.of("vulkan_rt_batch_fixed",new RtBenchmarkResults.Timing(100,8.,8.)),b.aliveFraction(),b.anyHitPerPrimary(),b.replaySamples(),b.mismatches(),b.skippedQueries())).toList();
+        assertEquals("not_comparable",RtBenchmarkResults.compare("environment_world_exact_cache",missing).verdict());
+    }
     @Test void blasComparisonUsesSceneCommitRatherThanUnchangedTransport(){
         var blocks=new ArrayList<RtBenchmarkResults.Block>();for(var p:RtBenchmarkPlan.blas(true).blocks()){var c=p.config();var state=new RtBenchmarkState(320,180,1,true,false,true,true,true,true,c.visibility(),c.queue(),c.omm(),c.ser(),true,true,12,50,20,1000,c.direct(),c.sceneUpdate());
             blocks.add(new RtBenchmarkResults.Block(p,0,100,state,true,List.of(),Map.of("vulkan_rt_batch_fixed",new RtBenchmarkResults.Timing(100,8.,8.),"vulkan_rt_scene_commit",new RtBenchmarkResults.Timing(100,p.candidate()?2.:3.,3.)),new double[]{1,.6,.4,.2,.1,.05},.1,256,0,0));}

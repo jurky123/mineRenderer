@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build-only Slang/SPIR-V compiler. No runtime compiler or source shader fallback."""
+import concurrent.futures
 import argparse, hashlib, json, os, pathlib, shutil, subprocess, struct, sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 STAGES = {'primary': 'raygeneration', 'closest_hit': 'closesthit', 'sky': 'miss', 'transport_primary': 'raygeneration', 'transport_indirect': 'raygeneration', 'transport_closest_hit': 'closesthit', 'transport_sky': 'miss', 'material_primary':'raygeneration', 'material_indirect':'raygeneration', 'material_closest_hit':'closesthit', 'material_sky':'miss', 'material_cutout':'anyhit','material_shadow_cutout':'anyhit','material_resolve':'raygeneration','transport_resolve':'raygeneration', 'material_visibility_miss':'miss','material_shadow_transmission':'anyhit','material_transmission_miss':'miss'}
@@ -55,7 +56,7 @@ def validate_byte_address_layout(binary):
         if vectors.get(element)==3 and strides.get(array)!=12:
             raise ValueError('padded vec3 ByteAddressBuffer alias: 12-byte indexing with '+str(strides.get(array))+'-byte ArrayStride; use scalar word loads')
 
-def validate_kernel_storage(binary):
+def validate_kernel_storage(binary, *, allow_ggx_inline=False):
     """Diffuse and GGX LUTs must live in the persistent assets buffer, not function arrays."""
     words=struct.unpack('<'+'I'*(len(binary)//4),binary);constants={};arrays=[];i=5
     while i<len(words):
@@ -64,7 +65,7 @@ def validate_kernel_storage(binary):
         elif opcode==28:arrays.append(args[2])
         if count==0:raise ValueError('invalid SPIR-V instruction')
         i+=count
-    if any(constants.get(length) in (1024,2145,6435) for length in arrays):
+    if any(constants.get(length) in ((2145,6435) if allow_ggx_inline else (1024,2145,6435)) for length in arrays):
         raise ValueError('preintegrated transport LUT compiled as a per-invocation array; use asset-buffer loads')
 
 def validate_layout(reflection, transport=False, material=False, compact=False):
@@ -99,25 +100,28 @@ def validate_layout(reflection, transport=False, material=False, compact=False):
         raise ValueError('camera ABI size mismatch')
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('--output', default='build/vulkan-rt'); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument('--output', default='build/vulkan-rt'); parser.add_argument('--ggx-storage',choices=['inline','assets'],default='inline'); parser.add_argument('--workers',type=int,choices=range(1,9),default=1); args = parser.parse_args()
     output = ROOT / args.output; output.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable,str(ROOT/'tools/generate_ggx_asset.py'),'--check'],check=True)
     compiler, validator = tool('slangc', 'SLANGC'), tool('spirv-val', 'SPIRV_VAL')
     version = subprocess.check_output([compiler, '-version'], stderr=subprocess.STDOUT, text=True).strip()
-    manifest = {'compiler': version, 'target': 'vulkan1.2', 'shaders': {}, 'sources': {}}
+    manifest = {'compiler': version, 'target': 'vulkan1.2', 'ggxStorage':args.ggx_storage, 'shaders': {}, 'sources': {}}
     for source in sorted((ROOT/'shaders/rt').rglob('*.slang')):
         manifest['sources'][str(source.relative_to(ROOT))] = hashlib.sha256(source.read_bytes()).hexdigest()
-    for entry, stage in STAGES.items():
+    def compile_entry(item):
+        entry,stage=item
         base,defines=VARIANTS.get(entry,(entry,[]))
-        if entry.startswith('material_'):defines=defines+['RT_GGX_ASSETS']
+        if entry.startswith('material_') and args.ggx_storage=='assets':defines=defines+['RT_GGX_ASSETS']
         source = ROOT / f'shaders/rt/world/{base}.slang'; spv = output / f'{entry}.spv'; reflection = output / f'{entry}.json'
         subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', base, *['-D'+define+'=1' for define in defines],
                         *(['-capability','spvShaderInvocationReorderNV'] if 'RT_SER' in defines else []), *(['-capability','spvRayQueryKHR'] if 'RT_RAY_QUERY' in defines else []), '-stage', stage, '-matrix-layout-column-major', '-O2', '-o', str(spv), '-reflection-json', str(reflection)], check=True)
         subprocess.run([validator, '--target-env', 'vulkan1.2', str(spv)], check=True)
         validate_byte_address_layout(spv.read_bytes())
-        validate_kernel_storage(spv.read_bytes())
+        validate_kernel_storage(spv.read_bytes(),allow_ggx_inline=args.ggx_storage=='inline')
         if entry != "material_visibility_miss":validate_layout(json.loads(reflection.read_text()), (entry.startswith("transport_") or entry.startswith("material_")), entry.startswith("material_"), "RT_COMPACT48" in defines)
         manifest['shaders'][entry] = {'stage': stage, 'defines':defines, 'sha256': hashlib.sha256(spv.read_bytes()).hexdigest(), 'bytes': spv.stat().st_size}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
+        list(pool.map(compile_entry,STAGES.items()))
     (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     print(f'Validated {len(STAGES)} Vulkan RT stages, camera ABI=96 bytes, continuation ABIs=64 bytes + 288-byte cold media + 48-byte AOV accumulator')
 if __name__ == '__main__': main()

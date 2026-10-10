@@ -33,7 +33,11 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
             .withBindGroupLayout(layout).withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
             .withColorTargetState(new ColorTargetState(Optional.empty(),GpuFormat.RGBA32_FLOAT,ColorTargetState.WRITE_ALL)).withCull(false).build();
     }
+    private final com.voxellight.rt.RtEnvironmentCache exactCache=new com.voxellight.rt.RtEnvironmentCache();
     void prepare(CommandEncoder encoder,VulkanDevice device,VulkanRtBuffer destination,int offset,EnvironmentPass weather,ShadowRenderer shadows) {
+        try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_environment_prepare")){prepareEnvironment(encoder,device,destination,offset,weather,shadows);}
+    }
+    private void prepareEnvironment(CommandEncoder encoder,VulkanDevice device,VulkanRtBuffer destination,int offset,EnvironmentPass weather,ShadowRenderer shadows) {
         if(map==null) {
             for(var pipeline:new RenderPipeline[]{MAP,CELLS,ROWS})if(!RenderSystem.getDevice().precompilePipeline(pipeline,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan environment pipeline unavailable");
             int usage=GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_TEXTURE_BINDING;
@@ -46,6 +50,10 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
         var light=shadows.light();var env=LightingEnvironment.polished(light,sky.skybox==DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);var sun=light.direction();
         var frozen=RtBenchmarkRunner.freeze("skyPalette",new float[]{env.directR(),env.directG(),env.directB(),env.directStrength(),
             env.skyR(),env.skyG(),env.skyB(),env.skyStrength(),env.horizonR(),env.horizonG(),env.horizonB(),env.lowerHemisphere(),sun.x,sun.y,sun.z,0});
+        var weatherInputs=weather.rtUniforms();
+        boolean cached=com.voxellight.rt.RtExecutionOptions.shader()==com.voxellight.rt.RtExecutionOptions.Shader.ENV_CACHED;
+        if(!cached)exactCache.clear();
+        if(cached&&exactCache.matches(destination,offset,weatherInputs,frozen))return;
         try(var stack=MemoryStack.stackPush()) {
             var data=stack.malloc(64).order(java.nio.ByteOrder.nativeOrder());for(float value:frozen)data.putFloat(value);data.flip();encoder.writeToBuffer(palette.slice(),data);
         }
@@ -60,6 +68,7 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
             encoder.copyTextureToBuffer(cells,destination,offset+WIDTH*HEIGHT*16,()->{},0);
             encoder.copyTextureToBuffer(rows,destination,offset+WIDTH*HEIGHT*32,()->{},0);
         }
+        if(cached)exactCache.updated(destination,offset,weatherInputs,frozen);
     }
     private static void draw(CommandEncoder encoder,RenderPipeline pipeline,GpuTextureView target,GpuTextureView input,String sampler,int width,int height) {
         try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan environment CDF")
@@ -68,6 +77,7 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
         }
     }
     @Override public void close() {
+        exactCache.clear();
         if(mapView!=null)mapView.close();if(cellsView!=null)cellsView.close();if(rowsView!=null)rowsView.close();
         if(map!=null)map.close();if(cells!=null)cells.close();if(rows!=null)rows.close();if(palette!=null)palette.close();
         map=cells=rows=null;mapView=cellsView=rowsView=null;palette=null;

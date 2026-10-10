@@ -42,6 +42,21 @@ public final class RtBenchmarkPlan {
     }
     private static Config policy(boolean query,RtExecutionOptions.Realtime mode,RtExecutionOptions.Queue queue){return new Config(query?RtExecutionOptions.Visibility.QUERY:RtExecutionOptions.Visibility.TRACE,queue,false,false,RtExecutionOptions.Direct.RIS,RtExecutionOptions.SceneUpdate.OPTIMIZED,mode);}
     /** Isolate scheduling with FULL/EXACT quality held fixed; do not inherit the frame suite's FAST shadow. */
+    public static Plan prepared(){
+        var blocks=new ArrayList<Block>();var base=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
+        var lifted=new Config(base.visibility(),base.queue(),base.omm(),base.ser(),base.direct(),base.sceneUpdate(),base.realtimePolicy(),RtExecutionOptions.Shader.GGX_PREPARED,base.shadow(),base.world(),base.integrator(),base.primary(),base.cache(),base.sampling(),base.kernel(),base.transport(),base.guides(),base.roughness());
+        pair(blocks,"ggx_point_invariants",base,lifted);return new Plan(List.copyOf(blocks),Map.of());
+    }
+    public static Plan environment(){
+        var blocks=new ArrayList<Block>();var base=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
+        var cached=new Config(base.visibility(),base.queue(),base.omm(),base.ser(),base.direct(),base.sceneUpdate(),base.realtimePolicy(),RtExecutionOptions.Shader.ENV_CACHED,base.shadow(),base.world(),base.integrator(),base.primary(),base.cache(),base.sampling(),base.kernel(),base.transport(),base.guides(),base.roughness());
+        pair(blocks,"environment_world_exact_cache",base,cached);return new Plan(List.copyOf(blocks),Map.of());
+    }
+    public static Plan ggx(){
+        var blocks=new ArrayList<Block>();var candidate=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
+        var baseline=new Config(candidate.visibility(),candidate.queue(),candidate.omm(),candidate.ser(),candidate.direct(),candidate.sceneUpdate(),candidate.realtimePolicy(),RtExecutionOptions.Shader.GGX_INLINE,candidate.shadow(),candidate.world(),candidate.integrator(),candidate.primary(),candidate.cache(),candidate.sampling(),candidate.kernel(),candidate.transport(),candidate.guides(),candidate.roughness());
+        pair(blocks,"ggx_storage",baseline,candidate);return new Plan(List.copyOf(blocks),Map.of());
+    }
     public static Plan integrator(){
         var blocks=new ArrayList<Block>();var base=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
         var iterative=new Config(base.visibility(),base.queue(),base.omm(),base.ser(),base.direct(),base.sceneUpdate(),base.realtimePolicy(),base.shader(),base.shadow(),base.world(),RtExecutionOptions.Integrator.ITERATIVE,base.primary(),base.cache(),base.sampling(),base.kernel(),base.transport(),base.guides(),base.roughness());
@@ -56,6 +71,14 @@ public final class RtBenchmarkPlan {
         pair(blocks,"iterative_indirect",fast,iterative);return new Plan(List.copyOf(blocks),Map.of());}
     public static Plan shader(boolean query){var blocks=new ArrayList<Block>();var base=policy(query,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);
         pair(blocks,"shader_clean_full",new Config(base.visibility(),base.queue(),false,false,base.direct(),base.sceneUpdate(),base.realtimePolicy(),RtExecutionOptions.Shader.RUNTIME),base);return new Plan(List.copyOf(blocks),Map.of());}
+    public static Plan queuesLate(boolean supported){
+        if(!supported)return new Plan(List.of(),Map.of("queue_late","indirect tracing unavailable"));
+        var blocks=new ArrayList<Block>();pair(blocks,"realtime_queue_full_late",policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED),policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.LATE));return new Plan(List.copyOf(blocks),Map.of());
+    }
+    public static Plan queuesFull(boolean supported){
+        if(!supported)return new Plan(List.of(),Map.of("queue_full","indirect tracing unavailable"));
+        var blocks=new ArrayList<Block>();pair(blocks,"realtime_queue_full_compact",policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED),policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.COMPACT));return new Plan(List.copyOf(blocks),Map.of());
+    }
     public static Plan queues(boolean query,boolean supported){var blocks=new ArrayList<Block>();if(!supported)return new Plan(List.of(),Map.of("queues","indirect tracing unavailable"));
         for(var mode:new RtExecutionOptions.Realtime[]{RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Realtime.SPARSE,RtExecutionOptions.Realtime.CACHE_SPARSE})for(var queue:new RtExecutionOptions.Queue[]{RtExecutionOptions.Queue.COMPACT,RtExecutionOptions.Queue.HYBRID})pair(blocks,"realtime_queue_"+mode.name().toLowerCase(Locale.ROOT)+"_"+queue.name().toLowerCase(Locale.ROOT),policy(query,mode,RtExecutionOptions.Queue.FIXED),policy(query,mode,queue));return new Plan(List.copyOf(blocks),Map.of());}
     public static Plan hot(boolean query,boolean supported){var blocks=new ArrayList<Block>(shader(query).blocks());var queues=queues(query,supported);blocks.addAll(queues.blocks());return new Plan(List.copyOf(blocks),queues.skipped());}

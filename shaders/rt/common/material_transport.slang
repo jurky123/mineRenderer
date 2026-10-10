@@ -369,6 +369,9 @@ void advanceHit(inout PathState path,SurfacePayload supplied,bool knownHit,bool 
         if(!rtProbeFirst(path))addRadiance(path,path.throughput.xyz*(directRis()?runtimeMiss(path.direction.xyz,path.direction.w,path.previousDelta!=0,uint(max(0,path.throughput.w-1))):missRadiance(path.direction.xyz,path.direction.w,path.previousDelta!=0)));path.origin.w=0;
     } else {
         Material m=surface.material;float3 point=path.origin.xyz+path.direction.xyz*hit.distance;
+#ifdef RT_GGX_PREPARED
+        m=prepareGgxEnergy(m);
+#endif
         if(m.type==WATER) {
             float4 controls=asfloat(assets.Load4(64));
             float3 waterNormal=terrainWaterNormal(surface.frame.n,point,camera.origin.xyz,controls.x,controls.z,asfloat(assets.Load(80)),controls.y,controls.w);

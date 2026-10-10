@@ -26,6 +26,14 @@ def main():
     subprocess.run([cxx,'-std=c++17','-O2','-DRT_GGX_ASSETS=1','-I'+str(output),str(ROOT/'tools/native/vulkan_transport_parity.cpp'),'-o',str(executable)],check=True)
     result+='GGX persistent asset path: '+subprocess.check_output([str(executable)],text=True)
 
+    # Same-point average/Fresnel reuse must remain aligned with the native BSDF.
+    subprocess.run([compiler,str(source),'-DRT_GGX_PREPARED=1','-target','spirv','-profile','spirv_1_5','-entry','transport_parity','-stage','compute','-o',str(output/'transport_parity_prepared.spv')],check=True)
+    subprocess.run([tool('spirv-val','SPIRV_VAL'),'--target-env','vulkan1.2',str(output/'transport_parity_prepared.spv')],check=True)
+    subprocess.run([compiler,str(source),'-DRT_GGX_PREPARED=1','-target','cpp','-entry','transport_parity','-stage','compute','-o',str(output/'transport_parity.cpp')],check=True)
+    executable=output/'transport_parity_prepared'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_transport_parity.cpp'),'-o',str(executable)],check=True)
+    result+='GGX same-point reuse: '+subprocess.check_output([str(executable)],text=True)
+
     (output/'water_fixture_native.h').write_text((ROOT/'native/rt/water_surface.h').read_text())
     source=ROOT/'shaders/rt/tests/terrain_material_parity.slang'
     spv=output/'terrain_material_parity.spv'

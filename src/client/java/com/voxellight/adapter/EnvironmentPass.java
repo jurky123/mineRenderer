@@ -10,6 +10,8 @@ import org.lwjgl.system.MemoryStack;
 /** One shared world-space weather contract for sky, surface lights, volume and water. */
 final class EnvironmentPass implements AutoCloseable  {
     private GpuBuffer settings;
+    private float[] rtUniforms;
+    float[] rtUniforms(){return rtUniforms;}
     private boolean sky=true,clouds=true,shadows=true,underwater=true,caustics=true,ripples=true,composed,active;
     private boolean submerged;
     private float rtRain,rtCloud,rtRipples;
@@ -71,6 +73,7 @@ final class EnvironmentPass implements AutoCloseable  {
             active&&sky?1:0,active&&sky&&cloud?1:0,polished&&overworld&&shadows&&cloud?1:0,rtRain,
             state.sunAngle,state.moonPhase==null?0:state.moonPhase.ordinal(),192,.48f,
             inWater?1:0,caustics&&polished&&overworld?1:0,ripples?1:0,waterTop});
+        rtUniforms=frozen;
         try(var stack=MemoryStack.stackPush()) {
             var data=stack.malloc(64).order(java.nio.ByteOrder.nativeOrder());for(float value:frozen)data.putFloat(value);data.flip();encoder.writeToBuffer(settings.slice(),data);
         }
@@ -96,7 +99,7 @@ final class EnvironmentPass implements AutoCloseable  {
     @Override public void close() {
         if(settings!=null) {
             settings.close();
-            settings=null;
+            settings=null;rtUniforms=null;
         }
         composed=active=false;
         clock=System.nanoTime();

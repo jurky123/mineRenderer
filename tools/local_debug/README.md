@@ -55,3 +55,13 @@ python -m unittest discover -s tools/acceptance -p "test_*.py"
 ```
 
 The native/shader/Java product build is not needed for this orchestration agent; it is compiled with the existing JDK and calls the installed mod. Any renderer/shader change still requires the project's full prescribed build and acceptance.
+
+
+Module experiments: `launch --suites ggx`, `environment`, or `prepared` requires the corresponding isolated overlay bank. GGX storage is not accepted; default `build_vulkan_rt.py` storage is INLINE. `--ggx-storage assets` is experimental. Prepared per-hit GGX reuse is macro guarded and default off. Shader numeric parity does not establish performance or visual acceptance.
+
+For per-camera baseline sampling, add `-Dvoxellight.debug.profileOnly=true` to the dedicated state's base-args.json and launch `--suites production --cameras terrain,foliage,mirror,glass_water,entity`. The driver settles 60 seconds at each camera, runs the existing production suite and then moves without switching guides or capturing images. Focus/readiness/workload gates remain intact. `profileEachCamera=true` instead keeps the separate settled capture pairs after each suite. Never compare diagnostic pipeline-statistics timings with normal timings.
+
+
+`queue_full` compares FIXED/COMPACT under FULL/EXACT. `queue_late` compares FIXED/LATE (B1 fixed, B2–B5 compact, mask=60). Both retain two ABBA rounds and original camera/workload/alive/timing gates. The built-in comparator reports RT batch; use `python tools/acceptance/module_abba.py RAW.zip --output world.json` for secondary World analysis inheriting the original validity. A stage gain is not automatically an end-to-end gain.
+
+`-Dvoxellight.debug.shader=GGX_PREPARED` or `-Dvoxellight.debug.queue=LATE` explicitly selects candidates before the 60-second prewarm. Quality-only runs use `--suites capture` and do not establish performance. Captures record actual benchmarkState in capture-states.log when available. The launcher verifies the mod artifact SHA against renderer.json and preserves previous launch metadata/telemetry under run-history before replacing output files.

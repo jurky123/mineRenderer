@@ -88,9 +88,19 @@ def ensure_idle():
 
 def launch(suites,cameras):
     ensure_idle()
+    # Preserve previous launch evidence before output/telemetry are replaced.
+    if (HERE/'process.json').exists():
+        previous=json.loads((HERE/'process.json').read_text())
+        history=HERE/'run-history'/str(previous['pid']);history.mkdir(parents=True,exist_ok=True)
+        for name in ['process.json','renderer.json','patch-build.json','launch-output.log','gpu-telemetry.csv','telemetry-output.log','watchdog-output.log','pipeline-compiler.csv','pipeline-compiler-status.json']:
+            if (HERE/name).exists() and not (history/name).exists():shutil.copy2(HERE/name,history/name)
     identity=HERE/'renderer.json'
-    renderer=json.loads(identity.read_text())['renderer'] if identity.exists() else 'voxellight'
-    allowed_suites={'production','guides','transport','scene','capture','integrator'}
+    renderer_data=json.loads(identity.read_text()) if identity.exists() else {'renderer':'voxellight'}
+    renderer=renderer_data['renderer']
+    if renderer_data.get('artifact'):
+        actual_sha=hashlib.sha256(pathlib.Path(renderer_data['artifact']).read_bytes()).hexdigest()
+        if actual_sha!=renderer_data.get('sha256'):raise RuntimeError('Renderer artifact SHA differs from prepared identity; rebuild provenance before launch')
+    allowed_suites={'production','guides','transport','scene','capture','integrator','ggx','environment','prepared','queue_full','queue_late'}
     if not set(suites.split(','))<=allowed_suites:raise ValueError('Unsupported suite')
     if 'capture' in suites.split(',') and suites!='capture':raise ValueError('Quality-only capture must run separately from performance suites')
     if not set(cameras.split(','))<={'terrain','foliage','mirror','glass_water','entity'}:raise ValueError('Unsupported fixture camera')
@@ -106,7 +116,7 @@ def launch(suites,cameras):
     kernel=ctypes.windll.kernel32;kernel.GetProcessTimes.argtypes=[wintypes.HANDLE,ctypes.POINTER(wintypes.FILETIME),ctypes.POINTER(wintypes.FILETIME),ctypes.POINTER(wintypes.FILETIME),ctypes.POINTER(wintypes.FILETIME)]
     created,exited,system,user=(wintypes.FILETIME() for _ in range(4));kernel.GetProcessTimes(int(process._handle),ctypes.byref(created),ctypes.byref(exited),ctypes.byref(system),ctypes.byref(user))
     creation=(created.dwHighDateTime<<32)|created.dwLowDateTime
-    (HERE/'process.json').write_text(json.dumps({'pid':process.pid,'creationFiletime':creation,'java':str(JAVA),'suites':suites,'gameDir':str(GAME),'renderer':renderer,'cameras':cameras,'jvmProperties':[a for a in args if a.startswith('-D')]},indent=2))
+    (HERE/'process.json').write_text(json.dumps({'pid':process.pid,'artifactSha256':renderer_data.get('sha256'),'creationFiletime':creation,'java':str(JAVA),'suites':suites,'gameDir':str(GAME),'renderer':renderer,'cameras':cameras,'jvmProperties':[a for a in args if a.startswith('-D')]},indent=2))
     with (HERE/'watchdog-output.log').open('w',encoding='utf-8') as watchlog:
         subprocess.Popen([sys.executable,str(CODE/'watchdog.py'),str(HERE)],stdout=watchlog,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW)
     with (HERE/'telemetry-output.log').open('w',encoding='utf-8') as telemetrylog:

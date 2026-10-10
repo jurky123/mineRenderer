@@ -169,6 +169,8 @@ public final class VulkanRtPipeline implements AutoCloseable, Destroyable {
     }
     private VkStridedDeviceAddressRegionKHR region(MemoryStack stack,long offset) {return VkStridedDeviceAddressRegionKHR.calloc(stack).deviceAddress(sbtBase+offset).stride(packing.stride()).size(packing.stride()*(material?(offset==packing.missOffset()?2:offset==packing.hitOffset()?7:1):1));}
     private static byte[] load(String stage) {
+        if((stage.startsWith("material_primary")||stage.startsWith("material_indirect"))&&com.voxellight.rt.RtExecutionOptions.shader()==com.voxellight.rt.RtExecutionOptions.Shader.GGX_PREPARED)stage+="_ggx_prepared";
+        if(stage.startsWith("material_")&&com.voxellight.rt.RtExecutionOptions.shader()==com.voxellight.rt.RtExecutionOptions.Shader.GGX_INLINE)stage+="_ggx_inline";
         try(var stream=VulkanRtPipeline.class.getResourceAsStream("/assets/voxellight/rt/vulkan/"+stage+".spv")) {
             if(stream==null)throw new IllegalStateException("Missing prebuilt RT stage "+stage);byte[] bytes=stream.readAllBytes();
             if(bytes.length<20||bytes.length%4!=0||ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt()!=0x07230203)throw new IllegalStateException("Invalid RT SPIR-V "+stage);return bytes;

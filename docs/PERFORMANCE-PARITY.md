@@ -76,3 +76,30 @@ medians 0.08190 / 0.06635 ms. Keep Wavefront. These results do not isolate GGX
 storage benefit, prove the register/spill cause, or establish Caustica parity.
 An earlier exploratory launch overlapped native regression work and is not
 the formal measurement, despite passing the built-in block gates.
+
+
+## Module acceptance update (2026-10-10)
+
+116 valid exported blocks: 96 controlled A/B blocks and 20 per-camera production baseline blocks. One additional prepared launch stalled in vkDestroyPipeline and was terminated by the exact-owned-JVM watchdog after 300 seconds. Keep that failure evidence; lifecycle root cause remains unresolved. No formal sampling overlapped builds, and all existing validity/focus/workload/alive/variation gates remain unchanged.
+
+GGX ASSETS storage is not accepted: RT batch improvement 4.61% initially, only 1.00% against 5.05% variation independently. `build_vulkan_rt.py` defaults to INLINE. Rebuild a current ASSETS bank explicitly (`--ggx-storage assets --output build/vulkan-rt-ggx-assets`) before the storage experiment; source/binary hashes must match. October 9 statements above describe the historical ASSETS artifact.
+
+Exact environment caching is default off. Child prepare cost dropped from roughly 0.205 ms to 0.001 ms, but a fresh World comparison improved only 2.98%, within the unchanged threshold. Cloud animation inputs remain exact dependencies whenever clouds are enabled.
+
+Same-hit GGX average/Fresnel reuse is default off, guarded by RT_GGX_PREPARED and Shader.GGX_PREPARED. The matched INLINE bank adds only FULL Primary/Indirect variants. Successful independent terrain ABBA launches each have 8/8 valid blocks: RT batch improvement 17.83% / 18.55%; World secondary analysis 13.87% / 14.39%. Repeat client frame interval improved 14.45%. This confirms terrain performance, not global material/temporal acceptance. The interrupted second launch remains documented.
+
+FULL/EXACT queue-only comparisons: COMPACT improves terrain World 14.31% / 14.42% in independent launches, but glass/water World -0.88% is within variation. Its glass/water B1 cost grew roughly 4.82 to 6.22 ms. Do not globally enable COMPACT.
+
+Explicit Queue.LATE keeps B1 fixed and compacts B2-B5 (mask 60). Glass/water independent World results 10.23% / 10.08%, both pass; terrain World 15.27% passes two ABBA rounds but has no independent terrain repeat. Repeat glass/water client frame interval improved 10.52%. AUTO/HYBRID defaults are unchanged. Do not add isolated speedup percentages to claim combined benefit.
+
+Built-in GGX/queue comparisons use RT batch. `tools/acceptance/module_abba.py` analyzes unchanged World or client timestamps using the original numerical ABBA rule, only when original completeness/validity/comparability permits it. Missing timestamps and malformed order fail closed.
+
+Both GGX_PREPARED/FIXED and CLEAN/LATE completed five-camera quality-only captures: 10 HDR/Guide exports per candidate, zero nonfinite floats, authored mirror ROI roughness unchanged. LATE actual execution state is recorded in capture-states.log. These checks establish data sanity, not stochastic image equivalence, temporal quality, or a repaired mirror model. Metal tint/material filtering/display are unchanged.
+
+All 110 default plus 2 prepared shaders pass Vulkan SPIR-V/ABI validation. Complete native/Slang regression passes, including three GGX paths at 57600 cases / 3225600 components each, max normalized error 0.000381917. Java compilation and targeted new logic tests pass; final full suite has 386 tests, 3 failures: two unchanged native material source contracts and missing packaged RR libraries. Native release rebuilding remains unavailable; selected overlays retain original native libraries and are development artifacts.
+
+Production baseline allows live terrain/dynamic models/sky/wind, unlike frozen-input controlled A/B. Resource logs show dynamic BLAS/TLAS updates in mirror/glass/entity regions. Treat its five-camera costs as descriptive module localization. Hardware ALU/cache/spill breakdowns, moving entities/chunks, reload/resize/dimension changes, and cross-renderer same-workload parity remain unproven.
+
+First prepared launch telemetry was overwritten by a reused state; its raw suite ZIP remains. Future launches archive previous metadata/telemetry, verify prepared artifact SHA and record it with process identity. Do not invent missing frequency/temperature data.
+
+A separate compiler diagnostic launch used pipelineStatistics=true with no performance suite. Driver status reports captureEnabled=true but no pipeline executables for these RT stages. Nsight Systems 2024.5.1 GPU metric enumeration reports ERR_NVGPUCTRPERM / insufficient privilege. Runtime occupancy/cache/spill metrics remain unavailable under current permissions; empty compiler CSV does not establish zero usage. No global driver permission change was made.

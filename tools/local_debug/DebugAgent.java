@@ -95,6 +95,10 @@ public class DebugAgent {
             catch(Throwable t){log("Camera movement ERROR "+t);stage=9;}
         });
     }
+    static void captureState(){
+        try {Object probe=type("com.voxellight.VoxelLightClient").getMethod("probe").invoke(null);Object state=call(probe,"benchmarkState");String line=Instant.now()+" camera="+cameras[camera]+" actual="+state+"\n";Files.writeString(root.resolve("capture-states.log"),line,StandardOpenOption.CREATE,StandardOpenOption.APPEND);log("Capture actual="+state);}
+        catch(Exception error){log("Capture state unavailable: "+error);}
+    }
     static void step(Object client)throws Exception {
         if(setupFailure!=null)throw new IllegalStateException(setupFailure);
         if(minecraft.getField("level").get(client)==null || minecraft.getField("player").get(client)==null) {
@@ -106,7 +110,11 @@ public class DebugAgent {
             if(reference){since=now;stage=2;log("Caustica reference: 60s prewarm; no VoxelLight commands");return;}
             String[] controls={"rt_backend vulkan_pt","rt_mode realtime","rt_reconstruction dlss","rt_spp 1","rt_transport full","rt_integrator wavefront","rt_shadow exact","rt_realtime full","rt_world exclusive","rt_primary monolithic","rt_guides endpoint","rt_roughness linear","rt_scene_update optimized","rt_accumulate freeze off"};
             for(String control:controls)if(!command(client,"voxellight "+control))throw new IllegalStateException("Command not handled: "+control);
-            since=now;stage=2;log("Renderer configured; 60s prewarm");return;
+            since=now;stage=2;String requestedShader=System.getProperty("voxellight.debug.shader");
+                if(requestedShader!=null){Class<?> shaderType=type("com.voxellight.rt.RtExecutionOptions$Shader");Object shader=java.lang.Enum.valueOf((Class)shaderType,requestedShader);type("com.voxellight.rt.RtExecutionOptions").getMethod("shader",shaderType).invoke(null,shader);log("Explicit diagnostic shader="+requestedShader);}
+                String requestedQueue=System.getProperty("voxellight.debug.queue");
+                if(requestedQueue!=null){Class<?> queueType=type("com.voxellight.rt.RtExecutionOptions$Queue");Object queue=java.lang.Enum.valueOf((Class)queueType,requestedQueue);type("com.voxellight.rt.RtExecutionOptions").getMethod("queue",queueType).invoke(null,queue);log("Explicit diagnostic queue="+requestedQueue);}
+                log("Renderer configured; 60s prewarm");return;
         }
         if(stage==2 && now-since>60_000_000_000L){
             if(reference){
@@ -142,25 +150,32 @@ public class DebugAgent {
             else if(hadRun || now-since>10_000_000_000L){
                 command(client,"voxellight stats");
                 log("Suite finished; inspect exported validity, interruptions and actual backend");
-                if(++suite<suites.length){since=now;stage=2;last="";}else {
+                if(++suite<suites.length){since=now;stage=2;last="";}else if(Boolean.getBoolean("voxellight.debug.profileOnly")){
+                    if(++camera<cameras.length){moveCamera(client);suite=0;hadRun=false;last="";since=now;stage=2;log("Profile-only camera="+cameras[camera]+"; 60s settle; captures skipped");}
+                    else {stage=9;log("Profile-only completed; stopping dedicated client normally");minecraft.getMethod("stop").invoke(client);}
+                }else {
                     command(client,"voxellight rt_guides endpoint");since=now;stage=4;log("Performance finished; settling ENDPOINT for separate image capture");
                 }
             }
         }
         if(stage==4 && now-since>10_000_000_000L){
-            command(client,"voxellight rt_capture_guides");
+            try {Class<?> diagnostics=type("com.voxellight.rt.vulkan.VulkanPipelineDiagnostics");diagnostics.getMethod("export",Path.class).invoke(null,root.resolve("pipeline-compiler.csv"));diagnostics.getMethod("exportStatus",Path.class).invoke(null,root.resolve("pipeline-compiler-status.json"));}catch(Exception e){log("Compiler export unavailable: "+e);}
+            captureState();command(client,"voxellight rt_capture_guides");
             type("net.minecraft.client.Screenshot").getMethod("grab",minecraft,boolean.class).invoke(null,client,false);
             since=now;stage=5;log("ENDPOINT HDR/Guide capture and native final screenshot requested outside benchmark; camera="+cameras[camera]);return;
         }
         if(stage==5 && now-since>8_000_000_000L){command(client,"voxellight rt_guides endpoint_fast");since=now;stage=6;return;}
         if(stage==6 && now-since>10_000_000_000L){
-            command(client,"voxellight rt_capture_guides");
+            try {Class<?> diagnostics=type("com.voxellight.rt.vulkan.VulkanPipelineDiagnostics");diagnostics.getMethod("export",Path.class).invoke(null,root.resolve("pipeline-compiler.csv"));diagnostics.getMethod("exportStatus",Path.class).invoke(null,root.resolve("pipeline-compiler-status.json"));}catch(Exception e){log("Compiler export unavailable: "+e);}
+            captureState();command(client,"voxellight rt_capture_guides");
             type("net.minecraft.client.Screenshot").getMethod("grab",minecraft,boolean.class).invoke(null,client,false);
             since=now;stage=7;log("ENDPOINT_FAST HDR/Guide capture and native final screenshot requested");return;
         }
         if(stage==7 && now-since>8_000_000_000L){
             command(client,"voxellight rt_guides endpoint");
-            if(++camera<cameras.length){moveCamera(client);since=now;stage=4;return;}
+            if(++camera<cameras.length){moveCamera(client);since=now;
+                if(Boolean.getBoolean("voxellight.debug.profileEachCamera")&&!reference&&!Arrays.asList(suites).contains("capture")){suite=0;hadRun=false;last="";stage=2;log("Per-camera suite: "+cameras[camera]+"; 60s settle before sampling");}else stage=4;
+                return;}
             stage=9;log("Driver completed; stopping dedicated client normally");minecraft.getMethod("stop").invoke(client);
         }
     }

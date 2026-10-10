@@ -33,7 +33,25 @@ bool simplifiedOrdinary(Material m){
 #endif
 }
 float multiscatterMix(Material m,float cosine){if(simplifiedOrdinary(m))return 0;return m.multipleScattering?clamp(1-ggxEnergy(sqrt(m.microfacetAlpha*m.alphaV),cosine),0,.9f):0;}
-float3 multiscatterF(Material m,float3 wo,float3 wi){if(simplifiedOrdinary(m)||!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return float3(0,0,0);float alpha=sqrt(m.microfacetAlpha*m.alphaV);float eo=ggxEnergy(alpha,wo.z);float ei=ggxEnergy(alpha,wi.z);float average=ggxAverageEnergy(alpha);if(average>.99999f)return float3(0,0,0);float3 F=float3(0,0,0);
+#ifdef RT_GGX_PREPARED
+// Only call after all material decoding/wetness/type changes are complete.
+Material prepareGgxEnergy(Material m){
+ m.energyPrepared=false;
+ if(simplifiedOrdinary(m)||!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return m;
+ float alpha=sqrt(m.microfacetAlpha*m.alphaV);float average=ggxAverageEnergy(alpha);
+ m.energyAverage=average;m.energyFactor=0;
+ if(average<=.99999f){float3 F=float3(0,0,0);
+  for(int i=0;i<8;i++){float c=(i+.5f)/8;F=F+(metal(m)?conductorFresnel(m,c):float3(1,1,1)*fresnelDielectric(c,(1+sqrt(m.f0))/(1-sqrt(m.f0))))*(2*c/8);}
+  m.energyFactor=float3(F.x*F.x*average/max(1e-6f,1-F.x*(1-average)),F.y*F.y*average/max(1e-6f,1-F.y*(1-average)),F.z*F.z*average/max(1e-6f,1-F.z*(1-average)));
+ }
+ m.energyPrepared=true;return m;
+}
+#endif
+float3 multiscatterF(Material m,float3 wo,float3 wi){
+#ifdef RT_GGX_PREPARED
+ if(m.energyPrepared){float average=m.energyAverage;if(average>.99999f)return float3(0,0,0);float alpha=sqrt(m.microfacetAlpha*m.alphaV);float eo=ggxEnergy(alpha,wo.z);float ei=ggxEnergy(alpha,wi.z);return m.energyFactor*((1-eo)*(1-ei)/(Pi*max(1e-6f,1-average)));}
+#endif
+if(simplifiedOrdinary(m)||!m.multipleScattering||m.type==COATED_DIFFUSE||dielectric(m))return float3(0,0,0);float alpha=sqrt(m.microfacetAlpha*m.alphaV);float eo=ggxEnergy(alpha,wo.z);float ei=ggxEnergy(alpha,wi.z);float average=ggxAverageEnergy(alpha);if(average>.99999f)return float3(0,0,0);float3 F=float3(0,0,0);
 for(int i=0;i<8;i++){float c=(i+.5f)/8;F=F+(metal(m)?conductorFresnel(m,c):float3(1,1,1)*fresnelDielectric(c,(1+sqrt(m.f0))/(1-sqrt(m.f0))))*(2*c/8);}float3 factor=float3(F.x*F.x*average/max(1e-6f,1-F.x*(1-average)),F.y*F.y*average/max(1e-6f,1-F.y*(1-average)),F.z*F.z*average/max(1e-6f,1-F.z*(1-average)));return factor*((1-eo)*(1-ei)/(Pi*max(1e-6f,1-average)));}
 BsdfEval evalLocal(Material m,float3 wo,float3 wi,float eta=1.5f,int forced=0){
  BsdfEval result = {float3(0,0,0),0};if(wo.z<=0||abs(wi.z)<1e-7f)return result;

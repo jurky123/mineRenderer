@@ -31,7 +31,7 @@ public final class RtExecutionOptions {
     public static Kernel kernel(){return kernel;}
     public static void kernel(Kernel value){if(kernel!=value){kernel=value;revision++;}}
     public enum Realtime {FULL(0),CACHE(1),SPARSE(2),CACHE_SPARSE(3);private final int flags;Realtime(int flags){this.flags=flags;}public int flags(boolean realtime){return realtime?flags:0;}}
-    public enum Shader {CLEAN,RUNTIME}
+    public enum Shader {CLEAN,RUNTIME,GGX_INLINE,ENV_CACHED,GGX_PREPARED}
     private static Shader shader=Shader.CLEAN;
     public static Shader shader(){return shader;}
     public static void shader(Shader value){if(shader!=value){shader=value;revision++;}}
@@ -71,7 +71,9 @@ public final class RtExecutionOptions {
     private static Shadow shadow=Shadow.EXACT;
     public static Shadow shadow(){return shadow;}
     public static void shadow(Shadow value){if(shadow!=value){shadow=value;revision++;}}
-    public enum Queue {AUTO,FIXED,COMPACT,HYBRID}
+    public enum Queue {AUTO,FIXED,COMPACT,HYBRID,LATE;
+        public int continuationMask(int calibrated){return switch(this){case FIXED->0;case AUTO,COMPACT->62;case HYBRID->calibrated;case LATE->60;};}
+    }
     private static Visibility visibility=Visibility.TRACE;
     private static Queue queue=Queue.AUTO;
     private static boolean omm,ser;

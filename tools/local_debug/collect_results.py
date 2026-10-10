@@ -35,7 +35,7 @@ for directory in (GAME/'benchmark-results/voxellight').glob('rt-suite-*'):
         for path in directory.rglob('*'):
             if path.is_file():output.write(path,path.relative_to(directory))
         if not existing.exists():output.writestr('automation-interruption.json',json.dumps(evidence,indent=2))
-for name in ['agent-events.log','launch-output.log','production-agent-events.log','production-launch-output.log','guides-transport-agent-events.log','guides-transport-launch-output.log','watchdog-output.log','gpu-telemetry.csv','telemetry-output.log','patch-build.json','process.json','fixture-verified.properties']:
+for name in ['agent-events.log','launch-output.log','production-agent-events.log','production-launch-output.log','guides-transport-agent-events.log','guides-transport-launch-output.log','watchdog-output.log','gpu-telemetry.csv','telemetry-output.log','patch-build.json','process.json','fixture-verified.properties','pipeline-compiler.csv','pipeline-compiler-status.json','capture-states.log']:
     if (HERE/name).exists():shutil.copy2(HERE/name,OUT/name)
 for path in (GAME/'benchmark-results/voxellight').glob('rr-guides-*.zip'):shutil.copy2(path,OUT/path.name)
 for path in (GAME/'screenshots').glob('*.png'):
@@ -45,5 +45,6 @@ if (HERE/'renderer.json').exists():shutil.copy2(HERE/'renderer.json',OUT/'render
 if (GAME/'rt-frame-stats').exists():shutil.copytree(GAME/'rt-frame-stats',OUT/'rt-frame-stats',dirs_exist_ok=True)
 for pattern in ('threads-*.txt','watchdog-*.json','watchdog-*-threads.txt','diagnostic-*-threads.txt'):
     for path in HERE.glob(pattern):shutil.copy2(path,OUT/path.name)
+if (HERE/'run-history').exists():shutil.copytree(HERE/'run-history',OUT/'run-history',dirs_exist_ok=True)
 (OUT/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps([{k:s[k] for k in ['file','suite','completed','validBlocks','totalBlocks','comparisons']} for s in report['suites']],ensure_ascii=False,indent=2))
