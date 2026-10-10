@@ -9,9 +9,15 @@ GAME=HERE/'game'
 report={'collectedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'scope':'Isolated local debugging; inspect artifact provenance and per-run validity before making comparisons.','suites':[],'incompleteRuns':[]}
 terminations=list(HERE.glob('watchdog-*.json'))
 if terminations:
-    report['sessionTermination']=json.loads(max(terminations,key=lambda p:p.stat().st_mtime).read_text())
-    # A suite may have exported successfully before restoration/capture later hangs.
-    # Preserve both facts; session completion is not inferred from suite completion.
+    records=[json.loads(p.read_text()) for p in sorted(terminations,key=lambda p:p.stat().st_mtime)]
+    report['historicalTerminations']=records
+    current=json.loads((HERE/'process.json').read_text()) if (HERE/'process.json').exists() else {}
+    created=current.get('creationFiletime')
+    created_utc=datetime.datetime(1601,1,1,tzinfo=datetime.timezone.utc)+datetime.timedelta(microseconds=created//10) if created else None
+    matching=[r for r in records if r.get('pid')==current.get('pid') and created_utc is not None and datetime.datetime.fromisoformat(r['utc'])>=created_utc]
+    if matching:report['sessionTermination']=matching[-1]
+    # A reused state can contain an old failure and a newer successful launch.
+    # Preserve both facts without assigning the old termination to the new JVM.
 if (HERE/'patch-build.json').exists():report['artifact']=json.loads((HERE/'patch-build.json').read_text())
 for path in sorted((GAME/'benchmark-results/voxellight').glob('rt-suite-*.zip')):
     with zipfile.ZipFile(path) as z:

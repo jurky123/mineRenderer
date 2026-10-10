@@ -30,7 +30,7 @@ try:
                     try:subprocess.run([str(pathlib.Path(record['java']).with_name('jcmd.exe')),str(pid),'Thread.print'],stdout=output,stderr=subprocess.STDOUT,timeout=15)
                     except Exception as error:output.write(str(error))
         if silent>=deadline:
-            evidence={'pid':pid,'completed':False,'reason':'No driver progress for 300 seconds; owned dedicated JVM terminated. External liveness bound, not a relaxed benchmark gate.','utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'suites':record['suites']}
+            evidence={'pid':pid,'creationFiletime':creation,'completed':False,'reason':'No driver progress for 300 seconds; owned dedicated JVM terminated. External liveness bound, not a relaxed benchmark gate.','utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'suites':record['suites']}
             events=eventfile.read_text(encoding='utf-8',errors='replace') if eventfile.exists() else ''
             evidence['lastEvents']=events.splitlines()[-12:]
             (state/f'watchdog-{pid}.json').write_text(json.dumps(evidence,indent=2),encoding='utf-8')
