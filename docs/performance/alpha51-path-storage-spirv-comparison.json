@@ -1,0 +1,89 @@
+{
+  "measurement": "static_spirv_instructions",
+  "gpu_acceleration_verified": false,
+  "limitations": "Loops and conditional branches affect dynamic instruction counts; driver lowering and cache traffic are not measured.",
+  "baseline": {
+    "source": "outputs/alpha.51/baseline-material-indirect.spvasm",
+    "spirv_bytes": 2901242,
+    "storage": {
+      "pathMedia": {
+        "load_instructions": 4,
+        "store_instructions": 18
+      },
+      "paths": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths1": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths2": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths3": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths4": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths5": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths6": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      },
+      "paths7": {
+        "load_instructions": 9,
+        "store_instructions": 7
+      }
+    }
+  },
+  "candidate": {
+    "source": "outputs/alpha.51/candidate-material-indirect.spvasm",
+    "spirv_bytes": 2893860,
+    "storage": {
+      "pathMedia": {
+        "load_instructions": 4,
+        "store_instructions": 4
+      },
+      "paths": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths1": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths2": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths3": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths4": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths5": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths6": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      },
+      "paths7": {
+        "load_instructions": 7,
+        "store_instructions": 7
+      }
+    }
+  }
+}

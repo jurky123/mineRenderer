@@ -89,7 +89,8 @@ float3 volumeVisibility(float3 point,LightSample light,MediumStack media){direct
 struct DirectReservoir {LightSample light;float3 value;float target,sum;uint bucket;};
 float3 directIntegrand(LightSample light,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,bool volume,float phaseG,float3 incoming,bool terminal=false,bool diffuseCached=false){
     if(light.pdf<=0)return 0;if(volume)return light.radiance*hg(dot(incoming,light.wi),phaseG);
-    BsdfEval e=evalBsdf(m,frame,wo,light.wi,eta);if(e.pdf<=0||!validShadingHemisphere(geometryNormal,frame.n,wo,light.wi))return 0;
+    if(!validShadingHemisphere(geometryNormal,frame.n,wo,light.wi))return 0;
+    BsdfEval e=evalBsdf(m,frame,wo,light.wi,eta);if(e.pdf<=0)return 0;
     float mis=light.kind==3||bounce>=5||terminal?1:powerHeuristic(directSurvival(bounce)*directBudget(bounce)*light.pdf,e.pdf);
     return light.radiance*(diffuseCached?cacheDirectBsdf(m,frame,wo,light.wi,directSurvival(bounce)*directBudget(bounce)*light.pdf,light.kind==3||bounce>=5):e.f*mis)*abs(dot(frame.n,light.wi));
 }

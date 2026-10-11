@@ -5,6 +5,10 @@
 #include <cmath>
 #include <cstdio>
 struct Vertex {float p[3],uv[2],n[3];unsigned tint,flags;};
+// Slang's generated member suffixes depend on which helpers the fixture uses.
+// Bind the stable production Camera ABI instead of depending on those suffixes.
+struct FixtureCamera {Vector<float,4> inverseClip[4],origin_0;unsigned width_0,height_0,frame_0,padding_0;};
+static_assert(sizeof(FixtureCamera)==sizeof(Camera_0));
 int main(){
  std::vector<Vertex> geometry;
  for(float z:{0.f,1.f}){geometry.push_back({{-4,-4,z},{0,0},{0,0,1},0xffffffff,0});geometry.push_back({{4,-4,z},{0,0},{0,0,1},0xffffffff,0});geometry.push_back({{0,4,z},{0,0},{0,0,1},0xffffffff,0});}
@@ -15,8 +19,8 @@ int main(){
  assets[208/4]=0xffffffff;assets[216/4]=128|(128<<8);assets[palette/4]=10<<8;assets[palette/4+65536]=(128<<8)|(20u<<24);
  assets[12/4]=environment;assets[28/4]=environment+16;assets[44/4]=environment+32;assets[84/4]=assets[88/4]=1;
  put(108,.00006793f);put(128,0);put(132,0);put(136,2);put(140,1);put(144,20);put(148,12.4f);put(152,4.8f);
- Camera_0 camera{};camera.width_0=camera.height_0=1;camera.origin_0={0,0,.5f,1};
- Vector<float,4> result{};GlobalParams_0 globals{};globals.geometry_0={reinterpret_cast<unsigned*>(geometry.data()),geometry.size()*40};globals.assets_0={assets.data(),assets.size()*4};globals.output_0={&result,1};globals.camera_0=&camera;
+ FixtureCamera camera{};camera.width_0=camera.height_0=1;camera.origin_0={0,0,.5f,1};
+ Vector<float,4> result{};GlobalParams_0 globals{};globals.geometry_0={reinterpret_cast<unsigned*>(geometry.data()),geometry.size()*40};globals.assets_0={assets.data(),assets.size()*4};globals.output_0={&result,1};globals.camera_0=reinterpret_cast<Camera_0*>(&camera);
  ComputeVaryingInput varying{};varying.endGroupID={1,1,1};
  float sourceDistance=2;
  auto run=[&](unsigned triangles,bool lit,const char* label){camera.padding_0=triangles;camera.origin_0.w=1;visibility_transport(&varying,nullptr,&globals);auto legacy=result;camera.origin_0.w=25;visibility_transport(&varying,nullptr,&globals);if(std::memcmp(&legacy,&result,sizeof(result))!=0){std::fprintf(stderr,"%s: optimized visibility differs from legacy\n",label);return false;}float expected=lit?20.f/(sourceDistance*sourceDistance*3.14159265358979323846f):0; if(!std::isfinite(result.x)||std::abs(result.x-expected)>.0001f){std::fprintf(stderr,"%s: RGB=%g/%g/%g expected red=%g\n",label,result.x,result.y,result.z,expected);return false;}return true;};
@@ -49,5 +53,11 @@ int main(){
  camera.frame_0=3;camera.padding_0=1;assets[192/4]=0;put(140,1);assets[palette/4+3*65536]=0;
  for(unsigned type:{0u,1u,2u,3u,4u,9u}){assets[palette/4+65536]=type|(128<<8);assets[palette/4+3*65536]=(type==3||type==4||type==9)?255u<<24:0;visibility_transport(&varying,nullptr,&globals);if(result.x>1e-6||result.y>1e-6||result.z>1e-6||result.w!=0){std::fprintf(stderr,"Primary known-hit transport/RNG parity failed type=%u: %g/%g/%g/%g\n",type,result.x,result.y,result.z,result.w);return 3;}}
  camera.padding_0=0;visibility_transport(&varying,nullptr,&globals);if(result.x>1e-6||result.y>1e-6||result.z>1e-6||result.w!=0)return 4;
+ PathHot_0 hot[8]{};MediumStorage_0 media[8];std::memset(media,0xa5,sizeof(media));
+ globals.paths_0={&hot[0],1};globals.paths1_0={&hot[1],1};globals.paths2_0={&hot[2],1};globals.paths3_0={&hot[3],1};
+ globals.paths4_0={&hot[4],1};globals.paths5_0={&hot[5],1};globals.paths6_0={&hot[6],1};globals.paths7_0={&hot[7],1};globals.pathMedia_0={media,8};
+ camera.frame_0=4;visibility_transport(&varying,nullptr,&globals);if(result.x!=0){std::fprintf(stderr,"Medium continuation roundtrip failed: %g\n",result.x);return 5;}
+ camera.frame_0=5;visibility_transport(&varying,nullptr,&globals);if(result.x>1e-6||result.y!=0){std::fprintf(stderr,"RIS geometric precheck parity failed: %g/%g\n",result.x,result.y);return 6;}
+ std::puts("Eight-lane medium stacks 8->0->8 with poisoned storage and 320 material/hemisphere RIS comparisons passed");
  std::puts("Production Slang surface transport: held and placed flame irradiance, opaque/cutout/glass/water/foliage/extinction visibility legacy-fast parity and flame self-shell plus split known-hit diffuse/metal/glass/water/miss RNG and continuation parity passed");
 }

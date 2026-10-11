@@ -40,7 +40,7 @@ float3 terrainEmission(uint triangle,float2 bary){
     return linearRgb(atlasTexel(0,uv))*linearRgb(geometry.Load(base+32))*strength;
 }
 struct TerrainSurface {Material material;Frame frame;float3 geometryNormal;uint flags;};
-TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred) {
+TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred,bool shadowOnly=false) {
     profileWork(0u);
     deferred=false;
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
@@ -69,6 +69,9 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool defer
         material.baseColor*=1-wet*material.porosity*.18;
         if(material.coatWeight>0)material.type=metal(material)?COATED_CONDUCTOR:COATED_DIFFUSE;
     }
+    // Exact visibility uses the geometric interface normal and decoded material;
+    // it never consumes the shading frame or its normal-map texture.
+    if(shadowOnly){TerrainSurface result={material,(Frame)0,ng,a.flags};return result;}
     // A reusable flat diffuse guide does not need UV tangent construction. Exact paths
     // complete the original frame after the history decision; textured normals stay exact.
     if(deferFrame&&(material.type==DIFFUSE||material.type==ROUGH_DIFFUSE)&&material.coatWeight==0&&material.transmission==0&&material.microfacetAlpha>=.15&&maxComponent(material.emission)==0&&dot(n,ng)>.99999){
@@ -88,6 +91,7 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool defer
 }
 
 TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance){bool deferred;return terrainSurface(triangle,bary,instance,false,deferred);}
+TerrainSurface terrainExactShadow(uint triangle,float2 bary,uint instance){bool deferred;return terrainSurface(triangle,bary,instance,false,deferred,true);}
 Frame terrainCompleteFrame(uint triangle,float2 bary){
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
     float2 uv=terrainUv(a,b,c,bary);float3 e1=b.p-a.p,e2=c.p-a.p;

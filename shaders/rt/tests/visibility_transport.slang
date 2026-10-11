@@ -16,6 +16,32 @@ SurfacePayload fixtureTraceFiltered(float3 origin,float3 direction,float maximum
 SurfacePayload fixtureTrace(float3 origin,float3 direction,float maximum){return fixtureTraceFiltered(origin,direction,maximum,0);}
 [shader("compute")] [numthreads(1,1,1)]
 void visibility_transport(uint3 tid:SV_DispatchThreadID){
+    if(camera.frame==4){
+        uint failures=0;
+        for(uint lane=0;lane<8;lane++)for(uint step=0;step<10;step++){
+            uint count=step<9?8-step:8;
+            PathState p=(PathState)0;p.origin=float4(1,2,3,1);p.direction=float4(0,0,1,.25);p.throughput=float4(.2,.3,.4,2);
+            p.mediumCount=count;p.etaScale=1.7;p.previousDelta=1;p.channel=2;p.reserved1=123;p.radiance.w=asfloat(17u+step);
+            for(uint i=0;i<count;i++){p.absorptionIor[i]=float4(i+1,i+2,i+3,1.33);p.scatteringPhase[i]=float4(i+.1,i+.2,i+.3,.4);p.mediumIds[i/4][i%4]=101+i;}
+            storePath(lane,p);PathState q=loadPath(lane,loadHot(lane));
+            failures+=q.mediumCount!=count||q.etaScale!=p.etaScale||q.previousDelta!=p.previousDelta||q.channel!=p.channel||q.reserved1!=p.reserved1||asuint(q.radiance.w)!=asuint(p.radiance.w)||any(q.origin!=p.origin)||any(q.direction!=p.direction)||any(q.throughput!=p.throughput);
+            for(uint i=0;i<count;i++)failures+=any(q.absorptionIor[i]!=p.absorptionIor[i])||any(q.scatteringPhase[i]!=p.scatteringPhase[i])||q.mediumIds[i/4][i%4]!=101+i;
+        }
+        output[0]=float4(failures,0,0,0);return;
+    }
+    if(camera.frame==5){
+        float error=0;uint failures=0;
+        for(uint type=0;type<=9;type++)for(uint i=0;i<32;i++){
+            Material m=defaultMaterial();m.type=type;m.baseColor=float3(.3,.5,.7);m.microfacetAlpha=.2;m.transmission=.8;
+            Frame f=makeFrame(safeNormalize(float3(.8,0,.6)));float3 wo=safeNormalize(float3(float(i%3)-1,.2,1));
+            LightSample light=(LightSample)0;light.pdf=.3;light.radiance=float3(2,3,4);light.wi=safeNormalize(float3(float(i%5)-2,.3,(i&1)!=0?1:-1));light.kind=i%4;
+            float3 actual=directIntegrand(light,m,f,wo,float3(0,0,1),1.5,1,false,0,float3(0));
+            BsdfEval e=evalBsdf(m,f,wo,light.wi,1.5);float3 expected=0;
+            if(e.pdf>0&&validShadingHemisphere(float3(0,0,1),f.n,wo,light.wi))expected=light.radiance*e.f*(light.kind==3?1:powerHeuristic(directSurvival(1)*directBudget(1)*light.pdf,e.pdf))*abs(dot(f.n,light.wi));
+            if(!all(isfinite(actual))||!all(isfinite(expected)))failures++;else error=max(error,maxComponent(abs(actual-expected)));
+        }
+        output[0]=float4(error,failures,0,0);return;
+    }
     if(camera.frame==3){
         PathState a=(PathState)0;a.origin=float4(0,0,.5,1);a.direction=float4(0,0,-1,0);a.throughput=float4(1,1,1,0);a.previousDelta=1;a.etaScale=1;a.radiance.w=asfloat(17u);PathState b=a;
         SurfacePayload hit=fixtureTrace(a.origin.xyz,a.direction.xyz,4096);advance(a);advanceHit(b,hit,true,true);

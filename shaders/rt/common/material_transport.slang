@@ -66,8 +66,8 @@ case 5:return decodeHot(paths5[local]);
 case 6:return decodeHot(paths6[local]);
 case 7:return decodeHot(paths7[local]);
 }return (PathHot)0;}
-PathState loadPath(uint index){
-    PathHot hot=loadHot(index);PathState path=(PathState)0;
+PathState loadPath(uint index,PathHot hot){
+    PathState path=(PathState)0;
     path.origin=hot.origin;
     path.direction=hot.direction;
     path.throughput=hot.throughput;
@@ -77,12 +77,14 @@ PathState loadPath(uint index){
     path.previousDelta=(hot.state>>4)&1u;
     path.padding=(hot.state>>5)&1u;
     path.channel=(hot.state>>6)&3u;
-    if(path.mediumCount>0){MediumStorage media=pathMedia[index];
-        for(uint i=0;i<path.mediumCount;i++){path.absorptionIor[i]=media.absorptionIor[i];path.scatteringPhase[i]=media.scatteringPhase[i];}
-        path.mediumIds[0]=media.mediumIds[0];path.mediumIds[1]=media.mediumIds[1];
+    if(path.mediumCount>0){
+        for(uint i=0;i<path.mediumCount;i++){path.absorptionIor[i]=pathMedia[index].absorptionIor[i];path.scatteringPhase[i]=pathMedia[index].scatteringPhase[i];}
+        path.mediumIds[0]=pathMedia[index].mediumIds[0];
+        if(path.mediumCount>4)path.mediumIds[1]=pathMedia[index].mediumIds[1];
     }
     return path;
 }
+PathState loadPath(uint index){return loadPath(index,loadHot(index));}
 void storePath(uint index,PathState path){PathHot hot;
     hot.origin=path.origin;
     hot.direction=path.direction;
@@ -90,9 +92,12 @@ void storePath(uint index,PathState path){PathHot hot;
     hot.seed=asuint(path.radiance.w);
     hot.state=path.mediumCount|(path.previousDelta<<4)|(path.padding<<5)|(path.channel<<6);hot.reserved=path.reserved1;
     hot.etaScale=path.etaScale;
-    if(path.mediumCount>0){MediumStorage media=(MediumStorage)0;
-        for(uint i=0;i<path.mediumCount;i++){media.absorptionIor[i]=path.absorptionIor[i];media.scatteringPhase[i]=path.scatteringPhase[i];}
-        media.mediumIds[0]=path.mediumIds[0];media.mediumIds[1]=path.mediumIds[1];pathMedia[index]=media;
+    // Inactive entries are never read; preserve the ABI without clearing or
+    // transferring the unused suffix of the eight-entry medium stack.
+    if(path.mediumCount>0){
+        for(uint i=0;i<path.mediumCount;i++){pathMedia[index].absorptionIor[i]=path.absorptionIor[i];pathMedia[index].scatteringPhase[i]=path.scatteringPhase[i];}
+        pathMedia[index].mediumIds[0]=path.mediumIds[0];
+        if(path.mediumCount>4)pathMedia[index].mediumIds[1]=path.mediumIds[1];
     }
     uint pixels=camera.width*camera.height,lane=index/pixels,local=index%pixels;switch(lane){
 case 0:paths[local]=encodeHot(hot);break;
@@ -218,24 +223,22 @@ float3 visibility(float3 origin,float3 direction,MediumStack media,float maximum
 #endif
 #if !defined(RT_CPU_FIXTURE)||defined(RT_VISIBILITY_FIXTURE)
     bool fast=!flameSource&&(uint(camera.origin.w)&8u)!=0;
-    if(fast&&opaqueBlocked(origin,direction,maximum))return float3(0);
     if(fast&&(uint(camera.origin.w)&16u)==0){
+        if(opaqueBlocked(origin,direction,maximum))return float3(0);
         if(media.count==0)return float3(1);Medium m=media.entries[media.count-1];return expNeg(m.sigmaA+m.sigmaS,maximum);
     }
 #endif
     float3 sourceBlock=floor(origin+direction*maximum);
     float3 value=float3(1);
     for(int boundary=0;boundary<24;boundary++) {
-        SurfacePayload hit=traceSurface(origin,direction,max(.001,maximum),254,true,
-#if defined(RT_CPU_FIXTURE)&&!defined(RT_VISIBILITY_FIXTURE)
-            false
-#else
-            fast
-#endif
-        );float distance=hit.distance>=0?hit.distance:maximum;
+        // Mixed geometry uses one ordered traversal. Opaque hits terminate in the
+        // same surface loop; an opaque pretest followed by a translucent miss
+        // needlessly traverses clear connections twice. Preserve exact media/Fresnel.
+        SurfacePayload hit=traceSurface(origin,direction,max(.001,maximum),254,true,false);
+        float distance=hit.distance>=0?hit.distance:maximum;
         if(media.count>0){Medium m=media.entries[media.count-1];value*=expNeg(m.sigmaA+m.sigmaS,distance);}
         if(hit.distance<0)return value;
-        TerrainSurface surface=terrainSurface(hit.triangle,hit.bary,hit.instance);Material m=surface.material;
+        TerrainSurface surface=terrainExactShadow(hit.triangle,hit.bary,hit.instance);Material m=surface.material;
         // The virtual flame point represents the entire source model. Its own stem
         // must not stamp a square umbra; other blocks and other torch bodies still occlude.
         float3 point=origin+direction*hit.distance;

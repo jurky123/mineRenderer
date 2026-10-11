@@ -1,0 +1,153 @@
+Material 3 Slang/native parity: 57600 cases, 3225600 components, max normalized error=0.000381917
+GGX persistent asset path: Material 3 Slang/native parity: 57600 cases, 3225600 components, max normalized error=0.000381917
+GGX same-point reuse: Material 3 Slang/native parity: 57600 cases, 3225600 components, max normalized error=0.000381917
+Terrain Slang/native binding parity + emission-only + shadow fast decoder + protected primary guide + deferred frame completion: 32 cases, 1408 components, max normalized error=2.98023e-08
+Environment Slang/native parity: 400000 samples, normalized PDFs/poles/histograms/black fallback, sun/environment MIS, deterministic held on/off/high-sky/irradiance, terminal-depth furnace and camera water; max normalized error=2.31713e-06
+Material-aware cache: 40 native lobe/PDF/MIS cases; conditional and marginal specular throughput/PDF + unbiased roulette; independent affine incident-light dense integral max relative error=0.000230494 passed
+Preintegrated diffuse kernel: 256 F0/roughness/grazing/positive-affine cases vs dense native integral; clipped fallback exact; max relative error=0.00405995, old64 error=0.0204025, kernel-vs-old64=0.0204498 passed
+Production realtime policy: exact suffix normalization, SH constant radiance, maturity, plane/epoch/TTL rejection, adaptive intervals, neutral RG8 normal admission, textured diffuse remodulation, dark-channel fallback, rough specular protection, jittered neighbor reprojection, noisy mean confidence and TTL, temporal color averaging without invented samples, gradual-light two-frame cap, protected materials, visibility replay isolation stable quad face identity with thin-plane/owner rejection, independent same-cell planes, training-before-suffix deduplication, matching-before-maturity diagnostics, confidence-preserving neighbor selection B0 pure-diffuse admission, rough-diffuse B0 training with protected medium/specular rejection, bounded compact request overflow, trained B0 rough hit, source-bounce isolation and FULL bypass passed
+Actual Slang BSDF + GLSL accumulation boundaries: matched IOR/grazing, overflow-safe MIS, invalid rejection, corrupt history recovery, live EMA, extreme finite HDR passed
+Actual GLSL reconstruction: pixel flow sign, surface footprint, plane rejection, dynamic identity, prior pose barycentric mapping, normal/material/albedo validation and sky rotation passed
+Actual GLSL DLSS guides: previous-current pixel motion, stationary jitter-independent motion, reverse-Z/sky depth and invalid clip guards passed
+Reconstruction contract: planar moving-endpoint reflection, stationary zero, normal transmission/TIR; 1024 packed direction cases max vector error=6.05405e-05; 256 GGX guide reflectance bounds passed
+Actual Slang emissive sampler: 200000 samples, area CDF, matched area NEE/hit PDFs, flame discrete PDF/inverse-square/no BSDF competitor passed
+Production flame RIS: 200000 samples, nearest two deterministic, occluded/color-weighted remainder energy within 0.8%, empty table passed
+Eight-lane medium stacks 8->0->8 with poisoned storage and 320 material/hemisphere RIS comparisons passed
+Production Slang surface transport: held and placed flame irradiance, opaque/cutout/glass/water/foliage/extinction visibility legacy-fast parity and flame self-shell plus split known-hit diffuse/metal/glass/water/miss RNG and continuation parity passed
+Production Slang PathHot 64B: split radiance/AOV, second sample bank, RNG, previous proposal cell and eight nested media roundtrip passed
+Production PackedPath48: PDF, depth, validity, RNG, proposal identity, AOV and eight-media roundtrip passed
+Production continuation queue guards/indirect count: empty, full capacity, two spp, dead/invalid/terminal paths and ping-pong indexing passed (CPU reservation substitute; no GPU concurrency claim)
+RIS variance sequence=OWEN mode=points surface=0 bounce=0 R=8.09729955 G=479.168989 B=17.8489414
+RIS variance sequence=OWEN mode=points surface=0 bounce=1 R=7.01369375 G=926.796991 B=16.4108944
+RIS variance sequence=OWEN mode=points surface=0 bounce=3 R=14.9309588 G=7705.9161 B=10.4765354
+RIS variance sequence=OWEN mode=points surface=0 bounce=5 R=32.5171079 G=15633.6803 B=23.121759
+RIS variance sequence=OWEN mode=points surface=1 bounce=0 R=117.74233 G=7651.62786 B=36.1088883
+RIS variance sequence=OWEN mode=points surface=1 bounce=1 R=99.6249537 G=14825.8419 B=28.7589848
+RIS variance sequence=OWEN mode=points surface=1 bounce=3 R=241.587092 G=123560.603 B=104.046791
+RIS variance sequence=OWEN mode=points surface=1 bounce=5 R=513.180994 G=250302.131 B=240.045643
+RIS variance sequence=SHIFT mode=points surface=0 bounce=0 R=8.88658902 G=482.862678 B=18.0853776
+RIS variance sequence=SHIFT mode=points surface=0 bounce=1 R=7.93806683 G=926.42412 B=18.8094956
+RIS variance sequence=SHIFT mode=points surface=0 bounce=3 R=14.9812268 G=7739.94984 B=10.486339
+RIS variance sequence=SHIFT mode=points surface=0 bounce=5 R=32.7450479 G=15765.2219 B=23.1276358
+RIS variance sequence=SHIFT mode=points surface=1 bounce=0 R=113.474029 G=7708.61953 B=39.0402305
+RIS variance sequence=SHIFT mode=points surface=1 bounce=1 R=105.973106 G=14818.1369 B=27.8921049
+RIS variance sequence=SHIFT mode=points surface=1 bounce=3 R=242.427472 G=124105.862 B=104.35631
+RIS variance sequence=SHIFT mode=points surface=1 bounce=5 R=516.967751 G=252407.282 B=241.505495
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=0 R=10.3948465 G=489.525168 B=20.0684486
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=1 R=10.1751459 G=940.82048 B=19.0531743
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=3 R=21.6168384 G=7833.99918 B=17.0886453
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=5 R=45.9150268 G=15858.0139 B=36.3646365
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=0 R=113.392813 G=7781.39291 B=41.9539465
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=1 R=115.555634 G=15021.8283 B=32.9532259
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=3 R=249.315738 G=125585.41 B=109.285136
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=5 R=715.215729 G=253889.509 B=437.131602
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=0 R=10.7738644 G=492.052456 B=20.0213061
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=1 R=11.026016 G=938.811317 B=20.6667438
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=3 R=21.7778394 G=7872.20966 B=17.1913268
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=5 R=46.8212523 G=16048.3208 B=36.9514483
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=0 R=129.180634 G=7819.15118 B=44.0026432
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=1 R=121.056369 G=14990.7345 B=32.3925891
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=3 R=250.053847 G=126199.41 B=109.104308
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=5 R=729.619539 G=256935.587 B=447.273325
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=0 R=10.4223694 G=475.892533 B=20.0341022
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=1 R=10.5480773 G=914.685438 B=18.7852178
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=3 R=21.1901289 G=7615.4779 B=16.7105178
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=5 R=45.0466937 G=15409.2322 B=35.5893744
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=0 R=120.186317 G=7561.48192 B=42.558575
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=1 R=124.155333 G=14600.9047 B=32.4479935
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=3 R=245.441238 G=122093.233 B=106.173144
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=5 R=701.749852 G=246709.671 B=425.170535
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=0 R=10.6579687 G=478.111782 B=20.0643549
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=1 R=10.8940133 G=911.386096 B=20.4431445
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=3 R=21.332963 G=7648.57192 B=16.7936503
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=5 R=45.9368642 G=15610.6421 B=36.1355797
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=0 R=127.088672 G=7598.60435 B=43.9993939
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=1 R=121.606315 G=14554.7433 B=31.6792416
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=3 R=246.169151 G=122625.665 B=105.937686
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=5 R=715.90322 G=249933.572 B=434.663021
+RIS variance sequence=OWEN mode=empty surface=0 bounce=0 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=0 bounce=1 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=0 bounce=3 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=0 bounce=5 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=0 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=1 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=3 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=5 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=0 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=1 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=3 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=5 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=0 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=1 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=3 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=5 R=0 G=0 B=0
+Production hierarchical direct RIS: colored/occluded points + area + environment, adaptive proposals, depth roulette, surface NEE/BSDF MIS energy, bounded Owen/digital-shift sequences with equal-budget variance reporting and matched hit PDF passed (200000 samples per case)
+Production shader specialization: direct compile-time selection, FULL policy bypass and unchanged path passed
+Production shader specialization: direct compile-time selection, FULL policy bypass and unchanged path passed
+Production shader specialization: direct compile-time selection, FULL policy bypass and unchanged path passed
+Production shader specialization: direct compile-time selection, FULL policy bypass and unchanged path passed
+RIS variance sequence=OWEN mode=points surface=0 bounce=0 R=8.09729955 G=479.168989 B=17.8489414
+RIS variance sequence=OWEN mode=points surface=0 bounce=1 R=7.01369375 G=926.796991 B=16.4108944
+RIS variance sequence=OWEN mode=points surface=0 bounce=3 R=14.9309588 G=7705.9161 B=10.4765354
+RIS variance sequence=OWEN mode=points surface=0 bounce=5 R=32.5171079 G=15633.6803 B=23.121759
+RIS variance sequence=OWEN mode=points surface=1 bounce=0 R=117.74233 G=7651.62786 B=36.1088883
+RIS variance sequence=OWEN mode=points surface=1 bounce=1 R=99.6249537 G=14825.8419 B=28.7589848
+RIS variance sequence=OWEN mode=points surface=1 bounce=3 R=241.587092 G=123560.603 B=104.046791
+RIS variance sequence=OWEN mode=points surface=1 bounce=5 R=513.180994 G=250302.131 B=240.045643
+RIS variance sequence=SHIFT mode=points surface=0 bounce=0 R=8.88658902 G=482.862678 B=18.0853776
+RIS variance sequence=SHIFT mode=points surface=0 bounce=1 R=7.93806683 G=926.42412 B=18.8094956
+RIS variance sequence=SHIFT mode=points surface=0 bounce=3 R=14.9812268 G=7739.94984 B=10.486339
+RIS variance sequence=SHIFT mode=points surface=0 bounce=5 R=32.7450479 G=15765.2219 B=23.1276358
+RIS variance sequence=SHIFT mode=points surface=1 bounce=0 R=113.474029 G=7708.61953 B=39.0402305
+RIS variance sequence=SHIFT mode=points surface=1 bounce=1 R=105.973106 G=14818.1369 B=27.8921049
+RIS variance sequence=SHIFT mode=points surface=1 bounce=3 R=242.427472 G=124105.862 B=104.35631
+RIS variance sequence=SHIFT mode=points surface=1 bounce=5 R=516.967751 G=252407.282 B=241.505495
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=0 R=10.3948465 G=489.525168 B=20.0684486
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=1 R=10.1751459 G=940.82048 B=19.0531743
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=3 R=21.6168384 G=7833.99918 B=17.0886453
+RIS variance sequence=OWEN mode=mixed surface=0 bounce=5 R=45.9150268 G=15858.0139 B=36.3646365
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=0 R=113.392813 G=7781.39291 B=41.9539465
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=1 R=115.555634 G=15021.8283 B=32.9532259
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=3 R=249.315738 G=125585.41 B=109.285136
+RIS variance sequence=OWEN mode=mixed surface=1 bounce=5 R=715.215729 G=253889.509 B=437.131602
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=0 R=10.7738644 G=492.052456 B=20.0213061
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=1 R=11.026016 G=938.811317 B=20.6667438
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=3 R=21.7778394 G=7872.20966 B=17.1913268
+RIS variance sequence=SHIFT mode=mixed surface=0 bounce=5 R=46.8212523 G=16048.3208 B=36.9514483
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=0 R=129.180634 G=7819.15118 B=44.0026432
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=1 R=121.056369 G=14990.7345 B=32.3925891
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=3 R=250.053847 G=126199.41 B=109.104308
+RIS variance sequence=SHIFT mode=mixed surface=1 bounce=5 R=729.619539 G=256935.587 B=447.273325
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=0 R=10.4223694 G=475.892533 B=20.0341022
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=1 R=10.5480773 G=914.685438 B=18.7852178
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=3 R=21.1901289 G=7615.4779 B=16.7105178
+RIS variance sequence=OWEN mode=adapted surface=0 bounce=5 R=45.0466937 G=15409.2322 B=35.5893744
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=0 R=120.186317 G=7561.48192 B=42.558575
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=1 R=124.155333 G=14600.9047 B=32.4479935
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=3 R=245.441238 G=122093.233 B=106.173144
+RIS variance sequence=OWEN mode=adapted surface=1 bounce=5 R=701.749852 G=246709.671 B=425.170535
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=0 R=10.6579687 G=478.111782 B=20.0643549
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=1 R=10.8940133 G=911.386096 B=20.4431445
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=3 R=21.332963 G=7648.57192 B=16.7936503
+RIS variance sequence=SHIFT mode=adapted surface=0 bounce=5 R=45.9368642 G=15610.6421 B=36.1355797
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=0 R=127.088672 G=7598.60435 B=43.9993939
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=1 R=121.606315 G=14554.7433 B=31.6792416
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=3 R=246.169151 G=122625.665 B=105.937686
+RIS variance sequence=SHIFT mode=adapted surface=1 bounce=5 R=715.90322 G=249933.572 B=434.663021
+RIS variance sequence=OWEN mode=empty surface=0 bounce=0 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=0 bounce=1 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=0 bounce=3 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=0 bounce=5 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=0 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=1 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=3 R=0 G=0 B=0
+RIS variance sequence=OWEN mode=empty surface=1 bounce=5 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=0 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=1 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=3 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=0 bounce=5 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=0 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=1 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=3 R=0 G=0 B=0
+RIS variance sequence=SHIFT mode=empty surface=1 bounce=5 R=0 G=0 B=0
+Production hierarchical direct RIS: colored/occluded points + area + environment, adaptive proposals, depth roulette, surface NEE/BSDF MIS energy, bounded Owen/digital-shift sequences with equal-budget variance reporting and matched hit PDF passed (200000 samples per case)

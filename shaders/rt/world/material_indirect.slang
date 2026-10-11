@@ -11,7 +11,7 @@ void material_indirect() {
         index=pageFeedback[1648u+(bounce&1u)*capacity+DispatchRaysIndex().x].x;
     }
     PathHot hot=loadHot(index);if(hot.origin.w==0||(hot.state&32u)!=0)return;
-    PathState path=loadPath(index);
+    PathState path=loadPath(index,hot);
 #ifdef RT_ITERATIVE
     for(uint bounce=1;bounce<6&&path.origin.w!=0&&path.padding==0;bounce++)advance(path);
     storePath(index,path);output[index]=pathOutput(path);
