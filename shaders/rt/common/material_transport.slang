@@ -106,6 +106,11 @@ case 7:paths7[local]=encodeHot(hot);break;
 }}
 
 [[vk::binding(7,0)]] RWStructuredBuffer<uint4> pageFeedback;
+#ifdef RT_PROFILE_WORKLOAD
+void profileWork(uint index) {
+    if ((uint(camera.origin.w)&2u)!=0) { uint previous; InterlockedAdd(pageFeedback[1630u+index/4][index%4],1,previous); }
+}
+#endif
 void requestMissPages(float3 origin,float3 direction,uint pathIndex){
 #ifndef RT_CPU_FIXTURE
     uint local=pathIndex%(camera.width*camera.height);uint2 pixel=uint2(local%camera.width,local/camera.width);
@@ -125,6 +130,15 @@ SurfacePayload traceSurface(float3 origin,float3 direction,float maximum=4096,ui
 #endif
 #else
     if(shadow&&(uint(camera.origin.w)&2u)!=0){uint ignored;InterlockedAdd(pageFeedback[513].x,1,ignored);}
+#ifdef RT_PROFILE_WORKLOAD
+    if(!shadow) {
+#ifdef RT_PROFILE_GUIDE
+        profileWork(4u);
+#else
+        profileWork(5u);
+#endif
+    }
+#endif
     RayDesc ray;ray.Origin=origin;ray.Direction=direction;ray.TMin=.001;ray.TMax=maximum;
     SurfacePayload hit;hit.distance=-1;hit.bary=0;hit.triangle=0;hit.instance=0;
     TraceRay(world,skipOpaque&&(uint(camera.origin.w)&256u)==0?RAY_FLAG_CULL_OPAQUE:RAY_FLAG_NONE,mask,0,1,0,ray,hit);return hit;

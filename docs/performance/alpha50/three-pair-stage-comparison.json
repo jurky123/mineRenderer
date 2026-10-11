@@ -1,0 +1,2933 @@
+{
+  "schema": 1,
+  "comparisons": [
+    {
+      "scene_id": "multi_light",
+      "stage": "cpu|graphics|client_frame_interval",
+      "independent_pairs": 3,
+      "median_delta_ms": 13.3912,
+      "delta_range_ms": [
+        12.7136,
+        13.474800000000002
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1357,
+            "p50_ms": 16.7682,
+            "p95_ms": 17.64576,
+            "min_ms": 13.9494,
+            "max_ms": 18.9312
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 4.0546,
+            "p95_ms": 4.747359999999999,
+            "min_ms": 1.4097,
+            "max_ms": 31.2636
+          },
+          "delta_p50_ms": 12.7136,
+          "delta_p95_ms": 12.8984,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1300,
+            "p50_ms": 17.5139,
+            "p95_ms": 18.48592,
+            "min_ms": 2.594,
+            "max_ms": 46.5299
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 4.1227,
+            "p95_ms": 4.823665,
+            "min_ms": 1.4167,
+            "max_ms": 12.1536
+          },
+          "delta_p50_ms": 13.3912,
+          "delta_p95_ms": 13.662255,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1316,
+            "p50_ms": 17.3638,
+            "p95_ms": 18.359299999999998,
+            "min_ms": 11.8823,
+            "max_ms": 22.6218
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 3.889,
+            "p95_ms": 4.6235349999999995,
+            "min_ms": 1.5501,
+            "max_ms": 30.1195
+          },
+          "delta_p50_ms": 13.474800000000002,
+          "delta_p95_ms": 13.735764999999997,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "cpu|graphics|client_frame_interval",
+      "independent_pairs": 3,
+      "median_delta_ms": 13.282900000000001,
+      "delta_range_ms": [
+        12.5736,
+        13.4996
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1188,
+            "p50_ms": 16.477,
+            "p95_ms": 17.43996,
+            "min_ms": 11.3489,
+            "max_ms": 4070.3654
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 3.9034,
+            "p95_ms": 4.638839999999999,
+            "min_ms": 1.2486,
+            "max_ms": 14.2521
+          },
+          "delta_p50_ms": 12.5736,
+          "delta_p95_ms": 12.801120000000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1326,
+            "p50_ms": 17.1933,
+            "p95_ms": 18.167749999999998,
+            "min_ms": 8.7556,
+            "max_ms": 24.8549
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 3.9104,
+            "p95_ms": 4.648479999999999,
+            "min_ms": 1.1892,
+            "max_ms": 33.5433
+          },
+          "delta_p50_ms": 13.282900000000001,
+          "delta_p95_ms": 13.519269999999999,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1324,
+            "p50_ms": 17.2183,
+            "p95_ms": 18.286759999999997,
+            "min_ms": 8.1377,
+            "max_ms": 24.8865
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 3.7187,
+            "p95_ms": 4.55033,
+            "min_ms": 1.1152,
+            "max_ms": 70.4001
+          },
+          "delta_p50_ms": 13.4996,
+          "delta_p95_ms": 13.736429999999999,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "gpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 13.123088,
+      "delta_range_ms": [
+        12.517391999999997,
+        13.193632000000003
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 16.436799999999998,
+            "p95_ms": 17.0310624,
+            "min_ms": 15.695136,
+            "max_ms": 17.843008
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 3.919408,
+            "p95_ms": 4.2710352,
+            "min_ms": 3.39344,
+            "max_ms": 4.780544
+          },
+          "delta_p50_ms": 12.517391999999997,
+          "delta_p95_ms": 12.7600272,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 17.119968,
+            "p95_ms": 17.6602112,
+            "min_ms": 16.441344,
+            "max_ms": 18.185056
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 3.99688,
+            "p95_ms": 4.327616,
+            "min_ms": 3.634656,
+            "max_ms": 4.752576
+          },
+          "delta_p50_ms": 13.123088,
+          "delta_p95_ms": 13.3325952,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 16.961136000000003,
+            "p95_ms": 17.561856,
+            "min_ms": 16.053248,
+            "max_ms": 18.464736
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 3.767504,
+            "p95_ms": 4.0957136,
+            "min_ms": 3.386912,
+            "max_ms": 4.4872
+          },
+          "delta_p50_ms": 13.193632000000003,
+          "delta_p95_ms": 13.466142399999999,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "gpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 13.086960000000001,
+      "delta_range_ms": [
+        12.426816,
+        13.301216000000004
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 16.150496,
+            "p95_ms": 16.7830528,
+            "min_ms": 15.451936,
+            "max_ms": 156.450816
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 3.72368,
+            "p95_ms": 4.064032,
+            "min_ms": 3.319904,
+            "max_ms": 4.919488
+          },
+          "delta_p50_ms": 12.426816,
+          "delta_p95_ms": 12.7190208,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 16.82664,
+            "p95_ms": 17.3779504,
+            "min_ms": 15.945184,
+            "max_ms": 18.463232
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 3.73968,
+            "p95_ms": 4.0744511999999995,
+            "min_ms": 3.231456,
+            "max_ms": 4.664704
+          },
+          "delta_p50_ms": 13.086960000000001,
+          "delta_p95_ms": 13.303499200000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 16.855296000000003,
+            "p95_ms": 17.464376,
+            "min_ms": 15.84864,
+            "max_ms": 18.791136
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 3.55408,
+            "p95_ms": 3.904352,
+            "min_ms": 3.21072,
+            "max_ms": 4.832576
+          },
+          "delta_p50_ms": 13.301216000000004,
+          "delta_p95_ms": 13.560024000000002,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "gpu|graphics|pt.ready_rr_inputs",
+      "independent_pairs": 3,
+      "median_delta_ms": 12.763824,
+      "delta_range_ms": [
+        12.134336,
+        12.876304
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 14.033408,
+            "p95_ms": 14.5854432,
+            "min_ms": 13.560288,
+            "max_ms": 142.685664
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 1.899072,
+            "p95_ms": 2.3512959999999996,
+            "min_ms": 1.79088,
+            "max_ms": 2.961408
+          },
+          "delta_p50_ms": 12.134336,
+          "delta_p95_ms": 12.2341472,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 14.654224,
+            "p95_ms": 15.0851232,
+            "min_ms": 13.989248,
+            "max_ms": 16.404704
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 1.8904,
+            "p95_ms": 2.3413919999999995,
+            "min_ms": 1.732288,
+            "max_ms": 2.677696
+          },
+          "delta_p50_ms": 12.763824,
+          "delta_p95_ms": 12.743731200000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 14.652336,
+            "p95_ms": 15.158504,
+            "min_ms": 13.908832,
+            "max_ms": 16.804704
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 1.776032,
+            "p95_ms": 2.2692159999999997,
+            "min_ms": 1.735968,
+            "max_ms": 2.697632
+          },
+          "delta_p50_ms": 12.876304,
+          "delta_p95_ms": 12.889288,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "gpu|graphics|pt.ready_rr_inputs",
+      "independent_pairs": 3,
+      "median_delta_ms": 12.685120000000001,
+      "delta_range_ms": [
+        12.13664,
+        12.814432
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 14.350592,
+            "p95_ms": 14.8178272,
+            "min_ms": 13.809344,
+            "max_ms": 15.677696
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 2.213952,
+            "p95_ms": 2.5637567999999997,
+            "min_ms": 1.900672,
+            "max_ms": 3.013088
+          },
+          "delta_p50_ms": 12.13664,
+          "delta_p95_ms": 12.2540704,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 14.927664,
+            "p95_ms": 15.317761599999999,
+            "min_ms": 14.169248,
+            "max_ms": 15.813216
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 2.2425439999999996,
+            "p95_ms": 2.5908656,
+            "min_ms": 2.034976,
+            "max_ms": 2.875808
+          },
+          "delta_p50_ms": 12.685120000000001,
+          "delta_p95_ms": 12.726896,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 14.793232,
+            "p95_ms": 15.246896,
+            "min_ms": 14.11776,
+            "max_ms": 16.299328
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 1.9788000000000001,
+            "p95_ms": 2.4354447999999995,
+            "min_ms": 1.889952,
+            "max_ms": 2.8336
+          },
+          "delta_p50_ms": 12.814432,
+          "delta_p95_ms": 12.8114512,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "cpu|graphics|client_frame_interval",
+      "independent_pairs": 3,
+      "median_delta_ms": 11.04185,
+      "delta_range_ms": [
+        10.751500000000002,
+        11.2447
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1646,
+            "p50_ms": 13.736450000000001,
+            "p95_ms": 15.131575,
+            "min_ms": 11.4276,
+            "max_ms": 16.1311
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 2.98495,
+            "p95_ms": 3.60549,
+            "min_ms": 1.1053,
+            "max_ms": 20.6168
+          },
+          "delta_p50_ms": 10.751500000000002,
+          "delta_p95_ms": 11.526085,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1582,
+            "p50_ms": 14.2944,
+            "p95_ms": 15.793655,
+            "min_ms": 8.607,
+            "max_ms": 21.3931
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 3.0497,
+            "p95_ms": 3.665075,
+            "min_ms": 1.2771,
+            "max_ms": 679.4286
+          },
+          "delta_p50_ms": 11.2447,
+          "delta_p95_ms": 12.12858,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1616,
+            "p50_ms": 13.9794,
+            "p95_ms": 15.469225,
+            "min_ms": 4.9101,
+            "max_ms": 21.2933
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 2.93755,
+            "p95_ms": 3.5958399999999995,
+            "min_ms": 1.1588,
+            "max_ms": 19.2238
+          },
+          "delta_p50_ms": 11.04185,
+          "delta_p95_ms": 11.873385,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "gpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 10.931328,
+      "delta_range_ms": [
+        10.62896,
+        11.103152
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 13.513728,
+            "p95_ms": 14.189504,
+            "min_ms": 12.616704,
+            "max_ms": 14.918656
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 2.884768,
+            "p95_ms": 3.1492576,
+            "min_ms": 2.48288,
+            "max_ms": 3.6072
+          },
+          "delta_p50_ms": 10.62896,
+          "delta_p95_ms": 11.0402464,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 14.064128,
+            "p95_ms": 14.867455999999999,
+            "min_ms": 13.04576,
+            "max_ms": 15.66208
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 2.960976,
+            "p95_ms": 3.2382479999999996,
+            "min_ms": 2.46656,
+            "max_ms": 3.70672
+          },
+          "delta_p50_ms": 11.103152,
+          "delta_p95_ms": 11.629207999999998,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 13.766048,
+            "p95_ms": 14.5756064,
+            "min_ms": 12.70512,
+            "max_ms": 15.374432
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 2.83472,
+            "p95_ms": 3.099528,
+            "min_ms": 2.488192,
+            "max_ms": 3.613888
+          },
+          "delta_p50_ms": 10.931328,
+          "delta_p95_ms": 11.4760784,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "gpu|graphics|pt.ready_rr_inputs",
+      "independent_pairs": 3,
+      "median_delta_ms": 10.584704,
+      "delta_range_ms": [
+        10.339599999999999,
+        10.7668
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 11.3088,
+            "p95_ms": 11.882944,
+            "min_ms": 10.584,
+            "max_ms": 12.62704
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 0.9692000000000001,
+            "p95_ms": 1.3180576,
+            "min_ms": 0.899904,
+            "max_ms": 1.800256
+          },
+          "delta_p50_ms": 10.339599999999999,
+          "delta_p95_ms": 10.5648864,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 11.756368,
+            "p95_ms": 12.465664,
+            "min_ms": 10.849568,
+            "max_ms": 13.368992
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 0.989568,
+            "p95_ms": 1.349608,
+            "min_ms": 0.885536,
+            "max_ms": 1.648032
+          },
+          "delta_p50_ms": 10.7668,
+          "delta_p95_ms": 11.116056,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 11.535712,
+            "p95_ms": 12.225865599999999,
+            "min_ms": 10.581792,
+            "max_ms": 12.953792
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 0.951008,
+            "p95_ms": 1.2971216,
+            "min_ms": 0.901056,
+            "max_ms": 1.765472
+          },
+          "delta_p50_ms": 10.584704,
+          "delta_p95_ms": 10.928743999999998,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "gpu|graphics|transport",
+      "independent_pairs": 3,
+      "median_delta_ms": 8.558496000000002,
+      "delta_range_ms": [
+        8.337536,
+        8.620112
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 10.268464,
+            "p95_ms": 10.7652912,
+            "min_ms": 9.668384,
+            "max_ms": 11.4016
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 1.9309280000000002,
+            "p95_ms": 2.4062319999999997,
+            "min_ms": 1.76336,
+            "max_ms": 2.871264
+          },
+          "delta_p50_ms": 8.337536,
+          "delta_p95_ms": 8.3590592,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 10.482976,
+            "p95_ms": 10.916849599999999,
+            "min_ms": 9.891008,
+            "max_ms": 11.400896
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 1.92448,
+            "p95_ms": 2.4193104,
+            "min_ms": 1.886656,
+            "max_ms": 2.710112
+          },
+          "delta_p50_ms": 8.558496000000002,
+          "delta_p95_ms": 8.497539199999999,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 10.449728,
+            "p95_ms": 10.876576,
+            "min_ms": 9.84144,
+            "max_ms": 11.926976
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 1.829616,
+            "p95_ms": 2.2779631999999994,
+            "min_ms": 1.75456,
+            "max_ms": 2.69168
+          },
+          "delta_p50_ms": 8.620112,
+          "delta_p95_ms": 8.598612800000001,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "cpu|graphics|client_frame_interval",
+      "independent_pairs": 3,
+      "median_delta_ms": 7.064500000000002,
+      "delta_range_ms": [
+        6.7493,
+        7.1454
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2291,
+            "p50_ms": 9.8447,
+            "p95_ms": 10.8192,
+            "min_ms": 1.8186,
+            "max_ms": 17.0114
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 3.0954,
+            "p95_ms": 3.67349,
+            "min_ms": 1.178,
+            "max_ms": 9.7631
+          },
+          "delta_p50_ms": 6.7493,
+          "delta_p95_ms": 7.14571,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2187,
+            "p50_ms": 10.3184,
+            "p95_ms": 11.3312,
+            "min_ms": 4.2374,
+            "max_ms": 16.7736
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 3.173,
+            "p95_ms": 3.7221949999999997,
+            "min_ms": 1.299,
+            "max_ms": 266.3275
+          },
+          "delta_p50_ms": 7.1454,
+          "delta_p95_ms": 7.609005000000002,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2226,
+            "p50_ms": 10.138000000000002,
+            "p95_ms": 11.18945,
+            "min_ms": 2.5165,
+            "max_ms": 22.7464
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 3.0735,
+            "p95_ms": 3.731719999999999,
+            "min_ms": 1.2021,
+            "max_ms": 9.4109
+          },
+          "delta_p50_ms": 7.064500000000002,
+          "delta_p95_ms": 7.4577300000000015,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "gpu|graphics|transport",
+      "independent_pairs": 3,
+      "median_delta_ms": 6.998208000000001,
+      "delta_range_ms": [
+        6.776352000000001,
+        7.0921759999999985
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 8.464256,
+            "p95_ms": 8.991792,
+            "min_ms": 7.996384,
+            "max_ms": 83.581248
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 1.687904,
+            "p95_ms": 2.1279295999999994,
+            "min_ms": 1.60224,
+            "max_ms": 2.6088
+          },
+          "delta_p50_ms": 6.776352000000001,
+          "delta_p95_ms": 6.8638624,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 8.679424000000001,
+            "p95_ms": 9.134592,
+            "min_ms": 8.206688,
+            "max_ms": 9.73472
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 1.681216,
+            "p95_ms": 2.1224608,
+            "min_ms": 1.54768,
+            "max_ms": 2.47536
+          },
+          "delta_p50_ms": 6.998208000000001,
+          "delta_p95_ms": 7.0121312,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 8.679407999999999,
+            "p95_ms": 9.173832,
+            "min_ms": 8.1488,
+            "max_ms": 10.404352
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 1.587232,
+            "p95_ms": 2.0533152,
+            "min_ms": 1.554464,
+            "max_ms": 2.516256
+          },
+          "delta_p50_ms": 7.0921759999999985,
+          "delta_p95_ms": 7.120516800000001,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "gpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 6.998016000000001,
+      "delta_range_ms": [
+        6.685008,
+        7.076016000000001
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 9.674864,
+            "p95_ms": 10.2179984,
+            "min_ms": 9.102592,
+            "max_ms": 12.01296
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 2.989856,
+            "p95_ms": 3.2695168,
+            "min_ms": 2.61296,
+            "max_ms": 3.792736
+          },
+          "delta_p50_ms": 6.685008,
+          "delta_p95_ms": 6.948481600000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 10.14272,
+            "p95_ms": 10.6960896,
+            "min_ms": 9.341824,
+            "max_ms": 11.252992
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 3.066704,
+            "p95_ms": 3.3374688,
+            "min_ms": 2.527328,
+            "max_ms": 3.676064
+          },
+          "delta_p50_ms": 7.076016000000001,
+          "delta_p95_ms": 7.358620800000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 9.958144,
+            "p95_ms": 10.554521600000001,
+            "min_ms": 9.235456,
+            "max_ms": 11.559936
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 2.960128,
+            "p95_ms": 3.2454015999999997,
+            "min_ms": 2.588032,
+            "max_ms": 3.718016
+          },
+          "delta_p50_ms": 6.998016000000001,
+          "delta_p95_ms": 7.309120000000002,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "gpu|graphics|transport",
+      "independent_pairs": 3,
+      "median_delta_ms": 6.6282239999999994,
+      "delta_range_ms": [
+        6.491968,
+        6.703888
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 7.283232,
+            "p95_ms": 7.8656,
+            "min_ms": 6.524192,
+            "max_ms": 8.480256
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 0.791264,
+            "p95_ms": 1.138912,
+            "min_ms": 0.731584,
+            "max_ms": 1.622848
+          },
+          "delta_p50_ms": 6.491968,
+          "delta_p95_ms": 6.726687999999999,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 7.510928,
+            "p95_ms": 8.214016,
+            "min_ms": 6.697152,
+            "max_ms": 8.930016
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 0.80704,
+            "p95_ms": 1.16592,
+            "min_ms": 0.71744,
+            "max_ms": 1.467072
+          },
+          "delta_p50_ms": 6.703888,
+          "delta_p95_ms": 7.048096000000001,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 7.403936,
+            "p95_ms": 8.075065599999999,
+            "min_ms": 6.596256,
+            "max_ms": 8.797568
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 0.775712,
+            "p95_ms": 1.1202607999999998,
+            "min_ms": 0.73296,
+            "max_ms": 1.591968
+          },
+          "delta_p50_ms": 6.6282239999999994,
+          "delta_p95_ms": 6.954804799999999,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "gpu|graphics|pt.ready_rr_inputs",
+      "independent_pairs": 3,
+      "median_delta_ms": 6.618912,
+      "delta_range_ms": [
+        6.381279999999999,
+        6.700768
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 7.518208,
+            "p95_ms": 7.948486399999999,
+            "min_ms": 6.851872,
+            "max_ms": 9.171072
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 1.136928,
+            "p95_ms": 1.4856928000000003,
+            "min_ms": 1.069984,
+            "max_ms": 1.815872
+          },
+          "delta_p50_ms": 6.381279999999999,
+          "delta_p95_ms": 6.4627935999999995,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 7.86176,
+            "p95_ms": 8.337369599999999,
+            "min_ms": 7.271744,
+            "max_ms": 9.123168
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 1.160992,
+            "p95_ms": 1.511264,
+            "min_ms": 1.036768,
+            "max_ms": 1.868096
+          },
+          "delta_p50_ms": 6.700768,
+          "delta_p95_ms": 6.826105599999999,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 7.744416,
+            "p95_ms": 8.2115712,
+            "min_ms": 6.94112,
+            "max_ms": 9.44336
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 1.125504,
+            "p95_ms": 1.4734783999999999,
+            "min_ms": 1.061728,
+            "max_ms": 1.99776
+          },
+          "delta_p50_ms": 6.618912,
+          "delta_p95_ms": 6.7380928,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "cpu|graphics|client_frame_interval",
+      "independent_pairs": 3,
+      "median_delta_ms": 6.19765,
+      "delta_range_ms": [
+        6.063500000000001,
+        6.488600000000001
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2575,
+            "p50_ms": 8.7664,
+            "p95_ms": 9.832559999999999,
+            "min_ms": 1.773,
+            "max_ms": 18.1453
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 2.7029,
+            "p95_ms": 3.3105399999999996,
+            "min_ms": 0.9267,
+            "max_ms": 16.5567
+          },
+          "delta_p50_ms": 6.063500000000001,
+          "delta_p95_ms": 6.5220199999999995,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2567,
+            "p50_ms": 8.7743,
+            "p95_ms": 9.86112,
+            "min_ms": 1.9343,
+            "max_ms": 18.6217
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 2.57665,
+            "p95_ms": 3.257094999999999,
+            "min_ms": 0.9264,
+            "max_ms": 19.8042
+          },
+          "delta_p50_ms": 6.19765,
+          "delta_p95_ms": 6.604025,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2498,
+            "p50_ms": 9.0302,
+            "p95_ms": 10.182705,
+            "min_ms": 2.0709,
+            "max_ms": 20.5347
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 2.5416,
+            "p95_ms": 3.3805099999999997,
+            "min_ms": 0.8771,
+            "max_ms": 12407.0077
+          },
+          "delta_p50_ms": 6.488600000000001,
+          "delta_p95_ms": 6.802195000000001,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "gpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 6.130127999999999,
+      "delta_range_ms": [
+        5.982336,
+        6.423023999999999
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 8.583264,
+            "p95_ms": 9.1581824,
+            "min_ms": 8.07488,
+            "max_ms": 9.870752
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 2.600928,
+            "p95_ms": 2.8708096,
+            "min_ms": 2.227072,
+            "max_ms": 3.487392
+          },
+          "delta_p50_ms": 5.982336,
+          "delta_p95_ms": 6.2873728,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 8.604479999999999,
+            "p95_ms": 9.209544000000001,
+            "min_ms": 7.996416,
+            "max_ms": 9.75264
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 2.474352,
+            "p95_ms": 2.7545488000000002,
+            "min_ms": 2.193664,
+            "max_ms": 3.133824
+          },
+          "delta_p50_ms": 6.130127999999999,
+          "delta_p95_ms": 6.454995200000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 8.847264,
+            "p95_ms": 9.4723744,
+            "min_ms": 8.163328,
+            "max_ms": 10.356256
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 2.42424,
+            "p95_ms": 2.7702576,
+            "min_ms": 2.18576,
+            "max_ms": 45.282976
+          },
+          "delta_p50_ms": 6.423023999999999,
+          "delta_p95_ms": 6.7021168,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "gpu|graphics|pt.ready_rr_inputs",
+      "independent_pairs": 3,
+      "median_delta_ms": 5.831024,
+      "delta_range_ms": [
+        5.792896,
+        6.026944
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 6.584032,
+            "p95_ms": 7.0543488000000005,
+            "min_ms": 6.01344,
+            "max_ms": 7.658432
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 0.791136,
+            "p95_ms": 1.1104256,
+            "min_ms": 0.719872,
+            "max_ms": 1.502656
+          },
+          "delta_p50_ms": 5.792896,
+          "delta_p95_ms": 5.9439232,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 6.584976,
+            "p95_ms": 7.053072,
+            "min_ms": 5.895264,
+            "max_ms": 7.72976
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 0.753952,
+            "p95_ms": 1.06576,
+            "min_ms": 0.714816,
+            "max_ms": 1.34224
+          },
+          "delta_p50_ms": 5.831024,
+          "delta_p95_ms": 5.987312,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 6.764864,
+            "p95_ms": 7.2806336,
+            "min_ms": 5.998848,
+            "max_ms": 7.94976
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 0.73792,
+            "p95_ms": 1.0599743999999998,
+            "min_ms": 0.714496,
+            "max_ms": 16.864384
+          },
+          "delta_p50_ms": 6.026944,
+          "delta_p95_ms": 6.2206592,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "gpu|graphics|primary_guides",
+      "independent_pairs": 3,
+      "median_delta_ms": 5.537856,
+      "delta_range_ms": [
+        5.179264,
+        5.574096
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 5.372864,
+            "p95_ms": 5.5166848,
+            "min_ms": 5.030016,
+            "max_ms": 58.384128
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 0.1936,
+            "p95_ms": 0.37550719999999904,
+            "min_ms": 0.184256,
+            "max_ms": 0.973376
+          },
+          "delta_p50_ms": 5.179264,
+          "delta_p95_ms": 5.141177600000001,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 5.734048,
+            "p95_ms": 5.9325504,
+            "min_ms": 5.221376,
+            "max_ms": 6.447168
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 0.196192,
+            "p95_ms": 0.37953599999999965,
+            "min_ms": 0.182656,
+            "max_ms": 0.627712
+          },
+          "delta_p50_ms": 5.537856,
+          "delta_p95_ms": 5.5530144,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 5.758992,
+            "p95_ms": 5.949624,
+            "min_ms": 5.215008,
+            "max_ms": 6.55344
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 0.184896,
+            "p95_ms": 0.45180479999999995,
+            "min_ms": 0.177952,
+            "max_ms": 0.963488
+          },
+          "delta_p50_ms": 5.574096,
+          "delta_p95_ms": 5.4978192,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "gpu|graphics|primary_guides",
+      "independent_pairs": 3,
+      "median_delta_ms": 4.122496,
+      "delta_range_ms": [
+        3.982784,
+        4.240863999999999
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 4.118944,
+            "p95_ms": 4.2600464,
+            "min_ms": 3.600704,
+            "max_ms": 4.84928
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 0.13616,
+            "p95_ms": 0.141504,
+            "min_ms": 0.129504,
+            "max_ms": 0.557856
+          },
+          "delta_p50_ms": 3.982784,
+          "delta_p95_ms": 4.1185424,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 4.3816,
+            "p95_ms": 4.5496768,
+            "min_ms": 3.775328,
+            "max_ms": 4.91712
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 0.140736,
+            "p95_ms": 0.146112,
+            "min_ms": 0.126944,
+            "max_ms": 0.603456
+          },
+          "delta_p50_ms": 4.240863999999999,
+          "delta_p95_ms": 4.403564800000001,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 4.257504,
+            "p95_ms": 4.4852656,
+            "min_ms": 3.64368,
+            "max_ms": 5.12368
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 0.135008,
+            "p95_ms": 0.14032639999999996,
+            "min_ms": 0.128448,
+            "max_ms": 0.9208
+          },
+          "delta_p50_ms": 4.122496,
+          "delta_p95_ms": 4.3449392,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "gpu|graphics|primary_guides",
+      "independent_pairs": 3,
+      "median_delta_ms": 3.992592,
+      "delta_range_ms": [
+        3.769568,
+        4.10768
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 3.91344,
+            "p95_ms": 4.0653071999999995,
+            "min_ms": 3.632448,
+            "max_ms": 4.52528
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 0.143872,
+            "p95_ms": 0.15067679999999992,
+            "min_ms": 0.134976,
+            "max_ms": 0.714368
+          },
+          "delta_p50_ms": 3.769568,
+          "delta_p95_ms": 3.9146303999999996,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 4.25584,
+            "p95_ms": 4.3966464,
+            "min_ms": 3.807616,
+            "max_ms": 4.562656
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 0.14816,
+            "p95_ms": 0.152128,
+            "min_ms": 0.143072,
+            "max_ms": 0.572864
+          },
+          "delta_p50_ms": 4.10768,
+          "delta_p95_ms": 4.2445184,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 4.131392,
+            "p95_ms": 4.365664,
+            "min_ms": 3.74928,
+            "max_ms": 4.525888
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 0.13879999999999998,
+            "p95_ms": 0.143712,
+            "min_ms": 0.130848,
+            "max_ms": 0.71024
+          },
+          "delta_p50_ms": 3.992592,
+          "delta_p95_ms": 4.221952,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "gpu|graphics|primary_guides",
+      "independent_pairs": 3,
+      "median_delta_ms": 3.755392,
+      "delta_range_ms": [
+        3.6933759999999998,
+        3.868992
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 3.869824,
+            "p95_ms": 4.0816,
+            "min_ms": 3.381984,
+            "max_ms": 4.675648
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 0.176448,
+            "p95_ms": 0.3447568,
+            "min_ms": 0.166144,
+            "max_ms": 0.840384
+          },
+          "delta_p50_ms": 3.6933759999999998,
+          "delta_p95_ms": 3.7368432,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 4.050688,
+            "p95_ms": 4.3079600000000005,
+            "min_ms": 3.48096,
+            "max_ms": 4.63056
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 0.181696,
+            "p95_ms": 0.18564,
+            "min_ms": 0.165792,
+            "max_ms": 0.624096
+          },
+          "delta_p50_ms": 3.868992,
+          "delta_p95_ms": 4.12232,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 3.929024,
+            "p95_ms": 4.196784,
+            "min_ms": 3.436704,
+            "max_ms": 4.531232
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 0.173632,
+            "p95_ms": 0.33695839999999955,
+            "min_ms": 0.16496,
+            "max_ms": 0.95568
+          },
+          "delta_p50_ms": 3.755392,
+          "delta_p95_ms": 3.8598256000000006,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "gpu|graphics|primary_guides",
+      "independent_pairs": 3,
+      "median_delta_ms": 2.966624,
+      "delta_range_ms": [
+        2.9547999999999996,
+        3.090528
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 3.100704,
+            "p95_ms": 3.3203647999999997,
+            "min_ms": 2.84272,
+            "max_ms": 3.745344
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 0.13408,
+            "p95_ms": 0.138432,
+            "min_ms": 0.123392,
+            "max_ms": 0.737664
+          },
+          "delta_p50_ms": 2.966624,
+          "delta_p95_ms": 3.1819328,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 3.08424,
+            "p95_ms": 3.3446,
+            "min_ms": 2.837024,
+            "max_ms": 3.712544
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 0.12944,
+            "p95_ms": 0.13569759999999997,
+            "min_ms": 0.122368,
+            "max_ms": 0.688736
+          },
+          "delta_p50_ms": 2.9547999999999996,
+          "delta_p95_ms": 3.2089024,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 3.216192,
+            "p95_ms": 3.49488,
+            "min_ms": 2.919712,
+            "max_ms": 3.872992
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 0.125664,
+            "p95_ms": 0.12996959999999994,
+            "min_ms": 0.120512,
+            "max_ms": 4.559296
+          },
+          "delta_p50_ms": 3.090528,
+          "delta_p95_ms": 3.3649104000000003,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "gpu|graphics|transport",
+      "independent_pairs": 3,
+      "median_delta_ms": 2.66336,
+      "delta_range_ms": [
+        2.631296,
+        2.7312
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 3.287552,
+            "p95_ms": 3.786656,
+            "min_ms": 2.860512,
+            "max_ms": 4.438016
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 0.656256,
+            "p95_ms": 0.9751488,
+            "min_ms": 0.592576,
+            "max_ms": 1.36816
+          },
+          "delta_p50_ms": 2.631296,
+          "delta_p95_ms": 2.8115072,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 3.286144,
+            "p95_ms": 3.777384,
+            "min_ms": 2.72272,
+            "max_ms": 4.24768
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 0.622784,
+            "p95_ms": 0.934208,
+            "min_ms": 0.588448,
+            "max_ms": 1.21632
+          },
+          "delta_p50_ms": 2.66336,
+          "delta_p95_ms": 2.843176,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 3.342752,
+            "p95_ms": 3.8417216,
+            "min_ms": 2.795904,
+            "max_ms": 4.438656
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 0.611552,
+            "p95_ms": 0.9289824,
+            "min_ms": 0.591008,
+            "max_ms": 12.408832
+          },
+          "delta_p50_ms": 2.7312,
+          "delta_p95_ms": 2.9127392,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "gpu|graphics|transport",
+      "independent_pairs": 3,
+      "median_delta_ms": 2.259424,
+      "delta_range_ms": [
+        2.230048,
+        2.311888
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 3.2294080000000003,
+            "p95_ms": 3.6630095999999996,
+            "min_ms": 2.918304,
+            "max_ms": 4.192192
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 0.99936,
+            "p95_ms": 1.3424576000000001,
+            "min_ms": 0.93824,
+            "max_ms": 1.671296
+          },
+          "delta_p50_ms": 2.230048,
+          "delta_p95_ms": 2.3205519999999993,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 3.278144,
+            "p95_ms": 3.7524224000000004,
+            "min_ms": 2.975232,
+            "max_ms": 4.33504
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 1.01872,
+            "p95_ms": 1.3653375999999997,
+            "min_ms": 0.905696,
+            "max_ms": 1.622016
+          },
+          "delta_p50_ms": 2.259424,
+          "delta_p95_ms": 2.3870848000000007,
+          "stage_fusion_sensitive": true
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 3.300784,
+            "p95_ms": 3.6997008,
+            "min_ms": 2.920832,
+            "max_ms": 4.209184
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 0.988896,
+            "p95_ms": 1.3304511999999997,
+            "min_ms": 0.929696,
+            "max_ms": 1.766304
+          },
+          "delta_p50_ms": 2.311888,
+          "delta_p95_ms": 2.3692496000000003,
+          "stage_fusion_sensitive": true
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "cpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.5842499999999999,
+      "delta_range_ms": [
+        0.51835,
+        0.585
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 0.98485,
+            "p95_ms": 1.269105,
+            "min_ms": 0.7353,
+            "max_ms": 8.0294
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 0.4665,
+            "p95_ms": 0.5640200000000001,
+            "min_ms": 0.3561,
+            "max_ms": 7.8712
+          },
+          "delta_p50_ms": 0.51835,
+          "delta_p95_ms": 0.7050849999999999,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 1.0549,
+            "p95_ms": 1.3068200000000003,
+            "min_ms": 0.7919,
+            "max_ms": 7.5088
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 0.4699,
+            "p95_ms": 0.5756899999999998,
+            "min_ms": 0.3501,
+            "max_ms": 6.9732
+          },
+          "delta_p50_ms": 0.585,
+          "delta_p95_ms": 0.7311300000000005,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 1.05775,
+            "p95_ms": 1.33626,
+            "min_ms": 0.7989,
+            "max_ms": 6.6844
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 0.4735,
+            "p95_ms": 0.583,
+            "min_ms": 0.3644,
+            "max_ms": 2.5003
+          },
+          "delta_p50_ms": 0.5842499999999999,
+          "delta_p95_ms": 0.75326,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "cpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.3681,
+      "delta_range_ms": [
+        0.3603,
+        0.40190000000000003
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 0.8558,
+            "p95_ms": 1.3504,
+            "min_ms": 0.6585,
+            "max_ms": 2.8938
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 0.4877,
+            "p95_ms": 0.6016,
+            "min_ms": 0.3453,
+            "max_ms": 2.2254
+          },
+          "delta_p50_ms": 0.3681,
+          "delta_p95_ms": 0.7488,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 0.8486,
+            "p95_ms": 1.3721,
+            "min_ms": 0.6709,
+            "max_ms": 4.5712
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 0.4883,
+            "p95_ms": 0.6023,
+            "min_ms": 0.3587,
+            "max_ms": 10.4789
+          },
+          "delta_p50_ms": 0.3603,
+          "delta_p95_ms": 0.7698000000000002,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 0.8867,
+            "p95_ms": 1.3993799999999998,
+            "min_ms": 0.6488,
+            "max_ms": 8.058
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 0.4848,
+            "p95_ms": 0.5984,
+            "min_ms": 0.414,
+            "max_ms": 2.1021
+          },
+          "delta_p50_ms": 0.40190000000000003,
+          "delta_p95_ms": 0.8009799999999998,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "cpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.28109999999999996,
+      "delta_range_ms": [
+        0.23350000000000004,
+        0.29569999999999996
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 0.6772,
+            "p95_ms": 0.7935899999999998,
+            "min_ms": 0.5342,
+            "max_ms": 1.1848
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 0.4437,
+            "p95_ms": 0.5616099999999998,
+            "min_ms": 0.3662,
+            "max_ms": 2.0437
+          },
+          "delta_p50_ms": 0.23350000000000004,
+          "delta_p95_ms": 0.23197999999999996,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 0.7281,
+            "p95_ms": 0.8663949999999998,
+            "min_ms": 0.5997,
+            "max_ms": 2.3237
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 0.4324,
+            "p95_ms": 0.5395349999999999,
+            "min_ms": 0.3567,
+            "max_ms": 1.9921
+          },
+          "delta_p50_ms": 0.29569999999999996,
+          "delta_p95_ms": 0.32685999999999993,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 0.7263,
+            "p95_ms": 0.8649,
+            "min_ms": 0.5611,
+            "max_ms": 1.3933
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 0.4452,
+            "p95_ms": 0.5516,
+            "min_ms": 0.3652,
+            "max_ms": 6.9032
+          },
+          "delta_p50_ms": 0.28109999999999996,
+          "delta_p95_ms": 0.3133,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "cpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.2506,
+      "delta_range_ms": [
+        0.20559999999999995,
+        0.26330000000000003
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 0.6546,
+            "p95_ms": 0.78644,
+            "min_ms": 0.4862,
+            "max_ms": 6.7814
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 0.449,
+            "p95_ms": 0.5571599999999999,
+            "min_ms": 0.373,
+            "max_ms": 8.5579
+          },
+          "delta_p50_ms": 0.20559999999999995,
+          "delta_p95_ms": 0.22928000000000015,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 0.6854,
+            "p95_ms": 0.8193199999999998,
+            "min_ms": 0.5556,
+            "max_ms": 5.3132
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 0.4348,
+            "p95_ms": 0.5387299999999999,
+            "min_ms": 0.3008,
+            "max_ms": 25.5294
+          },
+          "delta_p50_ms": 0.2506,
+          "delta_p95_ms": 0.2805899999999999,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 0.7194,
+            "p95_ms": 0.86825,
+            "min_ms": 0.546,
+            "max_ms": 14.0396
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 0.4561,
+            "p95_ms": 0.545,
+            "min_ms": 0.3194,
+            "max_ms": 5.7634
+          },
+          "delta_p50_ms": 0.26330000000000003,
+          "delta_p95_ms": 0.3232499999999999,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "cpu|graphics|world",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.2091,
+      "delta_range_ms": [
+        0.17700000000000005,
+        0.22579999999999995
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 0.6016,
+            "p95_ms": 0.72148,
+            "min_ms": 0.4428,
+            "max_ms": 11.41
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 0.4246,
+            "p95_ms": 0.52688,
+            "min_ms": 0.3155,
+            "max_ms": 6.6587
+          },
+          "delta_p50_ms": 0.17700000000000005,
+          "delta_p95_ms": 0.1946,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 0.6301,
+            "p95_ms": 0.76625,
+            "min_ms": 0.4744,
+            "max_ms": 1.9472
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 0.421,
+            "p95_ms": 0.523655,
+            "min_ms": 0.3597,
+            "max_ms": 1.8088
+          },
+          "delta_p50_ms": 0.2091,
+          "delta_p95_ms": 0.242595,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 0.6496,
+            "p95_ms": 0.8077099999999998,
+            "min_ms": 0.4507,
+            "max_ms": 7.7972
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 0.4238,
+            "p95_ms": 0.5208949999999997,
+            "min_ms": 0.3524,
+            "max_ms": 15.487
+          },
+          "delta_p50_ms": 0.22579999999999995,
+          "delta_p95_ms": 0.28681500000000015,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "gpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.07609600000000016,
+      "delta_range_ms": [
+        0.016255999999999826,
+        0.15567999999999982
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 1.182624,
+            "p95_ms": 1.4277408000000007,
+            "min_ms": 1.168288,
+            "max_ms": 6.404544
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 1.166368,
+            "p95_ms": 1.4704,
+            "min_ms": 1.119296,
+            "max_ms": 2.063072
+          },
+          "delta_p50_ms": 0.016255999999999826,
+          "delta_p95_ms": -0.04265919999999923,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 1.256544,
+            "p95_ms": 1.4695408,
+            "min_ms": 1.208384,
+            "max_ms": 1.664544
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 1.180448,
+            "p95_ms": 1.4911712,
+            "min_ms": 1.107584,
+            "max_ms": 2.062304
+          },
+          "delta_p50_ms": 0.07609600000000016,
+          "delta_p95_ms": -0.021630399999999828,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 1.2667519999999999,
+            "p95_ms": 1.485984,
+            "min_ms": 1.203136,
+            "max_ms": 1.864096
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 1.111072,
+            "p95_ms": 1.4338592000000001,
+            "min_ms": 1.091584,
+            "max_ms": 1.952544
+          },
+          "delta_p50_ms": 0.15567999999999982,
+          "delta_p95_ms": 0.05212479999999986,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "gpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.07331200000000004,
+      "delta_range_ms": [
+        0.0015680000000000138,
+        0.12014400000000003
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 1.181504,
+            "p95_ms": 1.4562144,
+            "min_ms": 1.166688,
+            "max_ms": 1.686336
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 1.179936,
+            "p95_ms": 1.4821791999999998,
+            "min_ms": 1.105216,
+            "max_ms": 1.968128
+          },
+          "delta_p50_ms": 0.0015680000000000138,
+          "delta_p95_ms": -0.0259647999999999,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 1.273248,
+            "p95_ms": 1.4823727999999998,
+            "min_ms": 1.22368,
+            "max_ms": 1.7296
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 1.199936,
+            "p95_ms": 1.506048,
+            "min_ms": 1.1776,
+            "max_ms": 2.008192
+          },
+          "delta_p50_ms": 0.07331200000000004,
+          "delta_p95_ms": -0.02367520000000023,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 1.256912,
+            "p95_ms": 1.4596239999999998,
+            "min_ms": 1.19984,
+            "max_ms": 1.693376
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 1.136768,
+            "p95_ms": 1.4290576000000001,
+            "min_ms": 1.102848,
+            "max_ms": 1.91776
+          },
+          "delta_p50_ms": 0.12014400000000003,
+          "delta_p95_ms": 0.03056639999999966,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "gpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.05483199999999999,
+      "delta_range_ms": [
+        0.024607999999999963,
+        0.06768000000000018
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 1.191328,
+            "p95_ms": 1.393984,
+            "min_ms": 1.176416,
+            "max_ms": 1.763808
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 1.16672,
+            "p95_ms": 1.4671248,
+            "min_ms": 1.10432,
+            "max_ms": 2.097408
+          },
+          "delta_p50_ms": 0.024607999999999963,
+          "delta_p95_ms": -0.0731408,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 1.251152,
+            "p95_ms": 1.477256,
+            "min_ms": 1.201408,
+            "max_ms": 1.774496
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 1.19632,
+            "p95_ms": 1.5061280000000001,
+            "min_ms": 1.0952,
+            "max_ms": 1.938336
+          },
+          "delta_p50_ms": 0.05483199999999999,
+          "delta_p95_ms": -0.02887200000000023,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 1.21744,
+            "p95_ms": 1.4210176,
+            "min_ms": 1.17968,
+            "max_ms": 1.576224
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 1.14976,
+            "p95_ms": 1.4473296,
+            "min_ms": 1.099424,
+            "max_ms": 1.980672
+          },
+          "delta_p50_ms": 0.06768000000000018,
+          "delta_p95_ms": -0.02631199999999989,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "gpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.05465600000000004,
+      "delta_range_ms": [
+        0.015231999999999912,
+        0.06222400000000006
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 1.181312,
+            "p95_ms": 1.3867551999999999,
+            "min_ms": 1.16832,
+            "max_ms": 1.673568
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 1.16608,
+            "p95_ms": 1.4714272000000002,
+            "min_ms": 1.116288,
+            "max_ms": 1.97328
+          },
+          "delta_p50_ms": 0.015231999999999912,
+          "delta_p95_ms": -0.0846720000000003,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 1.255744,
+            "p95_ms": 1.4908032,
+            "min_ms": 1.200384,
+            "max_ms": 1.842176
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 1.201088,
+            "p95_ms": 1.5120608,
+            "min_ms": 1.096704,
+            "max_ms": 1.987872
+          },
+          "delta_p50_ms": 0.05465600000000004,
+          "delta_p95_ms": -0.021257599999999988,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 1.218576,
+            "p95_ms": 1.4480480000000002,
+            "min_ms": 1.178144,
+            "max_ms": 1.769184
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 1.156352,
+            "p95_ms": 1.4580863999999998,
+            "min_ms": 1.109312,
+            "max_ms": 1.801632
+          },
+          "delta_p50_ms": 0.06222400000000006,
+          "delta_p95_ms": -0.010038399999999559,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "gpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.045055999999999985,
+      "delta_range_ms": [
+        0.0018879999999998898,
+        0.13135999999999992
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 1.182912,
+            "p95_ms": 1.3882047999999998,
+            "min_ms": 1.170112,
+            "max_ms": 1.772128
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 1.181024,
+            "p95_ms": 1.485856,
+            "min_ms": 1.10016,
+            "max_ms": 2.05488
+          },
+          "delta_p50_ms": 0.0018879999999998898,
+          "delta_p95_ms": -0.09765120000000027,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 1.184256,
+            "p95_ms": 1.421688,
+            "min_ms": 1.165088,
+            "max_ms": 1.690816
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 1.1392,
+            "p95_ms": 1.437312,
+            "min_ms": 1.09568,
+            "max_ms": 1.955648
+          },
+          "delta_p50_ms": 0.045055999999999985,
+          "delta_p95_ms": -0.01562399999999986,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 1.239968,
+            "p95_ms": 1.4783007999999997,
+            "min_ms": 1.179328,
+            "max_ms": 1.7648
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 1.108608,
+            "p95_ms": 1.4741823999999983,
+            "min_ms": 1.090528,
+            "max_ms": 27.698272
+          },
+          "delta_p50_ms": 0.13135999999999992,
+          "delta_p95_ms": 0.00411840000000141,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "multi_light",
+      "stage": "cpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.03740000000000002,
+      "delta_range_ms": [
+        0.02460000000000001,
+        0.040199999999999986
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1584,
+            "p50_ms": 0.1337,
+            "p95_ms": 0.15558499999999997,
+            "min_ms": 0.1132,
+            "max_ms": 0.3131
+          },
+          "caustica": {
+            "samples": 7390,
+            "p50_ms": 0.1091,
+            "p95_ms": 0.1348,
+            "min_ms": 0.0931,
+            "max_ms": 0.573
+          },
+          "delta_p50_ms": 0.02460000000000001,
+          "delta_p95_ms": 0.02078499999999997,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1518,
+            "p50_ms": 0.1433,
+            "p95_ms": 0.16971499999999998,
+            "min_ms": 0.1243,
+            "max_ms": 0.4295
+          },
+          "caustica": {
+            "samples": 7272,
+            "p50_ms": 0.1059,
+            "p95_ms": 0.1305,
+            "min_ms": 0.0925,
+            "max_ms": 0.6636
+          },
+          "delta_p50_ms": 0.03740000000000002,
+          "delta_p95_ms": 0.03921499999999997,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1536,
+            "p50_ms": 0.1503,
+            "p95_ms": 0.1702,
+            "min_ms": 0.12,
+            "max_ms": 0.4384
+          },
+          "caustica": {
+            "samples": 7700,
+            "p50_ms": 0.1101,
+            "p95_ms": 0.1344,
+            "min_ms": 0.0921,
+            "max_ms": 0.6033
+          },
+          "delta_p50_ms": 0.040199999999999986,
+          "delta_p95_ms": 0.0358,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "glass_water",
+      "stage": "cpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.0364,
+      "delta_range_ms": [
+        0.02890000000000001,
+        0.03889999999999999
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1921,
+            "p50_ms": 0.1335,
+            "p95_ms": 0.1511,
+            "min_ms": 0.1163,
+            "max_ms": 0.4961
+          },
+          "caustica": {
+            "samples": 10088,
+            "p50_ms": 0.1046,
+            "p95_ms": 0.12506499999999995,
+            "min_ms": 0.0759,
+            "max_ms": 1.2751
+          },
+          "delta_p50_ms": 0.02890000000000001,
+          "delta_p95_ms": 0.026035000000000058,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1846,
+            "p50_ms": 0.1445,
+            "p95_ms": 0.17195,
+            "min_ms": 0.1261,
+            "max_ms": 0.3289
+          },
+          "caustica": {
+            "samples": 10396,
+            "p50_ms": 0.1056,
+            "p95_ms": 0.1285,
+            "min_ms": 0.0804,
+            "max_ms": 1.2803
+          },
+          "delta_p50_ms": 0.03889999999999999,
+          "delta_p95_ms": 0.04344999999999999,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1887,
+            "p50_ms": 0.1409,
+            "p95_ms": 0.1571,
+            "min_ms": 0.1221,
+            "max_ms": 0.3932
+          },
+          "caustica": {
+            "samples": 10260,
+            "p50_ms": 0.1045,
+            "p95_ms": 0.1219,
+            "min_ms": 0.092,
+            "max_ms": 1.3145
+          },
+          "delta_p50_ms": 0.0364,
+          "delta_p95_ms": 0.035199999999999995,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "complex_building",
+      "stage": "cpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.03599999999999999,
+      "delta_range_ms": [
+        0.024599999999999997,
+        0.03789999999999999
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 1387,
+            "p50_ms": 0.1339,
+            "p95_ms": 0.15911000000000003,
+            "min_ms": 0.1114,
+            "max_ms": 0.4304
+          },
+          "caustica": {
+            "samples": 7685,
+            "p50_ms": 0.1093,
+            "p95_ms": 0.13277999999999993,
+            "min_ms": 0.0927,
+            "max_ms": 1.2492
+          },
+          "delta_p50_ms": 0.024599999999999997,
+          "delta_p95_ms": 0.026330000000000103,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 1548,
+            "p50_ms": 0.1435,
+            "p95_ms": 0.168565,
+            "min_ms": 0.1262,
+            "max_ms": 0.4342
+          },
+          "caustica": {
+            "samples": 7655,
+            "p50_ms": 0.1056,
+            "p95_ms": 0.1288,
+            "min_ms": 0.0758,
+            "max_ms": 0.5831
+          },
+          "delta_p50_ms": 0.03789999999999999,
+          "delta_p95_ms": 0.039764999999999995,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 1546,
+            "p50_ms": 0.149,
+            "p95_ms": 0.17585,
+            "min_ms": 0.1287,
+            "max_ms": 1.6064
+          },
+          "caustica": {
+            "samples": 8027,
+            "p50_ms": 0.113,
+            "p95_ms": 0.1355,
+            "min_ms": 0.0801,
+            "max_ms": 1.2756
+          },
+          "delta_p50_ms": 0.03599999999999999,
+          "delta_p95_ms": 0.04035,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "terrain",
+      "stage": "cpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.03570000000000001,
+      "delta_range_ms": [
+        0.03109999999999999,
+        0.03975000000000001
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 3005,
+            "p50_ms": 0.1349,
+            "p95_ms": 0.1579,
+            "min_ms": 0.1084,
+            "max_ms": 1.2885
+          },
+          "caustica": {
+            "samples": 11113,
+            "p50_ms": 0.1038,
+            "p95_ms": 0.126,
+            "min_ms": 0.0777,
+            "max_ms": 0.5461
+          },
+          "delta_p50_ms": 0.03109999999999999,
+          "delta_p95_ms": 0.03190000000000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2996,
+            "p50_ms": 0.1363,
+            "p95_ms": 0.1577,
+            "min_ms": 0.1148,
+            "max_ms": 0.438
+          },
+          "caustica": {
+            "samples": 11610,
+            "p50_ms": 0.1006,
+            "p95_ms": 0.1209,
+            "min_ms": 0.0881,
+            "max_ms": 0.6005
+          },
+          "delta_p50_ms": 0.03570000000000001,
+          "delta_p95_ms": 0.03680000000000001,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2915,
+            "p50_ms": 0.1433,
+            "p95_ms": 0.1674,
+            "min_ms": 0.1151,
+            "max_ms": 0.8023
+          },
+          "caustica": {
+            "samples": 5484,
+            "p50_ms": 0.10355,
+            "p95_ms": 0.12548499999999996,
+            "min_ms": 0.0897,
+            "max_ms": 1.3958
+          },
+          "delta_p50_ms": 0.03975000000000001,
+          "delta_p95_ms": 0.041915000000000036,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    },
+    {
+      "scene_id": "dynamic_entity",
+      "stage": "cpu|graphics|rr",
+      "independent_pairs": 3,
+      "median_delta_ms": 0.03520000000000001,
+      "delta_range_ms": [
+        0.02750000000000001,
+        0.0378
+      ],
+      "repeated": true,
+      "pairs": [
+        {
+          "pair_id": 10,
+          "voxellight": {
+            "samples": 2674,
+            "p50_ms": 0.1317,
+            "p95_ms": 0.14847,
+            "min_ms": 0.1062,
+            "max_ms": 0.4307
+          },
+          "caustica": {
+            "samples": 9739,
+            "p50_ms": 0.1042,
+            "p95_ms": 0.123,
+            "min_ms": 0.092,
+            "max_ms": 7.0712
+          },
+          "delta_p50_ms": 0.02750000000000001,
+          "delta_p95_ms": 0.025469999999999993,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 8,
+          "voxellight": {
+            "samples": 2553,
+            "p50_ms": 0.1418,
+            "p95_ms": 0.17150000000000004,
+            "min_ms": 0.112,
+            "max_ms": 0.4424
+          },
+          "caustica": {
+            "samples": 9402,
+            "p50_ms": 0.1066,
+            "p95_ms": 0.1273,
+            "min_ms": 0.0911,
+            "max_ms": 0.4356
+          },
+          "delta_p50_ms": 0.03520000000000001,
+          "delta_p95_ms": 0.044200000000000045,
+          "stage_fusion_sensitive": false
+        },
+        {
+          "pair_id": 9,
+          "voxellight": {
+            "samples": 2598,
+            "p50_ms": 0.1429,
+            "p95_ms": 0.17099000000000006,
+            "min_ms": 0.1116,
+            "max_ms": 0.4522
+          },
+          "caustica": {
+            "samples": 9797,
+            "p50_ms": 0.1051,
+            "p95_ms": 0.1255,
+            "min_ms": 0.0914,
+            "max_ms": 1.4058
+          },
+          "delta_p50_ms": 0.0378,
+          "delta_p95_ms": 0.04549000000000006,
+          "stage_fusion_sensitive": false
+        }
+      ]
+    }
+  ],
+  "rejected_pairs": [],
+  "limitations": [
+    "Inclusive scopes overlap: ranking is not an additive cost breakdown.",
+    "Compute and graphics queues overlap; their execution and host waits must not be added.",
+    "Stage fusion and semantic differences require source review before causal inference.",
+    "Pair differences are descriptive; frames are not independent experiment repetitions.",
+    "Workload counter comparisons and quality evidence are separate diagnostic inputs."
+  ]
+}

@@ -83,8 +83,9 @@ BsdfEval evalLocal(Material m,float3 wo,float3 wi,float eta=1.5f,int forced=0){
  if(m.coatWeight>0){float fcO=fresnelDielectric(wo.z,m.coatIOR);float fcI=fresnelDielectric(wi.z,m.coatIOR);float fc=fresnelDielectric(oh,m.coatIOR);float ca=max(.0005f,m.coatAlpha);float cp=m.coatWeight*.5f;float3 coat=float3(1,1,1)*(fc*D(h,ca,ca)*G(wo,wi,ca,ca)/(4*wo.z*wi.z));float pdf=normalPdf(wo,h,ca,ca)/max(1e-7f,4*oh);result.f=result.f*(1-m.coatWeight+m.coatWeight*(1-fcO)*(1-fcI))+coat*m.coatWeight;result.pdf=result.pdf*(1-cp)+pdf*cp;}
  return result;
 }
-BsdfEval evalBsdf(Material m,Frame f,float3 wo,float3 wi,float eta=1.5f,int forced=0){return evalLocal(m,f.local(wo),f.local(wi),eta,forced);}
+BsdfEval evalBsdf(Material m,Frame f,float3 wo,float3 wi,float eta=1.5f,int forced=0){profileWork(1u);return evalLocal(m,f.local(wo),f.local(wi),eta,forced);}
 BsdfSample sampleBsdf(Material m,Frame f,float3 woWorld,inout uint seed,float eta=1.5f,int forced=0){
+ profileWork(2u);
  float3 wo=f.local(woWorld);float3 wi=float3(0,0,0);BsdfSample s = {float3(0,0,0),float3(0,0,0),0,1,0};if(wo.z<=0)return s;
  float ax=max(.0005f,m.microfacetAlpha);float ay=max(.0005f,m.alphaV);uint flags=0;
  if(dielectric(m)&&m.type!=THIN_DIELECTRIC&&abs(eta-1)<1e-7f){if(forced==1)return s;s.wi=woWorld*-1;s.weight=float3(1,1,1)*m.transmission;s.pdf=1;s.eta=1;s.flags=SPECULAR|DELTA|TRANSMISSION;return s;}
@@ -98,6 +99,7 @@ BsdfSample sampleBsdf(Material m,Frame f,float3 woWorld,inout uint seed,float et
 }
 
 BsdfEval evalGlossy(Material m,Frame f,float3 woWorld,float3 wiWorld){
+ profileWork(1u);
  if(m.type==DIFFUSE||m.type==EMISSIVE||m.type==DIFFUSE_TRANSMISSION)return {float3(0,0,0),0};
  float3 wo=f.local(woWorld);float3 wi=f.local(wiWorld);if(wo.z<=0||wi.z<=0)return {float3(0,0,0),0};float3 h=safeNormalize(wo+wi);float oh=abs(dot(wo,h));float ax=max(.0005f,m.microfacetAlpha);float ay=max(.0005f,m.alphaV);float ior=sqrt(m.f0)>=.999f?1000:(1+sqrt(m.f0))/(1-sqrt(m.f0));
  float3 F=metal(m)?conductorFresnel(m,oh):float3(1,1,1)*fresnelDielectric(oh,ior);float3 base=F*(D(h,ax,ay)*G(wo,wi,ax,ay)/(4*wo.z*wi.z));float pdf=normalPdf(wo,h,ax,ay)/max(1e-7f,4*oh);
@@ -107,6 +109,7 @@ BsdfEval evalGlossy(Material m,Frame f,float3 woWorld,float3 wiWorld){
  return {base,pdf};
 }
 BsdfSample sampleGlossy(Material m,Frame f,float3 woWorld,inout uint seed){
+ profileWork(2u);
  float3 wo=f.local(woWorld);BsdfSample s = {float3(0,0,0),float3(0,0,0),0,1,0};if(m.type==DIFFUSE||m.type==EMISSIVE||m.type==DIFFUSE_TRANSMISSION)return s;if(wo.z<=0)return s;bool coat=m.type==COATED_DIFFUSE||rng(seed)<m.coatWeight*.5f;float ax=max(.0005f,coat?m.coatAlpha:m.microfacetAlpha);float ay=max(.0005f,coat?m.coatAlpha:m.alphaV);float3 wi;if(!coat&&rng(seed)<multiscatterMix(m,wo.z))wi=cosine(seed);else{float3 h=sampleNormal(wo,ax,ay,seed);wi=h*(2*dot(wo,h))-wo;}if(wi.z<=0)return s;s.wi=f.world(wi);BsdfEval e=evalGlossy(m,f,woWorld,s.wi);if(e.pdf<=0)return s;s.weight=e.f*(wi.z/e.pdf);s.pdf=e.pdf;s.flags=GLOSSY|REFLECTION;return s;
 }
 

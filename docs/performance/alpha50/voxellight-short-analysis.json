@@ -1,0 +1,273 @@
+{
+  "schema": 2,
+  "sampling_mode": "nsight",
+  "formal_timing_eligible": false,
+  "diagnostics": [
+    "Process 13928 was launched by the profiler",
+    "Common injection library initialized successfully.",
+    "VkCreateInstance called. Requested Vulkan API version 1.2.0",
+    "Profiling has started.",
+    "Not all Vulkan events might have been collected.",
+    "Number of Vulkan events collected: \t38299.",
+    "The total number of Vulkan GPU event timestamps exceeded the maximum supported value of 8192 per frame by 72019. The excess events will not be captured.",
+    "Profiling has stopped."
+  ],
+  "stages": {
+    "vulkan_rt_primary": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.0037135,
+        "p95_ms": 0.00410885,
+        "min_ms": 0.003489,
+        "max_ms": 0.004577
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_bounce_1": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.003809,
+        "p95_ms": 0.004759399999999996,
+        "min_ms": 0.003457,
+        "max_ms": 0.006369
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_bounce_2": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.003713,
+        "p95_ms": 0.004033,
+        "min_ms": 0.003457,
+        "max_ms": 0.005185
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_bounce_3": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.0039845,
+        "p95_ms": 0.004577,
+        "min_ms": 0.003457,
+        "max_ms": 0.004866
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_bounce_4": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.003681,
+        "p95_ms": 0.0039802,
+        "min_ms": 0.003458,
+        "max_ms": 0.007585
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_bounce_5": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.003713,
+        "p95_ms": 0.0040122,
+        "min_ms": 0.003521,
+        "max_ms": 0.004353
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_sample_resolve": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.002625,
+        "p95_ms": 0.0029882,
+        "min_ms": 0.00256,
+        "max_ms": 0.00317
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_deterministic_guides": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 0.002656,
+        "p95_ms": 0.0029568499999999996,
+        "min_ms": 0.002529,
+        "max_ms": 0.003137
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_dlss_rr": {
+      "marker_event_duration": {
+        "samples": 114,
+        "p50_ms": 1.176906,
+        "p95_ms": 1.3535590499999999,
+        "min_ms": 1.172026,
+        "max_ms": 1.437752
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 114,
+      "cpu_markers": 130,
+      "coverage": 0.8769230769230769
+    },
+    "vulkan_rt_visibility_trace_256_first": {
+      "marker_event_duration": {
+        "samples": 7,
+        "p50_ms": 0.002593,
+        "p95_ms": 0.0026698,
+        "min_ms": 0.002561,
+        "max_ms": 0.002689
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 7,
+      "cpu_markers": 8,
+      "coverage": 0.875
+    },
+    "vulkan_rt_visibility_query_256_second": {
+      "marker_event_duration": {
+        "samples": 7,
+        "p50_ms": 0.002657,
+        "p95_ms": 0.002721,
+        "min_ms": 0.002625,
+        "max_ms": 0.002721
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 7,
+      "cpu_markers": 8,
+      "coverage": 0.875
+    },
+    "vulkan_rt_visibility_query_256_first": {
+      "marker_event_duration": {
+        "samples": 7,
+        "p50_ms": 0.002593,
+        "p95_ms": 0.0026378,
+        "min_ms": 0.002561,
+        "max_ms": 0.002657
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 7,
+      "cpu_markers": 8,
+      "coverage": 0.875
+    },
+    "vulkan_rt_visibility_trace_256_second": {
+      "marker_event_duration": {
+        "samples": 7,
+        "p50_ms": 0.002625,
+        "p95_ms": 0.0026794,
+        "min_ms": 0.002593,
+        "max_ms": 0.002689
+      },
+      "shader_execution_time": null,
+      "gpu_markers": 7,
+      "cpu_markers": 8,
+      "coverage": 0.875
+    }
+  },
+  "limitations": [
+    "The installed tracer exports queue-submit and debug-begin events, not individual TraceRaysKHR workloads.",
+    "Debug-begin event duration is not shader execution time.",
+    "Intervals between ordered GPU begin markers include execution and dependency scheduling; they are not idle gaps.",
+    "CPU marker durations are not GPU execution time.",
+    "Dropped unlabelled workload events prevent a complete critical-path or idle-time calculation.",
+    "Capture-end in-flight scopes can lower coverage.",
+    "Nsight layer changes overhead; these times do not replace formal timestamps."
+  ],
+  "complete_non_replay_sequences": {
+    "samples": 99,
+    "visibility_replay_sequences_excluded": 14,
+    "incomplete_sequences": 0,
+    "begin_boundary_intervals": {
+      "vulkan_rt_primary_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 3.772713,
+        "p95_ms": 3.975832,
+        "min_ms": 3.567978,
+        "max_ms": 3.98964
+      },
+      "vulkan_rt_bounce_1_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 5.296352,
+        "p95_ms": 5.575012399999999,
+        "min_ms": 4.944674,
+        "max_ms": 6.434873
+      },
+      "vulkan_rt_bounce_2_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 4.233287,
+        "p95_ms": 4.6418215,
+        "min_ms": 4.130791,
+        "max_ms": 4.97693
+      },
+      "vulkan_rt_bounce_3_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 0.372862,
+        "p95_ms": 0.392109,
+        "min_ms": 0.339838,
+        "max_ms": 0.554492
+      },
+      "vulkan_rt_bounce_4_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 0.118143,
+        "p95_ms": 0.13404389999999997,
+        "min_ms": 0.109087,
+        "max_ms": 0.148063
+      },
+      "vulkan_rt_bounce_5_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 0.069887,
+        "p95_ms": 0.07748479999999999,
+        "min_ms": 0.052799,
+        "max_ms": 0.081888
+      },
+      "vulkan_rt_sample_resolve_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 0.099519,
+        "p95_ms": 0.12357019999999999,
+        "min_ms": 0.095199,
+        "max_ms": 0.266174
+      },
+      "vulkan_rt_deterministic_guides_begin_to_next_begin": {
+        "samples": 99,
+        "p50_ms": 0.610205,
+        "p95_ms": 0.7700248,
+        "min_ms": 0.60278,
+        "max_ms": 0.885019
+      },
+      "transport_begin_to_resolve_begin": {
+        "samples": 99,
+        "p50_ms": 10.106595,
+        "p95_ms": 10.5799489,
+        "min_ms": 9.703781,
+        "max_ms": 11.378139
+      },
+      "primary_begin_to_rr_begin": {
+        "samples": 99,
+        "p50_ms": 14.603496,
+        "p95_ms": 15.027173000000001,
+        "min_ms": 14.264266,
+        "max_ms": 15.851296
+      }
+    },
+    "semantics": "sequence between successive GPU Primary labels; full stage presence required; replay labels excluded; beginning-boundary intervals include execution and dependency scheduling, not standalone kernel times or idle gaps"
+  }
+}

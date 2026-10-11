@@ -5,13 +5,29 @@ import argparse, array, json, math, pathlib, re, sys, zipfile
 def fixture(directory):
     directory.mkdir(parents=True,exist_ok=True)
     # Keep each cleanup below the vanilla 32768-block fill limit.
-    commands=['time set noon','weather clear','difficulty peaceful','fill -8 98 -8 32 110 24 air','fill 33 98 -8 72 110 24 air','fill -8 98 -8 72 98 24 stone']
+    commands=['gamerule minecraft:advance_time false','gamerule minecraft:advance_weather false','gamerule minecraft:spawn_mobs false','gamerule minecraft:entity_drops false','gamerule minecraft:mob_drops false','kill @e[type=!minecraft:player]','time set noon','weather clear','difficulty peaceful','fill -8 98 -8 32 110 24 air','fill 33 98 -8 72 110 24 air','fill -8 98 -8 72 98 24 stone']
     scenes=[('terrain',0,'stone'),('foliage',16,'oak_leaves[persistent=true]'),('mirror',32,'gold_block'),('glass_water',48,'glass'),('entity',64,'iron_block')]
     for name,x,block in scenes:
         commands+= [f'fill {x} 99 6 {x+6} 103 6 {block}',f'setblock {x+3} 100 4 sea_lantern']
         if name=='glass_water':commands += [f'fill {x} 99 10 {x+6} 99 15 water',f'fill {x} 99 12 {x+6} 102 12 red_concrete']
         if name in ('mirror','glass_water','entity'):
             commands += [f'summon armor_stand {x+3} 99 {0 if name=="mirror" else 3 if name=="entity" else 9} {{Tags:["vl49_{name}"],NoGravity:1b,Invulnerable:1b}}']
+    for x in (80,112,144):
+        commands += [f'fill {x-4} 98 -8 {x+27} 122 24 air',f'fill {x-4} 98 -8 {x+27} 98 24 stone']
+    # A fixed three-storey building with interior partitions, windows and open sight lines.
+    commands += ['fill 80 99 2 104 116 22 stone_bricks hollow']
+    for y in (104,110): commands += [f'fill 81 {y} 3 103 {y} 21 oak_planks',f'fill 90 {y} 8 94 {y} 12 air']
+    for y in (100,106,112):
+        commands += [f'fill 82 {y} 2 86 {y+2} 2 glass',f'fill 95 {y} 2 100 {y+2} 2 glass',f'fill 91 {y} 3 91 {y+3} 21 stone_bricks',f'fill 91 {y} 8 91 {y+2} 10 air',f'setblock 88 {y+3} 10 sea_lantern']
+    commands += ['fill 88 99 2 89 102 2 air']
+    # Many independently positioned emissive blocks, rather than one large emissive wall.
+    commands += ['fill 112 99 4 135 110 23 gray_concrete hollow','fill 113 99 4 134 108 4 air']
+    for ix in range(5):
+        for iz in range(5): commands += [f'setblock {114+ix*4} 100 {6+iz*4} sea_lantern']
+    commands += ['fill 144 99 18 167 108 18 iron_block','kill @e[tag=vl50_dynamic]']
+    for index in range(6):
+        commands += [f'summon armor_stand {147+index*3} 99 7 {{Tags:["vl50_dynamic","vl50_dynamic_{index}"],NoGravity:1b,Invulnerable:1b,ShowArms:1b}}']
+    scenes += [('complex_building',80,'stone_bricks'),('multi_light',112,'sea_lantern'),('dynamic_entity',144,'moving armor stands')]
     # Local scratch world only; duplicate entities are cleared by explicit fixture tag.
     commands.insert(0,'kill @e[tag=vl49_mirror]');commands.insert(0,'kill @e[tag=vl49_glass_water]');commands.insert(0,'kill @e[tag=vl49_entity]')
     (directory/'setup.mcfunction').write_text('\n'.join(commands)+'\n')

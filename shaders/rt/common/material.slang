@@ -1,4 +1,9 @@
 #pragma once
+#ifdef RT_PROFILE_WORKLOAD
+void profileWork(uint index);
+#else
+void profileWork(uint index) {}
+#endif
 // Ported from native/rt/bsdf.h; preserve Material 3 transport semantics.
 #include "math.slang"
 static const uint DIFFUSE=0;

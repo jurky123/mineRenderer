@@ -76,6 +76,12 @@ public final class VulkanRtContext implements AutoCloseable {
     public VulkanRtContext(VulkanDevice device,boolean transport) {this(device,transport,false);}
     public VulkanRtContext(VulkanDevice device,boolean transport,boolean material) {this(device,transport,material,false);}
     public VulkanRtContext(VulkanDevice device,boolean transport,boolean material,boolean realtime) {
+        if(Boolean.getBoolean("voxellight.rt.workProfile")) {
+            try(var stream=VulkanRtContext.class.getResourceAsStream("/assets/voxellight/rt/vulkan/manifest.json")) {
+                if(stream==null || !new String(stream.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).contains("\"profileWorkload\": true"))
+                    throw new IllegalStateException("Work counters require a profile-workload shader bank");
+            } catch(java.io.IOException error) {throw new IllegalStateException("Cannot verify work counter shader bank",error);}
+        }
         twoPass=material&&realtime&&com.voxellight.rt.RtExecutionOptions.transport()==com.voxellight.rt.RtExecutionOptions.Transport.TWO_PASS;hotBytes=twoPass?48:64;
         if(material&&com.voxellight.rt.RtExecutionOptions.transport()!=com.voxellight.rt.RtExecutionOptions.Transport.FULL&&com.voxellight.rt.RtExecutionOptions.realtime()!=com.voxellight.rt.RtExecutionOptions.Realtime.FULL)throw new IllegalStateException("Transport experiments require FULL policy");
         this.realtime=realtime;primarySplit=twoPass||material&&realtime&&com.voxellight.rt.RtExecutionOptions.transport()==com.voxellight.rt.RtExecutionOptions.Transport.FULL&&com.voxellight.rt.RtExecutionOptions.primary()==com.voxellight.rt.RtExecutionOptions.Primary.SPLIT;iterative=material&&realtime&&com.voxellight.rt.RtExecutionOptions.transport()==com.voxellight.rt.RtExecutionOptions.Transport.FULL&&com.voxellight.rt.RtExecutionOptions.integrator()==com.voxellight.rt.RtExecutionOptions.Integrator.ITERATIVE;shadowMode=realtime?com.voxellight.rt.RtExecutionOptions.shadow():com.voxellight.rt.RtExecutionOptions.Shadow.EXACT;shaderMode=com.voxellight.rt.RtExecutionOptions.transport()==com.voxellight.rt.RtExecutionOptions.Transport.FULL?com.voxellight.rt.RtExecutionOptions.shader():com.voxellight.rt.RtExecutionOptions.Shader.CLEAN;
@@ -158,6 +164,9 @@ public final class VulkanRtContext implements AutoCloseable {
                 previousClip.get(2*16,policy);policy.putFloat(6*16,previousX).putFloat(6*16+4,previousY).putFloat(6*16+8,previousZ).putInt(6*16+12,previousValid?1:0);
                 encoder.writeToBuffer(feedback.slice(1568*16,7*16),policy);
                 var policyCounters=ByteBuffer.allocateDirect(21*16).order(ByteOrder.nativeOrder());policyCounters.putInt(15*16+4,1).putInt(15*16+8,1);encoder.writeToBuffer(feedback.slice(1600*16,21*16),policyCounters);
+                // Diagnostic counters describe one dispatch frame, not the lifetime of this context.
+                // Reuse the following transfer-to-shader barrier; the default bank has no extra upload.
+                if(Boolean.getBoolean("voxellight.rt.workProfile"))encoder.writeToBuffer(feedback.slice(1630*16,4*16),ByteBuffer.allocateDirect(4*16));
             }
             if(primarySplit&&primaryVisibility==null)primaryVisibility=twoPass?pipeline:new VulkanRtPipeline(device,runtimeFlags()==0?"material_primary_visibility_full":"material_primary_visibility_realtime");
             if(primarySplit&&primaryShade==null)primaryShade=new VulkanRtPipeline(device,twoPass?"material_primary_shade_compact":primaryStage.replace("material_primary","material_primary_shade"));
@@ -232,8 +241,8 @@ public final class VulkanRtContext implements AutoCloseable {
         try(var pass=RenderPassProfile.beginNative(command,name)){replay.dispatch(command,256,1,1);}
     }
     private void readPageFeedback(CommandEncoder encoder,boolean sampledAlive){
-        feedbackPending=true;var read=com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(()->"VoxelLight RT page requests",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,1621*16);
-        encoder.copyToBuffer(feedback.slice(0,1621*16),read.slice());
+        feedbackPending=true;var read=com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(()->"VoxelLight RT page requests",com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST|com.mojang.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ,(Boolean.getBoolean("voxellight.rt.workProfile")?1634:1621)*16);
+        encoder.copyToBuffer(feedback.slice(0,(Boolean.getBoolean("voxellight.rt.workProfile")?1634:1621)*16),read.slice());
         final int sampledWidth=width,sampledHeight=height,sampledSpp=samples;final long sampledFrame=RenderPassProfile.frameId(),sampledScene=scene.generation();final boolean measured=RenderPassProfile.enabled();final long sampledEmitterGeneration=scene.emitterGeneration();
         com.mojang.blaze3d.systems.RenderSystem.queueFencedTask(()->{try(var map=read.map(true,false)){if(!closed){var data=map.data().order(ByteOrder.nativeOrder());int count=Math.min(512,Math.max(0,data.getInt(0)));pageRequestCount+=count;for(int i=0;i<count;i++){int offset=(i+1)*16;pageRequests.add(new com.voxellight.world.SectionKey(data.getInt(offset),data.getInt(offset+4),data.getInt(offset+8)));}
                 var active=new long[6];for(int bounce=0;bounce<6;bounce++)active[bounce]=Integer.toUnsignedLong(data.getInt((514+bounce)*16));
@@ -243,6 +252,7 @@ public final class VulkanRtContext implements AutoCloseable {
                 var runtime=new long[com.voxellight.debug.RtWorkMetrics.REALTIME_COLUMNS.length];for(int i=0;i<runtime.length;i++)runtime[i]=Integer.toUnsignedLong(data.getInt((i<16?1600*16+i*4:i<56?1605*16+(i-16)*4:1616*16+(i-56)*4)));runtimeMetrics=Arrays.toString(runtime).replace(',','/');
                 if(measured&&sampledAlive){var guides=new long[16];for(int i=0;i<16;i++)guides[i]=Integer.toUnsignedLong(data.getInt(1617*16+i*4));guideMetrics=Arrays.toString(guides);com.voxellight.adapter.RtBenchmarkRunner.guideSample(sampledFrame,guides);}
                 if(measured&&sampledAlive)RenderPassProfile.rayWorkload(sampledFrame,sampledWidth,sampledHeight,sampledSpp,sampledScene,active,Integer.toUnsignedLong(data.getInt(513*16)),Integer.toUnsignedLong(data.getInt(513*16+4)),Integer.toUnsignedLong(data.getInt(540*16)),Math.min(256,Integer.toUnsignedLong(data.getInt(541*16))),Integer.toUnsignedLong(data.getInt(541*16+4)),direct,runtime);
+                if(measured&&sampledAlive&&Boolean.getBoolean("voxellight.rt.workProfile")) {var cross=new long[16];for(int i=0;i<16;i++)cross[i]=Integer.toUnsignedLong(data.getInt(1630*16+i*4));RenderPassProfile.crossWork(sampledFrame,cross);}
                 if(measured&&sampledAlive)lastWorkload="frame:"+sampledFrame+"/"+sampledWidth+"x"+sampledHeight+"/"+sampledSpp+"spp/active:"+Arrays.toString(active).replace(',','/')+"/shadow:"+Integer.toUnsignedLong(data.getInt(513*16))+"/anyHit:"+Integer.toUnsignedLong(data.getInt(513*16+4));
             }}catch(RuntimeException error){org.slf4j.LoggerFactory.getLogger("VoxelLight").warn("RT page feedback unavailable",error);}finally{read.close();feedbackPending=false;}});
     }

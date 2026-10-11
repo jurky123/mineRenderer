@@ -1,0 +1,1387 @@
+[
+  {
+    "schema": 1,
+    "renderer": "caustica",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 793,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 793,
+        "median_per_frame": 467064,
+        "range_per_frame": [
+          466282,
+          467737
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 793,
+        "median_per_frame": 209031,
+        "range_per_frame": [
+          207747,
+          210328
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": false,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 793,
+        "median_per_frame": 1008288,
+        "range_per_frame": [
+          1002576,
+          1015000
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 793,
+        "median_per_frame": 120820,
+        "range_per_frame": [
+          119997,
+          121629
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": true,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 793,
+        "median_per_frame": 226885,
+        "range_per_frame": [
+          225793,
+          227985
+        ]
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 793,
+        "median_per_frame": 226885,
+        "range_per_frame": [
+          225793,
+          227985
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 793,
+        "median_per_frame": 422862,
+        "range_per_frame": [
+          419943,
+          425844
+        ]
+      },
+      "bsdf_evals": {
+        "available": false,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "emitter_front_brdf_evals": {
+        "available": true,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 793,
+        "median_per_frame": 543682,
+        "range_per_frame": [
+          539940,
+          547398
+        ]
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\caustica\\raw\\work-counters.csv": "373e60fd09d43fda80136ac1493d71ea421460fef3e4209d64d964fcf027a9b1"
+    },
+    "scene_id": "terrain",
+    "frame_start": 1228,
+    "frame_end": 2021,
+    "process_identity": {
+      "pid": 37988,
+      "creation_filetime": 134361824409524705
+    },
+    "artifact_sha256": "8a7509aaf93d61856536d79d514bd9c70c6e2e3686cc2d057b556b3bf98e25be",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 793,
+      "frames_with_commands": 793,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 8,
+        "blas_updates_recorded": 684,
+        "tlas_builds_recorded": 793,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.01008827238335435,
+        "blas_updates_recorded": 0.862547288776797,
+        "tlas_builds_recorded": 1.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "caustica",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 376,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 376,
+        "median_per_frame": 636746.0,
+        "range_per_frame": [
+          635705,
+          637525
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 376,
+        "median_per_frame": 321233.0,
+        "range_per_frame": [
+          319158,
+          322935
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": false,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 376,
+        "median_per_frame": 2247856.0,
+        "range_per_frame": [
+          2240120,
+          2255624
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 376,
+        "median_per_frame": 195682.5,
+        "range_per_frame": [
+          194612,
+          196615
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": true,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 376,
+        "median_per_frame": 578862.5,
+        "range_per_frame": [
+          577415,
+          580302
+        ]
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 376,
+        "median_per_frame": 578862.5,
+        "range_per_frame": [
+          577415,
+          580302
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 376,
+        "median_per_frame": 632288.5,
+        "range_per_frame": [
+          628202,
+          636330
+        ]
+      },
+      "bsdf_evals": {
+        "available": false,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "emitter_front_brdf_evals": {
+        "available": true,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 376,
+        "median_per_frame": 827986.5,
+        "range_per_frame": [
+          822814,
+          832732
+        ]
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\caustica\\raw\\work-counters.csv": "373e60fd09d43fda80136ac1493d71ea421460fef3e4209d64d964fcf027a9b1"
+    },
+    "scene_id": "complex_building",
+    "frame_start": 2663,
+    "frame_end": 3039,
+    "process_identity": {
+      "pid": 37988,
+      "creation_filetime": 134361824409524705
+    },
+    "artifact_sha256": "8a7509aaf93d61856536d79d514bd9c70c6e2e3686cc2d057b556b3bf98e25be",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 376,
+      "frames_with_commands": 376,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 4,
+        "blas_updates_recorded": 362,
+        "tlas_builds_recorded": 376,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.010638297872340425,
+        "blas_updates_recorded": 0.9627659574468085,
+        "tlas_builds_recorded": 1.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "caustica",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 310,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 310,
+        "median_per_frame": 604286.5,
+        "range_per_frame": [
+          603604,
+          604933
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 310,
+        "median_per_frame": 507089.5,
+        "range_per_frame": [
+          505631,
+          508372
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": false,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 310,
+        "median_per_frame": 2893500.0,
+        "range_per_frame": [
+          2885984,
+          2900088
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 310,
+        "median_per_frame": 333661.0,
+        "range_per_frame": [
+          332586,
+          334475
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": true,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 310,
+        "median_per_frame": 542313.5,
+        "range_per_frame": [
+          541444,
+          543134
+        ]
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 310,
+        "median_per_frame": 542313.5,
+        "range_per_frame": [
+          541444,
+          543134
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 310,
+        "median_per_frame": 1307625.0,
+        "range_per_frame": [
+          1302455,
+          1312525
+        ]
+      },
+      "bsdf_evals": {
+        "available": false,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "emitter_front_brdf_evals": {
+        "available": true,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 310,
+        "median_per_frame": 1641317.5,
+        "range_per_frame": [
+          1635151,
+          1646629
+        ]
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\caustica\\raw\\work-counters.csv": "373e60fd09d43fda80136ac1493d71ea421460fef3e4209d64d964fcf027a9b1"
+    },
+    "scene_id": "multi_light",
+    "frame_start": 3475,
+    "frame_end": 3785,
+    "process_identity": {
+      "pid": 37988,
+      "creation_filetime": 134361824409524705
+    },
+    "artifact_sha256": "8a7509aaf93d61856536d79d514bd9c70c6e2e3686cc2d057b556b3bf98e25be",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 310,
+      "frames_with_commands": 310,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 1,
+        "blas_updates_recorded": 310,
+        "tlas_builds_recorded": 310,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.0032258064516129032,
+        "blas_updates_recorded": 1.0,
+        "tlas_builds_recorded": 1.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "caustica",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 734,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 734,
+        "median_per_frame": 515611.5,
+        "range_per_frame": [
+          514510,
+          517082
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 734,
+        "median_per_frame": 188375.0,
+        "range_per_frame": [
+          186740,
+          189376
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": false,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 734,
+        "median_per_frame": 815080.0,
+        "range_per_frame": [
+          807632,
+          820088
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 734,
+        "median_per_frame": 98259.5,
+        "range_per_frame": [
+          97498,
+          98851
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": true,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 734,
+        "median_per_frame": 313767.5,
+        "range_per_frame": [
+          311805,
+          316216
+        ]
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 734,
+        "median_per_frame": 313767.5,
+        "range_per_frame": [
+          311805,
+          316216
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 734,
+        "median_per_frame": 361740.5,
+        "range_per_frame": [
+          358373,
+          364888
+        ]
+      },
+      "bsdf_evals": {
+        "available": false,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "emitter_front_brdf_evals": {
+        "available": true,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 734,
+        "median_per_frame": 460027.0,
+        "range_per_frame": [
+          455871,
+          463687
+        ]
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\caustica\\raw\\work-counters.csv": "373e60fd09d43fda80136ac1493d71ea421460fef3e4209d64d964fcf027a9b1"
+    },
+    "scene_id": "glass_water",
+    "frame_start": 4647,
+    "frame_end": 5381,
+    "process_identity": {
+      "pid": 37988,
+      "creation_filetime": 134361824409524705
+    },
+    "artifact_sha256": "8a7509aaf93d61856536d79d514bd9c70c6e2e3686cc2d057b556b3bf98e25be",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 734,
+      "frames_with_commands": 734,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 738,
+        "blas_updates_recorded": 652,
+        "tlas_builds_recorded": 734,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 1.005449591280654,
+        "blas_updates_recorded": 0.888283378746594,
+        "tlas_builds_recorded": 1.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "caustica",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 688,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 688,
+        "median_per_frame": 495749.5,
+        "range_per_frame": [
+          494942,
+          497094
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 688,
+        "median_per_frame": 245270.5,
+        "range_per_frame": [
+          242471,
+          248586
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": false,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 688,
+        "median_per_frame": 1276520.0,
+        "range_per_frame": [
+          1268368,
+          1290232
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 688,
+        "median_per_frame": 138766.0,
+        "range_per_frame": [
+          136499,
+          140798
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": true,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 688,
+        "median_per_frame": 282531.0,
+        "range_per_frame": [
+          281069,
+          284739
+        ]
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 688,
+        "median_per_frame": 282531.0,
+        "range_per_frame": [
+          281069,
+          284739
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 688,
+        "median_per_frame": 434537.5,
+        "range_per_frame": [
+          428120,
+          439768
+        ]
+      },
+      "bsdf_evals": {
+        "available": false,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "emitter_front_brdf_evals": {
+        "available": true,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 688,
+        "median_per_frame": 573275.0,
+        "range_per_frame": [
+          564619,
+          580566
+        ]
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\caustica\\raw\\work-counters.csv": "373e60fd09d43fda80136ac1493d71ea421460fef3e4209d64d964fcf027a9b1"
+    },
+    "scene_id": "dynamic_entity",
+    "frame_start": 6266,
+    "frame_end": 6954,
+    "process_identity": {
+      "pid": 37988,
+      "creation_filetime": 134361824409524705
+    },
+    "artifact_sha256": "8a7509aaf93d61856536d79d514bd9c70c6e2e3686cc2d057b556b3bf98e25be",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 688,
+      "frames_with_commands": 688,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 31,
+        "blas_updates_recorded": 4726,
+        "tlas_builds_recorded": 688,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.04505813953488372,
+        "blas_updates_recorded": 6.869186046511628,
+        "tlas_builds_recorded": 1.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "voxellight",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 428,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 428,
+        "median_per_frame": 294799.0,
+        "range_per_frame": [
+          294429,
+          295232
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 428,
+        "median_per_frame": 371065.5,
+        "range_per_frame": [
+          369461,
+          372742
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": true,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 428,
+        "median_per_frame": 212552.0,
+        "range_per_frame": [
+          211729,
+          213484
+        ]
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 428,
+        "median_per_frame": 905499.5,
+        "range_per_frame": [
+          902641,
+          908661
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 428,
+        "median_per_frame": 124226.5,
+        "range_per_frame": [
+          123747,
+          124793
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": false,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 428,
+        "median_per_frame": 229858.0,
+        "range_per_frame": [
+          229044,
+          230804
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 428,
+        "median_per_frame": 743286.5,
+        "range_per_frame": [
+          740385,
+          746228
+        ]
+      },
+      "bsdf_evals": {
+        "available": true,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 428,
+        "median_per_frame": 1028398.5,
+        "range_per_frame": [
+          1025142,
+          1032039
+        ]
+      },
+      "emitter_front_brdf_evals": {
+        "available": false,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791709938156\\01-production-r1-p1-A.work.csv": "c92e54452e835841565a0e01f5c064303144d3f1db2e49b9956a96c09d1df5be",
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791709938156\\01-production-r1-p1-A.rays.csv": "09893e40a2f1e726bc4abcccce1ba6f259ad151529ba94845f5f92b2d8162086"
+    },
+    "scene_id": "terrain",
+    "frame_start": 4893,
+    "frame_end": 8313,
+    "process_identity": {
+      "pid": 33368,
+      "creation_filetime": 134361834775658251
+    },
+    "artifact_sha256": "d69b9b413b0bb1048c6027be0cf20f90f0b4ca72c02d8cc032ad5d44481eed12",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 3420,
+      "frames_with_commands": 0,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 0,
+        "blas_updates_recorded": 0,
+        "tlas_builds_recorded": 0,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.0,
+        "blas_updates_recorded": 0.0,
+        "tlas_builds_recorded": 0.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "voxellight",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 231,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 231,
+        "median_per_frame": 459127,
+        "range_per_frame": [
+          458721,
+          459390
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 231,
+        "median_per_frame": 596073,
+        "range_per_frame": [
+          594261,
+          598006
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": true,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 231,
+        "median_per_frame": 417403,
+        "range_per_frame": [
+          415959,
+          419005
+        ]
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 231,
+        "median_per_frame": 2118087,
+        "range_per_frame": [
+          2115442,
+          2119371
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 231,
+        "median_per_frame": 292707,
+        "range_per_frame": [
+          291832,
+          293679
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": false,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 231,
+        "median_per_frame": 615419,
+        "range_per_frame": [
+          614309,
+          615906
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 231,
+        "median_per_frame": 926407,
+        "range_per_frame": [
+          921219,
+          929418
+        ]
+      },
+      "bsdf_evals": {
+        "available": true,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 231,
+        "median_per_frame": 2474684,
+        "range_per_frame": [
+          2471324,
+          2476329
+        ]
+      },
+      "emitter_front_brdf_evals": {
+        "available": false,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710006173\\01-production-r1-p1-A.work.csv": "5eeea866b5e1f52c3d809ab4b5f229aa24941601db237eb21de42d29f68f688e",
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710006173\\01-production-r1-p1-A.rays.csv": "88eb7a5a89e960a99abca6a17625ab0f01cf259bbbc8c32e86ff8cdaa3697e43"
+    },
+    "scene_id": "complex_building",
+    "frame_start": 10809,
+    "frame_end": 12662,
+    "process_identity": {
+      "pid": 33368,
+      "creation_filetime": 134361834775658251
+    },
+    "artifact_sha256": "d69b9b413b0bb1048c6027be0cf20f90f0b4ca72c02d8cc032ad5d44481eed12",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 1853,
+      "frames_with_commands": 0,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 0,
+        "blas_updates_recorded": 0,
+        "tlas_builds_recorded": 0,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.0,
+        "blas_updates_recorded": 0.0,
+        "tlas_builds_recorded": 0.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "voxellight",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 227,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 227,
+        "median_per_frame": 472844,
+        "range_per_frame": [
+          472431,
+          473252
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 227,
+        "median_per_frame": 740129,
+        "range_per_frame": [
+          738562,
+          741534
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": true,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 227,
+        "median_per_frame": 527011,
+        "range_per_frame": [
+          526259,
+          527744
+        ]
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 227,
+        "median_per_frame": 2279916,
+        "range_per_frame": [
+          2277402,
+          2282266
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 227,
+        "median_per_frame": 382779,
+        "range_per_frame": [
+          382014,
+          383495
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": false,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 227,
+        "median_per_frame": 573850,
+        "range_per_frame": [
+          573164,
+          574440
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 227,
+        "median_per_frame": 1840783,
+        "range_per_frame": [
+          1837826,
+          1843989
+        ]
+      },
+      "bsdf_evals": {
+        "available": true,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 227,
+        "median_per_frame": 2673128,
+        "range_per_frame": [
+          2669941,
+          2676026
+        ]
+      },
+      "emitter_front_brdf_evals": {
+        "available": false,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710076189\\01-production-r1-p1-A.work.csv": "f056d1e0e93307f6737908ff4d3c73cda53d316a646c58908334f171309df9a9",
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710076189\\01-production-r1-p1-A.rays.csv": "629f51ebae15b8e8e42a317dc735324c7428602872cafd7b5547860532a14fb6"
+    },
+    "scene_id": "multi_light",
+    "frame_start": 15079,
+    "frame_end": 16889,
+    "process_identity": {
+      "pid": 33368,
+      "creation_filetime": 134361834775658251
+    },
+    "artifact_sha256": "d69b9b413b0bb1048c6027be0cf20f90f0b4ca72c02d8cc032ad5d44481eed12",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 1810,
+      "frames_with_commands": 0,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 0,
+        "blas_updates_recorded": 0,
+        "tlas_builds_recorded": 0,
+        "tlas_updates_recorded": 0
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.0,
+        "blas_updates_recorded": 0.0,
+        "tlas_builds_recorded": 0.0,
+        "tlas_updates_recorded": 0.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "voxellight",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 272,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 272,
+        "median_per_frame": 322870.5,
+        "range_per_frame": [
+          322208,
+          323656
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 272,
+        "median_per_frame": 545599.0,
+        "range_per_frame": [
+          542489,
+          549603
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": true,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 272,
+        "median_per_frame": 287432.5,
+        "range_per_frame": [
+          286044,
+          289176
+        ]
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 272,
+        "median_per_frame": 1109189.0,
+        "range_per_frame": [
+          1104640,
+          1113952
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 272,
+        "median_per_frame": 171025.5,
+        "range_per_frame": [
+          170225,
+          172133
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": false,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 272,
+        "median_per_frame": 391536.0,
+        "range_per_frame": [
+          389470,
+          394507
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 272,
+        "median_per_frame": 829886.5,
+        "range_per_frame": [
+          826119,
+          833793
+        ]
+      },
+      "bsdf_evals": {
+        "available": true,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 272,
+        "median_per_frame": 1235797.5,
+        "range_per_frame": [
+          1231077,
+          1241000
+        ]
+      },
+      "emitter_front_brdf_evals": {
+        "available": false,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710144198\\01-production-r1-p1-A.work.csv": "15f84f41bad3df4d9d657bde01f9334648709e1fadc563ca939aa10cb385d208",
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710144198\\01-production-r1-p1-A.rays.csv": "8b7cb54c9ab452f0fa08e442980699aee71e13edf46e9dcf23852c9865673a38"
+    },
+    "scene_id": "glass_water",
+    "frame_start": 19595,
+    "frame_end": 21771,
+    "process_identity": {
+      "pid": 33368,
+      "creation_filetime": 134361834775658251
+    },
+    "artifact_sha256": "d69b9b413b0bb1048c6027be0cf20f90f0b4ca72c02d8cc032ad5d44481eed12",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 2176,
+      "frames_with_commands": 2176,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 351,
+        "blas_updates_recorded": 1825,
+        "tlas_builds_recorded": 0,
+        "tlas_updates_recorded": 4352
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.16130514705882354,
+        "blas_updates_recorded": 0.8386948529411765,
+        "tlas_builds_recorded": 0.0,
+        "tlas_updates_recorded": 2.0
+      }
+    }
+  },
+  {
+    "schema": 1,
+    "renderer": "voxellight",
+    "sampling_mode": "counters",
+    "formal_timing_eligible": false,
+    "frames": 379,
+    "counters": {
+      "radiance_traces": {
+        "available": true,
+        "contract": "actual radiance tracing invocation; includes repeated camera-path traversal",
+        "samples": 379,
+        "median_per_frame": 318103,
+        "range_per_frame": [
+          317473,
+          319280
+        ]
+      },
+      "visibility_traces": {
+        "available": true,
+        "contract": "visibility tracing invocation; not RIS candidate count",
+        "samples": 379,
+        "median_per_frame": 393365,
+        "range_per_frame": [
+          390778,
+          395960
+        ]
+      },
+      "opaque_visibility_traversals": {
+        "available": true,
+        "contract": "VoxelLight opaque blocker pretest invocation (RayQuery or TraceRay by runtime mode); included in visibility_traces; Caustica field unavailable",
+        "samples": 379,
+        "median_per_frame": 233880,
+        "range_per_frame": [
+          232061,
+          235660
+        ]
+      },
+      "ris_candidates": {
+        "available": true,
+        "contract": "number of candidates offered to initial RIS evaluation",
+        "samples": 379,
+        "median_per_frame": 1088374,
+        "range_per_frame": [
+          1083611,
+          1096399
+        ]
+      },
+      "ris_selected": {
+        "available": true,
+        "contract": "reservoirs reaching final visibility/contribution evaluation",
+        "samples": 379,
+        "median_per_frame": 140834,
+        "range_per_frame": [
+          139525,
+          142248
+        ]
+      },
+      "closest_hit_invocations": {
+        "available": false,
+        "contract": "shader entry count; not equivalent to material decoding",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      },
+      "material_surface_decodes": {
+        "available": true,
+        "contract": "surface-parameter evaluation calls: VoxelLight terrainSurface (including dynamic-texture branch), Caustica evaluateMaterial in terrain/glass/entity closest hit; bypass paths remain different",
+        "samples": 379,
+        "median_per_frame": 277161,
+        "range_per_frame": [
+          275605,
+          279403
+        ]
+      },
+      "ris_positive_candidates": {
+        "available": true,
+        "contract": "initial RIS proposals with finite positive contribution weight",
+        "samples": 379,
+        "median_per_frame": 797724,
+        "range_per_frame": [
+          786114,
+          805901
+        ]
+      },
+      "bsdf_evals": {
+        "available": true,
+        "contract": "explicit evalBsdf/evalGlossy calls, including evalGlossy nested in sampleGlossy",
+        "samples": 379,
+        "median_per_frame": 1228370,
+        "range_per_frame": [
+          1223166,
+          1237295
+        ]
+      },
+      "emitter_front_brdf_evals": {
+        "available": false,
+        "contract": "Caustica emitter front-facing BRDF branch; excludes sun and manual BSDF paths; not equivalent to bsdf_evals",
+        "samples": 0,
+        "median_per_frame": null,
+        "range_per_frame": null
+      }
+    },
+    "limitations": [
+      "These mappings require shader call-site verification before causal comparisons.",
+      "Counter runs are separate from formal timing runs.",
+      "Unavailable fields are not zero.",
+      "32-bit per-frame atomic counters can wrap; aggregate range alone cannot prove absence of overflow."
+    ],
+    "source_files": {
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710212222\\01-production-r1-p1-A.work.csv": "4df17e445403974a9dbe6df905dd7c6da8fcd4a4acf5e231432eb8c3d595eb51",
+      "C:\\Users\\jzk\\Documents\\Codex\\2026-10-09\\e-mc-minecraft-versions-26-2\\outputs\\alpha.50\\\u8ba1\u6570\u8bca\u65ad\\voxellight\\raw\\rt-suite-1791710212222\\01-production-r1-p1-A.rays.csv": "c7b8fc58b899771d2364a6f3f99792824b47856f1086cc1f1634bc6251cafe5f"
+    },
+    "scene_id": "dynamic_entity",
+    "frame_start": 25508,
+    "frame_end": 28538,
+    "process_identity": {
+      "pid": 33368,
+      "creation_filetime": 134361834775658251
+    },
+    "artifact_sha256": "d69b9b413b0bb1048c6027be0cf20f90f0b4ca72c02d8cc032ad5d44481eed12",
+    "as_counts": {
+      "available": true,
+      "recording_frames": 3030,
+      "frames_with_commands": 3030,
+      "semantics": "CPU-recorded AS build-info entries; missing rows are zero only because enabled, lossless sparse export is verified; not GPU completion or elapsed cost",
+      "totals": {
+        "blas_builds_recorded": 0,
+        "blas_updates_recorded": 18180,
+        "tlas_builds_recorded": 0,
+        "tlas_updates_recorded": 6060
+      },
+      "per_recording_frame": {
+        "blas_builds_recorded": 0.0,
+        "blas_updates_recorded": 6.0,
+        "tlas_builds_recorded": 0.0,
+        "tlas_updates_recorded": 2.0
+      }
+    }
+  }
+]

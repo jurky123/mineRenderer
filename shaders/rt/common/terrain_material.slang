@@ -12,6 +12,7 @@ TerrainVertex terrainVertex(uint triangle,uint vertex) {
     v.tint=geometry.Load(offset+32);v.flags=geometry.Load(offset+36);return v;
 }
 uint atlasTexel(uint slot,float2 uv) {
+    profileWork(3u);
     uint4 shape=assets.Load4(slot*16);
     uint2 pixel=min(uint2(saturate(uv)*float2(shape.xy)),shape.xy-1);
     return assets.Load(shape.z+(pixel.y*shape.x+pixel.x)*4);
@@ -40,6 +41,7 @@ float3 terrainEmission(uint triangle,float2 bary){
 }
 struct TerrainSurface {Material material;Frame frame;float3 geometryNormal;uint flags;};
 TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred) {
+    profileWork(0u);
     deferred=false;
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
     float2 uv=terrainUv(a,b,c,bary);

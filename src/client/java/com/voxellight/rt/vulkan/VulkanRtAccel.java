@@ -57,7 +57,8 @@ public final class VulkanRtAccel implements AutoCloseable, Destroyable {
                 if(reuse)info.get(0).mode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR).srcAccelerationStructure(result.handle);
                 var ranges=VkAccelerationStructureBuildRangeInfoKHR.calloc(primitives.length,stack);
                 for(int i=0;i<primitives.length;i++)ranges.get(i).primitiveCount(primitives[i]);
-                vkCmdBuildAccelerationStructuresKHR(command,info,stack.pointers(ranges.address()));return result;
+                vkCmdBuildAccelerationStructuresKHR(command,info,stack.pointers(ranges.address()));
+                VulkanRtAsWorkProfile.record(info.get(0).type(),info.get(0).mode());return result;
             }catch(RuntimeException error){if(!reuse)result.close();throw error;}
         }
     }

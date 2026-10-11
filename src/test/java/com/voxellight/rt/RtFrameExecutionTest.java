@@ -14,6 +14,16 @@ class RtFrameExecutionTest {
             var material=RtBenchmarkPlan.material(true);assertEquals(24,material.blocks().size());for(var b:material.blocks()){b.config().apply();assertEquals(b.config(),RtBenchmarkPlan.Config.current());}controls.apply();assertEquals(controls,RtBenchmarkPlan.Config.current());
         }finally{original.apply();}assertEquals(original,RtBenchmarkPlan.Config.current());
     }
+    @Test void profilingCanUseOneProductionWindowWithoutChangingControls(){
+        String previous=System.getProperty("voxellight.rt.profileProductionBlocks");
+        try {
+            var controls=RtBenchmarkPlan.Config.current();
+            System.setProperty("voxellight.rt.profileProductionBlocks","1");
+            var plan=RtBenchmarkPlan.production(controls);assertEquals(1,plan.blocks().size());assertEquals(controls,plan.blocks().getFirst().config());
+            System.setProperty("voxellight.rt.profileProductionBlocks","0");
+            assertThrows(IllegalArgumentException.class,()->RtBenchmarkPlan.production(controls));
+        } finally {if(previous==null)System.clearProperty("voxellight.rt.profileProductionBlocks");else System.setProperty("voxellight.rt.profileProductionBlocks",previous);}
+    }
     @Test void frameJitterUsesBoundedTwoDimensionalHaltonWithFixedPeriod(){
         assertEquals(0,RtJitter.x(0));assertEquals(-1f/6,RtJitter.y(0),1e-7);
         assertEquals(-.25f,RtJitter.x(1));assertEquals(1f/6,RtJitter.y(1),1e-7);

@@ -34,6 +34,14 @@ public final class RenderPassProfile {
     public static void unobserveWork(java.util.function.Consumer<com.voxellight.debug.RtWorkMetrics.Sample> observer){workObservers.remove(observer);}
     public static long skippedQueries(){return skipped;}
     private static final PassMetrics metrics=new PassMetrics(14400);
+    private static final java.util.LinkedHashMap<Long,long[]> crossWork=new java.util.LinkedHashMap<>();
+    public static void crossWork(long frame,long[] counters){crossWork.put(frame,counters.clone());while(crossWork.size()>2000)crossWork.remove(crossWork.firstEntry().getKey());}
+    public static void exportCrossWork(Path path)throws IOException{
+        try(var writer=java.nio.file.Files.newBufferedWriter(path)){
+            writer.write("frame,material_surface_decodes,bsdf_evals,bsdf_samples,atlas_lookups,guide_rays,radiance_rays,ris_positive_candidates,reserved_7,reserved_8,reserved_9,reserved_10,reserved_11,reserved_12,reserved_13,reserved_14,reserved_15\n");
+            for(var entry:crossWork.entrySet()){writer.write(String.valueOf(entry.getKey()));for(long value:entry.getValue())writer.write(","+value);writer.write("\n");}
+        }
+    }
     private RenderPassProfile() { }
     public static void nextFrame() {
         frame++;width=height=spp=0;sceneGeneration=0;scopes.clear();
@@ -86,14 +94,22 @@ public final class RenderPassProfile {
         skipped++;return OFF;
     }
     public static final class Scope implements AutoCloseable {
-        private final CommandEncoder encoder;private org.lwjgl.vulkan.VkCommandBuffer command;private final String name;private final long id,start,parent,renderFrame,scene;private final int slot,w,h,samples;private boolean ended;
+        private final CommandEncoder encoder;private org.lwjgl.vulkan.VkCommandBuffer command;private final String name;private final long id,start,parent,renderFrame,scene;private final int slot,w,h,samples;private boolean ended,label;
         Scope(CommandEncoder encoder,String name,long id,int slot,long start){this.encoder=encoder;this.name=name;this.id=id;this.slot=slot;this.start=start;
             parent=id==0||scopes.isEmpty()?0:scopes.peek().id;renderFrame=frame;scene=sceneGeneration;w=width;h=height;samples=spp;
             if(id>0)scopes.push(this);
         }
-        Scope(org.lwjgl.vulkan.VkCommandBuffer command,String name,long id,int slot,long start){this((CommandEncoder)null,name,id,slot,start);this.command=command;}
+        Scope(org.lwjgl.vulkan.VkCommandBuffer command,String name,long id,int slot,long start){this((CommandEncoder)null,name,id,slot,start);this.command=command;
+            if(Boolean.getBoolean("voxellight.rt.nsightLabels")&&command.getDevice().getPhysicalDevice().getInstance().getCapabilities().vkCmdBeginDebugUtilsLabelEXT!=0&&command.getDevice().getPhysicalDevice().getInstance().getCapabilities().vkCmdEndDebugUtilsLabelEXT!=0){
+                try(var stack=org.lwjgl.system.MemoryStack.stackPush()){
+                    var marker=org.lwjgl.vulkan.VkDebugUtilsLabelEXT.calloc(stack).sType$Default().pLabelName(stack.UTF8(name));
+                    org.lwjgl.vulkan.EXTDebugUtils.vkCmdBeginDebugUtilsLabelEXT(command,marker);label=true;
+                }
+            }
+        }
         public void close(){
             if(ended)return;ended=true;if(id>0)scopes.remove(this);
+            if(label)org.lwjgl.vulkan.EXTDebugUtils.vkCmdEndDebugUtilsLabelEXT(command);
             if(command!=null){metrics.recordScope(id,renderFrame,parent,name,w,h,samples,scene,System.nanoTime()-start);if(pool instanceof NativePool nativePool)org.lwjgl.vulkan.VK10.vkCmdWriteTimestamp(command,org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,nativePool.handle(),slot*2+1);return;}
             if(encoder==null)return;
             metrics.recordScope(id,renderFrame,parent,name,w,h,samples,scene,System.nanoTime()-start);
@@ -106,8 +122,8 @@ public final class RenderPassProfile {
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit,long opaque,long replay,long mismatches){rayWorkload(frame,w,h,samples,scene,active,shadow,anyHit,opaque,replay,mismatches,new long[6][4]);}
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit,long opaque,long replay,long mismatches,long[][] direct){rayWorkload(frame,w,h,samples,scene,active,shadow,anyHit,opaque,replay,mismatches,direct,new long[16]);}
     public static void rayWorkload(long frame,int w,int h,int samples,long scene,long[] active,long shadow,long anyHit,long opaque,long replay,long mismatches,long[][] direct,long[] realtime){workMetrics.record(frame,w,h,samples,scene,active,shadow,anyHit,opaque,replay,mismatches,direct,realtime);var value=workMetrics.sample(frame);for(var observer:workObservers)observer.accept(value);}
-    public static void export(Path path)throws IOException{metrics.export(path);com.voxellight.rt.vulkan.VulkanPipelineDiagnostics.export(path.resolveSibling(path.getFileName()+".pipelines.csv"));com.voxellight.rt.vulkan.VulkanPipelineDiagnostics.exportStatus(path.resolveSibling(path.getFileName()+".pipelines-status.json"));String name=path.getFileName().toString();workMetrics.export(path.resolveSibling(name.endsWith(".passes.csv")?name.substring(0,name.length()-11)+".rays.csv":name+".rays.csv"));}
+    public static void export(Path path)throws IOException{metrics.export(path);if(Boolean.getBoolean("voxellight.rt.workProfile"))exportCrossWork(path.resolveSibling(path.getFileName()+".work.csv"));com.voxellight.rt.vulkan.VulkanPipelineDiagnostics.export(path.resolveSibling(path.getFileName()+".pipelines.csv"));com.voxellight.rt.vulkan.VulkanPipelineDiagnostics.exportStatus(path.resolveSibling(path.getFileName()+".pipelines-status.json"));String name=path.getFileName().toString();workMetrics.export(path.resolveSibling(name.endsWith(".passes.csv")?name.substring(0,name.length()-11)+".rays.csv":name+".rays.csv"));}
     static String status(){return ", passProfile="+(!enabled?"off":failed?"CPU only":pool==null?"not observed":"delayed GPU timestamps")+", passProfileSamples="+metrics.size()+", passProfileSkipped="+skipped;}
     private static void disable(){failed=true;if(pool!=null){try{pool.close();}catch(RuntimeException ignored){}pool=null;}}
-    static void clear(){disable();failed=false;metrics.clear();workMetrics.clear();counterFrames.clear();scopes.clear();java.util.Arrays.fill(pending,false);}
+    static void clear(){crossWork.clear();disable();failed=false;metrics.clear();workMetrics.clear();counterFrames.clear();scopes.clear();java.util.Arrays.fill(pending,false);}
 }

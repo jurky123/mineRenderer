@@ -99,7 +99,7 @@ DirectReservoir selectDirect(float3 point,Material m,Frame frame,float3 wo,float
     for(uint i=0;i<proposals;i++){
         directCounter(bounce,2);uint bucket;LightSample light=runtimeCandidate(point,cell,seed,bucket,directSequence(baseIndex+i,scramble));
         float3 value=directIntegrand(light,m,frame,wo,geometryNormal,eta,bounce,volume,phaseG,incoming,terminal,diffuseCached);float target=luminance(value);float weight=light.pdf>0?target/light.pdf:0;
-        if(!isfinite(weight)||weight<=0)continue;float next=selected.sum+weight;if(!isfinite(next))continue;selected.sum=next;
+        if(!isfinite(weight)||weight<=0)continue;profileWork(6);float next=selected.sum+weight;if(!isfinite(next))continue;selected.sum=next;
         if(rng(reservoirSeed)<weight/selected.sum){selected.light=light;selected.value=value;selected.target=target;selected.bucket=bucket;}
     }
     if(selected.target>0){selected.value*=selected.sum/(float(proposals)*selected.target*survival);directCounter(bounce,3);}return selected;

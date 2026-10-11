@@ -102,7 +102,7 @@ public final class RtBenchmarkPlan {
         return Collections.unmodifiableMap(selected);
     }
     /** Preserve the user's daily controls, including AUTO and optional device features. */
-    public static Plan production(Config current){var blocks=new ArrayList<Block>();for(int i=0;i<4;i++)blocks.add(new Block("production",0,i,false,current));return new Plan(List.copyOf(blocks),Map.of());}
+    public static Plan production(Config current){var blocks=new ArrayList<Block>();int count=Integer.getInteger("voxellight.rt.profileProductionBlocks",4);if(count<1||count>4)throw new IllegalArgumentException("production blocks must be 1..4");for(int i=0;i<count;i++)blocks.add(new Block("production",0,i,false,current));return new Plan(List.copyOf(blocks),Map.of());}
     public static Config guideConfig(Config c,RtExecutionOptions.Guides guides,RtExecutionOptions.Primary primary){return new Config(c.visibility(),c.queue(),c.omm(),c.ser(),c.direct(),c.sceneUpdate(),c.realtimePolicy(),c.shader(),c.shadow(),c.world(),c.integrator(),primary,c.cache(),c.sampling(),c.kernel(),c.transport(),guides,c.roughness());}
     public static Plan guides(){
         var blocks=new ArrayList<Block>();var base=policy(false,RtExecutionOptions.Realtime.FULL,RtExecutionOptions.Queue.FIXED);

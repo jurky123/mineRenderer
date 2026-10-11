@@ -100,17 +100,19 @@ def validate_layout(reflection, transport=False, material=False, compact=False):
         raise ValueError('camera ABI size mismatch')
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('--output', default='build/vulkan-rt'); parser.add_argument('--ggx-storage',choices=['inline','assets'],default='inline'); parser.add_argument('--workers',type=int,choices=range(1,9),default=1); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument('--output', default='build/vulkan-rt'); parser.add_argument('--ggx-storage',choices=['inline','assets'],default='inline'); parser.add_argument('--profile-workload',action='store_true',help='Counter-only shader bank; timings are diagnostic')
+    parser.add_argument('--workers',type=int,choices=range(1,9),default=1); args = parser.parse_args()
     output = ROOT / args.output; output.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable,str(ROOT/'tools/generate_ggx_asset.py'),'--check'],check=True)
     compiler, validator = tool('slangc', 'SLANGC'), tool('spirv-val', 'SPIRV_VAL')
     version = subprocess.check_output([compiler, '-version'], stderr=subprocess.STDOUT, text=True).strip()
-    manifest = {'compiler': version, 'target': 'vulkan1.2', 'ggxStorage':args.ggx_storage, 'shaders': {}, 'sources': {}}
+    manifest = {'compiler': version, 'target': 'vulkan1.2', 'ggxStorage':args.ggx_storage, 'profileWorkload':args.profile_workload, 'shaders': {}, 'sources': {}}
     for source in sorted((ROOT/'shaders/rt').rglob('*.slang')):
         manifest['sources'][str(source.relative_to(ROOT))] = hashlib.sha256(source.read_bytes()).hexdigest()
     def compile_entry(item):
         entry,stage=item
         base,defines=VARIANTS.get(entry,(entry,[]))
+        if args.profile_workload and entry.startswith('material_'):defines=defines+['RT_PROFILE_WORKLOAD']
         if entry.startswith('material_') and args.ggx_storage=='assets':defines=defines+['RT_GGX_ASSETS']
         source = ROOT / f'shaders/rt/world/{base}.slang'; spv = output / f'{entry}.spv'; reflection = output / f'{entry}.json'
         subprocess.run([compiler, str(source), '-target', 'spirv', '-profile', 'spirv_1_5', '-entry', base, *['-D'+define+'=1' for define in defines],

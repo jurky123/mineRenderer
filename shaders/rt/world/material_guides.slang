@@ -1,3 +1,4 @@
+#define RT_PROFILE_GUIDE 1
 #include "../common/material_transport.slang"
 #include "../common/primary_state.slang"
 #include "../common/reconstruction_math.slang"
