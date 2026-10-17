@@ -20,6 +20,22 @@ class RtLightRuntimeTest {
         }
         int records=data.getInt(36);for(int i=0;i<20;i++){assertEquals(i,data.getInt(records+i*64+48));assertEquals(1,data.getFloat(records+i*64+12));}
     }
+    @Test void directLocalPmfIndexMatchesAliasColumnsAndFallsBackAtCapacity(){
+        for(int groups:new int[]{0,1,17,160,512}){
+            var lights=new ArrayList<RtEmitterTable.Triangle>();
+            for(int i=0;i<groups;i++)lights.add(new RtEmitterTable.Triangle(i,0,new float[]{i*32f,0,3,1,2,3,0,0,0},0,i+1,1));
+            var data=RtLightRuntime.build(lights,-16.001,0,0,new float[]{.25f,.4f,.6f,.3f,.9f,.7f,.8f,1});
+            int index=data.getInt(60),grid=data.getInt(56),slots=data.getInt(52);
+            assertEquals(groups>0&&groups<=160,index!=0);
+            assertTrue(data.remaining()<=RtLightRuntime.MAX_BYTES);
+            if(index==0)continue;
+            for(int cell=0;cell<RtLightRuntime.WIDTH*RtLightRuntime.HEIGHT*RtLightRuntime.DEPTH;cell++)for(int section=0;section<groups;section++){
+                float expected=0;
+                for(int i=0;i<slots;i++){int a=grid+(cell*slots+i)*16;if(data.getInt(a+8)==section){expected=data.getFloat(a+12);break;}}
+                assertEquals(Float.floatToRawIntBits(expected),Float.floatToRawIntBits(data.getFloat(index+(cell*groups+section)*4)));
+            }
+        }
+    }
     @Test void sectionLocalHierarchyKeepsAreaAndPointIdsAndExactConditionalMasses(){
         var points=List.of(new RtEmitterTable.Triangle(9,0,new float[]{1,1,1,2,3,4,0,0,0},0,3,1),new RtEmitterTable.Triangle(2,0,new float[]{0,0,1,1,0,1,0,1,1},.5f,1,0));
         var data=RtLightRuntime.build(points,0,0,0,new float[]{1,1,1,1,1,1,1,1});assertEquals(1,data.getInt(8));int r=data.getInt(36);

@@ -75,7 +75,9 @@ public final class RtExecutionOptions {
         public int continuationMask(int calibrated){return switch(this){case FIXED->0;case AUTO,COMPACT->62;case HYBRID->calibrated;case LATE->60;};}
     }
     private static Visibility visibility=Visibility.TRACE;
-    private static Queue queue=Queue.AUTO;
+    // Measured late compaction keeps the expensive first continuation fixed.
+    // VulkanRtContext falls back to fixed dispatch when indirect queues are unavailable.
+    private static Queue queue=Queue.LATE;
     private static boolean omm,ser;
     private static long revision;
     private RtExecutionOptions(){}

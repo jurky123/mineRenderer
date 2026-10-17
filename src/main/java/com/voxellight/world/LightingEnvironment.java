@@ -40,6 +40,15 @@ public record LightingEnvironment(float directR, float directG, float directB, f
                 (.022f + .56f*day)*(.4f + .6f*clear),
                 mix(grey,hr,clear),mix(grey,hg,clear),mix(grey,hb,clear),.30f);
     }
+    /** Native sky color already includes time, biome and weather; decode it once for PT lighting. */
+    public static LightingEnvironment vanillaSky(ShadowLight light,boolean overworld,int skyColor,float sunAngle,float rainBrightness) {
+        var direct=polished(light,overworld,sunAngle,rainBrightness);
+        if(!overworld)return direct;
+        float r=linear((skyColor>>16)&255),g=linear((skyColor>>8)&255),b=linear(skyColor&255);
+        return new LightingEnvironment(direct.directR(),direct.directG(),direct.directB(),direct.directStrength(),
+                r,g,b,1,r,g,b,.30f);
+    }
+    private static float linear(int channel){float s=channel/255f;return s<=.04045f?s/12.92f:(float)Math.pow((s+.055f)/1.055f,2.4);}
     private static float mix(float a,float b,float t){return a+(b-a)*t;}
     private static float smooth(float a,float b,float x){float t=Math.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);}
 

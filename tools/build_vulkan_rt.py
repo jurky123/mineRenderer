@@ -31,6 +31,10 @@ VARIANTS['material_primary_shade_compact']=('material_primary_shade',['RT_CLEAN_
 VARIANTS['material_resolve_compact']=('material_resolve',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_COMPACT48'])
 VARIANTS['material_guides']=('material_guides',['RT_CLEAN_FULL','RT_DIRECT_RIS'])
 VARIANTS['material_guides_fast']=('material_guides',['RT_CLEAN_FULL','RT_DIRECT_RIS','RT_GUIDE_FAST'])
+# Coherent Primary uses ordinary tracing; Indirect reorders before decode.
+for name,(base,defines) in list(VARIANTS.items()):
+    if base=='material_indirect' and 'RT_SER' in defines:VARIANTS[name]=(base,defines+['RT_SER_PRE_DECODE'])
+    elif base in ('material_primary','material_primary_shade') and 'RT_SER' in defines:VARIANTS[name]=(base,[d for d in defines if d!='RT_SER'])
 STAGES.update({name:'raygeneration' for name in VARIANTS})
 def tool(name, variable):
     found = os.environ.get(variable) or shutil.which(name)

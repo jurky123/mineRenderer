@@ -21,6 +21,9 @@ rt::Material fixture(unsigned kind,float alpha) {
  if(kind==10)rt::setConductor(m,234);
  if(kind==11)rt::setConductor(m,255);
  if(kind>=12)rt::setConductor(m,230+kind-12);
+#ifdef RT_PARITY_NO_MULTISCATTER
+ m.multipleScattering=false;
+#endif
  return m;
 }
 int main() {

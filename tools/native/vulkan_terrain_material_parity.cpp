@@ -27,9 +27,10 @@ int main(){
  for(unsigned slot=0;slot<4;slot++){assets[slot*4]=slot==3?256:w;assets[slot*4+1]=slot==3?1280:1;assets[slot*4+2]=(24+(slot==3?w*3:w*slot))*4;}
  for(unsigned i=0;i<cases;i++){
   unsigned index=65504+i,type=i%10;
-  lut[index]=(i==31?80:((i*7)&255))|((i%4==0?231:50)<<8)|(19<<16)|(255u<<24);
+  unsigned blue[]={0,64,65,66,255};
+  lut[index]=(i==31?80:((i*7)&255))|((i%4==0?231:50)<<8)|((i==31?19:blue[i%5])<<16)|(255u<<24);
   lut[index+65536]=type|(128<<8)|(unsigned(type==5||type==6?150:0)<<16)|(20u<<24);
-  lut[index+65536*2]=32|(11<<8)|(2<<16)|(150u<<24);
+  lut[index+65536*2]=(i%7==0?0:32|(11<<8)|(2<<16))|(150u<<24);
   lut[index+65536*3]=2|(3<<8)|(4<<16)|(220u<<24);
   lut[index+65536*4]=128|(80<<8);
   unsigned alpha=i%3==0?64:255;
@@ -55,6 +56,7 @@ int main(){
   const auto& a=geometry[i*3];auto color=rgb(tex[i])*rgb(a.tint);auto m=decodeMaterial(ids[i],lut[ids[i]&65535],v(color.x,color.y,color.z),a.flags);
   m.emission=color*((ids[i]>>24&4)?(ids[i]>>16&255)/254.f:(a.flags>>16)/15.f)*8.f;
   if((a.flags&32)&&(ids[i]>>24&4)==0)m.emission=rt::V(0,0,0);
+  if((ids[i]>>24&3)==1&&rt::maxComponent(m.sigmaA)==0)m.sigmaA=rt::V(-std::log(std::max(.001f,color.x))*.7f,-std::log(std::max(.001f,color.y))*.7f,-std::log(std::max(.001f,color.z))*.7f);
   if((a.flags&8)&&rt::dielectric(m))m.type=rt::THIN_DIELECTRIC;
   m.mediumId=m.type==rt::WATER?0xfffffffeu:1+(i<<16)+(m.type<<8)+(unsigned)std::round(m.ior*255/3);
   float nx=(normal[i]&255)/127.5f-1,ny=(normal[i]>>8&255)/127.5f-1;auto n=rt::normalize(rt::V(nx,ny,std::sqrt(std::max(0.f,1-nx*nx-ny*ny))));
@@ -72,5 +74,8 @@ int main(){
   std::memcpy(assets.data()+24+w*3,lut.data(),lut.size()*4);terrain_material_parity(&varying,nullptr,&globals);
   auto checks=actual[i*14+13];if(checks.w!=(test==0||test==7?1:0)){std::fprintf(stderr,"Primary guide admission wrong variant=%u\n",test);return 5;}for(unsigned j=0;j<3;j++)if(reinterpret_cast<float*>(&checks)[j]>1e-6){std::fprintf(stderr,"Primary guide parity/admission failure variant=%u\n",test);return 4;}
  }
- std::printf("Terrain Slang/native binding parity + emission-only + shadow fast decoder + protected primary guide + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
+ // Vary UV across the atlas to check spatial emission and cutout at each point.
+ for(unsigned vertex=0;vertex<3;vertex++)geometry[i*3+vertex].uv[0]=vertex==1?1.f:0.f;
+ terrain_material_parity(&varying,nullptr,&globals);for(unsigned triangle=0;triangle<cases;triangle++)if(actual[triangle*14+11].y>1e-6){std::fprintf(stderr,"Nonuniform emission/cutout fetch parity failure triangle=%u\n",triangle);return 6;}
+ std::printf("Terrain Slang/native binding parity + shared spatial emission/cutout + EXACT sigmaA/sigmaS/phaseG/IOR/identity + protected primary guide + deferred frame completion: %u cases, %u components, max normalized error=%g\n",cases,cases*44,largest);
 }

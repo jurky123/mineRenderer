@@ -7,6 +7,17 @@ void terrain_material_parity(uint3 tid:SV_DispatchThreadID) {
     TerrainSurface surface=terrainSurface(i,bary,i);
     ShadowSurface shadow=terrainShadow(i,bary,i);bool transparent=dielectric(surface.material)||surface.material.type==DIFFUSE_TRANSMISSION;
     float shadowError=transparent?max(maxComponent(abs(shadow.sigmaA-surface.material.sigmaA)),max(maxComponent(abs(shadow.baseColor-surface.material.baseColor)),max(abs(shadow.ior-surface.material.ior),abs(shadow.transmission-surface.material.transmission)))):0;
+    ExactShadowSurface exact=terrainExactShadow(i,bary,i);bool exactTransparent=dielectric(exact.material)||exact.material.type==DIFFUSE_TRANSMISSION;
+    if(transparent){
+        shadowError=max(shadowError,maxComponent(abs(exact.material.sigmaA-surface.material.sigmaA)));
+        shadowError=max(shadowError,maxComponent(abs(exact.material.sigmaS-surface.material.sigmaS)));
+        shadowError=max(shadowError,max(abs(exact.material.phaseG-surface.material.phaseG),abs(exact.material.thickness-surface.material.thickness)));
+        shadowError=max(shadowError,max(abs(exact.material.ior-surface.material.ior),abs(exact.material.transmission-surface.material.transmission)));
+        if(surface.material.type==DIFFUSE_TRANSMISSION)shadowError=max(shadowError,maxComponent(abs(exact.material.baseColor-surface.material.baseColor)));
+        if(exact.material.type!=surface.material.type||exact.material.mediumId!=surface.material.mediumId)shadowError=max(shadowError,1);
+    }
+    if(transparent!=exactTransparent||exact.flags!=surface.flags)shadowError=max(shadowError,1);
+    shadowError=max(shadowError,maxComponent(abs(exact.geometryNormal-surface.geometryNormal)));
     result[i*14+12]=float4(shadowError,transparent&&shadow.type!=surface.material.type?1:0,transparent&&shadow.mediumId!=surface.material.mediumId?1:0,transparent?maxComponent(abs(shadow.geometryNormal-surface.geometryNormal)):0);
     TerrainSurface primary;bool eligible=terrainPrimaryGuide(i,bary,i,primary);float guideError=eligible?max(maxComponent(abs(primary.material.baseColor-surface.material.baseColor)),maxComponent(abs(primary.frame.n-surface.frame.n))):0;
     if(eligible){TerrainSurface trusted;terrainPrimaryGuide(i,bary,i,trusted,true);guideError=max(guideError,max(maxComponent(abs(trusted.material.baseColor-primary.material.baseColor)),maxComponent(abs(trusted.frame.n-primary.frame.n))));guideError=max(guideError,max(abs(trusted.material.f0-primary.material.f0),abs(trusted.material.alphaV-primary.material.alphaV)));}
@@ -25,5 +36,12 @@ void terrain_material_parity(uint3 tid:SV_DispatchThreadID) {
     result[i*14+9]=float4(m.eta,m.conductorId);
     bool deferred;TerrainSurface guide=terrainSurface(i,bary,i,true,deferred);Frame completed=deferred?terrainCompleteFrame(i,bary):guide.frame;
     result[i*14+11]=float4(deferred?1:0,max(maxComponent(abs(completed.n-surface.frame.n)),maxComponent(abs(terrainEmission(i,bary)-m.emission))),maxComponent(abs(completed.t-surface.frame.t)),maxComponent(abs(completed.b-surface.frame.b)));
+    for(uint sample=0;sample<10;sample++){
+        float2 lightBary=float2(sample*.1,(1-sample*.1)*.33);bool visible;
+        float3 emission=terrainLightEmission(i,lightBary,visible);bool referenceVisible=visibleTexel(i,lightBary);
+        float3 reference=referenceVisible?terrainEmission(i,lightBary):float3(0);
+        result[i*14+11].y=max(result[i*14+11].y,maxComponent(abs(emission-reference)));
+        if(visible!=referenceVisible)result[i*14+11].y=1;
+    }
     result[i*14+10]=float4(terrainWaterNormal(float3(0,1,0),float3(i*.03125,64,-.125*i),float3(0,65,0),12.5,.09,3.4,.7,1),0);
 }

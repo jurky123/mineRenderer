@@ -4,6 +4,17 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LightingEnvironmentTest {
+    @Test void nativeSkyUsesLinearColorWithoutApplyingTimeOrWeatherTwice(){
+        var sun=ShadowLight.fixed();
+        var a=LightingEnvironment.vanillaSky(sun,true,0x804020,0,1);
+        var b=LightingEnvironment.vanillaSky(sun,true,0x804020,(float)Math.PI,0);
+        assertEquals(.2158605f,a.skyR(),1e-6);assertEquals(.05126946f,a.skyG(),1e-6);assertEquals(.01444384f,a.skyB(),1e-6);
+        assertEquals(a.skyR(),b.skyR());assertEquals(a.skyG(),b.skyG());assertEquals(a.skyB(),b.skyB());assertEquals(1,a.skyStrength());
+        assertEquals(LightingEnvironment.polished(sun,true,0,1).directStrength(),a.directStrength());
+        assertEquals(0,LightingEnvironment.vanillaSky(sun,true,0,0,1).skyR());
+        assertEquals(1,LightingEnvironment.vanillaSky(sun,true,0xffffff,0,1).skyR());
+        assertEquals(LightingEnvironment.polished(ShadowLight.none(),false,0,1),LightingEnvironment.vanillaSky(ShadowLight.none(),false,0,0,1));
+    }
     @Test void moonIsCoolerAndWeakerThanDaylightButNightKeepsAmbient() {
         var day = LightingEnvironment.sample(ShadowLight.world(0,(float)Math.PI,1,0),true,0,1);
         var night = LightingEnvironment.sample(ShadowLight.world((float)Math.PI,0,1,0),true,(float)Math.PI,1);

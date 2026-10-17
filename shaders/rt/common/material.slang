@@ -24,17 +24,13 @@ static const uint TRANSMISSION=16;
 static const uint DELTA=32;
 static const uint DISPERSIVE=64;
 struct Material {
-#ifdef RT_GGX_PREPARED
  float energyAverage;float3 energyFactor;bool energyPrepared;
-#endif
  float3 baseColor;float3 eta;float3 k;float3 emission;float3 sigmaA;float3 sigmaS;
  float microfacetAlpha;float alphaV;float f0;float ior;float transmission;float coatWeight;float coatAlpha;float coatIOR;float porosity;float sss;float phaseG;float thickness;float abbeNumber;bool multipleScattering;
  uint type;uint conductorId;uint materialId;uint mediumId;
 };
 Material defaultMaterial() { Material m;
-#ifdef RT_GGX_PREPARED
  m.energyPrepared=false;m.energyAverage=1;m.energyFactor=0;
-#endif
     m.baseColor=float3(.5f,.5f,.5f);
     m.eta=float3(1.5f,1.5f,1.5f);
     m.k=float3(0,0,0);
@@ -68,6 +64,17 @@ void setConductor(inout Material m,uint id){
  m.conductorId=id;if(id>=230&&id<=237){m.eta=eta[id-230];m.k=k[id-230];}m.type=m.coatWeight>0?COATED_CONDUCTOR:CONDUCTOR;
 }
 // The same five-plane palette uploaded by PbrAtlas. No reinterpretation of LabPBR channels.
+uint materialClass(uint packed,uint profile,uint flags){
+    uint type=profile&255,green=(packed>>8)&255,blue=(packed>>16)&255;
+    if(green>=230)type=((profile>>16)&255)>0?COATED_CONDUCTOR:CONDUCTOR;
+    if((flags&16u)!=0)type=ROUGH_DIFFUSE;
+    bool metalType=type==CONDUCTOR||type==COATED_CONDUCTOR;
+    bool glassType=type==DIELECTRIC||type==THIN_DIELECTRIC||type==WATER;
+    if(blue>65&&!metalType&&!glassType)type=DIFFUSE_TRANSMISSION;
+    return type;
+}
+struct MaterialInterface {float3 baseColor,sigmaA,sigmaS;float ior,transmission,phaseG,thickness;uint type,mediumId;};
+bool dielectric(MaterialInterface m){return m.type==DIELECTRIC||m.type==THIN_DIELECTRIC||m.type==WATER;}
 Material decodeMaterial(uint id,uint packed,float3 color,uint flags,uint4 palette,uint optical,bool multipleScattering) {
     Material m=defaultMaterial();m.multipleScattering=multipleScattering;m.baseColor=color;
     float roughness=1-(packed&255)/255.0;m.microfacetAlpha=roughness*roughness;m.alphaV=m.microfacetAlpha;
@@ -83,5 +90,6 @@ Material decodeMaterial(uint id,uint packed,float3 color,uint flags,uint4 palett
     bool isMetal=m.type==CONDUCTOR||m.type==COATED_CONDUCTOR;
     bool isDielectric=m.type==DIELECTRIC||m.type==THIN_DIELECTRIC||m.type==WATER;
     if(m.sss>0&&!isMetal&&!isDielectric){m.type=DIFFUSE_TRANSMISSION;m.coatWeight=0;m.transmission=m.sss*.5;}
+    m.type=materialClass(packed,palette.x,flags);
     m.materialId=id&65535;m.mediumId=m.materialId+1;return m;
 }

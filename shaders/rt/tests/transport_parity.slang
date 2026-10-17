@@ -13,6 +13,9 @@ Material fixture(uint kind,float alpha) {
     if(kind==10) {setConductor(m,234);}
     if(kind==11) {setConductor(m,255);}
     if(kind>=12) {setConductor(m,230+kind-12);}
+#ifdef RT_PARITY_NO_MULTISCATTER
+    m.multipleScattering=false;
+#endif
 #ifdef RT_GGX_PREPARED
     m=prepareGgxEnergy(m);
 #endif

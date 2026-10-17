@@ -39,8 +39,21 @@ float3 terrainEmission(uint triangle,float2 bary){
     if(strength==0)return float3(0);
     return linearRgb(atlasTexel(0,uv))*linearRgb(geometry.Load(base+32))*strength;
 }
+// One UV/material/albedo fetch serves cutout and spatial emission at the sampled point.
+float3 terrainLightEmission(uint triangle,float2 bary,out bool visible){
+ uint base=triangle*120,flags=geometry.Load(base+36),tint=geometry.Load(base+32);visible=true;
+ float2 uv=asfloat(geometry.Load2(base+12))*(1-bary.x-bary.y)+asfloat(geometry.Load2(base+52))*bary.x+asfloat(geometry.Load2(base+92))*bary.y;
+ if((flags&128u)!=0){if((flags&1u)!=0)visible=cutoutVisible(dynamicTexel(flags,uv)>>24,tint>>24,flags);return 0;}
+ uint id=atlasTexel(1,uv);bool cutout=(flags&1u)!=0&&((id>>24)&3u)==0;
+ float strength=(((id>>24)&4u)!=0?((id>>16)&255u)/254.0:(flags>>16)/15.0)*8.0;
+ if((flags&32u)!=0&&((id>>24)&4u)==0)strength=0;
+ if(!cutout&&strength==0)return 0;
+ uint color=atlasTexel(0,uv);if(cutout)visible=cutoutVisible(color>>24,tint>>24,flags);
+ if(!visible||strength==0)return 0;
+ return linearRgb(color)*linearRgb(tint)*strength;
+}
 struct TerrainSurface {Material material;Frame frame;float3 geometryNormal;uint flags;};
-TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred,bool shadowOnly=false) {
+TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool deferFrame,out bool deferred) {
     profileWork(0u);
     deferred=false;
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
@@ -69,9 +82,6 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool defer
         material.baseColor*=1-wet*material.porosity*.18;
         if(material.coatWeight>0)material.type=metal(material)?COATED_CONDUCTOR:COATED_DIFFUSE;
     }
-    // Exact visibility uses the geometric interface normal and decoded material;
-    // it never consumes the shading frame or its normal-map texture.
-    if(shadowOnly){TerrainSurface result={material,(Frame)0,ng,a.flags};return result;}
     // A reusable flat diffuse guide does not need UV tangent construction. Exact paths
     // complete the original frame after the history decision; textured normals stay exact.
     if(deferFrame&&(material.type==DIFFUSE||material.type==ROUGH_DIFFUSE)&&material.coatWeight==0&&material.transmission==0&&material.microfacetAlpha>=.15&&maxComponent(material.emission)==0&&dot(n,ng)>.99999){
@@ -91,7 +101,33 @@ TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance,bool defer
 }
 
 TerrainSurface terrainSurface(uint triangle,float2 bary,uint instance){bool deferred;return terrainSurface(triangle,bary,instance,false,deferred);}
-TerrainSurface terrainExactShadow(uint triangle,float2 bary,uint instance){bool deferred;return terrainSurface(triangle,bary,instance,false,deferred,true);}
+struct ExactShadowSurface {MaterialInterface material;float3 geometryNormal;uint flags;};
+// Ordered EXACT transport needs neither conductor optics, GGX, emission, wet
+// coats nor shading frames. Opaque types terminate before fetching those data.
+ExactShadowSurface terrainExactShadow(uint triangle,float2 bary,uint instance){
+    profileWork(0u);ExactShadowSurface result=(ExactShadowSurface)0;uint base=triangle*120;
+    result.flags=geometry.Load(base+36);result.material.type=DIFFUSE;
+    float3 a=asfloat(readWords3(geometry,base)),b=asfloat(readWords3(geometry,base+40)),c=asfloat(readWords3(geometry,base+80));
+    result.geometryNormal=safeNormalize(cross(b-a,c-a));
+    if((result.flags&128u)!=0)return result;
+    float2 uv=asfloat(geometry.Load2(base+12))*(1-bary.x-bary.y)+asfloat(geometry.Load2(base+52))*bary.x+asfloat(geometry.Load2(base+92))*bary.y;
+    uint id=atlasTexel(1,uv),packed=paletteWord(id,0),profile=paletteWord(id,1);
+    MaterialInterface m=(MaterialInterface)0;m.type=materialClass(packed,profile,result.flags);
+    if(!dielectric(m)&&m.type!=DIFFUSE_TRANSMISSION){result.material=m;return result;}
+    uint absorption=paletteWord(id,2),scattering=paletteWord(id,3);
+    m.ior=(result.flags&16u)!=0?1.5:max(1,((profile>>8)&255)*3/255.0);
+    m.sigmaA=float3(absorption&255,(absorption>>8)&255,(absorption>>16)&255)*8/255.0;
+    m.sigmaS=float3(scattering&255,(scattering>>8)&255,(scattering>>16)&255)/255.0;
+    m.phaseG=((absorption>>24)&255)*1.8/255.0-.9;m.thickness=.0625;
+    m.transmission=(result.flags&16u)!=0?0:((scattering>>24)&255)/255.0;
+    uint blue=(packed>>16)&255;if(m.type==DIFFUSE_TRANSMISSION&&blue>65)m.transmission=(blue-65)/190.0*.5;
+    bool autoAbsorption=((id>>24)&3)==1&&maxComponent(m.sigmaA)==0;
+    if(m.type==DIFFUSE_TRANSMISSION||autoAbsorption){m.baseColor=linearRgb(atlasTexel(0,uv))*linearRgb(geometry.Load(base+32));}
+    if(autoAbsorption)m.sigmaA=-log(max(float3(.001),m.baseColor))*.7;
+    if((result.flags&8u)!=0&&dielectric(m))m.type=THIN_DIELECTRIC;
+    m.mediumId=m.type==WATER?0xfffffffeu:1+(instance<<16)+(m.type<<8)+(uint)round(m.ior*255/3);
+    result.material=m;return result;
+}
 Frame terrainCompleteFrame(uint triangle,float2 bary){
     TerrainVertex a=terrainVertex(triangle,0),b=terrainVertex(triangle,1),c=terrainVertex(triangle,2);
     float2 uv=terrainUv(a,b,c,bary);float3 e1=b.p-a.p,e2=c.p-a.p;

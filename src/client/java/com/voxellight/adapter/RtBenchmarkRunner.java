@@ -86,7 +86,7 @@ public final class RtBenchmarkRunner {
     public static boolean startGuides(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"guides");}
     public static boolean startScene(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"scene");}
     public static boolean startTransport(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"transport");}
-    public static boolean startPrepared(int seconds,Consumer<String> feedback){if(RtBenchmarkRunner.class.getResource("/assets/voxellight/rt/vulkan/material_primary_full_ggx_prepared.spv")==null){feedback.accept("VoxelLight: prepared-energy suite requires validated experiment shaders");return false;}return start(seconds,feedback,false,false,false,"prepared");}
+    public static boolean startPrepared(int seconds,Consumer<String> feedback){feedback.accept("VoxelLight: GGX preparation is integrated; the legacy prepared A/B suite is retired. Use production benchmarking.");return false;}
     public static boolean startEnvironment(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"environment");}
     public static boolean startGgx(int seconds,Consumer<String> feedback){if(RtBenchmarkRunner.class.getResource("/assets/voxellight/rt/vulkan/material_primary_full_ggx_inline.spv")==null){feedback.accept("VoxelLight: GGX storage suite requires the validated experiment shader bank");return false;}return start(seconds,feedback,false,false,false,"ggx");}
     public static boolean startIntegrator(int seconds,Consumer<String> feedback){return start(seconds,feedback,false,false,false,"integrator");}

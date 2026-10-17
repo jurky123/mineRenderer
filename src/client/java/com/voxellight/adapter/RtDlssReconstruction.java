@@ -39,10 +39,11 @@ final class RtDlssReconstruction implements AutoCloseable {
     private final GpuTextureView[] rawViews=new GpuTextureView[7],guideViews=new GpuTextureView[6];
     private GpuTexture result;
     private GpuTextureView resultView;
-    private final Matrix4f previousClip=new Matrix4f();
+    private final Matrix4f previousClip=new Matrix4f(),previousViewRotation=new Matrix4f();
     private double previousX,previousY,previousZ;
     private long epoch=Long.MIN_VALUE,lastTime;
     private boolean valid;
+    private long historyFrames,historyResets;
     private com.voxellight.rt.RtExecutionOptions.Guides lastGuides;
     private com.voxellight.rt.RtExecutionOptions.Roughness lastRoughness;
     private int quality=0; // NGX MaxPerf; no frame generation.
@@ -71,9 +72,15 @@ final class RtDlssReconstruction implements AutoCloseable {
             result=gpu.createTexture("VoxelLight DLSS RR output",32|GpuTexture.USAGE_TEXTURE_BINDING|GpuTexture.USAGE_COPY_DST|GpuTexture.USAGE_COPY_SRC,GpuFormat.RGBA16_FLOAT,ow,oh,1,1);resultView=gpu.createTextureView(result);
             settings=gpu.createBuffer(()->"VoxelLight DLSS guide settings",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,192);
         }
+        double dx=x-previousX,dy=y-previousY,dz=z-previousZ;
+        float forwardDot=previousViewRotation.m02()*viewRotation.m02()+previousViewRotation.m12()*viewRotation.m12()+previousViewRotation.m22()*viewRotation.m22();
+        boolean cameraCut=valid&&(dx*dx+dy*dy+dz*dz>64*64||forwardDot<0);
+        // Streamed/edited terrain is rejected per pixel by RR depth and motion; it is not a camera cut.
+        boolean historyReset=!valid||cameraCut;
+        boolean terrainChanged=epoch!=generation;
         for(int i=0;i<raw.length;i++)context.copyGuide(encoder,new int[]{0,1,2,6,7,8,9}[i],raw[i]);
         var data=ByteBuffer.allocateDirect(192).order(ByteOrder.nativeOrder());previousClip.get(0,data);clip.get(64,data);
-        data.position(128).putFloat((float)previousX).putFloat((float)previousY).putFloat((float)previousZ).putFloat(valid&&epoch==generation?1:0);
+        data.position(128).putFloat((float)previousX).putFloat((float)previousY).putFloat((float)previousZ).putFloat(historyReset?0:1);
         data.putFloat((float)x).putFloat((float)y).putFloat((float)z).putFloat(0);data.putFloat(w).putFloat(h).putFloat(0).putFloat(0);data.putFloat(com.voxellight.rt.RtExecutionOptions.roughness()==com.voxellight.rt.RtExecutionOptions.Roughness.ALPHA?1:0);data.position(192).flip();encoder.writeToBuffer(settings.slice(),data);
         var descriptor=RenderPassDescriptor.create(()->"VoxelLight DLSS RR guides").withRenderArea(new RenderPass.RenderArea(0,0,w,h));for(var view:guideViews)descriptor.withColorAttachment(view,Optional.empty());
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_dlss_guides");var pass=encoder.createRenderPass(descriptor)){
@@ -88,7 +95,7 @@ final class RtDlssReconstruction implements AutoCloseable {
         try(var stack=MemoryStack.stackPush();var profile=RenderPassProfile.beginNative(command,"vulkan_rt_dlss_rr")){
             barrier(command,stack,VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_TRANSFER_WRITE_BIT|VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT);
             // Ray sample displacement is opposite to a projection-matrix jitter.
-            try{DlssNative.evaluate(session,command.address(),images,w,h,ow,oh,quality,-RtJitter.x(context.lastFrame()),-RtJitter.y(context.lastFrame()),!valid||epoch!=generation,frameMs,matrices);}
+            try{DlssNative.evaluate(session,command.address(),images,w,h,ow,oh,quality,-RtJitter.x(context.lastFrame()),-RtJitter.y(context.lastFrame()),historyReset,frameMs,matrices);}
             catch(RuntimeException error){failure=error;}
             barrier(command,stack,VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_TRANSFER_READ_BIT);
         }
@@ -96,8 +103,9 @@ final class RtDlssReconstruction implements AutoCloseable {
         // Always close/submit the borrowed command before releasing the feature.
         if(vkEndCommandBuffer(command)!=VK_SUCCESS)throw new IllegalStateException("DLSS command end failed");nativeEncoder.execute(command);
         if(failure!=null)throw failure;
-        RtGuideCapture.capture(encoder,context,new GpuTextureView[]{noisy,guideViews[0],guideViews[1],guideViews[2],guideViews[3],guideViews[4],guideViews[5],resultView,rawViews[5],rawViews[6]},new String[]{"input-hdr","depth","motion","normal-roughness","diffuse-albedo","specular-albedo","specular-motion","rr-output","reflection-position","previous-reflection-position"},new int[]{4,1,2,4,4,4,2,4,4,4},new boolean[]{false,false,false,false,false,false,false,true,false,false},"RR frame="+context.lastFrame()+" epoch="+generation+" input="+w+"x"+h+" output="+ow+"x"+oh+" guides="+lastGuides+" roughness="+lastRoughness+" workingColor=linear-sRGB preExposure=1 depth=reverse-Z motion=previous-current-input-pixels jitter="+(-RtJitter.x(context.lastFrame()))+","+(-RtJitter.y(context.lastFrame()))+" reset="+(!valid||epoch!=generation)+" camera="+x+","+y+","+z+" clip="+clip);
-        previousClip.set(clip);previousX=x;previousY=y;previousZ=z;epoch=generation;valid=true;return resultView;
+        if(historyReset){historyResets++;historyFrames=0;}historyFrames++;
+        RtGuideCapture.capture(encoder,context,new GpuTextureView[]{noisy,guideViews[0],guideViews[1],guideViews[2],guideViews[3],guideViews[4],guideViews[5],resultView,rawViews[5],rawViews[6]},new String[]{"input-hdr","depth","motion","normal-roughness","diffuse-albedo","specular-albedo","specular-motion","rr-output","reflection-position","previous-reflection-position"},new int[]{4,1,2,4,4,4,2,4,4,4},new boolean[]{false,false,false,false,false,false,false,true,false,false},"RR frame="+context.lastFrame()+" epoch="+generation+" input="+w+"x"+h+" output="+ow+"x"+oh+" guides="+lastGuides+" roughness="+lastRoughness+" workingColor=linear-sRGB preExposure=1 depth=reverse-Z motion=previous-current-input-pixels jitter="+(-RtJitter.x(context.lastFrame()))+","+(-RtJitter.y(context.lastFrame()))+" reset="+historyReset+" historyFrames="+historyFrames+" historyResets="+historyResets+" terrainChanged="+terrainChanged+" cameraCut="+cameraCut+" camera="+x+","+y+","+z+" clip="+clip);
+        previousClip.set(clip);previousViewRotation.set(viewRotation);previousX=x;previousY=y;previousZ=z;epoch=generation;valid=true;return resultView;
     }
     private static void barrier(VkCommandBuffer command,MemoryStack stack,int source,int destination){
         vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,0,VkMemoryBarrier.calloc(1,stack).sType$Default().srcAccessMask(source).dstAccessMask(destination),null,null);

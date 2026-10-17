@@ -17,15 +17,16 @@ import net.minecraft.world.level.dimension.DimensionType;
 import org.lwjgl.system.MemoryStack;
 import java.util.Optional;
 
-/** Shared sky and exact solid-angle proposals; all radiance/CDF pixels stay on GPU. */
+/** Native sky color and exact solid-angle proposals; all radiance/CDF pixels stay on GPU. */
 final class VulkanRtEnvironmentAssets implements AutoCloseable {
-    static final int WIDTH=256,HEIGHT=128,BYTES=(WIDTH*HEIGHT*2+HEIGHT)*16;
+    static final int WIDTH=256,HEIGHT=128,BASE_BYTES=(WIDTH*HEIGHT*2+HEIGHT)*16,GUIDE_BYTES=(HEIGHT+1)*256*16,BYTES=BASE_BYTES+GUIDE_BYTES;
     static final RenderPipeline MAP=pipeline("rt_environment",BindGroupLayout.builder()
-        .withUniform("EnvironmentSettings",UniformType.UNIFORM_BUFFER).withUniform("RtEnvironmentSettings",UniformType.UNIFORM_BUFFER).build());
+        .withUniform("RtEnvironmentSettings",UniformType.UNIFORM_BUFFER).build());
     static final RenderPipeline CELLS=pipeline("vulkan_rt_environment_cells",BindGroupLayout.builder().withSampler("EnvironmentMap").build());
     static final RenderPipeline ROWS=pipeline("vulkan_rt_environment_rows",BindGroupLayout.builder().withSampler("EnvironmentCells").build());
-    private GpuTexture map,cells,rows;
-    private GpuTextureView mapView,cellsView,rowsView;
+    static final RenderPipeline GUIDE=pipeline("vulkan_rt_environment_guide",BindGroupLayout.builder().withSampler("EnvironmentCells").withSampler("EnvironmentRows").build());
+    private GpuTexture map,cells,rows,guide;
+    private GpuTextureView mapView,cellsView,rowsView,guideView;
     private GpuBuffer palette;
     private static RenderPipeline pipeline(String shader,BindGroupLayout layout) {
         return RenderPipeline.builder().withLocation(Identifier.fromNamespaceAndPath("voxellight","pipeline/vulkan_"+shader))
@@ -39,18 +40,20 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
     }
     private void prepareEnvironment(CommandEncoder encoder,VulkanDevice device,VulkanRtBuffer destination,int offset,EnvironmentPass weather,ShadowRenderer shadows) {
         if(map==null) {
-            for(var pipeline:new RenderPipeline[]{MAP,CELLS,ROWS})if(!RenderSystem.getDevice().precompilePipeline(pipeline,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan environment pipeline unavailable");
+            for(var pipeline:new RenderPipeline[]{MAP,CELLS,ROWS,GUIDE})if(!RenderSystem.getDevice().precompilePipeline(pipeline,RenderProbe.SHADERS).isValid())throw new IllegalStateException("Vulkan environment pipeline unavailable");
             int usage=GpuTexture.USAGE_RENDER_ATTACHMENT|GpuTexture.USAGE_COPY_SRC|GpuTexture.USAGE_TEXTURE_BINDING;
             map=device.createTexture("VoxelLight Vulkan shared HDR sky",usage,GpuFormat.RGBA32_FLOAT,WIDTH,HEIGHT,1,1);mapView=device.createTextureView(map);
             cells=device.createTexture("VoxelLight Vulkan environment cell CDF",usage,GpuFormat.RGBA32_FLOAT,WIDTH,HEIGHT,1,1);cellsView=device.createTextureView(cells);
             rows=device.createTexture("VoxelLight Vulkan environment row CDF",usage,GpuFormat.RGBA32_FLOAT,HEIGHT,1,1,1);rowsView=device.createTextureView(rows);
+            guide=device.createTexture("VoxelLight exact environment guide",usage,GpuFormat.RGBA32_FLOAT,256,HEIGHT+1,1,1);guideView=device.createTextureView(guide);
             palette=device.createBuffer(()->"VoxelLight Vulkan environment palette",GpuBuffer.USAGE_UNIFORM|GpuBuffer.USAGE_COPY_DST,64);
         }
         var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
-        var light=shadows.light();var env=LightingEnvironment.polished(light,sky.skybox==DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);var sun=light.direction();
+        var light=shadows.light();var env=LightingEnvironment.vanillaSky(light,sky.skybox==DimensionType.Skybox.OVERWORLD,sky.skyColor,sky.sunAngle,sky.rainBrightness);var sun=light.direction();
         var frozen=RtBenchmarkRunner.freeze("skyPalette",new float[]{env.directR(),env.directG(),env.directB(),env.directStrength(),
             env.skyR(),env.skyG(),env.skyB(),env.skyStrength(),env.horizonR(),env.horizonG(),env.horizonB(),env.lowerHemisphere(),sun.x,sun.y,sun.z,0});
-        var weatherInputs=weather.rtUniforms();
+        // Clouds and wind do not contribute to the native-color environment map.
+        var weatherInputs=new float[0];
         boolean cached=com.voxellight.rt.RtExecutionOptions.shader()==com.voxellight.rt.RtExecutionOptions.Shader.ENV_CACHED;
         if(!cached)exactCache.clear();
         if(cached&&exactCache.matches(destination,offset,weatherInputs,frozen))return;
@@ -59,7 +62,7 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
         }
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_environment_map");var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight Vulkan shared environment")
                 .withRenderArea(new RenderPass.RenderArea(0,0,WIDTH,HEIGHT)).withColorAttachment(mapView,Optional.empty()))) {
-            pass.setPipeline(MAP);pass.setUniform("EnvironmentSettings",weather.settings());pass.setUniform("RtEnvironmentSettings",palette);pass.draw(3,1,0,0);
+            pass.setPipeline(MAP);pass.setUniform("RtEnvironmentSettings",palette);pass.draw(3,1,0,0);
         }
         try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_environment_distribution")) {
             draw(encoder,CELLS,cellsView,mapView,"EnvironmentMap",WIDTH,HEIGHT);
@@ -67,6 +70,12 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
             encoder.copyTextureToBuffer(map,destination,offset,()->{},0);
             encoder.copyTextureToBuffer(cells,destination,offset+WIDTH*HEIGHT*16,()->{},0);
             encoder.copyTextureToBuffer(rows,destination,offset+WIDTH*HEIGHT*32,()->{},0);
+        }
+        try(var profile=RenderPassProfile.begin(encoder,"vulkan_rt_environment_guide")){
+            try(var pass=encoder.createRenderPass(RenderPassDescriptor.create(()->"VoxelLight exact environment guide").withRenderArea(new RenderPass.RenderArea(0,0,256,HEIGHT+1)).withColorAttachment(guideView,Optional.empty()))){
+                pass.setPipeline(GUIDE);pass.bindTexture("EnvironmentCells",cellsView,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.bindTexture("EnvironmentRows",rowsView,RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));pass.draw(3,1,0,0);
+            }
+            encoder.copyTextureToBuffer(guide,destination,offset+BASE_BYTES,()->{},0);
         }
         if(cached)exactCache.updated(destination,offset,weatherInputs,frozen);
     }
@@ -78,8 +87,8 @@ final class VulkanRtEnvironmentAssets implements AutoCloseable {
     }
     @Override public void close() {
         exactCache.clear();
-        if(mapView!=null)mapView.close();if(cellsView!=null)cellsView.close();if(rowsView!=null)rowsView.close();
+        if(guideView!=null)guideView.close();if(guide!=null)guide.close();if(mapView!=null)mapView.close();if(cellsView!=null)cellsView.close();if(rowsView!=null)rowsView.close();
         if(map!=null)map.close();if(cells!=null)cells.close();if(rows!=null)rows.close();if(palette!=null)palette.close();
-        map=cells=rows=null;mapView=cellsView=rowsView=null;palette=null;
+        map=cells=rows=guide=null;mapView=cellsView=rowsView=guideView=null;palette=null;
     }
 }

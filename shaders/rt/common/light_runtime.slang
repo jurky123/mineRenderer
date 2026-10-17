@@ -26,8 +26,12 @@ uint runtimeAliasPmf(uint base,uint count,float u,out float pmf){
 uint runtimeAlias(uint base,uint count,float u){float pmf;return runtimeAliasPmf(base,count,u,pmf);}
 float runtimeSectionPdf(uint section,uint cell){
     float global=asfloat(assets.Load(runtimeBase()+runtimeLoad(48)+section*16+12));if(cell==0)return global;
-    uint slots=runtimeLoad(52),base=runtimeBase()+runtimeLoad(56)+(cell-1)*slots*16;float local=0;
-    for(uint i=0;i<slots;i++)if(assets.Load(base+i*16+8)==section){local=asfloat(assets.Load(base+i*16+12));break;}
+    uint index=runtimeLoad(60);float local=0;
+    if(index!=0)local=asfloat(assets.Load(runtimeBase()+index+((cell-1)*runtimeLoad(8)+section)*4));
+    else{
+        uint slots=runtimeLoad(52),base=runtimeBase()+runtimeLoad(56)+(cell-1)*slots*16;
+        for(uint i=0;i<slots;i++)if(assets.Load(base+i*16+8)==section){local=asfloat(assets.Load(base+i*16+12));break;}
+    }
     return .2*global+.8*local;
 }
 float runtimeEnvironmentProbability(){return runtimeLights()>0?.2:1;}
@@ -37,23 +41,34 @@ LightSample runtimeSun(inout uint seed){
     LightSample light=(LightSample)0;float4 sun=directionalLight();if(luminance(directionalIrradiance())<=0||sun.w<=0)return light;
     light.kind=0;light.wi=sampleCone(sun.xyz,sun.w,seed);light.pdf=1/sun.w;light.radiance=directionalIrradiance()/sun.w;light.distance=4096;return light;
 }
-LightSample runtimeCandidate(float3 point,uint cell,inout uint seed,out uint bucket,float familyChoice){
+struct RuntimeCandidate {LightSample light;uint record;float2 bary;};
+RuntimeCandidate runtimeCandidateGeometry(float3 point,uint cell,inout uint seed,out uint bucket,float familyChoice){
+    RuntimeCandidate candidate=(RuntimeCandidate)0;
     LightSample light=(LightSample)0;bucket=0xffffffffu;float env=runtimeEnvironmentProbability();
-    if(familyChoice<env){light.wi=sampleEnvironment(seed);light.pdf=env*environmentDensity(light.wi);light.radiance=environmentRadiance(light.wi);light.kind=1;light.distance=4096;return light;}
+    if(familyChoice<env){light.wi=sampleEnvironment(seed);light.pdf=env*environmentDensity(light.wi);light.kind=1;light.distance=4096;candidate.light=light;return candidate;}
     uint g=runtimeLoad(8),section;float sectionPdf;
     if(cell>0&&rng(seed)<.8){uint base=runtimeBase()+runtimeLoad(56)+(cell-1)*runtimeLoad(52)*16;float local;section=runtimeAliasPmf(base,runtimeLoad(52),rng(seed),local);sectionPdf=.2*asfloat(assets.Load(runtimeBase()+runtimeLoad(48)+section*16+12))+.8*local;}
     else {section=runtimeAlias(runtimeBase()+runtimeLoad(48),g,rng(seed));sectionPdf=runtimeSectionPdf(section,cell);}
     uint node=runtimeNode(section),index=runtimeAlias(runtimeBase()+runtimeLoad(40)+assets.Load(node+16)*16,assets.Load(node+20),rng(seed));
     uint address=runtimeRecord(index);bucket=assets.Load(node+24);float pmf=(1-env)*sectionPdf*asfloat(assets.Load(address+12));
-    if(assets.Load(address+56)==1){float3 delta=asfloat(readWords3(assets,address))-point;light.distance=length(delta);if(light.distance<.025)return light;
-        light.wi=delta/light.distance;light.pdf=pmf;light.radiance=asfloat(readWords3(assets,address+16))/(light.distance*light.distance);light.kind=3;return light;}
+    if(assets.Load(address+56)==1){float3 delta=asfloat(readWords3(assets,address))-point;light.distance=length(delta);if(light.distance<.025){candidate.light=light;return candidate;}
+        light.wi=delta/light.distance;light.pdf=pmf;candidate.record=address;light.kind=3;candidate.light=light;return candidate;}
     float root=sqrt(rng(seed));float2 bary=float2(root*(1-rng(seed)),0);bary.y=root-bary.x;
     float3 a=asfloat(readWords3(assets,address)),b=asfloat(readWords3(assets,address+16)),c=asfloat(readWords3(assets,address+32));
-    float3 target=a*(1-root)+b*bary.x+c*bary.y;uint2 ids=assets.Load2(address+48);if(!visibleTexel(ids.x,bary))return light;
+    float3 target=a*(1-root)+b*bary.x+c*bary.y;candidate.record=address;candidate.bary=bary;
     float3 delta=target-point;light.distance=length(delta);light.wi=safeNormalize(delta);float cosine=abs(dot(safeNormalize(cross(b-a,c-a)),light.wi));
-    if(cosine<=1e-7||light.distance<=.001)return light;
-    light.pdf=pmf/asfloat(assets.Load(address+28))*dot(delta,delta)/cosine;light.radiance=terrainEmission(ids.x,bary);light.kind=4;return light;
+    if(cosine<=1e-7||light.distance<=.001){candidate.light=light;return candidate;}
+    light.pdf=pmf/asfloat(assets.Load(address+28))*dot(delta,delta)/cosine;light.kind=4;candidate.light=light;return candidate;
 }
+LightSample runtimeCandidateEmission(RuntimeCandidate candidate){
+    LightSample light=candidate.light;if(light.pdf<=0)return light;
+    if(light.kind==1)light.radiance=environmentRadiance(light.wi);
+    else if(light.kind==3)light.radiance=asfloat(readWords3(assets,candidate.record+16))/(light.distance*light.distance);
+    else if(light.kind==4){bool visible;light.radiance=terrainLightEmission(assets.Load(candidate.record+48),candidate.bary,visible);if(!visible)return (LightSample)0;}
+    return light;
+}
+// Compatibility caller fetches exact radiance; production RIS first rejects geometry.
+LightSample runtimeCandidate(float3 point,uint cell,inout uint seed,out uint bucket,float familyChoice){return runtimeCandidateEmission(runtimeCandidateGeometry(point,cell,seed,bucket,familyChoice));}
 float runtimeHitPdf(uint triangle,float3 point,float3 target,uint token,uint sourceBounce){
     uint lo=0,hi=runtimeLights();while(lo<hi){uint mid=(lo+hi)/2;if(assets.Load(runtimeRecord(mid)+48)<triangle)lo=mid+1;else hi=mid;}
     if(lo>=runtimeLights())return 0;uint address=runtimeRecord(lo);if(assets.Load(address+48)!=triangle||assets.Load(address+56)!=0)return 0;
@@ -87,23 +102,41 @@ void directVolumeCounter(uint component){
 }
 float3 volumeVisibility(float3 point,LightSample light,MediumStack media){directVolumeCounter(1);return visibility(point,light.wi,media,max(.001,light.distance-.002),light.kind==3);}
 struct DirectReservoir {LightSample light;float3 value;float target,sum;uint bucket;};
-float3 directIntegrand(LightSample light,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,bool volume,float phaseG,float3 incoming,bool terminal=false,bool diffuseCached=false){
+bool directReceiverAccept(PreparedBsdf prepared,float3 geometryNormal,float3 wi){
+    if(!validShadingHemisphere(geometryNormal,prepared.frame.n,prepared.woWorld,wi)||prepared.wo.z<=0)return false;
+    float z=dot(prepared.frame.n,wi);if(abs(z)<1e-7)return false;
+    Material m=prepared.material;if(m.type==THIN_DIELECTRIC)return false;
+    return z>0||dielectric(m)||m.type==DIFFUSE_TRANSMISSION;
+}
+float3 directIntegrand(LightSample light,PreparedBsdf prepared,float3 geometryNormal,uint bounce,bool volume,float phaseG,float3 incoming,bool terminal=false,bool diffuseCached=false){
+    Material m=prepared.material;Frame frame=prepared.frame;float3 wo=prepared.woWorld;
     if(light.pdf<=0)return 0;if(volume)return light.radiance*hg(dot(incoming,light.wi),phaseG);
     if(!validShadingHemisphere(geometryNormal,frame.n,wo,light.wi))return 0;
-    BsdfEval e=evalBsdf(m,frame,wo,light.wi,eta);if(e.pdf<=0)return 0;
+    BsdfEval e=evalBsdf(prepared,light.wi);if(e.pdf<=0)return 0;
     float mis=light.kind==3||bounce>=5||terminal?1:powerHeuristic(directSurvival(bounce)*directBudget(bounce)*light.pdf,e.pdf);
-    return light.radiance*(diffuseCached?cacheDirectBsdf(m,frame,wo,light.wi,directSurvival(bounce)*directBudget(bounce)*light.pdf,light.kind==3||bounce>=5):e.f*mis)*abs(dot(frame.n,light.wi));
+    return light.radiance*(diffuseCached?cacheDirectBsdf(prepared,light.wi,directSurvival(bounce)*directBudget(bounce)*light.pdf,light.kind==3||bounce>=5):e.f*mis)*abs(dot(frame.n,light.wi));
 }
-DirectReservoir selectDirect(float3 point,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,inout uint seed,bool volume=false,float phaseG=0,float3 incoming=float3(0),bool terminal=false,bool diffuseCached=false){
+DirectReservoir selectDirectPrepared(float3 point,PreparedBsdf prepared,float3 geometryNormal,uint bounce,inout uint seed,bool volume=false,float phaseG=0,float3 incoming=float3(0),bool terminal=false,bool diffuseCached=false){
     DirectReservoir selected=(DirectReservoir)0;selected.bucket=0xffffffffu;float survival=directSurvival(bounce);if(rng(seed)>=survival)return selected;
     uint proposals=directBudget(bounce),cell=runtimeCell(point),scramble=directHash(seed);uint baseIndex=camera.frame*max(1u,proposals),reservoirSeed=directHash(seed^0xac564b05u);
     for(uint i=0;i<proposals;i++){
-        directCounter(bounce,2);uint bucket;LightSample light=runtimeCandidate(point,cell,seed,bucket,directSequence(baseIndex+i,scramble));
-        float3 value=directIntegrand(light,m,frame,wo,geometryNormal,eta,bounce,volume,phaseG,incoming,terminal,diffuseCached);float target=luminance(value);float weight=light.pdf>0?target/light.pdf:0;
+        directCounter(bounce,2);uint bucket;RuntimeCandidate candidate=runtimeCandidateGeometry(point,cell,seed,bucket,directSequence(baseIndex+i,scramble));
+        if(candidate.light.pdf<=0)continue;
+        if(!volume&&!directReceiverAccept(prepared,geometryNormal,candidate.light.wi))continue;
+        LightSample light=runtimeCandidateEmission(candidate);
+        float3 value=directIntegrand(light,prepared,geometryNormal,bounce,volume,phaseG,incoming,terminal,diffuseCached);float target=luminance(value);float weight=light.pdf>0?target/light.pdf:0;
         if(!isfinite(weight)||weight<=0)continue;profileWork(6);float next=selected.sum+weight;if(!isfinite(next))continue;selected.sum=next;
         if(rng(reservoirSeed)<weight/selected.sum){selected.light=light;selected.value=value;selected.target=target;selected.bucket=bucket;}
     }
     if(selected.target>0){selected.value*=selected.sum/(float(proposals)*selected.target*survival);directCounter(bounce,3);}return selected;
+}
+float3 directIntegrand(LightSample light,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,bool volume,float phaseG,float3 incoming,bool terminal=false,bool diffuseCached=false){
+    PreparedBsdf prepared=volume?(PreparedBsdf)0:prepareSurfaceBsdf(m,frame,wo,eta);
+    return directIntegrand(light,prepared,geometryNormal,bounce,volume,phaseG,incoming,terminal,diffuseCached);
+}
+DirectReservoir selectDirect(float3 point,Material m,Frame frame,float3 wo,float3 geometryNormal,float eta,uint bounce,inout uint seed,bool volume=false,float phaseG=0,float3 incoming=float3(0),bool terminal=false,bool diffuseCached=false){
+    PreparedBsdf prepared=volume?(PreparedBsdf)0:prepareSurfaceBsdf(m,frame,wo,eta);
+    return selectDirectPrepared(point,prepared,geometryNormal,bounce,seed,volume,phaseG,incoming,terminal,diffuseCached);
 }
 void directAdapt(DirectReservoir sample,float3 transmission){
 #ifndef RT_CPU_FIXTURE

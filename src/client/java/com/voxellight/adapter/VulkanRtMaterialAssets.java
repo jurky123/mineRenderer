@@ -20,7 +20,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
     com.voxellight.rt.vulkan.VulkanRtBuffer buffer(){return buffer;}
     float[] lightingSignature(ShadowRenderer shadows){
         var light=shadows.light();var sun=light.direction();var sky=Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.skyRenderState;
-        var env=com.voxellight.world.LightingEnvironment.polished(light,sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD,sky.sunAngle,sky.rainBrightness);
+        var env=com.voxellight.world.LightingEnvironment.vanillaSky(light,sky.skybox==net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD,sky.skyColor,sky.sunAngle,sky.rainBrightness);
         float[] value=new float[16];value[0]=sun.x;value[1]=sun.y;value[2]=sun.z;
         value[3]=env.directR()*env.directStrength();value[4]=env.directG()*env.directStrength();value[5]=env.directB()*env.directStrength();
         var held=shadows.rtVirtualLight();System.arraycopy(held,0,value,6,8);
@@ -93,7 +93,7 @@ final class VulkanRtMaterialAssets implements AutoCloseable {
             runtimeBytes=runtime.remaining();runtimeLights=runtime.getInt(4);runtimeSections=runtime.getInt(8);encoder.writeToBuffer(buffer.slice(runtimeOffset,runtimeBytes),runtime);
             runtimeGeneration=scene.emitterGeneration();runtimeProposalRevision=scene.proposalRevision();runtimeFrame=frame;runtimeCellX=cx;runtimeCellY=cy;runtimeCellZ=cz;
         }
-        header.putInt(runtimeOffset).putInt(runtimeBytes).putInt(8).putInt(4).putInt(1).putInt((int)runtimeProposalRevision).putInt(com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE);header.putInt(240,kernelOffset);header.putInt(com.voxellight.rt.RtGgxEnergy.HEADER_OFFSET,ggxEnergyOffset);header.position(256);header.flip();
+        header.putInt(runtimeOffset).putInt(runtimeBytes).putInt(8).putInt(4).putInt(1).putInt((int)runtimeProposalRevision).putInt(com.voxellight.rt.RtLightRuntime.ADAPTIVE_SCALE);header.putInt(240,kernelOffset);header.putInt(com.voxellight.rt.RtGgxEnergy.HEADER_OFFSET,ggxEnergyOffset);header.putInt(252,environmentOffset+VulkanRtEnvironmentAssets.BASE_BYTES);header.position(256);header.flip();
         var player=Minecraft.getInstance().player;
         String heldItems=player==null?"none":net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem())+"/"+net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem());
         lightingStatus=", vulkanRtHeldItems="+heldItems+", vulkanRtHeldPosition="+header.getFloat(128)+"/"+header.getFloat(132)+"/"+header.getFloat(136)+", vulkanRtHeldEnabled="+(header.getFloat(140)>0)+", vulkanRtHeldIntensity="+header.getFloat(144)+"/"+header.getFloat(148)+"/"+header.getFloat(152)+", vulkanRtSunDirection="+lighting[0]+"/"+lighting[1]+"/"+lighting[2];

@@ -108,13 +108,16 @@ def launch(suites,cameras):
     args=json.loads((HERE/'base-args.json').read_text())
     args=[f'-javaagent:{HERE}/debug-agent.jar={HERE}',f'-Dvoxellight.debug.suites={suites}',f'-Dvoxellight.debug.cameras={cameras}',f'-Dvoxellight.debug.renderer={renderer}']+args
     counter_bank=False
+    diagnostic_bank=False
     with zipfile.ZipFile(renderer_data["artifact"]) as jar:
         if renderer=="voxellight":
-            counter_bank=json.loads(jar.read("assets/voxellight/rt/vulkan/manifest.json")).get("profileWorkload",False)
+            manifest=json.loads(jar.read("assets/voxellight/rt/vulkan/manifest.json"))
+            counter_bank=manifest.get("profileWorkload",False)
+            diagnostic_bank=manifest.get("diagnosticOnly",False)
         else:counter_bank="caustica/profile-counter-build.txt" in jar.namelist()
     counter_property="-D"+("voxellight" if renderer=="voxellight" else "caustica")+".rt.workProfile=true"
     if counter_bank!=(counter_property in args):raise RuntimeError("Counter bank and workProfile property must match")
-    sampling_mode="capture" if suites=="capture" else "counters" if counter_bank else "timing"
+    sampling_mode="capture" if suites=="capture" else "counters" if counter_bank else "diagnostic" if diagnostic_bank else "timing"
     if '-Dvoxellight.debug.diagnosticMode=nsight' in args:
         if counter_bank or suites=='capture':raise ValueError('Nsight requires a separate counter-free production diagnostic')
         sampling_mode='nsight'

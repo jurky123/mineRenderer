@@ -7,6 +7,7 @@ import java.util.*;
 public final class RtLightRuntime {
     // At most two direct events per path/bounce; 6-bit feedback cannot overflow the 1 GiB path budget.
     public static final int ADAPTIVE_SCALE=63;
+    public static final int MAX_BYTES=2*1024*1024,PMF_INDEX_MAX_BYTES=256*1024;
     public static final int WIDTH=9,HEIGHT=5,DEPTH=9,SLOTS=16,HEADER=64,MAGIC=0x4c525432;
     public record Key(int x,int y,int z){}
     private record Node(Key key,List<Integer> lights,float mass){}
@@ -38,9 +39,15 @@ public final class RtLightRuntime {
         for(int i=0;i<lights.size();i++)groups.computeIfAbsent(owner(lights.get(i)),ignored->new ArrayList<>()).add(i);
         var nodes=new ArrayList<Node>();for(var entry:groups.entrySet()){float mass=0;for(int i:entry.getValue())mass+=Math.max(1e-8f,lights.get(i).mass());nodes.add(new Node(entry.getKey(),entry.getValue(),mass*Math.clamp(adaptive[bucket(entry.getKey())],.25f,1f)));}
         int n=lights.size(),g=nodes.size(),slots=Math.min(SLOTS,g),recordOffset=HEADER,lightAlias=recordOffset+n*64,nodeOffset=lightAlias+n*16,globalAlias=nodeOffset+g*32,gridOffset=globalAlias+g*16;
-        var data=ByteBuffer.allocateDirect(gridOffset+WIDTH*HEIGHT*DEPTH*slots*16).order(ByteOrder.LITTLE_ENDIAN);
+        int aliasBytes=gridOffset+WIDTH*HEIGHT*DEPTH*slots*16;
+        long indexBytes=(long)WIDTH*HEIGHT*DEPTH*g*Float.BYTES;
+        // Index existing float32 local PMFs; retain the original tables and RNG.
+        // Zero offset keeps the original scan for empty or capacity-limited runtimes.
+        int indexOffset=g>0&&indexBytes<=PMF_INDEX_MAX_BYTES&&aliasBytes+indexBytes<=MAX_BYTES?aliasBytes:0;
+        var data=ByteBuffer.allocateDirect(aliasBytes+(indexOffset==0?0:(int)indexBytes)).order(ByteOrder.LITTLE_ENDIAN);
         int ox=(int)Math.floor(x/16)-WIDTH/2,oy=(int)Math.floor(y/16)-HEIGHT/2,oz=(int)Math.floor(z/16)-DEPTH/2;
         data.putInt(0,MAGIC).putInt(4,n).putInt(8,g).putInt(12,WIDTH).putInt(16,ox).putInt(20,oy).putInt(24,oz).putInt(28,HEIGHT).putInt(32,DEPTH).putInt(36,recordOffset).putInt(40,lightAlias).putInt(44,nodeOffset).putInt(48,globalAlias).putInt(52,slots).putInt(56,gridOffset);
+        data.putInt(60,indexOffset);
         int cursor=0;for(int group=0;group<g;group++){var node=nodes.get(group);int offset=nodeOffset+group*32;
             data.putFloat(offset,node.key.x*16+8).putFloat(offset+4,node.key.y*16+8).putFloat(offset+8,node.key.z*16+8).putFloat(offset+12,node.mass).putInt(offset+16,cursor).putInt(offset+20,node.lights.size()).putInt(offset+24,bucket(node.key));
             double[] weights=new double[node.lights.size()];for(int i=0;i<weights.length;i++)weights[i]=Math.max(1e-8f,lights.get(node.lights.get(i)).mass());var table=alias(weights);aliases(data,lightAlias+cursor*16,table,node.lights);
@@ -57,7 +64,10 @@ public final class RtLightRuntime {
                 for(int i=0;i<g;i++){if(nearest.size()<slots)nearest.add(i);else if(distances[i]<distances[nearest.peek()]||distances[i]==distances[nearest.peek()]&&i<nearest.peek()){nearest.remove();nearest.add(i);}}
                 var nearby=new ArrayList<>(nearest);nearby.sort(order);
                 var local=new double[slots];for(int i=0;i<slots;i++)local[i]=nodes.get(nearby.get(i)).mass/(distance(nodes.get(nearby.get(i)).key,px,py,pz)+256);
-                aliases(data,gridOffset+((cy*DEPTH+cz)*WIDTH+cx)*slots*16,alias(local),nearby);
+                int cell=(cy*DEPTH+cz)*WIDTH+cx;
+                var table=alias(local);
+                aliases(data,gridOffset+cell*slots*16,table,nearby);
+                if(indexOffset!=0)for(int i=0;i<slots;i++)data.putFloat(indexOffset+(cell*g+nearby.get(i))*Float.BYTES,table.pmf[i]);
             }
         }return data;
     }

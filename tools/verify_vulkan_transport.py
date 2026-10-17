@@ -129,6 +129,11 @@ void dlss_fixture(uint3 tid:SV_DispatchThreadID){
     executable=output/'visibility_transport'
     subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_visibility_transport.cpp'),'-o',str(executable)],check=True)
     result+=subprocess.check_output([str(executable)],text=True)
+    source=ROOT/'shaders/rt/tests/hit_contributions.slang'
+    subprocess.run([compiler,str(source),'-target','cpp','-entry','hit_contributions','-stage','compute','-o',str(output/'hit_contributions.cpp')],check=True)
+    executable=output/'hit_contributions'
+    subprocess.run([cxx,'-std=c++17','-O2','-I'+str(output),str(ROOT/'tools/native/vulkan_hit_contributions.cpp'),'-o',str(executable)],check=True)
+    result+=subprocess.check_output([str(executable)],text=True)
     source=ROOT/'shaders/rt/tests/path_storage.slang'
     subprocess.run([compiler,str(source),'-target','cpp','-entry','path_storage','-stage','compute','-o',str(output/'path_storage.cpp')],check=True)
     executable=output/'path_storage'

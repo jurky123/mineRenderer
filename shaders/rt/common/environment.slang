@@ -17,12 +17,21 @@ float environmentDensity(float3 direction) {
     float total=environmentPower();if(total<=0)return 1/(4*Pi);
     float4 cell=environmentCellData(environmentCell(direction));return cell.y/(total*cell.w);
 }
+// The guide is produced from this frame's identical CDF and total.
+// rng is a 24-bit fraction: seed >> 24 exactly identifies its 1/256 bin.
+// For nonnegative total, float multiplication is monotone, so upperBound
+// at b/256 and (b+1)/256 brackets upperBound(rng*total), including ties.
+void environmentBracket(uint bucket,float total,uint line,uint count,out uint lo,out uint hi){
+ lo=0;hi=count-1;uint base=assets.Load(252);if(base==0||total<=0)return;
+ uint2 bounds=uint2(asfloat(assets.Load2(base+(line*256u+bucket)*16u)));
+ lo=bounds.x;hi=bounds.y;
+}
 float3 sampleEnvironment(inout uint seed) {
     uint2 size=environmentSize();float total=environmentPower();
     if(total<=0){float y=1-2*rng(seed),phi=2*Pi*rng(seed),r=sqrt(max(0,1-y*y));return float3(r*cos(phi),y,r*sin(phi));}
-    float value=rng(seed)*total;uint lo=0,hi=size.y-1;
+    float value=rng(seed)*total;uint lo,hi;environmentBracket(seed>>24,total,0,size.y,lo,hi);
     while(lo<hi){uint mid=(lo+hi)/2;if(environmentRowData(mid).x<=value)lo=mid+1;else hi=mid;}uint row=lo;
-    value=rng(seed)*environmentRowData(row).y;lo=0;hi=size.x-1;
+    float rowTotal=environmentRowData(row).y;value=rng(seed)*rowTotal;environmentBracket(seed>>24,rowTotal,row+1,size.x,lo,hi);
     while(lo<hi){uint mid=(lo+hi)/2;if(environmentCellData(uint2(mid,row)).x<=value)lo=mid+1;else hi=mid;}uint column=lo;
     float y=lerp(cos(Pi*row/size.y),cos(Pi*(row+1)/size.y),rng(seed));float phi=2*Pi*(column+rng(seed))/size.x,r=sqrt(max(0,1-y*y));return float3(r*cos(phi),y,r*sin(phi));
 }
