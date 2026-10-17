@@ -1,0 +1,18 @@
+{
+  "candidate": "alpha87_proposal_context",
+  "productionAccepted": false,
+  "installed": false,
+  "gameTests": 0,
+  "causticaLaunches": 0,
+  "sourceUnchanged": true,
+  "fullRisSlowerPercent": 2.634593356242809,
+  "stageClockEligible": {
+    "emitter_geometry": false,
+    "complete_candidate": true,
+    "full_ris": true,
+    "complete_candidate_loop": true
+  },
+  "excludedStageReason": "emitter_geometry includes short low-boost windows; no acceptance claim for that stage. The initial all-stage clock assertion failed and was not hidden; full RIS and complete-candidate stages independently meet the clock gate. No repeat required to reject a slower full RIS candidate.",
+  "numerical": "All saved affected-block words and RNG bitwise across A1/B/A2; emission intermediate probes separately bitwise against captured production outputs. Frozen multi_light input coverage only.",
+  "reason": "Complete candidate loop improvement does not survive full BSDF/MIS/reservoir integration. Static metadata load removal is confirmed, but driver register/cache/occupancy causes remain unproven."
+}

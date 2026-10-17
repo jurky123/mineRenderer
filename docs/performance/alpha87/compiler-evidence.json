@@ -1,0 +1,185 @@
+{
+  "A1": {
+    "loopMergeLine": 1695,
+    "continueLabelLine": 5748,
+    "headerLoads": [
+      {
+        "headerOffsetBytes": 16,
+        "line": 1603,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 20,
+        "line": 1607,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 24,
+        "line": 1611,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 12,
+        "line": 1618,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 28,
+        "line": 1622,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 32,
+        "line": 1626,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 4,
+        "line": 1783,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 8,
+        "line": 2161,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 48,
+        "line": 2186,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 60,
+        "line": 2242,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 52,
+        "line": 2250,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 56,
+        "line": 2254,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 56,
+        "line": 2321,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 52,
+        "line": 2327,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 48,
+        "line": 2374,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 44,
+        "line": 2393,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 40,
+        "line": 2400,
+        "insideOuterLoopText": true
+      },
+      {
+        "headerOffsetBytes": 36,
+        "line": 2452,
+        "insideOuterLoopText": true
+      }
+    ],
+    "insideCount": 12,
+    "outsideCount": 6,
+    "spvBytes": 102076
+  },
+  "B": {
+    "loopMergeLine": 1738,
+    "continueLabelLine": 5734,
+    "headerLoads": [
+      {
+        "headerOffsetBytes": 16,
+        "line": 1603,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 20,
+        "line": 1607,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 24,
+        "line": 1611,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 12,
+        "line": 1618,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 28,
+        "line": 1622,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 32,
+        "line": 1626,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 8,
+        "line": 1684,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 36,
+        "line": 1688,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 40,
+        "line": 1693,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 44,
+        "line": 1698,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 48,
+        "line": 1703,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 52,
+        "line": 1708,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 56,
+        "line": 1712,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 60,
+        "line": 1717,
+        "insideOuterLoopText": false
+      },
+      {
+        "headerOffsetBytes": 4,
+        "line": 1721,
+        "insideOuterLoopText": false
+      }
+    ],
+    "insideCount": 0,
+    "outsideCount": 15,
+    "spvBytes": 101796
+  }
+}

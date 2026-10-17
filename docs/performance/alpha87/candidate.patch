@@ -1,0 +1,58 @@
+--- alpha86/light_runtime.slang
++++ candidate/light_runtime.slang
+@@ -42,15 +42,29 @@
+     light.kind=0;light.wi=sampleCone(sun.xyz,sun.w,seed);light.pdf=1/sun.w;light.radiance=directionalIrradiance()/sun.w;light.distance=4096;return light;
+ }
+ struct RuntimeCandidate {LightSample light;uint record;float2 bary;};
+-RuntimeCandidate runtimeCandidateGeometry(float3 point,uint cell,inout uint seed,out uint bucket,float familyChoice){
++// Read-only proposal metadata is invariant for the whole RIS loop.
++struct RuntimeProposalContext {uint base,groups,records,leaves,nodes,global,local,slots,index,cell;float env;};
++RuntimeProposalContext runtimeProposalContext(uint cell){
++ RuntimeProposalContext c;c.base=runtimeBase();c.groups=runtimeLoad(8);
++ c.records=c.base+runtimeLoad(36);c.leaves=c.base+runtimeLoad(40);c.nodes=c.base+runtimeLoad(44);
++ c.global=c.base+runtimeLoad(48);c.slots=runtimeLoad(52);c.local=c.base+runtimeLoad(56);
++ c.index=runtimeLoad(60);c.cell=cell;c.env=runtimeEnvironmentProbability();return c;
++}
++float runtimeSectionPdf(RuntimeProposalContext c,uint section){
++ float global=asfloat(assets.Load(c.global+section*16+12));if(c.cell==0)return global;
++ float local=0;if(c.index!=0)local=asfloat(assets.Load(c.base+c.index+((c.cell-1)*c.groups+section)*4));
++ else for(uint i=0;i<c.slots;i++){uint a=c.local+(c.cell-1)*c.slots*16+i*16;if(assets.Load(a+8)==section){local=asfloat(assets.Load(a+12));break;}}
++ return .2*global+.8*local;
++}
++RuntimeCandidate runtimeCandidateGeometry(RuntimeProposalContext context,float3 point,inout uint seed,out uint bucket,float familyChoice){
+     RuntimeCandidate candidate=(RuntimeCandidate)0;
+-    LightSample light=(LightSample)0;bucket=0xffffffffu;float env=runtimeEnvironmentProbability();
++    LightSample light=(LightSample)0;bucket=0xffffffffu;uint cell=context.cell;float env=context.env;
+     if(familyChoice<env){light.wi=sampleEnvironment(seed);light.pdf=env*environmentDensity(light.wi);light.kind=1;light.distance=4096;candidate.light=light;return candidate;}
+-    uint g=runtimeLoad(8),section;float sectionPdf;
+-    if(cell>0&&rng(seed)<.8){uint base=runtimeBase()+runtimeLoad(56)+(cell-1)*runtimeLoad(52)*16;float local;section=runtimeAliasPmf(base,runtimeLoad(52),rng(seed),local);sectionPdf=.2*asfloat(assets.Load(runtimeBase()+runtimeLoad(48)+section*16+12))+.8*local;}
+-    else {section=runtimeAlias(runtimeBase()+runtimeLoad(48),g,rng(seed));sectionPdf=runtimeSectionPdf(section,cell);}
+-    uint node=runtimeNode(section),index=runtimeAlias(runtimeBase()+runtimeLoad(40)+assets.Load(node+16)*16,assets.Load(node+20),rng(seed));
+-    uint address=runtimeRecord(index);bucket=assets.Load(node+24);float pmf=(1-env)*sectionPdf*asfloat(assets.Load(address+12));
++    uint g=context.groups,section;float sectionPdf;
++    if(cell>0&&rng(seed)<.8){uint base=context.local+(cell-1)*context.slots*16;float local;section=runtimeAliasPmf(base,context.slots,rng(seed),local);sectionPdf=.2*asfloat(assets.Load(context.global+section*16+12))+.8*local;}
++    else {section=runtimeAlias(context.global,g,rng(seed));sectionPdf=runtimeSectionPdf(context,section);}
++    uint node=context.nodes+section*32,index=runtimeAlias(context.leaves+assets.Load(node+16)*16,assets.Load(node+20),rng(seed));
++    uint address=context.records+index*64;bucket=assets.Load(node+24);float pmf=(1-env)*sectionPdf*asfloat(assets.Load(address+12));
+     if(assets.Load(address+56)==1){float3 delta=asfloat(readWords3(assets,address))-point;light.distance=length(delta);if(light.distance<.025){candidate.light=light;return candidate;}
+         light.wi=delta/light.distance;light.pdf=pmf;candidate.record=address;light.kind=3;candidate.light=light;return candidate;}
+     float root=sqrt(rng(seed));float2 bary=float2(root*(1-rng(seed)),0);bary.y=root-bary.x;
+@@ -60,6 +74,7 @@
+     if(cosine<=1e-7||light.distance<=.001){candidate.light=light;return candidate;}
+     light.pdf=pmf/asfloat(assets.Load(address+28))*dot(delta,delta)/cosine;light.kind=4;candidate.light=light;return candidate;
+ }
++RuntimeCandidate runtimeCandidateGeometry(float3 point,uint cell,inout uint seed,out uint bucket,float familyChoice){return runtimeCandidateGeometry(runtimeProposalContext(cell),point,seed,bucket,familyChoice);}
+ LightSample runtimeCandidateEmission(RuntimeCandidate candidate){
+     LightSample light=candidate.light;if(light.pdf<=0)return light;
+     if(light.kind==1)light.radiance=environmentRadiance(light.wi);
+@@ -119,8 +134,9 @@
+ DirectReservoir selectDirectPrepared(float3 point,PreparedBsdf prepared,float3 geometryNormal,uint bounce,inout uint seed,bool volume=false,float phaseG=0,float3 incoming=float3(0),bool terminal=false,bool diffuseCached=false){
+     DirectReservoir selected=(DirectReservoir)0;selected.bucket=0xffffffffu;float survival=directSurvival(bounce);if(rng(seed)>=survival)return selected;
+     uint proposals=directBudget(bounce),cell=runtimeCell(point),scramble=directHash(seed);uint baseIndex=camera.frame*max(1u,proposals),reservoirSeed=directHash(seed^0xac564b05u);
++    RuntimeProposalContext context=runtimeProposalContext(cell);
+     for(uint i=0;i<proposals;i++){
+-        directCounter(bounce,2);uint bucket;RuntimeCandidate candidate=runtimeCandidateGeometry(point,cell,seed,bucket,directSequence(baseIndex+i,scramble));
++        directCounter(bounce,2);uint bucket;RuntimeCandidate candidate=runtimeCandidateGeometry(context,point,seed,bucket,directSequence(baseIndex+i,scramble));
+         if(candidate.light.pdf<=0)continue;
+         if(!volume&&!directReceiverAccept(prepared,geometryNormal,candidate.light.wi))continue;
+         LightSample light=runtimeCandidateEmission(candidate);

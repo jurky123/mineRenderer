@@ -1,0 +1,42 @@
+{
+  "stages": {
+    "original": {
+      "p50_ms": 0.069728,
+      "p95_ms": 0.072704,
+      "clockMedian": 2535.0,
+      "clockSamples": 5,
+      "bitwise": true
+    },
+    "cached_tint_linear_rgb": {
+      "p50_ms": 0.070656,
+      "p95_ms": 0.073728,
+      "clockMedian": 2535.0,
+      "clockSamples": 5,
+      "bitwise": true
+    },
+    "cached_color_linear_rgb": {
+      "p50_ms": 0.070656,
+      "p95_ms": 0.073728,
+      "clockMedian": 2535.0,
+      "clockSamples": 5,
+      "bitwise": true
+    },
+    "cached_uv_and_atlas_texels": {
+      "p50_ms": 0.069824,
+      "p95_ms": 0.072704,
+      "clockMedian": 2535.0,
+      "clockSamples": 4,
+      "bitwise": true
+    },
+    "original_repeat": {
+      "p50_ms": 0.06980800000000001,
+      "p95_ms": 0.072704,
+      "clockMedian": 2535.0,
+      "clockSamples": 5,
+      "bitwise": true
+    }
+  },
+  "productionEmissionCaptureBitwise": true,
+  "areaInputs": 1577,
+  "note": "Diagnostic substitutions; differences are not additive or strict frame-cost upper bounds."
+}
